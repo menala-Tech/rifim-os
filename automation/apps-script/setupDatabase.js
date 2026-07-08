@@ -15,7 +15,7 @@
 // ─────────────────────────────────────────────
 
 function setupRIFIMDatabase() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = _getDB();
   ss.setName('RIFIM OS — Smart Office Database');
 
   Logger.log('=== RIFIM OS Database Setup Dimulai ===');
@@ -33,15 +33,8 @@ function setupRIFIMDatabase() {
   ss.setActiveSheet(ss.getSheetByName('documents'));
 
   Logger.log('=== Setup Selesai! ===');
-  SpreadsheetApp.getUi().alert(
-    '✅ RIFIM OS Database berhasil dibuat!\n\n' +
-    'Sheet yang tersedia:\n' +
-    '• documents — Arsip semua dokumen\n' +
-    '• numbering_sequences — Penomoran otomatis\n' +
-    '• company_config — Konfigurasi perusahaan\n' +
-    '• doc_types — 20 jenis dokumen\n\n' +
-    'Salin Spreadsheet ID dari URL dan simpan di configLoader.js'
-  );
+  Logger.log('✅ RIFIM OS Database berhasil dibuat!');
+  Logger.log('Sheet: documents, numbering_sequences, company_config, doc_types');
 }
 
 

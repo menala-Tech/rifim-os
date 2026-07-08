@@ -74,11 +74,9 @@ function generateDocument(input) {
  * @private
  */
 function _validateInput(input) {
-  if (!input)                 throw new Error('Input tidak boleh kosong.');
-  if (!input.documentType)    throw new Error('documentType diperlukan.');
-  if (!input.recipientName)   throw new Error('recipientName diperlukan.');
-  if (!input.subject)         throw new Error('subject (perihal) diperlukan.');
-  if (!input.body)            throw new Error('body (isi dokumen) diperlukan.');
+  if (!input)              throw new Error('Input tidak boleh kosong.');
+  if (!input.documentType) throw new Error('documentType diperlukan.');
+  if (!input.subject)      throw new Error('subject (perihal) diperlukan.');
 }
 
 /**
@@ -93,12 +91,14 @@ function _getTemplateId(docType, config) {
     ST:    'gdoc_template_surat',
     SIZ:   'gdoc_template_surat',
     SKT:   'gdoc_template_surat',
-    INV:   'gdoc_template_inv',
-    KWT:   'gdoc_template_inv',
-    MOU:   'gdoc_template_mou',
-    PKS:   'gdoc_template_mou',
+    BA:    'gdoc_template_surat',
+    FCO:   'gdoc_template_surat',
     PROP:  'gdoc_template_surat',
     CP:    'gdoc_template_surat',
+    INV:   'gdoc_template_inv',
+    KWT:   'gdoc_template_kwt',
+    MOU:   'gdoc_template_mou',
+    PKS:   'gdoc_template_mou',
     SP1:   'gdoc_template_sp',
     SP2:   'gdoc_template_sp',
     SP3:   'gdoc_template_sp',
@@ -107,8 +107,6 @@ function _getTemplateId(docType, config) {
     SPG:   'gdoc_template_pkwt',
     SMT:   'gdoc_template_pkwt',
     PI:    'gdoc_template_pkwt',
-    BA:    'gdoc_template_surat',
-    FCO:   'gdoc_template_surat',
   };
   const key = KEY_MAP[docType];
   if (!key) throw new Error('Tidak ada mapping template untuk: ' + docType);

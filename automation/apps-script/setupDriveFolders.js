@@ -84,15 +84,13 @@ function setupDriveFolders() {
   // Simpan semua folder ID ke company_config
   _saveFolderIdsToConfig(folderIds);
 
-  // Tampilkan ringkasan
-  SpreadsheetApp.getUi().alert(
-    '✅ Folder Drive berhasil dibuat!\n\n' +
-    '📁 Root        : ' + root.getName() + '\n' +
-    '📁 Dokumen     : ' + dokumen.getId() + '\n\n' +
-    'Semua subfolder (' + DOC_TYPE_FOLDERS.length + ' folder) sudah dibuat.\n' +
-    'Folder ID tersimpan di sheet company_config.\n\n' +
-    'Subfolder bulan akan dibuat OTOMATIS saat dokumen digenerate.'
-  );
+  Logger.log('=================================================');
+  Logger.log('✅ Folder Drive berhasil dibuat!');
+  Logger.log('📁 Root    : ' + root.getName() + ' (' + root.getId() + ')');
+  Logger.log('📁 Dokumen : ' + dokumen.getId());
+  Logger.log('Total subfolder: ' + DOC_TYPE_FOLDERS.length);
+  Logger.log('Subfolder bulan dibuat OTOMATIS saat dokumen digenerate.');
+  Logger.log('=================================================');
 }
 
 
@@ -101,8 +99,19 @@ function setupDriveFolders() {
  * @private
  */
 function _saveFolderIdsToConfig(folderIds) {
-  var sheet = _getDB().getSheetByName('company_config');
-  var data  = sheet.getDataRange().getValues();
+  var ss    = _getDB();
+  var sheet = ss.getSheetByName('company_config');
+
+  // Jika sheet belum ada (setupRIFIMDatabase() belum dijalankan), buat dulu
+  if (!sheet) {
+    Logger.log('⚠️ Sheet company_config tidak ditemukan — membuat sheet baru...');
+    sheet = ss.insertSheet('company_config');
+    sheet.appendRow(['key', 'value', 'description']);
+    sheet.getRange(1, 1, 1, 3).setBackground('#C40000').setFontColor('#FFFFFF').setFontWeight('bold');
+    Logger.log('✅ Sheet company_config berhasil dibuat');
+  }
+
+  var data = sheet.getDataRange().getValues();
 
   var updates = {
     'drive_root_folder_id':    folderIds['root'],
