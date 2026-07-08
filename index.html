@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RIFIM OS</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #F5F5F7;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 48px 56px;
+      text-align: center;
+      box-shadow: 0 4px 32px rgba(0,0,0,.1);
+      max-width: 480px;
+      width: 90%;
+    }
+    .logo {
+      width: 64px; height: 64px;
+      background: #C40000;
+      border-radius: 14px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 20px; color: white;
+      margin-bottom: 20px;
+    }
+    h1 { font-size: 28px; font-weight: 900; color: #1A1A1A; margin-bottom: 6px; }
+    p  { font-size: 13px; color: #777; margin-bottom: 32px; }
+    .modules { display: flex; flex-direction: column; gap: 10px; }
+    a.mod {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 18px; border-radius: 10px;
+      border: 1.5px solid #E0E0E0;
+      text-decoration: none; color: #1A1A1A;
+      font-weight: 700; font-size: 13px;
+      transition: border-color .12s, background .12s;
+    }
+    a.mod:hover { border-color: #C40000; background: #FFF8F8; }
+    a.mod.primary { background: #C40000; color: white; border-color: #C40000; }
+    a.mod.primary:hover { background: #A00000; }
+    .icon { font-size: 20px; width: 24px; text-align: center; }
+    .badge {
+      margin-left: auto; font-size: 9px; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase;
+      padding: 2px 8px; border-radius: 20px;
+      background: rgba(255,255,255,.25); color: inherit;
+      border: 1px solid rgba(255,255,255,.35);
+    }
+    .badge-dark { background: #E8F0FF; color: #2255CC; border-color: #C0D0FF; }
+    .ver { margin-top: 28px; font-size: 10px; color: #bbb; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">RI<span style="opacity:.7">F</span></div>
+    <h1>RIFIM OS</h1>
+    <p>Enterprise Operating System — PT. RIFIM Internasional Gemilang</p>
+    <div class="modules">
+      <a class="mod primary" href="/modules/smart-office/index.html">
+        <span class="icon">⚡</span>
+        Smart Office
+        <span class="badge">LIVE</span>
+      </a>
+      <a class="mod" href="#" style="opacity:.45;cursor:not-allowed">
+        <span class="icon">👥</span>
+        HRIS
+        <span class="badge badge-dark">Segera</span>
+      </a>
+      <a class="mod" href="#" style="opacity:.45;cursor:not-allowed">
+        <span class="icon">💰</span>
+        Finance
+        <span class="badge badge-dark">Segera</span>
+      </a>
+      <a class="mod" href="#" style="opacity:.45;cursor:not-allowed">
+        <span class="icon">🤝</span>
+        CRM
+        <span class="badge badge-dark">Segera</span>
+      </a>
+    </div>
+    <div class="ver">v1.0.0 — Sprint 0 · Juli 2026</div>
+  </div>
+</body>
+</html>
