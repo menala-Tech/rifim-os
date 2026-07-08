@@ -503,70 +503,121 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- ── Result Modal ───────────────────────────────────────── -->
+<div id="resultOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:36px 40px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3);position:relative">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:48px;margin-bottom:12px">✅</div>
+      <div style="font-size:20px;font-weight:900;color:#1A1A1A;margin-bottom:6px">Dokumen Berhasil Dibuat!</div>
+      <div style="font-size:12px;color:#888">Tersimpan otomatis ke Google Drive &amp; Database</div>
+    </div>
+    <div style="background:#FFF8F8;border:1.5px solid #E0C0C0;border-radius:10px;padding:16px 20px;margin-bottom:20px;text-align:center">
+      <div style="font-size:10px;color:#C40000;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">Nomor Dokumen</div>
+      <div id="resultDocNum" style="font-size:18px;font-weight:900;color:#1A1A1A;font-family:'Courier New',monospace"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+      <a id="resultGdocBtn" href="#" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#C40000;color:#fff;text-decoration:none;padding:12px;border-radius:8px;font-weight:700;font-size:13px">
+        📄 Buka Google Doc
+      </a>
+      <a id="resultPdfBtn" href="#" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#1A1A1A;color:#fff;text-decoration:none;padding:12px;border-radius:8px;font-weight:700;font-size:13px">
+        📥 Download PDF
+      </a>
+    </div>
+    <button onclick="closeResult()" style="width:100%;padding:10px;border:1.5px solid #DDD;border-radius:8px;background:#fff;color:#888;font-size:13px;cursor:pointer">Tutup</button>
+  </div>
+</div>
+
+<!-- ── Loading Overlay ────────────────────────────────────── -->
+<div id="loadingOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:998;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:40px 48px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="font-size:40px;margin-bottom:14px;animation:spin 1s linear infinite;display:inline-block">⚙️</div>
+    <div style="font-size:16px;font-weight:700;color:#1A1A1A;margin-bottom:6px">Memproses Dokumen...</div>
+    <div id="loadingStatus" style="font-size:12px;color:#888">Menghubungi engine...</div>
+  </div>
+</div>
+
+<style>
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+</style>
+
 <script>
-  // Document type dynamic fields definition
+  // ── CONFIG ───────────────────────────────────────────────────
+  // Isi setelah deploy GAS sebagai Web App:
+  // Apps Script → Deploy → Manage Deployments → copy Web App URL
+  const GAS_WEB_APP_URL = '';
+
+  // ── Document type dynamic fields ─────────────────────────────
+  // id harus cocok dengan nama placeholder di template (lowercase version)
   const DOC_FIELDS = {
-    SURAT:  [{id:'recipient',label:'Penerima',ph:'PT. Nama Perusahaan'},{id:'address',label:'Alamat Penerima',ph:'Di Tempat / Kota Batam'},{id:'body',label:'Isi Surat',type:'textarea',ph:'Tuliskan isi surat...',full:true}],
-    ST:     [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'task',label:'Uraian Tugas',ph:'Melakukan survei lapangan...',type:'textarea',full:true},{id:'location',label:'Lokasi Tugas',ph:'Kota Batam'},{id:'start',label:'Tanggal Mulai',type:'date'},{id:'end',label:'Tanggal Selesai',type:'date'}],
-    SIZ:    [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'leave_type',label:'Jenis Izin',type:'select',opts:['Sakit','Cuti Tahunan','Keperluan Keluarga','Lainnya']},{id:'start',label:'Tanggal Mulai',type:'date'},{id:'end',label:'Tanggal Selesai',type:'date'},{id:'reason',label:'Alasan',type:'textarea',full:true,ph:'Keterangan...'}],
-    SKT:    [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'position',label:'Jabatan',ph:'Staff Operasional'},{id:'purpose',label:'Keperluan',ph:'Pengajuan KPR / Visa...'}],
-    BA:     [{id:'event',label:'Nama Kegiatan',ph:'Rapat Evaluasi Bulanan'},{id:'date',label:'Tanggal Kegiatan',type:'date'},{id:'location',label:'Tempat',ph:'Kantor RIFIM, Batam'},{id:'attendees',label:'Peserta',type:'textarea',ph:'1. Nama Jabatan\n2. Nama Jabatan'},{id:'result',label:'Hasil / Keputusan',type:'textarea',full:true,ph:'Keputusan yang diambil...'}],
-    INV:    [{id:'client',label:'Nama Klien',ph:'PT. Maxim Technology'},{id:'client_addr',label:'Alamat Klien',ph:'Jakarta'},{id:'items',label:'Rincian Layanan',type:'textarea',ph:'1. Jasa Promosi — Rp5.000.000\n2. Aktivasi OOH — Rp2.000.000',full:true},{id:'due',label:'Jatuh Tempo',type:'date'}],
-    KWT:    [{id:'payer',label:'Nama Pembayar',ph:'PT. Maxim Technology'},{id:'amount',label:'Jumlah',ph:'Rp 7.000.000'},{id:'purpose',label:'Keterangan Pembayaran',ph:'Jasa Promosi Bulan Juni 2026'}],
-    PROP:   [{id:'recipient',label:'Ditujukan Kepada',ph:'PT. Nama Perusahaan'},{id:'project',label:'Nama Proyek / Program',ph:'Kampanye Digital Maxim Q3 2026'},{id:'scope',label:'Lingkup Pekerjaan',type:'textarea',ph:'Uraikan lingkup...',full:true},{id:'budget',label:'Estimasi Anggaran',ph:'Rp 25.000.000'}],
-    CP:     [{id:'recipient',label:'Ditujukan Kepada',ph:'PT. Nama Perusahaan'},{id:'purpose',label:'Tujuan Pengiriman',ph:'Pendaftaran Vendor / Tender...'}],
-    MOU:    [{id:'party_b',label:'Pihak Kedua',ph:'PT. Nama Mitra'},{id:'scope',label:'Lingkup Kerjasama',type:'textarea',ph:'Uraikan bidang kerjasama...',full:true},{id:'duration',label:'Jangka Waktu',ph:'12 Bulan'},{id:'signing',label:'Tanggal Penandatanganan',type:'date'}],
-    PKS:    [{id:'party_b',label:'Pihak Kedua',ph:'PT. Nama Mitra'},{id:'scope',label:'Lingkup Pekerjaan',type:'textarea',ph:'...',full:true},{id:'value',label:'Nilai Kerjasama',ph:'Rp 50.000.000'},{id:'duration',label:'Durasi',ph:'6 Bulan'},{id:'signing',label:'Tanggal TTD',type:'date'}],
-    SP1:    [{id:'emp_name',label:'Nama Karyawan',ph:'Budi Santoso'},{id:'emp_id',label:'ID Karyawan',ph:'RIG-2024-001'},{id:'position',label:'Jabatan',ph:'Staff Lapangan'},{id:'violation',label:'Pelanggaran',type:'textarea',ph:'Uraikan pelanggaran...',full:true},{id:'incident',label:'Tanggal Kejadian',type:'date'}],
-    SP2:    [{id:'emp_name',label:'Nama Karyawan',ph:'Budi Santoso'},{id:'emp_id',label:'ID Karyawan',ph:'RIG-2024-001'},{id:'violation',label:'Pelanggaran',type:'textarea',ph:'...',full:true},{id:'prev_sp',label:'Nomor SP 1 Sebelumnya',ph:'001/RIFIM/SP1/IV/2026'}],
-    SP3:    [{id:'emp_name',label:'Nama Karyawan',ph:'Budi Santoso'},{id:'emp_id',label:'ID Karyawan',ph:'RIG-2024-001'},{id:'violation',label:'Pelanggaran',type:'textarea',ph:'...',full:true},{id:'prev_sp',label:'Nomor SP 1 & 2',ph:'001/.../SP1/... dan 001/.../SP2/...'}],
-    PKWT:   [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'emp_id',label:'ID Karyawan',ph:'RIG-2026-020'},{id:'position',label:'Jabatan',ph:'Staff Operasional'},{id:'salary',label:'Gaji Pokok',ph:'Rp 3.500.000'},{id:'start',label:'Mulai Kontrak',type:'date'},{id:'end',label:'Akhir Kontrak',type:'date'}],
-    SPG:    [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'old_pos',label:'Jabatan Lama',ph:'Staff Operasional'},{id:'new_pos',label:'Jabatan Baru',ph:'Supervisor Operasional'},{id:'effective',label:'Berlaku Mulai',type:'date'}],
-    SMT:    [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'from',label:'Dari Departemen',ph:'Operasional Batam'},{id:'to',label:'Ke Departemen',ph:'Operasional Balikpapan'},{id:'effective',label:'Berlaku Mulai',type:'date'}],
-    PHK:    [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'position',label:'Jabatan',ph:'Staff Lapangan'},{id:'last_day',label:'Hari Kerja Terakhir',type:'date'},{id:'reason',label:'Alasan PHK',type:'select',opts:['Habis Kontrak','Resign','Pelanggaran Berat','Efisiensi Perusahaan']}],
-    PI:     [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'position',label:'Jabatan',ph:'Supervisor'},{id:'dept',label:'Departemen',ph:'Operasional'}],
-    FCO:    [{id:'type',label:'Jenis Checklist',type:'select',opts:['Operasional Harian','Checklist Kendaraan','Checklist Kantor','Checklist Event']},{id:'officer',label:'Nama Petugas',ph:'Ahmad Fauzi'},{id:'items',label:'Item Checklist',type:'textarea',ph:'1. Item\n2. Item\n3. Item',full:true}],
+    SURAT:  [{id:'recipient_name',label:'Penerima',ph:'PT. Nama Perusahaan'},{id:'recipient_address',label:'Alamat Penerima',ph:'Di Tempat / Kota Batam'},{id:'body',label:'Isi Surat',type:'textarea',ph:'Tuliskan isi surat...',full:true}],
+    ST:     [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Operasional'},{id:'employee_dept',label:'Departemen',ph:'Operasional'},{id:'task_desc',label:'Uraian Tugas',type:'textarea',ph:'Melakukan survei lapangan...',full:true},{id:'task_location',label:'Lokasi Tugas',ph:'Kota Batam'},{id:'start_date',label:'Tanggal Mulai',type:'date'},{id:'end_date',label:'Tanggal Selesai',type:'date'}],
+    SIZ:    [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Operasional'},{id:'leave_type',label:'Jenis Izin',type:'select',opts:['Sakit','Cuti Tahunan','Keperluan Keluarga','Lainnya']},{id:'start_date',label:'Tanggal Mulai',type:'date'},{id:'end_date',label:'Tanggal Selesai',type:'date'},{id:'leave_days',label:'Jumlah Hari',ph:'3'},{id:'reason',label:'Alasan',type:'textarea',full:true,ph:'Keterangan alasan...'}],
+    SKT:    [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Operasional'},{id:'employee_dept',label:'Departemen',ph:'Operasional'},{id:'statement_purpose',label:'Keperluan / Pernyataan',type:'textarea',full:true,ph:'Bahwa yang bersangkutan benar-benar karyawan aktif...'}],
+    BA:     [{id:'event_name',label:'Nama Kegiatan',ph:'Rapat Evaluasi Bulanan'},{id:'event_date',label:'Tanggal Kegiatan',type:'date'},{id:'event_time',label:'Waktu',ph:'09.00 — 12.00 WIB'},{id:'location',label:'Tempat',ph:'Kantor RIFIM, Batam'},{id:'attendees',label:'Peserta',type:'textarea',ph:'1. Nama — Jabatan\n2. Nama — Jabatan'},{id:'description',label:'Uraian Kegiatan',type:'textarea',ph:'Uraian kegiatan...'},{id:'result',label:'Hasil / Keputusan',type:'textarea',full:true,ph:'Keputusan yang diambil...'}],
+    INV:    [{id:'client_name',label:'Nama Klien',ph:'PT. Maxim Technology'},{id:'client_address',label:'Alamat Klien',ph:'Jakarta Selatan'},{id:'client_phone',label:'Telepon Klien',ph:'+62 21 ...'},{id:'due_date',label:'Jatuh Tempo',type:'date'},{id:'tax_percent',label:'PPN (%)',ph:'11'},{id:'items',label:'Rincian Layanan (HTML rows)',type:'textarea',ph:'<tr><td class="c">1</td><td>Jasa Promosi</td><td class="c">1</td><td class="r">Rp5.000.000</td><td class="r">Rp5.000.000</td></tr>',full:true},{id:'subtotal',label:'Subtotal',ph:'Rp 5.000.000'},{id:'tax_amount',label:'Jumlah PPN',ph:'Rp 550.000'},{id:'grand_total',label:'Grand Total',ph:'Rp 5.550.000'},{id:'bank_name',label:'Nama Bank',ph:'Bank BCA'},{id:'bank_account',label:'No. Rekening',ph:'1234 5678 90'},{id:'bank_holder',label:'Atas Nama',ph:'PT. Rifim Internasional Gemilang'},{id:'payment_terms',label:'Syarat Pembayaran',ph:'Maks. 14 hari'},{id:'notes',label:'Catatan',ph:'Mohon cantumkan nomor invoice pada bukti transfer'}],
+    KWT:    [{id:'payer_name',label:'Nama Pembayar',ph:'PT. Maxim Technology'},{id:'amount',label:'Jumlah',ph:'Rp 7.000.000'},{id:'amount_text',label:'Terbilang',ph:'Tujuh Juta Rupiah'},{id:'payment_purpose',label:'Keterangan Pembayaran',ph:'Jasa Promosi Bulan Juni 2026'},{id:'payment_detail',label:'Rincian',type:'textarea',ph:'- Item 1: Rp X\n- Item 2: Rp Y'},{id:'payment_date',label:'Tanggal Bayar',type:'date'}],
+    PROP:   [{id:'recipient_name',label:'Ditujukan Kepada',ph:'Bpk/Ibu Manager'},{id:'recipient_title',label:'Jabatan Penerima',ph:'General Manager'},{id:'recipient_company',label:'Perusahaan Penerima',ph:'PT. Nama Perusahaan'},{id:'recipient_address',label:'Alamat',ph:'Kota'},{id:'project_name',label:'Nama Proyek / Program',ph:'Kampanye Digital Maxim Q3 2026'},{id:'background',label:'Latar Belakang',type:'textarea',ph:'Uraikan latar belakang...'},{id:'objectives',label:'Tujuan Kerjasama',type:'textarea',ph:'...'},{id:'scope_items',label:'Lingkup / Penawaran',type:'textarea',ph:'<div class="offer-item">1. Jasa ...</div>',full:true},{id:'timeline',label:'Timeline',ph:'3 Bulan (Agustus — Oktober 2026)'},{id:'budget',label:'Estimasi Anggaran',ph:'Rp 25.000.000'}],
+    CP:     [{id:'recipient_name',label:'Ditujukan Kepada',ph:'PT. Nama Perusahaan'},{id:'services',label:'Layanan Utama',type:'textarea',ph:'✔ Promosi Digital\n✔ Aktivasi Lapangan'},{id:'vision',label:'Visi',ph:'Menjadi mitra bisnis terpercaya...'},{id:'mission',label:'Misi',type:'textarea',ph:'1. ...\n2. ...'},{id:'strengths',label:'Keunggulan',type:'textarea',full:true,ph:'Kami memiliki...'}],
+    MOU:    [{id:'party_b_name',label:'Nama Pihak Kedua',ph:'PT. Nama Mitra'},{id:'party_b_pic',label:'Diwakili oleh',ph:'Nama Direktur'},{id:'party_b_title',label:'Jabatan',ph:'Direktur Utama'},{id:'party_b_address',label:'Alamat Pihak Kedua',ph:'Kota'},{id:'scope',label:'Lingkup Kerjasama',type:'textarea',ph:'Para pihak sepakat...',full:true},{id:'duration',label:'Jangka Waktu',ph:'12 Bulan'},{id:'end_date',label:'Tanggal Berakhir',type:'date'},{id:'rights_obligations',label:'Hak & Kewajiban',type:'textarea',ph:'...'},{id:'signing_day',label:'Hari Penandatanganan',ph:'Rabu'},{id:'signing_date',label:'Tanggal TTD',type:'date'}],
+    PKS:    [{id:'party_b_name',label:'Nama Pihak Kedua',ph:'PT. Nama Mitra'},{id:'party_b_pic',label:'Diwakili oleh',ph:'Nama Direktur'},{id:'party_b_title',label:'Jabatan',ph:'Direktur Utama'},{id:'scope',label:'Lingkup Pekerjaan',type:'textarea',ph:'...',full:true},{id:'value',label:'Nilai Kerjasama',ph:'Rp 50.000.000'},{id:'payment_terms',label:'Mekanisme Pembayaran',ph:'30 hari setelah invoice'},{id:'duration',label:'Durasi',ph:'6 Bulan'},{id:'end_date',label:'Tanggal Berakhir',type:'date'},{id:'rights_obligations',label:'Hak & Kewajiban',type:'textarea',ph:'...'},{id:'signing_day',label:'Hari Penandatanganan',ph:'Rabu'},{id:'signing_date',label:'Tanggal TTD',type:'date'}],
+    SP1:    [{id:'employee_name',label:'Nama Karyawan',ph:'Budi Santoso'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2024-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Lapangan'},{id:'employee_dept',label:'Departemen',ph:'Operasional'},{id:'incident_date',label:'Tanggal Kejadian',type:'date'},{id:'violation',label:'Uraian Pelanggaran',type:'textarea',ph:'Karyawan yang bersangkutan terbukti...',full:true}],
+    SP2:    [{id:'employee_name',label:'Nama Karyawan',ph:'Budi Santoso'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2024-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Lapangan'},{id:'previous_sp_number',label:'Nomor SP-1 Sebelumnya',ph:'001/RIFIM/SP1/IV/2026'},{id:'incident_date',label:'Tanggal Kejadian',type:'date'},{id:'violation',label:'Uraian Pelanggaran',type:'textarea',ph:'...',full:true}],
+    SP3:    [{id:'employee_name',label:'Nama Karyawan',ph:'Budi Santoso'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2024-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Lapangan'},{id:'sp1_number',label:'Nomor SP-1',ph:'001/RIFIM/SP1/IV/2026'},{id:'sp2_number',label:'Nomor SP-2',ph:'001/RIFIM/SP2/V/2026'},{id:'incident_date',label:'Tanggal Kejadian',type:'date'},{id:'violation',label:'Uraian Pelanggaran',type:'textarea',ph:'...',full:true}],
+    PKWT:   [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id_card',label:'NIK / KTP',ph:'3172...'},{id:'employee_position',label:'Jabatan',ph:'Staff Operasional'},{id:'employee_dept',label:'Departemen',ph:'Operasional'},{id:'salary',label:'Gaji Pokok',ph:'Rp 3.500.000'},{id:'payday',label:'Tanggal Gajian',ph:'25'},{id:'work_hours',label:'Jam Kerja',ph:'8 jam'},{id:'work_days',label:'Hari Kerja',ph:'5'},{id:'contract_start',label:'Mulai Kontrak',type:'date'},{id:'contract_end',label:'Akhir Kontrak',type:'date'}],
+    SPG:    [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'old_position',label:'Jabatan Lama',ph:'Staff Operasional'},{id:'new_position',label:'Jabatan Baru',ph:'Supervisor Operasional'},{id:'employee_dept',label:'Departemen',ph:'Operasional'},{id:'effective_date',label:'Berlaku Mulai',type:'date'}],
+    SMT:    [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Operasional'},{id:'from_dept',label:'Dari Departemen',ph:'Operasional Batam'},{id:'to_dept',label:'Ke Departemen',ph:'Operasional Balikpapan'},{id:'new_location',label:'Lokasi Baru',ph:'Balikpapan'},{id:'effective_date',label:'Berlaku Mulai',type:'date'}],
+    PHK:    [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Lapangan'},{id:'employee_dept',label:'Departemen',ph:'Operasional'},{id:'join_date',label:'Tanggal Bergabung',type:'date'},{id:'last_working_day',label:'Hari Kerja Terakhir',type:'date'},{id:'phk_reason',label:'Alasan PHK',type:'textarea',full:true,ph:'Uraikan alasan PHK...'}],
+    PI:     [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'employee_position',label:'Jabatan',ph:'Supervisor'},{id:'employee_dept',label:'Departemen',ph:'Operasional'}],
+    FCO:    [{id:'checklist_type',label:'Jenis Checklist',type:'select',opts:['Operasional Harian','Checklist Kendaraan','Checklist Kantor','Checklist Event']},{id:'officer_name',label:'Nama Petugas',ph:'Ahmad Fauzi'},{id:'officer_title',label:'Jabatan Petugas',ph:'Supervisor'},{id:'check_date',label:'Tanggal',type:'date'},{id:'period',label:'Periode',ph:'Juli 2026'},{id:'location',label:'Lokasi',ph:'Kantor RIFIM Batam'},{id:'checklist_items',label:'Item Checklist (HTML rows)',type:'textarea',ph:'<tr><td>1</td><td>Item pemeriksaan</td><td style="text-align:center">✅</td><td>Normal</td></tr>',full:true},{id:'notes',label:'Catatan & Temuan',type:'textarea',ph:'Tidak ada temuan berarti...'}],
   };
 
-  const MONTHS = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
-  let currentCode = 'SURAT';
+  const MONTHS     = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+  let   currentCode = 'SURAT';
+  let   lastResult  = null;
 
+  // ── Pilih jenis dokumen ──────────────────────────────────────
   function selectDoc(el, code, label, icon) {
     document.querySelectorAll('.doc-card').forEach(c => c.classList.remove('selected'));
     el.classList.add('selected');
     currentCode = code;
-    document.getElementById('fIcon').textContent = icon;
-    document.getElementById('fTitle').textContent = label;
-    document.getElementById('fSub').textContent = `Isi formulir di bawah untuk membuat ${label}`;
+    document.getElementById('fIcon').textContent   = icon;
+    document.getElementById('fTitle').textContent  = label;
+    document.getElementById('fSub').textContent    = `Isi formulir di bawah untuk membuat ${label}`;
     updateDocNum();
     renderDynFields(code);
     document.getElementById('formPanel').classList.add('show');
     document.getElementById('formPanel').scrollIntoView({behavior:'smooth', block:'nearest'});
   }
 
-  function updateDocNum() {
+  // ── Preview nomor (dari GAS peek atau estimasi lokal) ────────
+  async function updateDocNum() {
+    const el  = document.getElementById('docNum');
     const now = new Date();
-    const seq = String(Math.floor(Math.random()*50)+1).padStart(3,'0');
-    document.getElementById('docNum').textContent =
-      `${seq}/RIFIM/${currentCode}/${MONTHS[now.getMonth()]}/${now.getFullYear()}`;
+    el.textContent = `—/RIFIM/${currentCode}/${MONTHS[now.getMonth()]}/${now.getFullYear()}`;
+
+    if (!GAS_WEB_APP_URL) return;
+    try {
+      const res  = await fetch(`${GAS_WEB_APP_URL}?action=peek&code=${currentCode}`);
+      const data = await res.json();
+      if (data.success) el.textContent = data.nextNumber;
+    } catch(_) { /* biarkan estimasi lokal */ }
   }
 
+  // ── Render form dinamis ──────────────────────────────────────
   function renderDynFields(code) {
-    const fields = DOC_FIELDS[code] || [];
+    const fields    = DOC_FIELDS[code] || [];
     const container = document.getElementById('dynFields');
-    let html = '<div class="fsec">Detail Dokumen</div>';
-    const normals = fields.filter(f => !f.full);
-    const fulls   = fields.filter(f => f.full);
+    let html        = '<div class="fsec">Detail Dokumen</div>';
+    const normals   = fields.filter(f => !f.full);
+    const fulls     = fields.filter(f => f.full);
     if (normals.length) {
       html += '<div class="fgrid">';
       normals.forEach(f => { html += buildField(f); });
       html += '</div>';
     }
-    if (fulls.length) {
-      html += '<div class="fgrid full">';
-      fulls.forEach(f => { html += buildField(f); });
-      html += '</div>';
-    }
+    fulls.forEach(f => {
+      html += `<div class="fgrid full">${buildField(f)}</div>`;
+    });
     container.innerHTML = html;
   }
 
@@ -584,36 +635,119 @@
     return `<div class="field"><label>${f.label}</label><input type="text" id="${f.id}" placeholder="${f.ph||''}"></div>`;
   }
 
+  // ── GENERATE DOKUMEN ─────────────────────────────────────────
+  async function generateDoc() {
+    if (!GAS_WEB_APP_URL) {
+      showToast('⚙️ GAS_WEB_APP_URL belum diisi — deploy Web App dulu di Apps Script', false);
+      return;
+    }
+
+    // Validasi field wajib
+    const subject = document.getElementById('subject').value.trim();
+    if (!subject) { showToast('⚠️ Perihal / Judul wajib diisi', false); return; }
+
+    // Kumpulkan semua dynamic field sebagai extra object
+    const extra = {};
+    (DOC_FIELDS[currentCode] || []).forEach(f => {
+      const el = document.getElementById(f.id);
+      if (el) extra[f.id] = el.value;
+    });
+
+    const input = {
+      documentType:  currentCode,
+      subject:       subject,
+      attachment:    document.getElementById('attachment').value.trim() || '-',
+      documentDate:  document.getElementById('docDate').value,
+      directorName:  document.getElementById('signerName').value.trim(),
+      directorTitle: document.getElementById('signerTitle').value.trim(),
+      extra,
+    };
+
+    // Loading state
+    setLoading(true, 'Menghubungi engine RIFIM OS...');
+    const btn = document.querySelector('.btn.btn-primary');
+    btn.disabled   = true;
+    btn.textContent = '⏳ Memproses...';
+
+    try {
+      setLoading(true, 'Membuat dokumen & mengisi data...');
+      const res = await fetch(GAS_WEB_APP_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'text/plain' }, // hindari CORS preflight
+        body:    JSON.stringify(input),
+      });
+
+      const result = await res.json();
+      setLoading(false);
+
+      if (result.success) {
+        lastResult = result;
+        showResult(result);
+        updateDocNum(); // refresh nomor berikutnya
+      } else {
+        showToast('❌ ' + (result.message || 'Gagal membuat dokumen'), false);
+      }
+    } catch (err) {
+      setLoading(false);
+      showToast('❌ Koneksi gagal: ' + err.message, false);
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = '⚡ Generate Dokumen';
+    }
+  }
+
+  // ── Preview (buka doc terakhir yang dibuat) ──────────────────
+  function previewDoc() {
+    if (lastResult && lastResult.gdocUrl) {
+      window.open(lastResult.gdocUrl, '_blank');
+    } else {
+      showToast('Belum ada dokumen yang dibuat di sesi ini', false);
+    }
+  }
+
+  function clearForm() {
+    document.querySelectorAll('#formPanel input, #formPanel textarea, #formPanel select')
+      .forEach(el => { if (el.type !== 'date') el.value = ''; });
+    showToast('Form dikosongkan', false);
+  }
+
+  // ── Result modal ─────────────────────────────────────────────
+  function showResult(result) {
+    document.getElementById('resultDocNum').textContent  = result.documentNumber || '—';
+    document.getElementById('resultGdocBtn').href        = result.gdocUrl  || '#';
+    document.getElementById('resultPdfBtn').href         = result.pdfUrl   || '#';
+    document.getElementById('resultOverlay').style.display = 'flex';
+  }
+  function closeResult() {
+    document.getElementById('resultOverlay').style.display = 'none';
+  }
+
+  // ── Loading overlay ──────────────────────────────────────────
+  function setLoading(show, msg) {
+    const ov = document.getElementById('loadingOverlay');
+    ov.style.display = show ? 'flex' : 'none';
+    if (msg) document.getElementById('loadingStatus').textContent = msg;
+  }
+
+  // ── Tab & filter ─────────────────────────────────────────────
   function showTab(name, el) {
-    document.getElementById('tab-buat').style.display  = name==='buat'  ? 'block' : 'none';
-    document.getElementById('tab-arsip').style.display = name==='arsip' ? 'block' : 'none';
+    document.getElementById('tab-buat').style.display  = name === 'buat'  ? 'block' : 'none';
+    document.getElementById('tab-arsip').style.display = name === 'arsip' ? 'block' : 'none';
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     if (el) el.classList.add('active');
   }
 
   function filterCat(cat) { showToast(`Filter: ${cat}`, false); }
 
-  function generateDoc() {
-    showToast('⏳ Memproses dokumen...', false);
-    setTimeout(() => showToast('✅ Dokumen berhasil dibuat & disimpan ke Drive!', true), 1800);
-  }
-  function previewDoc() { showToast('👁 Membuka preview dokumen...', false); }
-  function clearForm()  {
-    document.querySelectorAll('#formPanel input, #formPanel textarea, #formPanel select')
-      .forEach(el => { if(el.type!=='date') el.value=''; });
-    showToast('Form dikosongkan', false);
-  }
-
   function showToast(msg, ok) {
     const t = document.getElementById('toast');
     t.textContent = msg;
-    t.className = 'toast show' + (ok ? ' ok' : '');
-    setTimeout(() => t.className = 'toast', 3200);
+    t.className   = 'toast show' + (ok ? ' ok' : '');
+    setTimeout(() => t.className = 'toast', 3500);
   }
 
-  // Init
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('docDate').value = today;
+  // ── Init ──────────────────────────────────────────────────────
+  document.getElementById('docDate').value = new Date().toISOString().split('T')[0];
   updateDocNum();
   renderDynFields('SURAT');
 </script>
