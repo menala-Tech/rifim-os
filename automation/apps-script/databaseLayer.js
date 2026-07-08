@@ -2,47 +2,49 @@
  * RIFIM OS — Database Layer
  * Abstraksi akses Google Sheets.
  * Dirancang agar mudah dimigrasi ke Supabase di Phase 2.
+ *
+ * Kolom sheet `documents` (17 kolom, urut):
+ * id | document_number | document_type | document_code | document_date |
+ * recipient_name | recipient_address | subject | attachment | body_summary |
+ * status | gdoc_url | pdf_url | qr_url | created_by | created_at | updated_at
  */
 
 /**
  * Simpan record dokumen ke sheet documents.
- * @param {object} record - Document record object
+ * @param {object} record
  */
 function saveDocumentRecord(record) {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('documents');
-
+  const sheet = _getDB().getSheetByName('documents');
   if (!sheet) throw new Error('Sheet documents tidak ditemukan.');
 
   sheet.appendRow([
     record.id,
     record.document_number,
     record.document_type,
+    record.document_code   || '',
     record.document_date,
     record.recipient_name,
-    record.recipient_address,
+    record.recipient_address || '',
     record.subject,
-    record.body,
-    record.attachment,
-    record.status,
-    record.gdoc_url,
-    record.pdf_url,
-    record.qr_url  || '',
-    record.created_by,
+    record.attachment      || '-',
+    record.body_summary    || '',
+    record.status          || 'FINAL',
+    record.gdoc_url        || '',
+    record.pdf_url         || '',
+    record.qr_url          || '',
+    record.created_by      || '',
     record.created_at,
     record.updated_at,
   ]);
 }
 
 /**
- * Ambil semua dokumen dari sheet.
- * @param {object} filters - { documentType, status, month, year }
- * @returns {Array} Array of record objects
+ * Ambil semua dokumen.
+ * @param {object} filters - { documentCode, status }
+ * @returns {Array}
  */
 function getDocuments(filters) {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('documents');
-
+  const sheet = _getDB().getSheetByName('documents');
   if (!sheet) throw new Error('Sheet documents tidak ditemukan.');
 
   const data    = sheet.getDataRange().getValues();
@@ -57,7 +59,7 @@ function getDocuments(filters) {
   }
 
   if (filters) {
-    if (filters.documentType) records = records.filter(function(r) { return r.document_type === filters.documentType; });
+    if (filters.documentCode) records = records.filter(function(r) { return r.document_code === filters.documentCode; });
     if (filters.status)       records = records.filter(function(r) { return r.status === filters.status; });
   }
 
@@ -65,22 +67,20 @@ function getDocuments(filters) {
 }
 
 /**
- * Update status dokumen.
+ * Update status dokumen berdasarkan document_number.
  * @param {string} documentNumber
- * @param {string} newStatus
+ * @param {string} newStatus  DRAFT | FINAL | SENT | ARCHIVED
  */
 function updateDocumentStatus(documentNumber, newStatus) {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('documents');
+  const sheet = _getDB().getSheetByName('documents');
   const data  = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
     if (data[i][1] === documentNumber) {
-      sheet.getRange(i + 1, 10).setValue(newStatus);
-      sheet.getRange(i + 1, 16).setValue(new Date().toISOString());
+      sheet.getRange(i + 1, 11).setValue(newStatus);           // kolom 11 = status
+      sheet.getRange(i + 1, 17).setValue(new Date().toISOString()); // kolom 17 = updated_at
       return true;
     }
   }
-
   return false;
 }

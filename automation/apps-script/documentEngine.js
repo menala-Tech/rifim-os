@@ -83,13 +83,37 @@ function _validateInput(input) {
 
 /**
  * Ambil Template Google Doc ID berdasarkan jenis dokumen.
- * Template ID disimpan di company_config, bukan hardcoded.
+ * Key di company_config: gdoc_template_surat, gdoc_template_inv, dll.
  * @private
  */
 function _getTemplateId(docType, config) {
-  const key = 'TEMPLATE_ID_' + docType;
-  const id  = config[key];
-  if (!id) throw new Error('Template ID tidak ditemukan untuk: ' + docType + '. Set ' + key + ' di company_config.');
+  // Map kode dokumen → key di company_config
+  const KEY_MAP = {
+    SURAT: 'gdoc_template_surat',
+    ST:    'gdoc_template_surat',
+    SIZ:   'gdoc_template_surat',
+    SKT:   'gdoc_template_surat',
+    INV:   'gdoc_template_inv',
+    KWT:   'gdoc_template_inv',
+    MOU:   'gdoc_template_mou',
+    PKS:   'gdoc_template_mou',
+    PROP:  'gdoc_template_surat',
+    CP:    'gdoc_template_surat',
+    SP1:   'gdoc_template_sp',
+    SP2:   'gdoc_template_sp',
+    SP3:   'gdoc_template_sp',
+    PHK:   'gdoc_template_sp',
+    PKWT:  'gdoc_template_pkwt',
+    SPG:   'gdoc_template_pkwt',
+    SMT:   'gdoc_template_pkwt',
+    PI:    'gdoc_template_pkwt',
+    BA:    'gdoc_template_surat',
+    FCO:   'gdoc_template_surat',
+  };
+  const key = KEY_MAP[docType];
+  if (!key) throw new Error('Tidak ada mapping template untuk: ' + docType);
+  const id = config[key];
+  if (!id) throw new Error('Template ID belum diisi untuk key "' + key + '" di sheet company_config.');
   return id;
 }
 
@@ -98,21 +122,24 @@ function _getTemplateId(docType, config) {
  * @private
  */
 function _buildRecord(input, config, docNumber, finalDoc, pdfFile) {
+  const now = new Date().toISOString();
   return {
-    id:              'DOC-' + Date.now(),
-    document_number: docNumber,
-    document_type:   input.documentType,
-    document_date:   input.documentDate || new Date().toISOString().split('T')[0],
-    recipient_name:  input.recipientName,
+    id:               'DOC-' + Date.now(),
+    document_number:  docNumber,
+    document_type:    DOCUMENT_TYPES[input.documentType] ? DOCUMENT_TYPES[input.documentType].label : input.documentType,
+    document_code:    input.documentType,
+    document_date:    input.documentDate || now.split('T')[0],
+    recipient_name:   input.recipientName,
     recipient_address: input.recipientAddress || '',
-    subject:         input.subject,
-    body:            input.body,
-    attachment:      input.attachment || '-',
-    status:          'FINAL',
-    gdoc_url:        finalDoc.getUrl(),
-    pdf_url:         pdfFile.getUrl(),
-    created_by:      Session.getActiveUser().getEmail(),
-    created_at:      new Date().toISOString(),
-    updated_at:      new Date().toISOString(),
+    subject:          input.subject,
+    attachment:       input.attachment || '-',
+    body_summary:     (input.body || '').substring(0, 200),
+    status:           'FINAL',
+    gdoc_url:         finalDoc.getUrl(),
+    pdf_url:          pdfFile.getUrl(),
+    qr_url:           '',
+    created_by:       Session.getActiveUser().getEmail(),
+    created_at:       now,
+    updated_at:       now,
   };
 }
