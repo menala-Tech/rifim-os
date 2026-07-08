@@ -1,0 +1,553 @@
+
+<title>RIFIM OS — Surat Resmi</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #C8C8C8;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+    color: #1C1C1C;
+    padding: 28px 12px 40px;
+  }
+
+  /* ── A4 PAPER ── */
+  .page {
+    background: #FFFFFF;
+    width: 794px;
+    min-height: 1122px;
+    margin: 0 auto;
+    box-shadow: 0 6px 40px rgba(0,0,0,0.28);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* ══════════════════════
+     HEADER
+  ══════════════════════ */
+  .header {
+    padding: 18px 32px 0 28px;
+    display: flex;
+    align-items: stretch;
+    gap: 20px;
+  }
+
+  /* --- Logo column --- */
+  .logo-col {
+    flex-shrink: 0;
+    width: 150px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-bottom: 10px;
+    gap: 5px;
+  }
+
+  .logo-svg { width: 140px; height: 88px; display: block; }
+
+  .logo-company-text {
+    font-size: 6.8px;
+    font-weight: 700;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    text-align: center;
+    color: #1C1C1C;
+    line-height: 1.5;
+  }
+
+  /* --- Vertical separator --- */
+  .v-sep {
+    width: 1.5px;
+    background: #CC0000;
+    margin: 2px 0 12px;
+    align-self: stretch;
+    flex-shrink: 0;
+  }
+
+  /* --- Info column --- */
+  .info-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding-top: 4px;
+    gap: 0;
+  }
+
+  .company-name {
+    font-size: 18.5px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: #1C1C1C;
+    line-height: 1.05;
+  }
+
+  .company-role {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: #CC0000;
+    margin: 4px 0 10px;
+  }
+
+  /* Values row */
+  .values-row {
+    display: flex;
+    border-top: 1px solid #DCDCDC;
+    border-bottom: 1px solid #DCDCDC;
+    padding: 5px 0;
+    margin-bottom: 6px;
+  }
+
+  .value-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 7.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: #1C1C1C;
+    padding-right: 11px;
+  }
+
+  .value-pill:not(:last-child) {
+    margin-right: 11px;
+    border-right: 1px solid #DCDCDC;
+  }
+
+  .vi { color: #CC0000; font-size: 10px; line-height: 1; }
+
+  .tagline {
+    font-size: 8px;
+    letter-spacing: 0.8px;
+    color: #666;
+    font-style: italic;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  /* Contact strip */
+  .contact-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    font-size: 7.5px;
+    color: #555;
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .ci {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-right: 12px;
+  }
+
+  .ci:not(:last-child) {
+    border-right: 1px solid #DCDCDC;
+    margin-right: 12px;
+  }
+
+  .cico { color: #CC0000; font-size: 9px; }
+
+  /* ══════════════════════
+     RULES
+  ══════════════════════ */
+  .rule-thick {
+    height: 4px;
+    background: #CC0000;
+    margin-top: 12px;
+  }
+
+  .rule-thin {
+    height: 1.5px;
+    background: #AA0000;
+    margin-top: 2px;
+  }
+
+  /* ══════════════════════
+     LETTER BODY
+  ══════════════════════ */
+  .letter-body {
+    padding: 24px 36px 0 36px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Nomor / Lampiran / Perihal  +  Date */
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 22px;
+    gap: 20px;
+  }
+
+  .meta-fields {
+    display: table;
+    border-collapse: collapse;
+    font-size: 11.5px;
+  }
+
+  .meta-tr { display: table-row; }
+
+  .meta-label {
+    display: table-cell;
+    padding-bottom: 2px;
+    width: 72px;
+    vertical-align: top;
+    white-space: nowrap;
+  }
+
+  .meta-sep {
+    display: table-cell;
+    padding: 0 10px 2px;
+    vertical-align: top;
+  }
+
+  .meta-val {
+    display: table-cell;
+    vertical-align: top;
+    padding-bottom: 2px;
+  }
+
+  .meta-val.bold-val { font-weight: 700; }
+
+  .letter-date {
+    font-size: 11.5px;
+    color: #1C1C1C;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Recipient */
+  .recipient-block {
+    font-size: 11.5px;
+    line-height: 1.65;
+    margin-bottom: 18px;
+  }
+
+  .to-bold { font-weight: 700; }
+
+  /* Salutation */
+  .salutation { font-size: 11.5px; margin-bottom: 12px; }
+
+  /* Paragraphs */
+  .p {
+    font-size: 11.5px;
+    line-height: 1.85;
+    text-align: justify;
+    margin-bottom: 11px;
+    text-indent: 38px;
+  }
+
+  /* Numbered list */
+  .doc-list {
+    margin: 4px 0 12px 56px;
+    padding-left: 0;
+    list-style: none;
+    counter-reset: doclist;
+    font-size: 11.5px;
+    line-height: 1.75;
+  }
+
+  .doc-list li {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 7px;
+    counter-increment: doclist;
+  }
+
+  .doc-list li::before {
+    content: counter(doclist) ".";
+    font-weight: 700;
+    flex-shrink: 0;
+    min-width: 16px;
+  }
+
+  /* ══════════════════════
+     SIGNATURE
+  ══════════════════════ */
+  .sig-area {
+    padding: 20px 36px 0;
+    display: flex;
+    align-items: flex-end;
+  }
+
+  .sig-block { font-size: 11.5px; line-height: 1.65; }
+
+  .sig-from   { margin-bottom: 2px; }
+  .sig-co     { font-weight: 700; margin-bottom: 54px; }
+
+  .sig-name {
+    font-weight: 700;
+    font-size: 11.5px;
+    border-top: 1.5px solid #1C1C1C;
+    padding-top: 4px;
+    display: inline-block;
+    min-width: 148px;
+  }
+
+  .sig-title { font-size: 10.5px; color: #444; }
+
+  /* ══════════════════════
+     FOOTER BAR
+  ══════════════════════ */
+  .footer-spacer { flex: 1; min-height: 24px; }
+
+  .footer-rules {
+    margin-top: 16px;
+  }
+
+  .footer-bar {
+    background: #CC0000;
+    padding: 9px 32px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .fb-brand {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .fb-maxim {
+    font-size: 12.5px;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  .fb-airport {
+    font-size: 7px;
+    color: rgba(255,255,255,0.7);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .fb-sep {
+    width: 1px;
+    height: 28px;
+    background: rgba(255,255,255,0.35);
+  }
+
+  .fb-slogan {
+    font-size: 7.5px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #fff;
+    line-height: 1.6;
+  }
+</style>
+
+<div class="page">
+
+  <!-- ════════════ HEADER ════════════ -->
+  <div class="header">
+
+    <!-- Logo -->
+    <div class="logo-col">
+      <svg class="logo-svg" viewBox="0 0 140 88" xmlns="http://www.w3.org/2000/svg">
+        <!-- Runway/world globe base (subtle) -->
+        <ellipse cx="70" cy="80" rx="62" ry="6" fill="#F0F0F0"/>
+        <!-- Airport tower silhouette (very subtle) -->
+        <rect x="110" y="50" width="4" height="22" fill="#E8E8E8"/>
+        <rect x="107" y="46" width="10" height="6" rx="1" fill="#E8E8E8"/>
+        <!-- Arrow curve (upward trajectory) -->
+        <path d="M 58 58 Q 82 32 122 10" stroke="#CC0000" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <!-- Arrowhead -->
+        <polygon points="122,10 114,17 122,19" fill="#CC0000"/>
+        <!-- Airplane -->
+        <g transform="translate(118,8) rotate(-38) scale(0.85)">
+          <ellipse cx="0" cy="0" rx="7" ry="2.5" fill="#CC0000"/>
+          <polygon points="-1,-2 -8,-6 -8,-3.5" fill="#CC0000"/>
+          <polygon points="3,-1 8,-4 8,-2" fill="#CC0000"/>
+          <polygon points="-4,1.5 -5,4 -2,3" fill="#CC0000"/>
+        </g>
+        <!-- RI square -->
+        <rect x="1" y="18" width="52" height="52" rx="4" fill="#CC0000"/>
+        <rect x="4.5" y="21.5" width="45" height="45" rx="2.5" fill="none" stroke="white" stroke-width="1.8"/>
+        <text x="27" y="55" text-anchor="middle" fill="white"
+              font-family="Arial Black, Arial, sans-serif" font-size="23" font-weight="900">RI</text>
+        <!-- FIM -->
+        <text x="57" y="68" fill="#CC0000"
+              font-family="Arial Black, Arial, sans-serif" font-size="40" font-weight="900"
+              letter-spacing="-2">FIM</text>
+      </svg>
+      <div class="logo-company-text">PT. Rifim Internasional<br>Gemilang</div>
+    </div>
+
+    <div class="v-sep"></div>
+
+    <!-- Company Info -->
+    <div class="info-col">
+      <div class="company-name">PT. RIFIM Internasional Gemilang</div>
+      <div class="company-role">Vendor Operasional Maxim</div>
+
+      <div class="values-row">
+        <div class="value-pill"><span class="vi">✦</span> Integritas</div>
+        <div class="value-pill"><span class="vi">◈</span> Inovasi</div>
+        <div class="value-pill"><span class="vi">⚙</span> Kualitas</div>
+        <div class="value-pill"><span class="vi">▲</span> Keberlanjutan</div>
+      </div>
+
+      <div class="tagline">Membangun Hari Ini, Menginspirasi Masa Depan</div>
+
+      <div class="contact-row">
+        <div class="ci">
+          <span class="cico">⊙</span>
+          Fanindo Blok S No. 20, Tanjung Uncang, Batu Aji, Kota Batam
+        </div>
+        <div class="ci">
+          <span class="cico">✆</span>
+          +62 821 7010 2349
+        </div>
+        <div class="ci">
+          <span class="cico">✉</span>
+          rifiminternasionalgemilang@gmail.com
+        </div>
+        <div class="ci">
+          <span class="cico">⊕</span>
+          www.rifimgroup.com
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Red rules under header -->
+  <div class="rule-thick"></div>
+  <div class="rule-thin"></div>
+
+  <!-- ════════════ LETTER BODY ════════════ -->
+  <div class="letter-body">
+
+    <!-- Nomor / Lampiran / Perihal + Date -->
+    <div class="meta-row">
+      <div class="meta-fields">
+        <div class="meta-tr">
+          <span class="meta-label">Nomor</span>
+          <span class="meta-sep">:</span>
+          <span class="meta-val">045/RIG-ADV/VI/2026</span>
+        </div>
+        <div class="meta-tr">
+          <span class="meta-label">Lampiran</span>
+          <span class="meta-sep">:</span>
+          <span class="meta-val">1 (Satu) Berkas Proposal Profil Agensi</span>
+        </div>
+        <div class="meta-tr">
+          <span class="meta-label">Perihal</span>
+          <span class="meta-sep">:</span>
+          <span class="meta-val bold-val">Penawaran Kerjasama Strategic Marketing Agency &amp; Aktivasi</span>
+        </div>
+      </div>
+
+      <div class="letter-date">Batam, 15 May 2026</div>
+    </div>
+
+    <!-- Recipient -->
+    <div class="recipient-block">
+      <div class="to-bold">Kepada Yth.</div>
+      <div class="to-bold">PT. Teknologi Perdana Indonesia</div>
+      <div>Di Tempat</div>
+    </div>
+
+    <!-- Salutation -->
+    <div class="salutation">Dengan hormat,</div>
+
+    <!-- Body paragraphs -->
+    <div class="p">
+      Melalui surat ini, kami <strong>PT. Rifim Internasional Gemilang</strong>, perusahaan yang bergerak
+      di bidang periklanan dan pemasaran strategis, bermaksud mengajukan penawaran kerjasama sebagai
+      mitra agensi promosi untuk layanan transportasi Maxim. Kami memahami bahwa Maxim terus berekspansi
+      di Indonesia dan membutuhkan penetrasi pasar yang kuat melalui promosi lokal yang masif. Oleh
+      karena itu, kami menawarkan solusi pemasaran terpadu yang mencakup:
+    </div>
+
+    <ol class="doc-list">
+      <li>
+        <div>
+          <strong>Pengelolaan &amp; Distribusi Kode Promo:</strong> Kami akan mengelola distribusi kode promo
+          khusus (seperti bonus Rp200.000 untuk pengguna baru) melalui kanal offline dan online untuk
+          meningkatkan jumlah first-order.
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Aktivasi Iklan Luar Ruang (OOH):</strong> Pemasangan materi promosi di titik strategis
+          (kantor, mal, atau area publik) guna memperkuat brand awareness.
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Digital Campaign:</strong> Kampanye media sosial menggunakan aset visual kreatif untuk
+          menarik minat pengguna baru mengaktifkan kode promo hadiah.
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Field Marketing:</strong> Tim lapangan untuk edukasi cara aktivasi aplikasi dan penggunaan
+          saldo bonus bagi calon pelanggan serta pelaksanaan event promosi Maxim.
+        </div>
+      </li>
+    </ol>
+
+    <div class="p">
+      Kami yakin dengan rekam jejak agensi kami dalam membantu promosi Maxim di Kota Batam serta
+      kapasitas kami sebagai perusahaan vendor transportasi Maxim di beberapa kota, kami dapat
+      membantu Maxim mencapai target jumlah pengunduh dan pesanan harian yang lebih tinggi di wilayah
+      Balikpapan dan Samarinda. Bersama surat ini, kami lampirkan detail proposal teknis, rincian biaya
+      layanan, serta skema pembagian keuntungan untuk Bapak/Ibu tinjau lebih lanjut. Kami sangat terbuka
+      untuk mendiskusikan penawaran ini dalam pertemuan formal.
+    </div>
+
+    <div class="p">
+      Besar harapan kami untuk dapat bergabung sebagai bagian dari ekosistem pertumbuhan Maxim.
+      Atas perhatian dan kerjasamanya, kami ucapkan terima kasih.
+    </div>
+
+  </div>
+
+  <!-- ════════════ SIGNATURE ════════════ -->
+  <div class="sig-area">
+    <div class="sig-block">
+      <div class="sig-from">Hormat kami,</div>
+      <div class="sig-co">PT. RIFIM INTERNASIONAL GEMILANG</div>
+      <!-- signature line space -->
+      <div class="sig-name">BOBBY RAHMAN M.B</div>
+      <div class="sig-title">Direktur Utama</div>
+    </div>
+  </div>
+
+  <div class="footer-spacer"></div>
+
+  <!-- ════════════ FOOTER ════════════ -->
+  <div class="footer-rules">
+    <div class="rule-thick"></div>
+    <div class="footer-bar">
+      <div class="fb-brand">
+        <!-- Plane SVG -->
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+          <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+        </svg>
+        <div>
+          <div class="fb-maxim">MAXIM</div>
+          <div class="fb-airport">AIRPORT</div>
+        </div>
+      </div>
+      <div class="fb-sep"></div>
+      <div class="fb-slogan">Melayani Dunia<br>Menggerakkan Negeri</div>
+    </div>
+  </div>
+
+</div>
