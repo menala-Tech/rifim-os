@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "name": "rifim-os",
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
     { "source": "/smart-office", "destination": "/modules/smart-office/index.html" },
