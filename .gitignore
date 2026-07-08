@@ -1,0 +1,40 @@
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+config.local.js
+secrets.js
+credentials.json
+
+# Google Apps Script
+.clasp.json
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Temp
+temp/
+*.tmp
+*.bak
+
+# Build
+dist/
+build/
+.cache/
+
+# Logs
+logs/
+*.log
