@@ -6,7 +6,6 @@
   <title>Smart Office — RIFIM OS</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
       --red:    #C40000;
       --red-dk: #8B0000;
@@ -18,260 +17,164 @@
       --muted:  #777;
       --success:#1A8A4A;
       --radius: 10px;
-      --shadow: 0 2px 12px rgba(0,0,0,.08);
+      --shadow: 0 2px 14px rgba(0,0,0,.08);
     }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
-    body {
-      font-family: Arial, Helvetica, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-    }
-
-    /* ── TOP NAV ── */
+    /* NAV */
     .topnav {
-      background: var(--gray);
-      padding: 0 28px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 54px;
-      position: sticky;
-      top: 0;
-      z-index: 100;
+      background: var(--gray); padding: 0 28px;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 54px; position: sticky; top: 0; z-index: 100;
     }
-    .nav-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      text-decoration: none;
-    }
+    .nav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
     .nav-logo {
-      width: 32px; height: 32px;
-      background: var(--red);
-      border-radius: 6px;
+      width: 34px; height: 34px; background: var(--red); border-radius: 7px;
       display: flex; align-items: center; justify-content: center;
-      font-weight: 900; font-size: 13px; color: white; letter-spacing: -0.5px;
+      font-weight: 900; font-size: 12px; color: white; letter-spacing: -.5px;
     }
-    .nav-title { font-size: 14px; font-weight: 700; color: white; letter-spacing: 0.3px; }
-    .nav-module { font-size: 10px; color: rgba(255,255,255,.5); letter-spacing: 1px; text-transform: uppercase; }
-    .nav-user { font-size: 12px; color: rgba(255,255,255,.6); }
+    .nav-title  { font-size: 14px; font-weight: 700; color: white; letter-spacing: .3px; }
+    .nav-module { font-size: 9.5px; color: rgba(255,255,255,.45); letter-spacing: 1.2px; text-transform: uppercase; }
+    .nav-user   { font-size: 12px; color: rgba(255,255,255,.55); }
 
-    /* ── LAYOUT ── */
+    /* LAYOUT */
     .layout { display: flex; min-height: calc(100vh - 54px); }
 
-    /* ── SIDEBAR ── */
-    .sidebar {
-      width: 220px;
-      background: var(--white);
-      border-right: 1px solid var(--border);
-      padding: 20px 0;
-      flex-shrink: 0;
+    /* SIDEBAR */
+    .sidebar { width: 210px; background: var(--white); border-right: 1px solid var(--border); padding: 18px 0; flex-shrink: 0; }
+    .sb-label { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); padding: 0 16px 7px; margin-top: 14px; }
+    .sb-item {
+      display: flex; align-items: center; gap: 9px;
+      padding: 9px 16px; cursor: pointer; font-size: 12.5px; color: var(--text);
+      border-left: 3px solid transparent; transition: background .12s; text-decoration: none;
     }
-    .sidebar-section { margin-bottom: 24px; }
-    .sidebar-label {
-      font-size: 9.5px; font-weight: 700; letter-spacing: 1.5px;
-      text-transform: uppercase; color: var(--muted);
-      padding: 0 18px 8px;
-    }
-    .sidebar-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 9px 18px; cursor: pointer;
-      font-size: 13px; color: var(--text);
-      border-left: 3px solid transparent;
-      transition: background .15s;
-      text-decoration: none;
-    }
-    .sidebar-item:hover { background: var(--bg); }
-    .sidebar-item.active {
-      background: #FFF0F0;
-      border-left-color: var(--red);
-      color: var(--red);
-      font-weight: 700;
-    }
-    .sidebar-icon { font-size: 16px; width: 20px; text-align: center; }
+    .sb-item:hover { background: var(--bg); }
+    .sb-item.active { background: #FFF0F0; border-left-color: var(--red); color: var(--red); font-weight: 700; }
+    .sb-icon { font-size: 15px; width: 18px; text-align: center; }
 
-    /* ── MAIN ── */
-    .main { flex: 1; padding: 28px 32px; max-width: 900px; }
+    /* MAIN */
+    .main { flex: 1; padding: 26px 30px; overflow-y: auto; }
+    .page-title { font-size: 21px; font-weight: 900; margin-bottom: 3px; }
+    .page-sub   { font-size: 12.5px; color: var(--muted); margin-bottom: 26px; }
 
-    .page-title {
-      font-size: 22px; font-weight: 900;
-      color: var(--text); margin-bottom: 4px;
+    /* TABS */
+    .tabs { display: flex; gap: 4px; margin-bottom: 22px; border-bottom: 2px solid var(--border); }
+    .tab {
+      padding: 9px 18px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+      color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -2px;
+      transition: color .12s;
     }
-    .page-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--red); border-bottom-color: var(--red); }
 
-    /* ── DOC TYPE CARDS ── */
-    .doc-types {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 14px;
-      margin-bottom: 32px;
+    /* DOC CATEGORY */
+    .cat-section { margin-bottom: 28px; }
+    .cat-title {
+      font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
     }
+    .cat-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    .doc-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+
     .doc-card {
-      background: var(--white);
-      border: 2px solid var(--border);
-      border-radius: var(--radius);
-      padding: 18px 14px;
-      cursor: pointer;
-      text-align: center;
-      transition: border-color .15s, box-shadow .15s;
+      background: var(--white); border: 1.5px solid var(--border);
+      border-radius: var(--radius); padding: 14px 10px 12px;
+      cursor: pointer; text-align: center;
+      transition: border-color .12s, box-shadow .12s, transform .1s;
     }
-    .doc-card:hover { border-color: var(--red); box-shadow: var(--shadow); }
-    .doc-card.selected {
-      border-color: var(--red);
-      background: #FFF8F8;
-    }
-    .doc-card-icon { font-size: 28px; margin-bottom: 8px; }
-    .doc-card-name { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-    .doc-card-desc { font-size: 10px; color: var(--muted); margin-top: 3px; }
+    .doc-card:hover { border-color: var(--red); box-shadow: var(--shadow); transform: translateY(-1px); }
+    .doc-card.selected { border-color: var(--red); background: #FFF8F8; }
+    .doc-card-icon { font-size: 24px; margin-bottom: 7px; }
+    .doc-card-name { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; line-height: 1.3; }
+    .doc-card-code { font-size: 9.5px; color: var(--red); font-weight: 700; margin-top: 3px; letter-spacing: .5px; }
 
-    /* ── FORM ── */
-    .form-card {
-      background: var(--white);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 28px;
-    }
-    .form-section-title {
-      font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
-      text-transform: uppercase; color: var(--red);
-      border-bottom: 1.5px solid #F0E0E0;
-      padding-bottom: 8px; margin-bottom: 18px;
-    }
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; margin-bottom: 24px; }
-    .form-grid.full { grid-template-columns: 1fr; }
+    /* FORM PANEL */
+    .panel-wrap { display: none; }
+    .panel-wrap.show { display: block; }
+    .form-card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); padding: 26px; }
 
-    .field { display: flex; flex-direction: column; gap: 5px; }
-    .field label { font-size: 11px; font-weight: 700; color: var(--gray); letter-spacing: 0.3px; }
+    .form-header {
+      display: flex; align-items: center; gap: 12px;
+      padding-bottom: 16px; margin-bottom: 20px;
+      border-bottom: 1.5px solid var(--border);
+    }
+    .form-header-icon { font-size: 28px; }
+    .form-header-title { font-size: 17px; font-weight: 900; }
+    .form-header-sub   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .fsec { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--red); border-bottom: 1.5px solid #F0E0E0; padding-bottom: 7px; margin: 20px 0 14px; }
+    .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+    .fgrid.full { grid-template-columns: 1fr; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 10.5px; font-weight: 700; color: var(--gray); }
     .field input, .field select, .field textarea {
-      border: 1.5px solid var(--border);
-      border-radius: 7px;
-      padding: 9px 12px;
-      font-size: 12.5px;
-      font-family: Arial, sans-serif;
-      color: var(--text);
-      background: var(--white);
-      transition: border-color .15s;
-      outline: none;
+      border: 1.5px solid var(--border); border-radius: 7px;
+      padding: 9px 11px; font-size: 12.5px; font-family: Arial, sans-serif;
+      color: var(--text); background: var(--white); transition: border-color .12s; outline: none;
     }
-    .field input:focus, .field select:focus, .field textarea:focus {
-      border-color: var(--red);
-    }
-    .field textarea { resize: vertical; min-height: 100px; line-height: 1.6; }
-    .field-hint { font-size: 10px; color: var(--muted); }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--red); }
+    .field textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
+    .field-hint { font-size: 9.5px; color: var(--muted); }
 
-    .doc-number-preview {
-      background: #F8F0F0;
-      border: 1.5px solid #F0C0C0;
-      border-radius: 7px;
-      padding: 10px 14px;
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--red);
-      letter-spacing: 0.5px;
-      font-family: 'Courier New', monospace;
+    .doc-num-box {
+      background: #F8F0F0; border: 1.5px solid #F0C0C0;
+      border-radius: 7px; padding: 10px 13px;
+      font-size: 13px; font-weight: 700; color: var(--red);
+      letter-spacing: .5px; font-family: 'Courier New', monospace;
     }
 
-    /* ── ACTIONS ── */
-    .form-actions {
-      display: flex;
-      gap: 12px;
-      padding-top: 20px;
-      border-top: 1px solid var(--border);
-      margin-top: 8px;
-    }
-    .btn {
-      padding: 11px 24px;
-      border-radius: 7px;
-      border: none;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.3px;
-      transition: opacity .15s, transform .1s;
-    }
+    .form-actions { display: flex; gap: 10px; padding-top: 18px; border-top: 1px solid var(--border); margin-top: 8px; }
+    .btn { padding: 10px 22px; border-radius: 7px; border: none; cursor: pointer; font-size: 12.5px; font-weight: 700; letter-spacing: .3px; transition: opacity .12s, transform .1s; }
     .btn:active { transform: scale(.98); }
-    .btn-primary { background: var(--red); color: white; }
-    .btn-primary:hover { opacity: .9; }
-    .btn-secondary {
-      background: white;
-      color: var(--gray);
-      border: 1.5px solid var(--border);
-    }
+    .btn-primary   { background: var(--red);   color: white; }
+    .btn-primary:hover { opacity: .88; }
+    .btn-secondary { background: white; color: var(--gray); border: 1.5px solid var(--border); }
     .btn-secondary:hover { background: var(--bg); }
-    .btn-ghost { background: transparent; color: var(--muted); font-weight: 400; }
+    .btn-ghost     { background: transparent; color: var(--muted); }
 
-    /* ── RECENT DOCS ── */
-    .recent-section { margin-top: 32px; }
-    .section-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 14px;
-    }
-    .section-title { font-size: 15px; font-weight: 700; }
-    .see-all { font-size: 12px; color: var(--red); text-decoration: none; cursor: pointer; }
-
-    .doc-table {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--white);
-      border-radius: var(--radius);
-      overflow: hidden;
-      box-shadow: var(--shadow);
-    }
-    .doc-table th {
-      background: var(--bg);
-      padding: 10px 16px;
-      text-align: left;
-      font-size: 10.5px;
-      font-weight: 700;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      color: var(--muted);
-      border-bottom: 1px solid var(--border);
-    }
-    .doc-table td {
-      padding: 12px 16px;
-      font-size: 12.5px;
-      border-bottom: 1px solid var(--border);
-    }
+    /* RECENT TABLE */
+    .recent { margin-top: 28px; }
+    .sec-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .sec-title { font-size: 15px; font-weight: 700; }
+    .see-all { font-size: 12px; color: var(--red); cursor: pointer; }
+    .doc-table { width: 100%; border-collapse: collapse; background: var(--white); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+    .doc-table th { background: var(--bg); padding: 9px 14px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
+    .doc-table td { padding: 11px 14px; font-size: 12px; border-bottom: 1px solid var(--border); }
     .doc-table tr:last-child td { border-bottom: none; }
     .doc-table tr:hover td { background: var(--bg); }
+    .badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+    .badge-draft  { background: #F5F5F5; color: #666; }
+    .badge-final  { background: #E8F5EE; color: var(--success); }
+    .badge-sent   { background: #E8F0FF; color: #2255CC; }
+    .doc-num { font-family: monospace; font-size: 11px; color: var(--red); }
+    .act { color: var(--red); font-size: 12px; cursor: pointer; }
+    .act:hover { text-decoration: underline; }
 
-    .badge {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.3px;
-    }
-    .badge-draft    { background: #F5F5F5; color: #666; }
-    .badge-final    { background: #E8F5EE; color: var(--success); }
-    .badge-sent     { background: #E8F0FF; color: #2255CC; }
-
-    .action-link { color: var(--red); font-size: 12px; cursor: pointer; text-decoration: none; }
-    .action-link:hover { text-decoration: underline; }
-
-    /* ── TOAST ── */
+    /* TOAST */
     .toast {
-      position: fixed; bottom: 28px; right: 28px;
+      position: fixed; bottom: 24px; right: 24px;
       background: var(--gray); color: white;
-      padding: 12px 20px; border-radius: 8px;
-      font-size: 13px; box-shadow: 0 4px 20px rgba(0,0,0,.2);
-      transform: translateY(80px); opacity: 0;
-      transition: transform .3s, opacity .3s;
-      z-index: 999;
+      padding: 12px 18px; border-radius: 8px; font-size: 12.5px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.2);
+      transform: translateY(70px); opacity: 0;
+      transition: transform .28s, opacity .28s; z-index: 999;
     }
     .toast.show { transform: translateY(0); opacity: 1; }
-    .toast.success { border-left: 4px solid var(--success); }
+    .toast.ok   { border-left: 4px solid var(--success); }
+
+    /* STATS BAR */
+    .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 26px; }
+    .stat-card { background: var(--white); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
+    .stat-num  { font-size: 26px; font-weight: 900; color: var(--red); line-height: 1; }
+    .stat-lbl  { font-size: 11px; color: var(--muted); margin-top: 4px; }
   </style>
 </head>
 <body>
 
-<!-- TOP NAV -->
 <nav class="topnav">
   <a class="nav-brand" href="#">
-    <div class="nav-logo">RI<span style="color:rgba(255,255,255,.7)">F</span></div>
+    <div class="nav-logo">RI<span style="opacity:.7">F</span></div>
     <div>
       <div class="nav-title">RIFIM OS</div>
       <div class="nav-module">Smart Office</div>
@@ -284,242 +187,435 @@
 
   <!-- SIDEBAR -->
   <aside class="sidebar">
-    <div class="sidebar-section">
-      <div class="sidebar-label">Smart Office</div>
-      <a class="sidebar-item active" href="#">
-        <span class="sidebar-icon">📄</span> Buat Surat
-      </a>
-      <a class="sidebar-item" href="#">
-        <span class="sidebar-icon">📋</span> Arsip Surat
-      </a>
-      <a class="sidebar-item" href="#">
-        <span class="sidebar-icon">🔢</span> Nomor Surat
-      </a>
-    </div>
-    <div class="sidebar-section">
-      <div class="sidebar-label">Dokumen</div>
-      <a class="sidebar-item" href="#">
-        <span class="sidebar-icon">🧾</span> Invoice
-      </a>
-      <a class="sidebar-item" href="#">
-        <span class="sidebar-icon">📝</span> Proposal
-      </a>
-      <a class="sidebar-item" href="#">
-        <span class="sidebar-icon">👤</span> PKWT / SP
-      </a>
-    </div>
-    <div class="sidebar-section">
-      <div class="sidebar-label">Sistem</div>
-      <a class="sidebar-item" href="#">
-        <span class="sidebar-icon">⚙️</span> Pengaturan
-      </a>
-    </div>
+    <div class="sb-label" style="margin-top:0">Menu</div>
+    <a class="sb-item active" href="#" onclick="showTab('buat')">
+      <span class="sb-icon">⚡</span> Buat Dokumen
+    </a>
+    <a class="sb-item" href="#" onclick="showTab('arsip')">
+      <span class="sb-icon">📁</span> Arsip Dokumen
+    </a>
+    <a class="sb-item" href="#">
+      <span class="sb-icon">🔢</span> Penomoran
+    </a>
+
+    <div class="sb-label">Kategori</div>
+    <a class="sb-item" href="#" onclick="filterCat('Korespondensi')">
+      <span class="sb-icon">📨</span> Korespondensi
+    </a>
+    <a class="sb-item" href="#" onclick="filterCat('Keuangan')">
+      <span class="sb-icon">💰</span> Keuangan
+    </a>
+    <a class="sb-item" href="#" onclick="filterCat('Kerjasama')">
+      <span class="sb-icon">🤝</span> Kerjasama
+    </a>
+    <a class="sb-item" href="#" onclick="filterCat('HR / SDM')">
+      <span class="sb-icon">👥</span> HR / SDM
+    </a>
+    <a class="sb-item" href="#" onclick="filterCat('Operasional')">
+      <span class="sb-icon">✅</span> Operasional
+    </a>
+
+    <div class="sb-label">Sistem</div>
+    <a class="sb-item" href="#"><span class="sb-icon">⚙️</span> Pengaturan</a>
   </aside>
 
   <!-- MAIN -->
   <main class="main">
-    <div class="page-title">Buat Dokumen Baru</div>
-    <div class="page-sub">Pilih jenis dokumen lalu isi formulir — sistem akan membuat nomor otomatis.</div>
 
-    <!-- DOC TYPE SELECT -->
-    <div class="doc-types">
-      <div class="doc-card selected" onclick="selectDoc(this,'SURAT')">
-        <div class="doc-card-icon">📨</div>
-        <div class="doc-card-name">Surat</div>
-        <div class="doc-card-desc">Surat resmi keluar</div>
+    <!-- STATS -->
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-num">47</div>
+        <div class="stat-lbl">Total Dokumen Bulan Ini</div>
       </div>
-      <div class="doc-card" onclick="selectDoc(this,'INVOICE')">
-        <div class="doc-card-icon">🧾</div>
-        <div class="doc-card-name">Invoice</div>
-        <div class="doc-card-desc">Tagihan klien</div>
+      <div class="stat-card">
+        <div class="stat-num">20</div>
+        <div class="stat-lbl">Jenis Dokumen Aktif</div>
       </div>
-      <div class="doc-card" onclick="selectDoc(this,'PROPOSAL')">
-        <div class="doc-card-icon">📋</div>
-        <div class="doc-card-name">Proposal</div>
-        <div class="doc-card-desc">Proposal kerjasama</div>
+      <div class="stat-card">
+        <div class="stat-num">12</div>
+        <div class="stat-lbl">Draft Belum Selesai</div>
       </div>
-      <div class="doc-card" onclick="selectDoc(this,'PKWT')">
-        <div class="doc-card-icon">📝</div>
-        <div class="doc-card-name">PKWT / SP</div>
-        <div class="doc-card-desc">Kontrak & surat peringatan</div>
+      <div class="stat-card">
+        <div class="stat-num">3</div>
+        <div class="stat-lbl">Menunggu TTD</div>
       </div>
     </div>
 
-    <!-- FORM -->
-    <div class="form-card">
-
-      <!-- Section: Identitas Dokumen -->
-      <div class="form-section-title">Identitas Dokumen</div>
-      <div class="form-grid">
-        <div class="field">
-          <label>Nomor Dokumen (Otomatis)</label>
-          <div class="doc-number-preview" id="docNumberPreview">001/RIFIM/SURAT/VII/2026</div>
-          <span class="field-hint">Generate otomatis saat simpan</span>
-        </div>
-        <div class="field">
-          <label>Tanggal Surat</label>
-          <input type="date" id="docDate" value="2026-07-09">
-        </div>
-        <div class="field">
-          <label>Perihal</label>
-          <input type="text" id="subject" placeholder="Penawaran Kerjasama...">
-        </div>
-        <div class="field">
-          <label>Lampiran</label>
-          <input type="text" id="attachment" placeholder="1 (Satu) Berkas">
-        </div>
-      </div>
-
-      <!-- Section: Penerima -->
-      <div class="form-section-title">Penerima</div>
-      <div class="form-grid">
-        <div class="field">
-          <label>Nama Perusahaan / Instansi</label>
-          <input type="text" id="recipientName" placeholder="PT. Nama Perusahaan">
-        </div>
-        <div class="field">
-          <label>Alamat / Kota</label>
-          <input type="text" id="recipientAddress" placeholder="Di Tempat / Kota Batam">
-        </div>
-      </div>
-
-      <!-- Section: Isi Surat -->
-      <div class="form-section-title">Isi Surat</div>
-      <div class="form-grid full">
-        <div class="field">
-          <label>Isi / Body Surat</label>
-          <textarea id="body" placeholder="Tuliskan isi surat di sini...&#10;&#10;Sistem akan memformat secara otomatis sesuai template korporat."></textarea>
-        </div>
-      </div>
-
-      <!-- Section: Penanda Tangan -->
-      <div class="form-section-title">Penanda Tangan</div>
-      <div class="form-grid">
-        <div class="field">
-          <label>Nama</label>
-          <input type="text" id="signerName" value="BOBBY RAHMAN M.B">
-        </div>
-        <div class="field">
-          <label>Jabatan</label>
-          <input type="text" id="signerTitle" value="Direktur Utama">
-        </div>
-      </div>
-
-      <!-- ACTIONS -->
-      <div class="form-actions">
-        <button class="btn btn-primary" onclick="generateDoc()">⚡ Generate Dokumen</button>
-        <button class="btn btn-secondary" onclick="previewDoc()">👁 Preview</button>
-        <button class="btn btn-ghost" onclick="clearForm()">Bersihkan</button>
-      </div>
-
+    <!-- TABS -->
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('buat',this)">⚡ Buat Dokumen</div>
+      <div class="tab" onclick="showTab('arsip',this)">📁 Arsip</div>
     </div>
 
-    <!-- RECENT DOCS -->
-    <div class="recent-section">
-      <div class="section-header">
-        <div class="section-title">Dokumen Terakhir</div>
-        <a class="see-all">Lihat Semua →</a>
+    <!-- TAB: BUAT DOKUMEN -->
+    <div id="tab-buat">
+      <div class="page-title">Buat Dokumen Baru</div>
+      <div class="page-sub">Pilih jenis dokumen — nomor dibuat otomatis oleh sistem.</div>
+
+      <!-- KORESPONDENSI -->
+      <div class="cat-section">
+        <div class="cat-title">📨 Korespondensi</div>
+        <div class="doc-grid">
+          <div class="doc-card selected" onclick="selectDoc(this,'SURAT','Surat Resmi','📨')">
+            <div class="doc-card-icon">📨</div>
+            <div class="doc-card-name">Surat Resmi</div>
+            <div class="doc-card-code">SURAT</div>
+          </div>
+          <div class="doc-card" onclick="selectDoc(this,'ST','Surat Tugas','📋')">
+            <div class="doc-card-icon">📋</div>
+            <div class="doc-card-name">Surat Tugas</div>
+            <div class="doc-card-code">ST</div>
+          </div>
+          <div class="doc-card" onclick="selectDoc(this,'SIZ','Surat Izin','🗓')">
+            <div class="doc-card-icon">🗓</div>
+            <div class="doc-card-name">Surat Izin</div>
+            <div class="doc-card-code">SIZ</div>
+          </div>
+          <div class="doc-card" onclick="selectDoc(this,'SKT','Surat Keterangan','📃')">
+            <div class="doc-card-icon">📃</div>
+            <div class="doc-card-name">Surat Keterangan</div>
+            <div class="doc-card-code">SKT</div>
+          </div>
+          <div class="doc-card" onclick="selectDoc(this,'BA','Berita Acara','📰')">
+            <div class="doc-card-icon">📰</div>
+            <div class="doc-card-name">Berita Acara</div>
+            <div class="doc-card-code">BA</div>
+          </div>
+        </div>
       </div>
-      <table class="doc-table">
-        <thead>
-          <tr>
-            <th>Nomor</th>
-            <th>Perihal</th>
-            <th>Penerima</th>
-            <th>Tanggal</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style="font-family:monospace;font-size:11.5px;color:var(--red)">045/RIFIM/SURAT/VI/2026</td>
-            <td>Penawaran Kerjasama Marketing</td>
-            <td>PT. Teknologi Perdana Indonesia</td>
-            <td>15 Jun 2026</td>
-            <td><span class="badge badge-sent">Terkirim</span></td>
-            <td><a class="action-link">Buka ↗</a></td>
-          </tr>
-          <tr>
-            <td style="font-family:monospace;font-size:11.5px;color:var(--red)">044/RIFIM/SURAT/VI/2026</td>
-            <td>Permohonan Kerjasama Distribusi</td>
-            <td>CV. Maju Bersama</td>
-            <td>10 Jun 2026</td>
-            <td><span class="badge badge-final">Final</span></td>
-            <td><a class="action-link">Buka ↗</a></td>
-          </tr>
-          <tr>
-            <td style="font-family:monospace;font-size:11.5px;color:var(--red)">043/RIFIM/SURAT/VI/2026</td>
-            <td>Undangan Rapat Koordinasi</td>
-            <td>Internal — Tim Operasional</td>
-            <td>5 Jun 2026</td>
-            <td><span class="badge badge-draft">Draft</span></td>
-            <td><a class="action-link">Buka ↗</a></td>
-          </tr>
-        </tbody>
-      </table>
+
+      <!-- KEUANGAN -->
+      <div class="cat-section">
+        <div class="cat-title">💰 Keuangan</div>
+        <div class="doc-grid">
+          <div class="doc-card" onclick="selectDoc(this,'INV','Invoice','🧾')">
+            <div class="doc-card-icon">🧾</div>
+            <div class="doc-card-name">Invoice</div>
+            <div class="doc-card-code">INV</div>
+          </div>
+          <div class="doc-card" onclick="selectDoc(this,'KWT','Kwitansi','💰')">
+            <div class="doc-card-icon">💰</div>
+            <div class="doc-card-name">Kwitansi</div>
+            <div class="doc-card-code">KWT</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KERJASAMA -->
+      <div class="cat-section">
+        <div class="cat-title">🤝 Kerjasama</div>
+        <div class="doc-grid">
+          <div class="doc-card" onclick="selectDoc(this,'PROP','Proposal','📊')">
+            <div class="doc-card-icon">📊</div>
+            <div class="doc-card-name">Proposal</div>
+            <div class="doc-card-code">PROP</div>
+          </div>
+          <div class="doc-card" onclick="selectDoc(this,'CP','Company Profile','🏢')">
+            <div class="doc-card-icon">🏢</div>
+            <div class="doc-card-name">Company Profile</div>
+            <div class="doc-card-code">CP</div>
+          </div>
+          <div class="doc-card" onclick="selectDoc(this,'MOU','MoU','🤝')">
+            <div class="doc-card-icon">🤝</div>
+            <div class="doc-card-name">MoU</div>
+            <div class="doc-card-code">MOU</div>
+          </div>
+          <div class="doc-card" onclick="selectDoc(this,'PKS','Perjanjian Kerjasama','📑')">
+            <div class="doc-card-icon">📑</div>
+            <div class="doc-card-name">Perjanjian Kerjasama</div>
+            <div class="doc-card-code">PKS</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HR / SDM -->
+      <div class="cat-section">
+        <div class="cat-title">👥 HR / SDM</div>
+        <div class="doc-grid">
+          <div class="doc-card" onclick="selectDoc(this,'SP1','Surat Peringatan 1','⚠️')">
+            <div class="doc-card-icon">⚠️</div>
+            <div class="doc-card-name">SP 1</div>
+            <div class="doc-card-code">SP1</div>
+          </div>
+          <div class="doc-card" onclick="selectDoc(this,'SP2','Surat Peringatan 2','🔴')">
+            <div class="doc-card-icon">🔴</div>
+            <div class="doc-card-name">SP 2</div>
+            <div class="doc-card-code">SP2</div>
+          </div>
+          <div class="doc-card" onclick="selectDoc(this,'SP3','Surat Peringatan 3','🚫')">
+            <div class="doc-card-icon">🚫</div>
+            <div class="doc-card-name">SP 3</div>
+            <div class="doc-card-code">SP3</div>
+          </div>
+          <div class="doc-card" onclick="selectDoc(this,'PKWT','Kontrak PKWT','📝')">
+            <div class="doc-card-icon">📝</div>
+            <div class="doc-card-name">Kontrak PKWT</div>
+            <div class="doc-card-code">PKWT</div>
+          </div>
+          <div class="doc-card" onclick="selectDoc(this,'SPG','Surat Pengangkatan','🎖')">
+            <div class="doc-card-icon">🎖</div>
+            <div class="doc-card-name">Pengangkatan</div>
+            <div class="doc-card-code">SPG</div>
+          </div>
+          <div class="doc-card" onclick="selectDoc(this,'SMT','Surat Mutasi','🔄')">
+            <div class="doc-card-icon">🔄</div>
+            <div class="doc-card-name">Mutasi</div>
+            <div class="doc-card-code">SMT</div>
+          </div>
+          <div class="doc-card" onclick="selectDoc(this,'PHK','Surat PHK','📤')">
+            <div class="doc-card-icon">📤</div>
+            <div class="doc-card-name">Surat PHK</div>
+            <div class="doc-card-code">PHK</div>
+          </div>
+          <div class="doc-card" onclick="selectDoc(this,'PI','Pakta Integritas','🛡')">
+            <div class="doc-card-icon">🛡</div>
+            <div class="doc-card-name">Pakta Integritas</div>
+            <div class="doc-card-code">PI</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPERASIONAL -->
+      <div class="cat-section">
+        <div class="cat-title">✅ Operasional</div>
+        <div class="doc-grid">
+          <div class="doc-card" onclick="selectDoc(this,'FCO','Form Checklist','✅')">
+            <div class="doc-card-icon">✅</div>
+            <div class="doc-card-name">Form Checklist Operasional</div>
+            <div class="doc-card-code">FCO</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FORM -->
+      <div class="panel-wrap show" id="formPanel">
+        <div class="form-card">
+          <div class="form-header">
+            <div class="form-header-icon" id="fIcon">📨</div>
+            <div>
+              <div class="form-header-title" id="fTitle">Surat Resmi</div>
+              <div class="form-header-sub" id="fSub">Isi formulir di bawah — semua field wajib kecuali lampiran</div>
+            </div>
+          </div>
+
+          <div class="fsec">Identitas Dokumen</div>
+          <div class="fgrid">
+            <div class="field">
+              <label>Nomor Dokumen (Otomatis)</label>
+              <div class="doc-num-box" id="docNum">001/RIFIM/SURAT/VII/2026</div>
+              <span class="field-hint">Di-generate saat klik Generate</span>
+            </div>
+            <div class="field">
+              <label>Tanggal</label>
+              <input type="date" id="docDate">
+            </div>
+            <div class="field">
+              <label>Perihal / Judul</label>
+              <input type="text" id="subject" placeholder="Penawaran Kerjasama...">
+            </div>
+            <div class="field">
+              <label>Lampiran</label>
+              <input type="text" id="attachment" placeholder="1 (Satu) Berkas — kosongkan jika tidak ada">
+            </div>
+          </div>
+
+          <div id="dynFields"></div>
+
+          <div class="fsec">Penanda Tangan</div>
+          <div class="fgrid">
+            <div class="field">
+              <label>Nama</label>
+              <input type="text" id="signerName" value="BOBBY RAHMAN M.B">
+            </div>
+            <div class="field">
+              <label>Jabatan</label>
+              <input type="text" id="signerTitle" value="Direktur Utama">
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-primary"   onclick="generateDoc()">⚡ Generate Dokumen</button>
+            <button class="btn btn-secondary" onclick="previewDoc()">👁 Preview</button>
+            <button class="btn btn-ghost"     onclick="clearForm()">Bersihkan</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end tab-buat -->
+
+    <!-- TAB: ARSIP -->
+    <div id="tab-arsip" style="display:none">
+      <div class="page-title">Arsip Dokumen</div>
+      <div class="page-sub">Semua dokumen tersimpan otomatis ke Google Drive & database.</div>
+      <div class="recent" style="margin-top:0">
+        <table class="doc-table">
+          <thead>
+            <tr>
+              <th>Nomor</th><th>Jenis</th><th>Perihal</th>
+              <th>Penerima / Karyawan</th><th>Tanggal</th>
+              <th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="doc-num">045/RIFIM/SURAT/VI/2026</td>
+              <td>Surat Resmi</td><td>Penawaran Kerjasama Marketing</td>
+              <td>PT. Teknologi Perdana</td><td>15 Jun 2026</td>
+              <td><span class="badge badge-sent">Terkirim</span></td>
+              <td><a class="act">Buka ↗</a></td>
+            </tr>
+            <tr>
+              <td class="doc-num">012/RIFIM/INV/VI/2026</td>
+              <td>Invoice</td><td>Jasa Promosi Maxim — Jun 2026</td>
+              <td>PT. Maxim Technology</td><td>30 Jun 2026</td>
+              <td><span class="badge badge-final">Final</span></td>
+              <td><a class="act">Buka ↗</a></td>
+            </tr>
+            <tr>
+              <td class="doc-num">003/RIFIM/PKWT/VI/2026</td>
+              <td>Kontrak PKWT</td><td>Kontrak Kerja 6 Bulan</td>
+              <td>Ahmad Fauzi</td><td>1 Jun 2026</td>
+              <td><span class="badge badge-final">Final</span></td>
+              <td><a class="act">Buka ↗</a></td>
+            </tr>
+            <tr>
+              <td class="doc-num">001/RIFIM/SP1/V/2026</td>
+              <td>SP 1</td><td>Pelanggaran Disiplin</td>
+              <td>Budi Santoso</td><td>10 Mei 2026</td>
+              <td><span class="badge badge-sent">Terkirim</span></td>
+              <td><a class="act">Buka ↗</a></td>
+            </tr>
+            <tr>
+              <td class="doc-num">044/RIFIM/SURAT/VI/2026</td>
+              <td>Surat Resmi</td><td>Permohonan Kerjasama</td>
+              <td>CV. Maju Bersama</td><td>10 Jun 2026</td>
+              <td><span class="badge badge-draft">Draft</span></td>
+              <td><a class="act">Buka ↗</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
   </main>
 </div>
 
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
 <script>
-  const DOC_TYPES = { SURAT:'SURAT', INVOICE:'INV', PROPOSAL:'PROP', PKWT:'PKWT' };
-  let currentType = 'SURAT';
+  // Document type dynamic fields definition
+  const DOC_FIELDS = {
+    SURAT:  [{id:'recipient',label:'Penerima',ph:'PT. Nama Perusahaan'},{id:'address',label:'Alamat Penerima',ph:'Di Tempat / Kota Batam'},{id:'body',label:'Isi Surat',type:'textarea',ph:'Tuliskan isi surat...',full:true}],
+    ST:     [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'task',label:'Uraian Tugas',ph:'Melakukan survei lapangan...',type:'textarea',full:true},{id:'location',label:'Lokasi Tugas',ph:'Kota Batam'},{id:'start',label:'Tanggal Mulai',type:'date'},{id:'end',label:'Tanggal Selesai',type:'date'}],
+    SIZ:    [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'leave_type',label:'Jenis Izin',type:'select',opts:['Sakit','Cuti Tahunan','Keperluan Keluarga','Lainnya']},{id:'start',label:'Tanggal Mulai',type:'date'},{id:'end',label:'Tanggal Selesai',type:'date'},{id:'reason',label:'Alasan',type:'textarea',full:true,ph:'Keterangan...'}],
+    SKT:    [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'position',label:'Jabatan',ph:'Staff Operasional'},{id:'purpose',label:'Keperluan',ph:'Pengajuan KPR / Visa...'}],
+    BA:     [{id:'event',label:'Nama Kegiatan',ph:'Rapat Evaluasi Bulanan'},{id:'date',label:'Tanggal Kegiatan',type:'date'},{id:'location',label:'Tempat',ph:'Kantor RIFIM, Batam'},{id:'attendees',label:'Peserta',type:'textarea',ph:'1. Nama Jabatan\n2. Nama Jabatan'},{id:'result',label:'Hasil / Keputusan',type:'textarea',full:true,ph:'Keputusan yang diambil...'}],
+    INV:    [{id:'client',label:'Nama Klien',ph:'PT. Maxim Technology'},{id:'client_addr',label:'Alamat Klien',ph:'Jakarta'},{id:'items',label:'Rincian Layanan',type:'textarea',ph:'1. Jasa Promosi — Rp5.000.000\n2. Aktivasi OOH — Rp2.000.000',full:true},{id:'due',label:'Jatuh Tempo',type:'date'}],
+    KWT:    [{id:'payer',label:'Nama Pembayar',ph:'PT. Maxim Technology'},{id:'amount',label:'Jumlah',ph:'Rp 7.000.000'},{id:'purpose',label:'Keterangan Pembayaran',ph:'Jasa Promosi Bulan Juni 2026'}],
+    PROP:   [{id:'recipient',label:'Ditujukan Kepada',ph:'PT. Nama Perusahaan'},{id:'project',label:'Nama Proyek / Program',ph:'Kampanye Digital Maxim Q3 2026'},{id:'scope',label:'Lingkup Pekerjaan',type:'textarea',ph:'Uraikan lingkup...',full:true},{id:'budget',label:'Estimasi Anggaran',ph:'Rp 25.000.000'}],
+    CP:     [{id:'recipient',label:'Ditujukan Kepada',ph:'PT. Nama Perusahaan'},{id:'purpose',label:'Tujuan Pengiriman',ph:'Pendaftaran Vendor / Tender...'}],
+    MOU:    [{id:'party_b',label:'Pihak Kedua',ph:'PT. Nama Mitra'},{id:'scope',label:'Lingkup Kerjasama',type:'textarea',ph:'Uraikan bidang kerjasama...',full:true},{id:'duration',label:'Jangka Waktu',ph:'12 Bulan'},{id:'signing',label:'Tanggal Penandatanganan',type:'date'}],
+    PKS:    [{id:'party_b',label:'Pihak Kedua',ph:'PT. Nama Mitra'},{id:'scope',label:'Lingkup Pekerjaan',type:'textarea',ph:'...',full:true},{id:'value',label:'Nilai Kerjasama',ph:'Rp 50.000.000'},{id:'duration',label:'Durasi',ph:'6 Bulan'},{id:'signing',label:'Tanggal TTD',type:'date'}],
+    SP1:    [{id:'emp_name',label:'Nama Karyawan',ph:'Budi Santoso'},{id:'emp_id',label:'ID Karyawan',ph:'RIG-2024-001'},{id:'position',label:'Jabatan',ph:'Staff Lapangan'},{id:'violation',label:'Pelanggaran',type:'textarea',ph:'Uraikan pelanggaran...',full:true},{id:'incident',label:'Tanggal Kejadian',type:'date'}],
+    SP2:    [{id:'emp_name',label:'Nama Karyawan',ph:'Budi Santoso'},{id:'emp_id',label:'ID Karyawan',ph:'RIG-2024-001'},{id:'violation',label:'Pelanggaran',type:'textarea',ph:'...',full:true},{id:'prev_sp',label:'Nomor SP 1 Sebelumnya',ph:'001/RIFIM/SP1/IV/2026'}],
+    SP3:    [{id:'emp_name',label:'Nama Karyawan',ph:'Budi Santoso'},{id:'emp_id',label:'ID Karyawan',ph:'RIG-2024-001'},{id:'violation',label:'Pelanggaran',type:'textarea',ph:'...',full:true},{id:'prev_sp',label:'Nomor SP 1 & 2',ph:'001/.../SP1/... dan 001/.../SP2/...'}],
+    PKWT:   [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'emp_id',label:'ID Karyawan',ph:'RIG-2026-020'},{id:'position',label:'Jabatan',ph:'Staff Operasional'},{id:'salary',label:'Gaji Pokok',ph:'Rp 3.500.000'},{id:'start',label:'Mulai Kontrak',type:'date'},{id:'end',label:'Akhir Kontrak',type:'date'}],
+    SPG:    [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'old_pos',label:'Jabatan Lama',ph:'Staff Operasional'},{id:'new_pos',label:'Jabatan Baru',ph:'Supervisor Operasional'},{id:'effective',label:'Berlaku Mulai',type:'date'}],
+    SMT:    [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'from',label:'Dari Departemen',ph:'Operasional Batam'},{id:'to',label:'Ke Departemen',ph:'Operasional Balikpapan'},{id:'effective',label:'Berlaku Mulai',type:'date'}],
+    PHK:    [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'position',label:'Jabatan',ph:'Staff Lapangan'},{id:'last_day',label:'Hari Kerja Terakhir',type:'date'},{id:'reason',label:'Alasan PHK',type:'select',opts:['Habis Kontrak','Resign','Pelanggaran Berat','Efisiensi Perusahaan']}],
+    PI:     [{id:'emp_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'position',label:'Jabatan',ph:'Supervisor'},{id:'dept',label:'Departemen',ph:'Operasional'}],
+    FCO:    [{id:'type',label:'Jenis Checklist',type:'select',opts:['Operasional Harian','Checklist Kendaraan','Checklist Kantor','Checklist Event']},{id:'officer',label:'Nama Petugas',ph:'Ahmad Fauzi'},{id:'items',label:'Item Checklist',type:'textarea',ph:'1. Item\n2. Item\n3. Item',full:true}],
+  };
 
-  function selectDoc(el, type) {
+  const MONTHS = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+  let currentCode = 'SURAT';
+
+  function selectDoc(el, code, label, icon) {
     document.querySelectorAll('.doc-card').forEach(c => c.classList.remove('selected'));
     el.classList.add('selected');
-    currentType = type;
-    updateDocNumber();
+    currentCode = code;
+    document.getElementById('fIcon').textContent = icon;
+    document.getElementById('fTitle').textContent = label;
+    document.getElementById('fSub').textContent = `Isi formulir di bawah untuk membuat ${label}`;
+    updateDocNum();
+    renderDynFields(code);
+    document.getElementById('formPanel').classList.add('show');
+    document.getElementById('formPanel').scrollIntoView({behavior:'smooth', block:'nearest'});
   }
 
-  function updateDocNumber() {
+  function updateDocNum() {
     const now = new Date();
-    const months = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
-    const m = months[now.getMonth()];
-    const y = now.getFullYear();
     const seq = String(Math.floor(Math.random()*50)+1).padStart(3,'0');
-    const code = DOC_TYPES[currentType];
-    document.getElementById('docNumberPreview').textContent =
-      `${seq}/RIFIM/${code}/${m}/${y}`;
+    document.getElementById('docNum').textContent =
+      `${seq}/RIFIM/${currentCode}/${MONTHS[now.getMonth()]}/${now.getFullYear()}`;
   }
+
+  function renderDynFields(code) {
+    const fields = DOC_FIELDS[code] || [];
+    const container = document.getElementById('dynFields');
+    let html = '<div class="fsec">Detail Dokumen</div>';
+    const normals = fields.filter(f => !f.full);
+    const fulls   = fields.filter(f => f.full);
+    if (normals.length) {
+      html += '<div class="fgrid">';
+      normals.forEach(f => { html += buildField(f); });
+      html += '</div>';
+    }
+    if (fulls.length) {
+      html += '<div class="fgrid full">';
+      fulls.forEach(f => { html += buildField(f); });
+      html += '</div>';
+    }
+    container.innerHTML = html;
+  }
+
+  function buildField(f) {
+    if (f.type === 'textarea') {
+      return `<div class="field"><label>${f.label}</label><textarea id="${f.id}" placeholder="${f.ph||''}"></textarea></div>`;
+    }
+    if (f.type === 'select') {
+      const opts = f.opts.map(o => `<option>${o}</option>`).join('');
+      return `<div class="field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`;
+    }
+    if (f.type === 'date') {
+      return `<div class="field"><label>${f.label}</label><input type="date" id="${f.id}"></div>`;
+    }
+    return `<div class="field"><label>${f.label}</label><input type="text" id="${f.id}" placeholder="${f.ph||''}"></div>`;
+  }
+
+  function showTab(name, el) {
+    document.getElementById('tab-buat').style.display  = name==='buat'  ? 'block' : 'none';
+    document.getElementById('tab-arsip').style.display = name==='arsip' ? 'block' : 'none';
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    if (el) el.classList.add('active');
+  }
+
+  function filterCat(cat) { showToast(`Filter: ${cat}`, false); }
 
   function generateDoc() {
-    const subject = document.getElementById('subject').value;
-    const recipient = document.getElementById('recipientName').value;
-    if (!subject || !recipient) {
-      showToast('⚠️ Perihal dan Penerima wajib diisi', false);
-      return;
-    }
-    showToast('⚡ Memproses dokumen...', false);
-    setTimeout(() => {
-      showToast('✅ Dokumen berhasil dibuat! Membuka Google Doc...', true);
-    }, 1800);
+    showToast('⏳ Memproses dokumen...', false);
+    setTimeout(() => showToast('✅ Dokumen berhasil dibuat & disimpan ke Drive!', true), 1800);
   }
-
-  function previewDoc() {
-    showToast('👁 Membuka preview...', false);
-  }
-
-  function clearForm() {
-    ['subject','attachment','recipientName','recipientAddress','body'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
+  function previewDoc() { showToast('👁 Membuka preview dokumen...', false); }
+  function clearForm()  {
+    document.querySelectorAll('#formPanel input, #formPanel textarea, #formPanel select')
+      .forEach(el => { if(el.type!=='date') el.value=''; });
     showToast('Form dikosongkan', false);
   }
 
-  function showToast(msg, success) {
+  function showToast(msg, ok) {
     const t = document.getElementById('toast');
     t.textContent = msg;
-    t.className = 'toast show' + (success ? ' success' : '');
-    setTimeout(() => t.className = 'toast', 3000);
+    t.className = 'toast show' + (ok ? ' ok' : '');
+    setTimeout(() => t.className = 'toast', 3200);
   }
 
-  updateDocNumber();
+  // Init
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('docDate').value = today;
+  updateDocNum();
+  renderDynFields('SURAT');
 </script>
 </body>
 </html>
