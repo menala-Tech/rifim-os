@@ -1,0 +1,821 @@
+
+<title>RIFIM OS — Premium Corporate Letterhead</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #A0A0A0;
+    font-family: Arial, Helvetica, sans-serif;
+    padding: 36px 12px 52px;
+    min-height: 100vh;
+  }
+
+  /* ════ A4 PAGE ════ */
+  .page {
+    width: 794px;
+    min-height: 1123px;
+    background: #FFFFFF;
+    margin: 0 auto;
+    box-shadow: 0 8px 60px rgba(0,0,0,0.35), 0 2px 12px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ════ HEADER ════ */
+  .header {
+    position: relative;
+    height: 188px;
+    background: linear-gradient(150deg, #FFFFFF 0%, #FAF6F6 55%, #F3ECEC 100%);
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .header-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .header-content {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    display: flex;
+    align-items: stretch;
+    padding: 18px 26px 16px 22px;
+    gap: 20px;
+  }
+
+  /* — Logo — */
+  .logo-col {
+    flex-shrink: 0;
+    width: 148px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .logo-col-name {
+    font-size: 6.2px;
+    font-weight: 700;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: #2B2B2B;
+    text-align: center;
+    line-height: 1.55;
+  }
+
+  /* — Vertical rule — */
+  .vsep {
+    width: 1px;
+    background: linear-gradient(to bottom, transparent 5%, #C40000 25%, #C40000 75%, transparent 95%);
+    align-self: stretch;
+    flex-shrink: 0;
+    margin: 6px 0;
+  }
+
+  /* — Company info — */
+  .info-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-top: 2px;
+  }
+
+  .co-name {
+    font-family: 'Arial Black', 'Arial Bold', Arial, sans-serif;
+    font-size: 16.5px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #2B2B2B;
+    line-height: 1.0;
+  }
+
+  .co-subtitle {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 2.8px;
+    text-transform: uppercase;
+    color: #C40000;
+    margin: 4px 0 10px;
+  }
+
+  .values-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border-top: 0.75px solid #E2DCDC;
+    border-bottom: 0.75px solid #E2DCDC;
+    padding: 5px 0;
+    margin-bottom: 8px;
+  }
+
+  .val {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    color: #2B2B2B;
+    padding-right: 10px;
+  }
+
+  .val:not(:last-child) {
+    border-right: 0.75px solid #E2DCDC;
+    margin-right: 10px;
+  }
+
+  .co-tagline {
+    font-size: 8px;
+    color: #888;
+    font-style: italic;
+    letter-spacing: 0.3px;
+  }
+
+  /* ════ SEPARATOR ════ */
+  .separator {
+    flex-shrink: 0;
+    height: 14px;
+    position: relative;
+  }
+
+  /* ════ CONTACT STRIP ════ */
+  .contact-strip {
+    flex-shrink: 0;
+    background: #F6F3F3;
+    border-bottom: 0.75px solid #EAE4E4;
+    padding: 7px 32px;
+    display: flex;
+    align-items: center;
+    gap: 22px;
+  }
+
+  .c-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 7.5px;
+    color: #444;
+    white-space: nowrap;
+  }
+
+  .c-icon-circle {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #C40000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* ════ BODY ════ */
+  .body-area {
+    flex: 1;
+    position: relative;
+    background: #FFFFFF;
+    padding: 28px 50px 20px;
+    overflow: hidden;
+  }
+
+  .body-bg-art {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .body-content {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Letter meta fields */
+  .meta-block {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+    gap: 24px;
+  }
+
+  .meta-table { display: table; font-size: 11px; }
+  .meta-row   { display: table-row; }
+  .meta-lbl   { display: table-cell; width: 72px; padding-bottom: 3px; vertical-align: top; color: #2B2B2B; }
+  .meta-colon { display: table-cell; padding: 0 10px 3px; vertical-align: top; }
+  .meta-val   { display: table-cell; vertical-align: top; padding-bottom: 3px; }
+  .meta-val.bld { font-weight: 700; }
+
+  .meta-date {
+    font-size: 11px;
+    font-family: 'Times New Roman', Georgia, serif;
+    color: #2B2B2B;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Recipient */
+  .recipient {
+    font-size: 11px;
+    line-height: 1.7;
+    margin-bottom: 18px;
+  }
+  .recipient .bold { font-weight: 700; }
+
+  /* Salutation & paragraphs */
+  .salut { font-size: 11px; margin-bottom: 14px; }
+
+  .para {
+    font-size: 11px;
+    font-family: 'Times New Roman', Georgia, serif;
+    line-height: 1.9;
+    text-align: justify;
+    margin-bottom: 12px;
+    text-indent: 40px;
+    color: #1A1A1A;
+  }
+
+  .doc-list {
+    margin: 2px 0 14px 60px;
+    list-style: none;
+    counter-reset: dl;
+    font-size: 11px;
+    font-family: 'Times New Roman', Georgia, serif;
+    line-height: 1.8;
+    color: #1A1A1A;
+  }
+
+  .doc-list li {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    counter-increment: dl;
+  }
+
+  .doc-list li::before {
+    content: counter(dl) ".";
+    font-weight: 700;
+    flex-shrink: 0;
+    min-width: 14px;
+    font-family: Arial, sans-serif;
+  }
+
+  /* Signature */
+  .sig {
+    padding-top: 18px;
+    font-size: 11px;
+    line-height: 1.7;
+  }
+
+  .sig-co   { font-weight: 700; margin-bottom: 52px; }
+
+  .sig-name {
+    font-weight: 700;
+    font-size: 11px;
+    border-top: 1.5px solid #2B2B2B;
+    padding-top: 5px;
+    display: inline-block;
+    min-width: 150px;
+  }
+
+  .sig-title { font-size: 10px; color: #555; }
+
+  /* ════ FOOTER ════ */
+  .footer {
+    flex-shrink: 0;
+    height: 90px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .footer-content {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 0 32px;
+    /* Push content into lower 60% of footer (below wave tops) */
+    padding-top: 28px;
+  }
+
+  .footer-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .footer-maxim {
+    font-family: 'Arial Black', Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 900;
+    color: #FFFFFF;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  .footer-airport-sub {
+    font-size: 6.5px;
+    color: rgba(255,255,255,0.65);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+
+  .footer-divider {
+    width: 1px;
+    height: 30px;
+    background: rgba(255,255,255,0.3);
+  }
+
+  .footer-slogan {
+    font-size: 7.5px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.9);
+    line-height: 1.7;
+  }
+</style>
+
+<div class="page">
+
+  <!-- ══════════════════ HEADER ══════════════════ -->
+  <div class="header">
+
+    <!-- Airport background art -->
+    <svg class="header-bg" viewBox="0 0 794 188" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="hbg" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#C40000" stop-opacity="0.06"/>
+          <stop offset="100%" stop-color="#C40000" stop-opacity="0.02"/>
+        </linearGradient>
+      </defs>
+
+      <!-- Background glow behind tower area -->
+      <ellipse cx="680" cy="94" rx="160" ry="100" fill="#C40000" opacity="0.04"/>
+
+      <!-- ATC Control Tower -->
+      <!-- Tower shaft -->
+      <rect x="692" y="18" width="7" height="135" fill="#2B2B2B" opacity="0.07"/>
+      <!-- Tower neck widening -->
+      <rect x="688" y="88" width="15" height="45" fill="#2B2B2B" opacity="0.07"/>
+      <!-- Observation deck base -->
+      <rect x="674" y="82" width="43" height="16" rx="1" fill="#2B2B2B" opacity="0.07"/>
+      <!-- Obs deck glass strip -->
+      <rect x="676" y="85" width="39" height="6" fill="#2B2B2B" opacity="0.04"/>
+      <!-- Radar disc -->
+      <ellipse cx="695" cy="16" rx="14" ry="5" fill="#2B2B2B" opacity="0.06"/>
+      <line x1="695" y1="18" x2="695" y2="21" stroke="#2B2B2B" stroke-width="2" opacity="0.06"/>
+      <!-- Tower antenna -->
+      <line x1="695" y1="8" x2="695" y2="18" stroke="#2B2B2B" stroke-width="1.5" opacity="0.06"/>
+
+      <!-- Secondary smaller structure (left) -->
+      <rect x="120" y="100" width="5" height="88" fill="#2B2B2B" opacity="0.05"/>
+      <rect x="114" y="95" width="17" height="12" rx="1" fill="#2B2B2B" opacity="0.05"/>
+      <rect x="116" y="92" width="13" height="5" fill="#2B2B2B" opacity="0.04"/>
+
+      <!-- Terminal building (along bottom of header) -->
+      <!-- Main concourse -->
+      <path d="M 0,162 Q 200,150 400,158 Q 600,165 794,155 L 794,188 L 0,188 Z" fill="#2B2B2B" opacity="0.05"/>
+      <!-- Roof ridge of terminal -->
+      <path d="M 50,158 Q 200,145 380,152 Q 560,160 750,150" stroke="#2B2B2B" stroke-width="1.5" fill="none" opacity="0.05"/>
+      <!-- Gate jetway fingers -->
+      <rect x="90"  y="145" width="6" height="18" fill="#2B2B2B" opacity="0.05"/>
+      <rect x="165" y="142" width="6" height="21" fill="#2B2B2B" opacity="0.05"/>
+      <rect x="240" y="147" width="6" height="16" fill="#2B2B2B" opacity="0.05"/>
+      <rect x="320" y="144" width="6" height="19" fill="#2B2B2B" opacity="0.05"/>
+      <rect x="410" y="148" width="6" height="15" fill="#2B2B2B" opacity="0.05"/>
+      <rect x="490" y="145" width="6" height="18" fill="#2B2B2B" opacity="0.05"/>
+      <rect x="565" y="142" width="6" height="21" fill="#2B2B2B" opacity="0.05"/>
+      <rect x="635" y="147" width="6" height="16" fill="#2B2B2B" opacity="0.05"/>
+      <!-- Corridor dome / terminal roof curve -->
+      <path d="M 0,160 Q 100,148 220,155 Q 340,162 460,154 Q 580,147 700,155 L 794,152" stroke="#2B2B2B" stroke-width="0.8" fill="none" opacity="0.04"/>
+
+      <!-- Airplane silhouette (upper right area, flying left-to-right) -->
+      <g transform="translate(450,38) rotate(-7)" opacity="0.06" fill="#2B2B2B">
+        <!-- Fuselage -->
+        <ellipse cx="0" cy="0" rx="58" ry="8"/>
+        <!-- Left wing (above) -->
+        <polygon points="-8,-6 28,2 22,18 -8,14"/>
+        <!-- Right wing (below, hidden in 2D - just horizontal stabs) -->
+        <!-- Horizontal stabiliser -->
+        <polygon points="-50,-1 -36,0 -40,-8 -52,-5"/>
+        <polygon points="-50,1 -36,0 -40,8 -52,5"/>
+        <!-- Vertical tail -->
+        <polygon points="-52,-1 -42,-1 -46,-14 -54,-5"/>
+        <!-- Nose cone -->
+        <ellipse cx="58" cy="0" rx="9" ry="6"/>
+        <!-- Engine nacelles on wing -->
+        <ellipse cx="12" cy="6" rx="9" ry="3"/>
+        <ellipse cx="24" cy="9" rx="7" ry="2.5"/>
+      </g>
+
+      <!-- Futuristic red wave lines -->
+      <path d="M -20,55 C 80,38 180,62 290,48 C 400,34 510,58 640,44 C 730,35 780,50 830,42"
+            stroke="#C40000" stroke-width="0.9" fill="none" opacity="0.14"/>
+      <path d="M -20,72 C 100,58 220,76 360,63 C 500,50 610,72 720,60 C 770,54 800,64 830,58"
+            stroke="#C40000" stroke-width="0.65" fill="none" opacity="0.10"/>
+      <path d="M -20,88 C 60,80 180,94 320,84 C 460,74 580,90 700,80 C 760,74 795,83 830,77"
+            stroke="#C40000" stroke-width="0.5" fill="none" opacity="0.08"/>
+      <path d="M -20,105 C 120,98 250,110 380,103 C 510,96 640,108 760,100 C 790,98 810,103 830,100"
+            stroke="#C40000" stroke-width="0.4" fill="none" opacity="0.06"/>
+
+      <!-- Runway perspective lines (lower header) -->
+      <line x1="350" y1="188" x2="500" y2="140" stroke="#2B2B2B" stroke-width="0.5" opacity="0.04"/>
+      <line x1="420" y1="188" x2="520" y2="140" stroke="#2B2B2B" stroke-width="0.5" opacity="0.04"/>
+      <line x1="490" y1="188" x2="545" y2="140" stroke="#2B2B2B" stroke-width="0.5" opacity="0.04"/>
+    </svg>
+
+    <!-- Header content -->
+    <div class="header-content">
+
+      <!-- 3D RIFIM Logo -->
+      <div class="logo-col">
+        <svg width="138" height="94" viewBox="0 0 138 94" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="boxFront" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stop-color="#E05555"/>
+              <stop offset="35%"  stop-color="#C40000"/>
+              <stop offset="100%" stop-color="#730000"/>
+            </linearGradient>
+            <linearGradient id="boxRight" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stop-color="#5A0000"/>
+              <stop offset="100%" stop-color="#3A0000"/>
+            </linearGradient>
+            <linearGradient id="boxBottom" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%"   stop-color="#4A0000"/>
+              <stop offset="100%" stop-color="#2A0000"/>
+            </linearGradient>
+            <linearGradient id="fimGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stop-color="#D44040"/>
+              <stop offset="45%"  stop-color="#C40000"/>
+              <stop offset="100%" stop-color="#8B0000"/>
+            </linearGradient>
+            <filter id="logoshadow">
+              <feDropShadow dx="1.5" dy="2.5" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.28"/>
+            </filter>
+          </defs>
+
+          <!-- Background sketch (very faint) -->
+          <path d="M 40,90 Q 70,70 110,75 Q 130,78 140,85" stroke="#C40000" stroke-width="0.5" fill="none" opacity="0.10"/>
+
+          <!-- 3D box — bottom face -->
+          <polygon points="8,73 60,73 65,78 13,78" fill="url(#boxBottom)" opacity="0.85"/>
+          <!-- 3D box — right face -->
+          <polygon points="56,20 65,24 65,78 56,73" fill="url(#boxRight)"/>
+          <!-- 3D box — front face (main red) -->
+          <rect x="2" y="18" width="54" height="55" rx="4" fill="url(#boxFront)" filter="url(#logoshadow)"/>
+          <!-- Bevel highlight top -->
+          <rect x="2" y="18" width="54" height="3.5" rx="2" fill="rgba(255,255,255,0.28)"/>
+          <!-- Inner border frame -->
+          <rect x="5.5" y="21.5" width="47" height="48" rx="2" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.4"/>
+          <!-- Subtle horizontal lines (panel effect) -->
+          <line x1="5.5" y1="36" x2="52.5" y2="36" stroke="rgba(255,255,255,0.06)" stroke-width="0.8"/>
+          <line x1="5.5" y1="52" x2="52.5" y2="52" stroke="rgba(255,255,255,0.06)" stroke-width="0.8"/>
+          <!-- RI text -->
+          <text x="29" y="56" text-anchor="middle" fill="white"
+                font-family="Arial Black, Arial, sans-serif" font-size="22" font-weight="900"
+                style="filter:drop-shadow(0 1px 3px rgba(0,0,0,0.45))">RI</text>
+
+          <!-- FIM text -->
+          <text x="61" y="71" fill="url(#fimGrad)"
+                font-family="Arial Black, Arial, sans-serif" font-size="40" font-weight="900"
+                letter-spacing="-1.5"
+                style="filter:drop-shadow(1px 2px 2px rgba(0,0,0,0.22))">FIM</text>
+
+          <!-- Upward trajectory arrow -->
+          <path d="M 57,62 C 72,46 92,30 128,12" stroke="#C40000" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <polygon points="128,12 120,19 129,20" fill="#C40000"/>
+
+          <!-- Small airplane -->
+          <g transform="translate(126,9) rotate(-40) scale(0.7)">
+            <ellipse cx="0" cy="0" rx="8" ry="2.5" fill="#C40000"/>
+            <polygon points="0,-2 -9,-7 -9,-4" fill="#C40000"/>
+            <polygon points="3,-1 9,-5 9,-2.5" fill="#C40000"/>
+            <polygon points="-5,1.5 -7,5 -2,4" fill="#C40000"/>
+          </g>
+        </svg>
+        <div class="logo-col-name">PT. Rifim Internasional<br>Gemilang</div>
+      </div>
+
+      <div class="vsep"></div>
+
+      <!-- Company info -->
+      <div class="info-col">
+        <div class="co-name">PT. RIFIM Internasional Gemilang</div>
+        <div class="co-subtitle">Vendor Operasional Maxim Indonesia</div>
+
+        <div class="values-row">
+          <!-- Integritas — shield icon -->
+          <div class="val">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6.5 1L2 3v4c0 2.5 2 4.5 4.5 5.5C9 11.5 11 9.5 11 7V3L6.5 1z" fill="#C40000" opacity="0.9"/>
+              <path d="M4.5 6.5l1.5 1.5 3-3" stroke="white" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Integritas
+          </div>
+          <!-- Inovasi — lightbulb -->
+          <div class="val">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="6.5" cy="5" r="3.5" fill="#C40000" opacity="0.9"/>
+              <rect x="5" y="8.5" width="3" height="1.5" rx="0.5" fill="#C40000" opacity="0.8"/>
+              <rect x="5.5" y="10.2" width="2" height="0.8" rx="0.4" fill="#C40000" opacity="0.7"/>
+              <line x1="6.5" y1="1" x2="6.5" y2="1.5" stroke="#C40000" stroke-width="1" opacity="0.7"/>
+              <line x1="9.5" y1="2" x2="9" y2="2.5" stroke="#C40000" stroke-width="1" opacity="0.7"/>
+              <line x1="3.5" y1="2" x2="4" y2="2.5" stroke="#C40000" stroke-width="1" opacity="0.7"/>
+            </svg>
+            Inovasi
+          </div>
+          <!-- Kualitas — star -->
+          <div class="val">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <polygon points="6.5,1.5 7.9,5.1 11.7,5.2 8.8,7.6 9.9,11.3 6.5,9.2 3.1,11.3 4.2,7.6 1.3,5.2 5.1,5.1" fill="#C40000" opacity="0.9"/>
+            </svg>
+            Kualitas
+          </div>
+          <!-- Keberlanjutan — leaf/arrows -->
+          <div class="val">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6.5 2C4 2 2 4 2 6.5c0 .8.2 1.5.5 2.2L6.5 11l4-2.3c.3-.7.5-1.4.5-2.2C11 4 9 2 6.5 2z" fill="#C40000" opacity="0.9"/>
+              <path d="M6.5 2v9" stroke="white" stroke-width="0.8" opacity="0.7"/>
+            </svg>
+            Keberlanjutan
+          </div>
+        </div>
+
+        <div class="co-tagline">"Membangun Hari Ini, Menginspirasi Masa Depan"</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ SEPARATOR ══════════════════ -->
+  <div class="separator">
+    <svg width="794" height="14" viewBox="0 0 794 14" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#8B0000"/>
+          <stop offset="60%" stop-color="#C40000"/>
+          <stop offset="100%" stop-color="#C40000"/>
+        </linearGradient>
+      </defs>
+      <!-- Main red line -->
+      <rect x="0" y="5" width="744" height="2.5" fill="url(#lineGrad)"/>
+      <!-- Parallelogram spear accent (right end) -->
+      <polygon points="735,5 758,5 794,10 771,10" fill="#C40000"/>
+      <polygon points="748,5 772,5 794,8 770,8" fill="#8B0000" opacity="0.7"/>
+      <!-- Thin under-line -->
+      <rect x="0" y="9" width="735" height="0.75" fill="#C40000" opacity="0.4"/>
+      <!-- Thin silver highlight above -->
+      <rect x="0" y="4.5" width="740" height="0.75" fill="#E0A0A0" opacity="0.5"/>
+    </svg>
+  </div>
+
+  <!-- ══════════════════ CONTACT STRIP ══════════════════ -->
+  <div class="contact-strip">
+    <div class="c-item">
+      <div class="c-icon-circle">
+        <svg width="9" height="9" viewBox="0 0 10 10" fill="white" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="5" cy="4" r="2.5" fill="white"/>
+          <polygon points="5,9 2.5,5 7.5,5" fill="white"/>
+        </svg>
+      </div>
+      Fanindo Blok S No. 20, Tanjung Uncang, Batu Aji, Kota Batam
+    </div>
+    <div class="c-item">
+      <div class="c-icon-circle">
+        <svg width="9" height="9" viewBox="0 0 10 10" fill="white" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 2c0 0-.5 0-.8.6L1.5 4c-.3.7.5 2 1.5 3s2.3 1.8 3 1.5l1.4-.7c.6-.3.6-.8.6-.8L6.8 6c0 0-.4-.2-.7.1L5.8 6.5c-.2.2-.6.1-1-.3-.4-.4-1.2-1.2-1.6-1.6-.4-.4-.5-.8-.3-1L3.3 3.2C3.6 2.9 3.4 2.5 3.4 2.5L3 2z" fill="white"/>
+        </svg>
+      </div>
+      +62 821 7010 2349
+    </div>
+    <div class="c-item">
+      <div class="c-icon-circle">
+        <svg width="9" height="9" viewBox="0 0 10 10" fill="white" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="2.5" width="8" height="5.5" rx="1" fill="none" stroke="white" stroke-width="0.9"/>
+          <path d="M1.5 3l3.5 2.8L8.5 3" stroke="white" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+      rifiminternasionalgemilang@gmail.com
+    </div>
+    <div class="c-item">
+      <div class="c-icon-circle">
+        <svg width="9" height="9" viewBox="0 0 10 10" fill="white" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="5" cy="5" r="3.5" fill="none" stroke="white" stroke-width="0.9"/>
+          <ellipse cx="5" cy="5" rx="1.5" ry="3.5" fill="none" stroke="white" stroke-width="0.7"/>
+          <line x1="1.5" y1="3.5" x2="8.5" y2="3.5" stroke="white" stroke-width="0.7"/>
+          <line x1="1.5" y1="6.5" x2="8.5" y2="6.5" stroke="white" stroke-width="0.7"/>
+        </svg>
+      </div>
+      www.rifimgroup.com
+    </div>
+  </div>
+
+  <!-- ══════════════════ BODY ══════════════════ -->
+  <div class="body-area">
+
+    <!-- Background art (watermarks + texture) -->
+    <svg class="body-bg-art" viewBox="0 0 794 820" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+
+      <!-- Very subtle wave texture lines -->
+      <path d="M -100,120 C 100,108 250,132 450,118 C 650,104 750,125 920,112"
+            stroke="#BBBBBB" stroke-width="1.5" fill="none" opacity="0.06"/>
+      <path d="M -100,240 C 50,230 200,248 380,237 C 560,226 700,244 920,232"
+            stroke="#BBBBBB" stroke-width="1.2" fill="none" opacity="0.05"/>
+      <path d="M -100,360 C 80,352 220,366 410,355 C 600,344 730,360 920,350"
+            stroke="#BBBBBB" stroke-width="1" fill="none" opacity="0.04"/>
+      <path d="M -100,480 C 100,474 280,486 460,477 C 640,468 760,480 920,473"
+            stroke="#BBBBBB" stroke-width="0.8" fill="none" opacity="0.04"/>
+      <path d="M -100,600 C 150,595 320,604 500,597 C 680,590 780,600 920,594"
+            stroke="#BBBBBB" stroke-width="0.7" fill="none" opacity="0.03"/>
+
+      <!-- Body airport silhouette watermark (center-right, very faint) -->
+      <g opacity="0.045" transform="translate(280, 260)">
+        <!-- Main terminal -->
+        <rect x="0" y="180" width="480" height="45" fill="#2B2B2B"/>
+        <!-- Roof curve -->
+        <path d="M 0,180 Q 120,165 240,173 Q 360,181 480,168 L 480,180 Z" fill="#2B2B2B"/>
+        <!-- Gate fingers -->
+        <rect x="40"  y="157" width="8" height="24" fill="#2B2B2B"/>
+        <rect x="100" y="153" width="8" height="28" fill="#2B2B2B"/>
+        <rect x="170" y="158" width="8" height="23" fill="#2B2B2B"/>
+        <rect x="250" y="155" width="8" height="26" fill="#2B2B2B"/>
+        <rect x="320" y="159" width="8" height="22" fill="#2B2B2B"/>
+        <rect x="395" y="154" width="8" height="27" fill="#2B2B2B"/>
+        <rect x="450" y="158" width="8" height="23" fill="#2B2B2B"/>
+        <!-- Control tower -->
+        <rect x="530" y="50" width="10" height="175" fill="#2B2B2B"/>
+        <rect x="520" y="118" width="30" height="52" fill="#2B2B2B"/>
+        <rect x="512" y="108" width="46" height="18" rx="1" fill="#2B2B2B"/>
+        <ellipse cx="535" cy="48" rx="18" ry="7" fill="#2B2B2B"/>
+        <!-- Runway markings -->
+        <rect x="200" y="240" width="80" height="4" rx="2" fill="#2B2B2B" opacity="0.6"/>
+        <rect x="200" y="255" width="80" height="4" rx="2" fill="#2B2B2B" opacity="0.4"/>
+        <rect x="200" y="270" width="80" height="4" rx="2" fill="#2B2B2B" opacity="0.3"/>
+      </g>
+
+      <!-- RIFIM wordmark watermark — bottom right, 4% opacity -->
+      <text x="750" y="780"
+            font-family="Arial Black, Arial, sans-serif"
+            font-size="96" font-weight="900"
+            fill="#C40000" opacity="0.04"
+            text-anchor="end" transform="rotate(-8, 750, 780)">RIFIM</text>
+    </svg>
+
+    <!-- Letter content -->
+    <div class="body-content">
+      <div class="meta-block">
+        <div class="meta-table">
+          <div class="meta-row">
+            <span class="meta-lbl">Nomor</span>
+            <span class="meta-colon">:</span>
+            <span class="meta-val">045/RIG-ADV/VI/2026</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-lbl">Lampiran</span>
+            <span class="meta-colon">:</span>
+            <span class="meta-val">1 (Satu) Berkas Proposal Profil Agensi</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-lbl">Perihal</span>
+            <span class="meta-colon">:</span>
+            <span class="meta-val bld">Penawaran Kerjasama Strategic Marketing Agency &amp; Aktivasi</span>
+          </div>
+        </div>
+        <div class="meta-date">Batam, 15 Mei 2026</div>
+      </div>
+
+      <div class="recipient">
+        <div class="bold">Kepada Yth.</div>
+        <div class="bold">PT. Teknologi Perdana Indonesia</div>
+        <div>Di Tempat</div>
+      </div>
+
+      <div class="salut">Dengan hormat,</div>
+
+      <div class="para">
+        Melalui surat ini, kami <strong>PT. Rifim Internasional Gemilang</strong>, perusahaan yang
+        bergerak di bidang periklanan dan pemasaran strategis, bermaksud mengajukan penawaran
+        kerjasama sebagai mitra agensi promosi untuk layanan transportasi Maxim. Kami memahami
+        bahwa Maxim terus berekspansi di Indonesia dan membutuhkan penetrasi pasar yang kuat
+        melalui promosi lokal yang masif. Oleh karena itu, kami menawarkan solusi pemasaran
+        terpadu yang mencakup:
+      </div>
+
+      <ol class="doc-list">
+        <li><div><strong>Pengelolaan &amp; Distribusi Kode Promo:</strong> Kami akan mengelola distribusi
+        kode promo khusus (seperti bonus Rp200.000 untuk pengguna baru) melalui kanal offline
+        dan online untuk meningkatkan jumlah first-order.</div></li>
+        <li><div><strong>Aktivasi Iklan Luar Ruang (OOH):</strong> Pemasangan materi promosi di titik
+        strategis (kantor, mal, atau area publik) guna memperkuat brand awareness.</div></li>
+        <li><div><strong>Digital Campaign:</strong> Kampanye media sosial menggunakan aset visual kreatif
+        untuk menarik minat pengguna baru mengaktifkan kode promo hadiah.</div></li>
+        <li><div><strong>Field Marketing:</strong> Tim lapangan untuk edukasi cara aktivasi aplikasi dan
+        penggunaan saldo bonus bagi calon pelanggan serta pelaksanaan event promosi Maxim.</div></li>
+      </ol>
+
+      <div class="para">
+        Kami yakin dengan rekam jejak agensi kami dalam membantu promosi Maxim di Kota Batam serta
+        kapasitas kami sebagai perusahaan vendor transportasi Maxim di beberapa kota, kami dapat
+        membantu Maxim mencapai target jumlah pengunduh dan pesanan harian yang lebih tinggi di
+        wilayah Balikpapan dan Samarinda. Bersama surat ini, kami lampirkan detail proposal teknis,
+        rincian biaya layanan, serta skema pembagian keuntungan untuk Bapak/Ibu tinjau lebih lanjut.
+      </div>
+
+      <div class="para">
+        Besar harapan kami untuk dapat bergabung sebagai bagian dari ekosistem pertumbuhan Maxim.
+        Atas perhatian dan kerjasamanya, kami ucapkan terima kasih.
+      </div>
+
+      <div class="sig">
+        <div>Hormat kami,</div>
+        <div class="sig-co">PT. RIFIM INTERNASIONAL GEMILANG</div>
+        <div class="sig-name">BOBBY RAHMAN M.B</div>
+        <div class="sig-title">Direktur Utama</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ FOOTER ══════════════════ -->
+  <div class="footer">
+    <!-- Wave SVG -->
+    <svg width="794" height="90" viewBox="0 0 794 90" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="fgrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#8B0000"/>
+          <stop offset="100%" stop-color="#5A0000"/>
+        </linearGradient>
+      </defs>
+      <!-- Base dark red -->
+      <rect width="794" height="90" fill="url(#fgrad)"/>
+
+      <!-- Wave layer 1 — back, darkest -->
+      <path d="M 0,48 C 60,30 130,52 210,38 C 290,24 380,50 470,35 C 560,20 650,44 720,32 C 760,24 780,38 794,30 L 794,0 L 0,0 Z"
+            fill="#730000"/>
+
+      <!-- Wave layer 2 — mid -->
+      <path d="M 0,58 C 80,42 170,62 270,48 C 370,34 450,56 550,44 C 630,34 710,54 794,42 L 794,0 L 0,0 Z"
+            fill="#C40000"/>
+
+      <!-- Wave layer 3 — front highlight -->
+      <path d="M 0,68 C 100,56 200,70 320,60 C 440,50 540,66 640,57 C 710,50 760,62 794,56 L 794,0 L 0,0 Z"
+            fill="#D43030" opacity="0.7"/>
+
+      <!-- Thin white accent lines on waves -->
+      <path d="M 0,58 C 80,42 170,62 270,48 C 370,34 450,56 550,44 C 630,34 710,54 794,42"
+            stroke="rgba(255,255,255,0.12)" stroke-width="1" fill="none"/>
+      <path d="M 0,68 C 100,56 200,70 320,60 C 440,50 540,66 640,57 C 710,50 760,62 794,56"
+            stroke="rgba(255,255,255,0.08)" stroke-width="0.7" fill="none"/>
+
+      <!-- Airport silhouette at footer bottom (white ghost) -->
+      <g fill="rgba(255,255,255,0.07)" transform="translate(0,58)">
+        <rect x="0" y="12" width="794" height="22"/>
+        <path d="M 0,12 Q 150,5 300,10 Q 450,15 600,8 Q 700,4 794,10 L 794,12 Z" fill="rgba(255,255,255,0.06)"/>
+        <!-- Control tower tiny -->
+        <rect x="700" y="-18" width="5" height="32"/>
+        <rect x="694" y="-20" width="17" height="8" rx="1"/>
+        <!-- Gate fingers -->
+        <rect x="80"  y="4" width="4" height="9"/>
+        <rect x="160" y="3" width="4" height="10"/>
+        <rect x="250" y="5" width="4" height="8"/>
+        <rect x="340" y="4" width="4" height="9"/>
+        <rect x="440" y="3" width="4" height="10"/>
+        <rect x="540" y="5" width="4" height="8"/>
+        <rect x="620" y="4" width="4" height="9"/>
+      </g>
+    </svg>
+
+    <!-- Footer text content -->
+    <div class="footer-content">
+      <div class="footer-brand">
+        <!-- Plane icon -->
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg" opacity="0.95">
+          <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+        </svg>
+        <div>
+          <div class="footer-maxim">MAXIM AIRPORT</div>
+          <div class="footer-airport-sub"></div>
+        </div>
+      </div>
+      <div class="footer-divider"></div>
+      <div class="footer-slogan">Melayani Dunia<br>Menggerakkan Negeri</div>
+    </div>
+  </div>
+
+</div>
