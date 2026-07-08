@@ -48,7 +48,7 @@ function generateDocument(input) {
     replacePlaceholders(docCopy.getId(), data);
 
     const finalDoc   = saveDocument(docCopy, input.documentType, docNumber);
-    const pdfFile    = exportToPDF(finalDoc.getId(), docNumber);
+    const pdfFile    = exportToPDF(finalDoc.getId(), input.documentType, docNumber);
     const record     = _buildRecord(input, config, docNumber, finalDoc, pdfFile);
 
     saveDocumentRecord(record);

@@ -218,7 +218,8 @@ function _setupCompanyConfigSheet(ss) {
     ['company_nib',         '-',                                          'Nomor Induk Berusaha'],
     ['company_siup',        '-',                                          'Nomor SIUP'],
     // Google Drive
-    ['drive_root_folder_id','',                                           'ID folder utama RIFIM SMART OFFICE di Drive'],
+    ['drive_root_folder_id','19taBn0YXxjXTb-SxqFXGhwOPShZ4VlIt',       'ID folder root RIFIM OS di Google Drive'],
+    ['drive_dokumen_folder_id','',                                        'ID folder Dokumen (set oleh setupDriveFolders)'],
     ['gdoc_template_surat', '',                                           'ID template Google Doc — Surat Resmi'],
     ['gdoc_template_inv',   '',                                           'ID template Google Doc — Invoice'],
     ['gdoc_template_pkwt',  '',                                           'ID template Google Doc — PKWT'],
