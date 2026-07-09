@@ -7,7 +7,7 @@ secrets.js
 credentials.json
 
 # Google Apps Script
-.clasp.json
+# .clasp.json — tracked intentionally (scriptId only, not credentials)
 
 # Node
 node_modules/
