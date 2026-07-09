@@ -797,7 +797,7 @@ let allEmployees = [];
 let allContracts = [];
 let allLeave     = [];
 let allPayroll   = [];
-let selectedCompany = 'ALL';
+let selectedCompany = localStorage.getItem('rifim_company') || 'ALL';
 
 // ════════════════════════════════════════════════════════════
 // AUTH
@@ -875,6 +875,9 @@ document.getElementById('auth-email').addEventListener('keydown', e => {
 // INIT
 // ════════════════════════════════════════════════════════════
 function initApp() {
+  // Sync company dari portal
+  const coSel = document.getElementById('company-selector');
+  if (coSel) coSel.value = selectedCompany;
   // Set tahun di filter payroll
   const yearSel = document.getElementById('filter-payroll-year');
   for (let y = 2024; y <= 2030; y++) {

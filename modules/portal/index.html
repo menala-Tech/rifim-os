@@ -3,193 +3,234 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#1a1a2e">
+<meta name="theme-color" content="#1A1A1A">
 <title>RIFIM OS — Portal</title>
 <link rel="manifest" href="/manifest.json">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --primary:#1a1a2e;--accent:#e94560;--accent2:#0f3460;
-  --bg:#f0f2f5;--card:#fff;--border:#e0e0e0;
-  --text:#222;--muted:#888;--success:#27ae60;
+  --red:#C40000;--red-dark:#3A0000;--red-mid:#8B0000;
+  --dark:#1A1A1A;--dark2:#2B2B2B;--dark3:#111;
+  --card:#fff;--border:#e0e0e0;--text:#222;--muted:#888;
   --font:'Segoe UI',system-ui,sans-serif;
 }
-body{font-family:var(--font);background:var(--primary);color:#fff;min-height:100vh;display:flex;flex-direction:column}
+body{font-family:var(--font);background:var(--dark);color:#fff;min-height:100vh;display:flex;flex-direction:column}
 
 /* ─── AUTH GATE ─── */
 #auth-gate{
   flex:1;display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);
-  padding:24px;
+  background:linear-gradient(145deg,#1A1A1A 0%,#3A0000 60%,#2B2B2B 100%);
+  padding:24px;min-height:100vh;
 }
-.auth-box{
+.auth-card{
   background:#fff;border-radius:20px;padding:48px 40px;width:100%;max-width:400px;
-  box-shadow:0 24px 80px rgba(0,0,0,.5);text-align:center;
+  box-shadow:0 24px 80px rgba(0,0,0,.6);text-align:center;
 }
-.auth-logo{width:64px;height:64px;margin:0 auto 16px;display:block}
-.auth-box h1{font-size:28px;font-weight:700;color:var(--primary);margin-bottom:4px}
-.auth-box .subtitle{color:var(--muted);font-size:14px;margin-bottom:32px}
-.auth-box input{
+.auth-logo{width:72px;height:72px;margin:0 auto 12px;display:block;object-fit:contain}
+.auth-logo-fallback{
+  width:72px;height:72px;background:var(--red);border-radius:16px;
+  margin:0 auto 12px;display:flex;align-items:center;justify-content:center;
+  font-size:28px;font-weight:700;color:#fff;letter-spacing:1px;
+}
+.auth-card h1{font-size:26px;font-weight:800;color:var(--dark);margin-bottom:2px}
+.auth-card .sub{color:var(--muted);font-size:13px;margin-bottom:28px}
+.auth-card input{
   width:100%;padding:13px 16px;border:2px solid var(--border);border-radius:10px;
-  font-size:14px;margin-bottom:12px;outline:none;transition:border .2s;
+  font-size:14px;margin-bottom:12px;outline:none;transition:border .2s;color:var(--dark);
 }
-.auth-box input:focus{border-color:var(--accent)}
-.auth-box button{
-  width:100%;padding:13px;background:var(--accent);color:#fff;
-  border:none;border-radius:10px;font-size:15px;font-weight:600;
+.auth-card input:focus{border-color:var(--red)}
+.btn-login{
+  width:100%;padding:13px;background:var(--red);color:#fff;
+  border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;
   transition:background .2s;
 }
-.auth-box button:hover{background:#c0392b}
-#auth-error{color:var(--accent);font-size:13px;margin-top:10px;display:none}
-.auth-box .tagline{margin-top:20px;font-size:12px;color:var(--muted)}
+.btn-login:hover{background:var(--red-mid)}
+.btn-login:disabled{opacity:.6;cursor:default}
+#auth-err{color:var(--red);font-size:13px;margin-top:10px;display:none}
+.auth-footer{margin-top:20px;font-size:11px;color:var(--muted)}
 
 /* ─── PORTAL APP ─── */
-#app{flex:1;display:none;flex-direction:column;
-  background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);
+#app{flex:1;display:none;flex-direction:column;min-height:100vh;
+  background:linear-gradient(145deg,#1A1A1A 0%,#3A0000 60%,#2B2B2B 100%);
 }
+
+/* ─── HEADER ─── */
 header{
   display:flex;align-items:center;justify-content:space-between;
-  padding:16px 32px;border-bottom:1px solid rgba(255,255,255,.1);
+  padding:14px 28px;border-bottom:1px solid rgba(255,255,255,.1);
+  background:rgba(0,0,0,.3);backdrop-filter:blur(8px);
+  position:sticky;top:0;z-index:50;
 }
-.header-brand{display:flex;align-items:center;gap:12px}
-.header-brand img{width:36px;height:36px;border-radius:8px}
-.header-brand span{font-size:18px;font-weight:700;letter-spacing:1px}
-.header-user{display:flex;align-items:center;gap:12px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{width:36px;height:36px;object-fit:contain;border-radius:8px}
+.brand-txt .brand-name{font-size:17px;font-weight:800;letter-spacing:1px}
+.brand-txt .brand-sub{font-size:10px;opacity:.5;letter-spacing:.5px;text-transform:uppercase}
+.header-right{display:flex;align-items:center;gap:12px}
 .user-info{text-align:right}
-.user-name{font-size:14px;font-weight:600}
-.user-role{font-size:11px;opacity:.6}
-#btn-logout{
-  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
+.user-name{font-size:13px;font-weight:600}
+.user-role{
+  display:inline-block;margin-top:2px;padding:1px 8px;
+  background:rgba(196,0,0,.3);border:1px solid rgba(196,0,0,.5);
+  border-radius:20px;font-size:10px;color:#ff9999;font-weight:600;
+}
+.btn-out{
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
   color:#fff;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer;
 }
-#btn-logout:hover{background:rgba(255,255,255,.2)}
+.btn-out:hover{background:rgba(255,255,255,.15)}
 
 /* ─── MAIN ─── */
-main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px}
-.portal-title{text-align:center;margin-bottom:48px}
-.portal-title h2{font-size:32px;font-weight:700;margin-bottom:8px}
-.portal-title p{font-size:15px;opacity:.6}
+main{flex:1;padding:32px 24px;max-width:960px;width:100%;margin:0 auto}
 
-.modules-grid{
-  display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-  gap:20px;width:100%;max-width:900px;
+/* ─── COMPANY SELECTOR ─── */
+.section-label{font-size:11px;font-weight:600;opacity:.5;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px}
+.company-pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:32px}
+.company-pill{
+  padding:8px 18px;border-radius:30px;font-size:13px;font-weight:600;cursor:pointer;
+  border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);
+  transition:all .2s;white-space:nowrap;
 }
-.module-card{
-  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
-  border-radius:16px;padding:28px 24px;text-align:center;
+.company-pill:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.35)}
+.company-pill.active{background:var(--red);border-color:var(--red);box-shadow:0 0 16px rgba(196,0,0,.4)}
+
+/* ─── MODULE GRID ─── */
+.section-title{font-size:22px;font-weight:700;margin-bottom:6px}
+.section-desc{font-size:13px;opacity:.5;margin-bottom:20px}
+.modules-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+
+.mod-card{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  border-radius:16px;padding:24px 20px;text-align:center;
   transition:all .2s;position:relative;overflow:hidden;
 }
-.module-card:not(.disabled){cursor:pointer}
-.module-card:not(.disabled):hover{
-  background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);
-  transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.3);
+.mod-card.active-mod{cursor:pointer}
+.mod-card.active-mod:hover{
+  background:rgba(255,255,255,.11);border-color:rgba(255,255,255,.25);
+  transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.4);
 }
-.module-card:not(.disabled):hover .module-arrow{opacity:1;transform:translateX(0)}
-.module-card.disabled{opacity:.45;cursor:default}
-.module-icon{font-size:48px;margin-bottom:16px;display:block}
-.module-name{font-size:17px;font-weight:700;margin-bottom:6px}
-.module-desc{font-size:13px;opacity:.6;line-height:1.5}
-.module-tag{
-  display:inline-block;margin-top:12px;padding:3px 10px;
-  border-radius:20px;font-size:11px;font-weight:600;
+.mod-card.active-mod:hover .mod-arrow{opacity:1;transform:translate(0,0)}
+.mod-card.disabled-mod{opacity:.4;cursor:default}
+.mod-icon{font-size:40px;margin-bottom:14px;display:block}
+.mod-name{font-size:16px;font-weight:700;margin-bottom:5px}
+.mod-desc{font-size:12px;opacity:.55;line-height:1.5}
+.mod-tag{display:inline-block;margin-top:10px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600}
+.tag-on{background:rgba(39,174,96,.2);color:#2ecc71;border:1px solid rgba(39,174,96,.3)}
+.tag-off{background:rgba(255,255,255,.06);color:rgba(255,255,255,.35);border:1px solid rgba(255,255,255,.1)}
+.mod-arrow{
+  position:absolute;top:12px;right:14px;font-size:16px;opacity:0;
+  transform:translate(-4px,4px);transition:all .2s;
 }
-.tag-active{background:rgba(39,174,96,.2);color:#2ecc71;border:1px solid rgba(39,174,96,.3)}
-.tag-soon{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.1)}
-.module-arrow{
-  position:absolute;top:16px;right:16px;font-size:18px;opacity:0;
-  transform:translateX(-4px);transition:all .2s;
-}
-.module-card:not(.disabled):active{transform:translateY(-1px)}
 
-footer{text-align:center;padding:20px;opacity:.4;font-size:12px}
+footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
+
+@media(max-width:600px){
+  header{padding:12px 16px}
+  main{padding:24px 16px}
+  .modules-grid{grid-template-columns:1fr 1fr}
+  .brand-txt .brand-sub{display:none}
+}
 </style>
 </head>
 <body>
 
 <!-- AUTH GATE -->
 <div id="auth-gate">
-  <div class="auth-box">
-    <img class="auth-logo" src="/icon-192.png" alt="RIFIM OS" onerror="this.style.display='none'">
+  <div class="auth-card">
+    <img class="auth-logo" src="/icon-192.png" alt="RIFIM OS"
+         onerror="this.style.display='none';document.getElementById('logo-fb').style.display='flex'">
+    <div class="auth-logo-fallback" id="logo-fb" style="display:none">RG</div>
     <h1>RIFIM OS</h1>
-    <p class="subtitle">Sistem Operasional Terpadu RIFIM Group</p>
+    <p class="sub">Sistem Operasional Terpadu RIFIM Group</p>
     <input type="email" id="auth-email" placeholder="Email akun Anda" autocomplete="email">
-    <button onclick="doLogin()">Masuk ke RIFIM OS</button>
-    <div id="auth-error"></div>
-    <p class="tagline">Akses terbatas untuk pengguna yang diotorisasi</p>
+    <button class="btn-login" id="btn-masuk" onclick="doLogin()">Masuk ke RIFIM OS</button>
+    <div id="auth-err"></div>
+    <p class="auth-footer">Akses terbatas untuk pengguna yang diotorisasi</p>
   </div>
 </div>
 
 <!-- PORTAL APP -->
 <div id="app">
   <header>
-    <div class="header-brand">
+    <div class="brand">
       <img src="/icon-192.png" alt="RIFIM" onerror="this.style.display='none'">
-      <span>RIFIM OS</span>
+      <div class="brand-txt">
+        <div class="brand-name">RIFIM OS</div>
+        <div class="brand-sub">Smart Enterprise System</div>
+      </div>
     </div>
-    <div class="header-user">
+    <div class="header-right">
       <div class="user-info">
         <div class="user-name" id="user-name">—</div>
         <div class="user-role" id="user-role">—</div>
       </div>
-      <button id="btn-logout" onclick="doLogout()">Keluar</button>
+      <button class="btn-out" onclick="doLogout()">Keluar</button>
     </div>
   </header>
 
   <main>
-    <div class="portal-title">
-      <h2>Pilih Modul</h2>
-      <p>Pilih modul yang ingin Anda akses</p>
+    <!-- Company Selector -->
+    <div class="section-label">Konteks Perusahaan</div>
+    <div class="company-pills">
+      <div class="company-pill active" data-code="ALL" onclick="selectCompany(this)">Semua Perusahaan</div>
+      <div class="company-pill" data-code="RIFIM" onclick="selectCompany(this)">PT. RIFIM Internasional Gemilang</div>
+      <div class="company-pill" data-code="MIG" onclick="selectCompany(this)">PT. Menala Internasional Gemilang</div>
+      <div class="company-pill" data-code="LAILAN" onclick="selectCompany(this)">CV. Lailan Kalilan Indonesia</div>
     </div>
 
+    <!-- Module Grid -->
+    <div class="section-title">Pilih Modul</div>
+    <div class="section-desc">Klik modul untuk mulai bekerja</div>
     <div class="modules-grid">
 
-      <div class="module-card" onclick="goTo('/smart-office')">
-        <span class="module-icon">📄</span>
-        <div class="module-name">Smart Office</div>
-        <div class="module-desc">Buat & kelola dokumen resmi, surat, invoice, kwitansi, dan kontrak</div>
-        <span class="module-tag tag-active">Aktif</span>
-        <div class="module-arrow">→</div>
+      <div class="mod-card active-mod" onclick="goTo('/smart-office')">
+        <span class="mod-icon">📄</span>
+        <div class="mod-name">Smart Office</div>
+        <div class="mod-desc">Buat & kelola surat, invoice, kwitansi, dan kontrak resmi</div>
+        <span class="mod-tag tag-on">Aktif</span>
+        <div class="mod-arrow">→</div>
       </div>
 
-      <div class="module-card" onclick="goTo('/hris')">
-        <span class="module-icon">👥</span>
-        <div class="module-name">HRIS</div>
-        <div class="module-desc">Manajemen karyawan, kontrak, absensi, cuti, dan penggajian</div>
-        <span class="module-tag tag-active">Aktif</span>
-        <div class="module-arrow">→</div>
+      <div class="mod-card active-mod" onclick="goTo('/hris')">
+        <span class="mod-icon">👥</span>
+        <div class="mod-name">HRIS</div>
+        <div class="mod-desc">Karyawan, kontrak kerja, absensi, cuti, dan penggajian</div>
+        <span class="mod-tag tag-on">Aktif</span>
+        <div class="mod-arrow">→</div>
       </div>
 
-      <div class="module-card disabled">
-        <span class="module-icon">🚗</span>
-        <div class="module-name">RAOS</div>
-        <div class="module-desc">Manajemen armada, monitoring driver, dan operasional rideshare</div>
-        <span class="module-tag tag-soon">Segera Hadir</span>
+      <div class="mod-card disabled-mod">
+        <span class="mod-icon">🚗</span>
+        <div class="mod-name">RAOS</div>
+        <div class="mod-desc">Armada, monitoring driver, dan operasional rideshare</div>
+        <span class="mod-tag tag-off">Segera Hadir</span>
       </div>
 
-      <div class="module-card disabled">
-        <span class="module-icon">💰</span>
-        <div class="module-name">Finance</div>
-        <div class="module-desc">Laporan keuangan, anggaran, dan rekap transaksi perusahaan</div>
-        <span class="module-tag tag-soon">Segera Hadir</span>
+      <div class="mod-card disabled-mod">
+        <span class="mod-icon">💰</span>
+        <div class="mod-name">Finance</div>
+        <div class="mod-desc">Laporan keuangan, anggaran, dan rekap transaksi</div>
+        <span class="mod-tag tag-off">Segera Hadir</span>
       </div>
 
     </div>
   </main>
 
-  <footer>RIFIM OS &copy; 2026 — PT. RIFIM Internasional Gemilang</footer>
+  <footer>RIFIM OS &copy; 2026 &mdash; PT. RIFIM Internasional Gemilang · PT. Menala Internasional Gemilang · CV. Lailan Kalilan Indonesia</footer>
 </div>
 
 <script>
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx9_RVyi_58XIeSH-fvrg7CpsUJUpOP5Mim0Q5IDiBiQI7d--WboYhgt7MF6JQl32dW/exec';
 
+// ── AUTH ─────────────────────────────────────────────────────────────
 async function doLogin() {
   const email = document.getElementById('auth-email').value.trim();
   if (!email) return showErr('Masukkan email Anda.');
-  const btn = document.querySelector('#auth-gate button');
+  const btn = document.getElementById('btn-masuk');
   btn.textContent = 'Memverifikasi...';
   btn.disabled = true;
+  document.getElementById('auth-err').style.display = 'none';
   try {
-    const res = await fetch(GAS_URL + '?' + new URLSearchParams({ action: 'auth', email }));
+    const res  = await fetch(GAS_URL + '?' + new URLSearchParams({ action: 'auth', email }));
     const data = await res.json();
     if (data.success) {
       const session = { ...data.user, email, ts: Date.now() };
@@ -199,7 +240,7 @@ async function doLogin() {
       showErr(data.message || 'Akses ditolak. Email tidak terdaftar.');
     }
   } catch (e) {
-    showErr('Gagal terhubung. Periksa koneksi internet.');
+    showErr('Gagal terhubung ke server. Coba lagi.');
   } finally {
     btn.textContent = 'Masuk ke RIFIM OS';
     btn.disabled = false;
@@ -207,7 +248,7 @@ async function doLogin() {
 }
 
 function showErr(msg) {
-  const el = document.getElementById('auth-error');
+  const el = document.getElementById('auth-err');
   el.textContent = msg;
   el.style.display = 'block';
 }
@@ -216,29 +257,42 @@ function showPortal(user) {
   document.getElementById('auth-gate').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('user-name').textContent = user.full_name || user.email;
-  document.getElementById('user-role').textContent = user.role || '';
-}
-
-function goTo(path) {
-  window.location.href = path;
+  document.getElementById('user-role').textContent = user.role || 'USER';
+  // Restore saved company
+  const savedCo = localStorage.getItem('rifim_company') || 'ALL';
+  document.querySelectorAll('.company-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.code === savedCo);
+  });
 }
 
 function doLogout() {
   localStorage.removeItem('rifim_auth');
+  localStorage.removeItem('rifim_company');
   location.reload();
+}
+
+// ── COMPANY SELECTOR ─────────────────────────────────────────────────
+function selectCompany(el) {
+  document.querySelectorAll('.company-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  localStorage.setItem('rifim_company', el.dataset.code);
+}
+
+// ── NAVIGATION ───────────────────────────────────────────────────────
+function goTo(path) {
+  window.location.href = path;
 }
 
 document.getElementById('auth-email').addEventListener('keydown', e => {
   if (e.key === 'Enter') doLogin();
 });
 
-// Auto-login dari session yang tersimpan
+// ── AUTO-LOGIN ────────────────────────────────────────────────────────
 (function init() {
   const raw = localStorage.getItem('rifim_auth');
   if (raw) {
     try {
       const user = JSON.parse(raw);
-      // Session expired setelah 8 jam
       if (Date.now() - (user.ts || 0) < 8 * 60 * 60 * 1000) {
         showPortal(user);
         return;
