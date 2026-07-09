@@ -2,7 +2,14 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#C40000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="RIFIM OS">
+  <meta name="description" content="Smart Office — PT. RIFIM Internasional Gemilang">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/branding/icon/icon-192.png">
   <title>Smart Office — RIFIM OS</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -18,46 +25,185 @@
       --success:#1A8A4A;
       --radius: 10px;
       --shadow: 0 2px 14px rgba(0,0,0,.08);
+      --sb-w:   210px;
+      --topnav-h: 54px;
     }
     body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
-    /* NAV */
+    /* ═══════════════════════════════════════════
+       LOGIN SCREEN
+    ══════════════════════════════════════════ */
+    #loginScreen {
+      position: fixed; inset: 0; z-index: 9999;
+      background: linear-gradient(145deg, #1A1A1A 0%, #3A0000 60%, #2B2B2B 100%);
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .login-card {
+      background: var(--white); border-radius: 20px; padding: 40px 36px;
+      width: 100%; max-width: 400px;
+      box-shadow: 0 30px 80px rgba(0,0,0,.5);
+      text-align: center;
+    }
+    .login-logo-img {
+      max-width: 180px; max-height: 64px; object-fit: contain;
+      margin: 0 auto 8px; display: block;
+    }
+    .login-logo-mark {
+      width: 72px; height: 72px; background: var(--red); border-radius: 18px;
+      margin: 0 auto 16px; display: none;
+      align-items: center; justify-content: center;
+    }
+    .login-logo-mark svg { display: block; }
+    .login-title { font-size: 22px; font-weight: 900; color: var(--text); margin-bottom: 2px; }
+    .login-sub   { font-size: 11.5px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
+    .login-field { text-align: left; margin-bottom: 14px; }
+    .login-field label { display: block; font-size: 10.5px; font-weight: 700; color: var(--gray); margin-bottom: 5px; }
+    .login-field input {
+      width: 100%; padding: 12px 14px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 14px; outline: none; transition: border-color .15s;
+    }
+    .login-field input:focus { border-color: var(--red); }
+    .login-error { color: var(--red); font-size: 12px; text-align: left; min-height: 18px; margin-bottom: 12px; }
+    .login-btn {
+      width: 100%; padding: 13px; background: var(--red);
+      color: white; border: none; border-radius: 9px;
+      font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity .15s;
+    }
+    .login-btn:hover   { opacity: .88; }
+    .login-btn:disabled{ opacity: .5; cursor: not-allowed; }
+    .login-footer { margin-top: 20px; font-size: 11px; color: #aaa; }
+    .login-footer span { color: var(--red); font-weight: 700; }
+
+    /* ═══════════════════════════════════════════
+       SIDEBAR BACKDROP (mobile overlay)
+    ══════════════════════════════════════════ */
+    #sbBackdrop {
+      display: none; position: fixed; inset: 0; z-index: 490;
+      background: rgba(0,0,0,.45);
+    }
+    #sbBackdrop.show { display: block; }
+
+    /* ═══════════════════════════════════════════
+       TOP NAV
+    ══════════════════════════════════════════ */
     .topnav {
-      background: var(--gray); padding: 0 28px;
+      background: var(--gray);
       display: flex; align-items: center; justify-content: space-between;
-      height: 54px; position: sticky; top: 0; z-index: 100;
+      height: var(--topnav-h); padding: 0 16px 0 8px;
+      position: sticky; top: 0; z-index: 400;
     }
-    .nav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-    .nav-logo {
+    .nav-left  { display: flex; align-items: center; gap: 6px; }
+    .nav-right { display: flex; align-items: center; gap: 10px; }
+
+    /* Hamburger */
+    .hamburger {
+      width: 40px; height: 40px; background: transparent; border: none;
+      cursor: pointer; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 5px; padding: 6px; border-radius: 6px;
+      transition: background .12s;
+    }
+    .hamburger:hover { background: rgba(255,255,255,.1); }
+    .hamburger span {
+      display: block; width: 20px; height: 2px;
+      background: rgba(255,255,255,.75); border-radius: 2px;
+      transition: transform .2s, opacity .2s;
+    }
+
+    /* Brand */
+    .nav-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-mark-nav {
       width: 34px; height: 34px; background: var(--red); border-radius: 7px;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 900; font-size: 12px; color: white; letter-spacing: -.5px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      overflow: hidden;
     }
-    .nav-title  { font-size: 14px; font-weight: 700; color: white; letter-spacing: .3px; }
-    .nav-module { font-size: 9.5px; color: rgba(255,255,255,.45); letter-spacing: 1.2px; text-transform: uppercase; }
-    .nav-user   { font-size: 12px; color: rgba(255,255,255,.55); }
+    .logo-mark-nav img { width: 100%; height: 100%; object-fit: cover; }
+    .logo-img-nav {
+      height: 30px; max-width: 100px; object-fit: contain;
+      filter: brightness(0) invert(1); display: none;
+    }
+    .nav-title  { font-size: 14px; font-weight: 700; color: white; letter-spacing: .3px; line-height: 1.2; }
+    .nav-module { font-size: 9px; color: rgba(255,255,255,.45); letter-spacing: 1.2px; text-transform: uppercase; }
+    .nav-user   { font-size: 12px; color: rgba(255,255,255,.6); }
+    .btn-logout {
+      padding: 6px 14px; background: transparent; border: 1.5px solid rgba(255,255,255,.25);
+      border-radius: 6px; color: rgba(255,255,255,.7); font-size: 11.5px; font-weight: 700;
+      cursor: pointer; transition: background .12s, color .12s;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,.12); color: white; }
 
-    /* LAYOUT */
-    .layout { display: flex; min-height: calc(100vh - 54px); }
+    /* ═══════════════════════════════════════════
+       LAYOUT
+    ══════════════════════════════════════════ */
+    .layout { display: flex; min-height: calc(100vh - var(--topnav-h)); }
 
-    /* SIDEBAR */
-    .sidebar { width: 210px; background: var(--white); border-right: 1px solid var(--border); padding: 18px 0; flex-shrink: 0; }
+    /* ═══════════════════════════════════════════
+       SIDEBAR
+    ══════════════════════════════════════════ */
+    .sidebar {
+      width: var(--sb-w); background: var(--white); border-right: 1px solid var(--border);
+      padding: 0 0 80px; flex-shrink: 0;
+      display: flex; flex-direction: column;
+      transition: width .2s;
+    }
+    .sb-toprow {
+      display: none; /* shown only on mobile */
+      align-items: center; justify-content: space-between;
+      padding: 14px 14px 10px; border-bottom: 1px solid var(--border);
+    }
+    .sb-toprow-brand { display: flex; align-items: center; gap: 8px; }
+    .sb-toprow-brand span { font-size: 14px; font-weight: 900; color: var(--text); }
+    .sb-close-btn {
+      width: 32px; height: 32px; background: var(--bg); border: none;
+      border-radius: 6px; cursor: pointer; font-size: 16px; color: var(--muted);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .sb-close-btn:hover { background: var(--border); }
     .sb-label { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); padding: 0 16px 7px; margin-top: 14px; }
     .sb-item {
       display: flex; align-items: center; gap: 9px;
       padding: 9px 16px; cursor: pointer; font-size: 12.5px; color: var(--text);
       border-left: 3px solid transparent; transition: background .12s; text-decoration: none;
     }
-    .sb-item:hover { background: var(--bg); }
+    .sb-item:hover  { background: var(--bg); }
     .sb-item.active { background: #FFF0F0; border-left-color: var(--red); color: var(--red); font-weight: 700; }
-    .sb-icon { font-size: 15px; width: 18px; text-align: center; }
+    .sb-icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
+    .sb-text { white-space: nowrap; overflow: hidden; }
 
-    /* MAIN */
-    .main { flex: 1; padding: 26px 30px; overflow-y: auto; }
+    /* Sidebar collapse (desktop) */
+    .layout.sb-collapsed .sidebar { width: 52px; }
+    .layout.sb-collapsed .sb-text,
+    .layout.sb-collapsed .sb-label,
+    .layout.sb-collapsed .sb-toprow,
+    .layout.sb-collapsed .sb-logout-wrap { display: none; }
+    .layout.sb-collapsed .sb-item { padding: 11px; justify-content: center; }
+
+    /* Sidebar logout (bottom) */
+    .sb-logout-wrap { margin-top: auto; border-top: 1px solid var(--border); padding-top: 4px; }
+    .sb-logout-item { color: var(--muted) !important; }
+
+    /* ═══════════════════════════════════════════
+       MAIN
+    ══════════════════════════════════════════ */
+    .main { flex: 1; padding: 26px 30px; overflow-y: auto; min-width: 0; }
     .page-title { font-size: 21px; font-weight: 900; margin-bottom: 3px; }
     .page-sub   { font-size: 12.5px; color: var(--muted); margin-bottom: 26px; }
 
-    /* TABS */
+    /* Mobile back button */
+    .mobile-back {
+      display: none; align-items: center; gap: 6px;
+      margin-bottom: 16px;
+    }
+    .mobile-back button {
+      background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px;
+      padding: 9px 16px; font-size: 13px; font-weight: 700; color: var(--text);
+      cursor: pointer; display: flex; align-items: center; gap: 6px;
+    }
+    .mobile-back button:active { opacity: .75; }
+
+    /* ═══════════════════════════════════════════
+       TABS (desktop)
+    ══════════════════════════════════════════ */
     .tabs { display: flex; gap: 4px; margin-bottom: 22px; border-bottom: 2px solid var(--border); }
     .tab {
       padding: 9px 18px; font-size: 12.5px; font-weight: 700; cursor: pointer;
@@ -67,42 +213,41 @@
     .tab:hover { color: var(--text); }
     .tab.active { color: var(--red); border-bottom-color: var(--red); }
 
-    /* DOC CATEGORY */
+    /* ═══════════════════════════════════════════
+       DOC CATEGORY GRID
+    ══════════════════════════════════════════ */
     .cat-section { margin-bottom: 28px; }
     .cat-title {
       font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
       color: var(--muted); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
     }
     .cat-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-
     .doc-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
-
     .doc-card {
       background: var(--white); border: 1.5px solid var(--border);
       border-radius: var(--radius); padding: 14px 10px 12px;
       cursor: pointer; text-align: center;
       transition: border-color .12s, box-shadow .12s, transform .1s;
     }
-    .doc-card:hover { border-color: var(--red); box-shadow: var(--shadow); transform: translateY(-1px); }
+    .doc-card:hover    { border-color: var(--red); box-shadow: var(--shadow); transform: translateY(-1px); }
     .doc-card.selected { border-color: var(--red); background: #FFF8F8; }
     .doc-card-icon { font-size: 24px; margin-bottom: 7px; }
     .doc-card-name { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; line-height: 1.3; }
     .doc-card-code { font-size: 9.5px; color: var(--red); font-weight: 700; margin-top: 3px; letter-spacing: .5px; }
 
-    /* FORM PANEL */
+    /* ═══════════════════════════════════════════
+       FORM PANEL
+    ══════════════════════════════════════════ */
     .panel-wrap { display: none; }
     .panel-wrap.show { display: block; }
     .form-card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); padding: 26px; }
-
     .form-header {
       display: flex; align-items: center; gap: 12px;
-      padding-bottom: 16px; margin-bottom: 20px;
-      border-bottom: 1.5px solid var(--border);
+      padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1.5px solid var(--border);
     }
-    .form-header-icon { font-size: 28px; }
+    .form-header-icon  { font-size: 28px; }
     .form-header-title { font-size: 17px; font-weight: 900; }
     .form-header-sub   { font-size: 11px; color: var(--muted); margin-top: 2px; }
-
     .fsec { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--red); border-bottom: 1.5px solid #F0E0E0; padding-bottom: 7px; margin: 20px 0 14px; }
     .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
     .fgrid.full { grid-template-columns: 1fr; }
@@ -116,29 +261,37 @@
     .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--red); }
     .field textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
     .field-hint { font-size: 9.5px; color: var(--muted); }
-
     .doc-num-box {
       background: #F8F0F0; border: 1.5px solid #F0C0C0;
       border-radius: 7px; padding: 10px 13px;
       font-size: 13px; font-weight: 700; color: var(--red);
       letter-spacing: .5px; font-family: 'Courier New', monospace;
     }
-
-    .form-actions { display: flex; gap: 10px; padding-top: 18px; border-top: 1px solid var(--border); margin-top: 8px; }
+    .form-actions { display: flex; gap: 10px; padding-top: 18px; border-top: 1px solid var(--border); margin-top: 8px; flex-wrap: wrap; }
     .btn { padding: 10px 22px; border-radius: 7px; border: none; cursor: pointer; font-size: 12.5px; font-weight: 700; letter-spacing: .3px; transition: opacity .12s, transform .1s; }
     .btn:active { transform: scale(.98); }
-    .btn-primary   { background: var(--red);   color: white; }
+    .btn-primary   { background: var(--red); color: white; }
     .btn-primary:hover { opacity: .88; }
     .btn-secondary { background: white; color: var(--gray); border: 1.5px solid var(--border); }
     .btn-secondary:hover { background: var(--bg); }
     .btn-ghost     { background: transparent; color: var(--muted); }
 
-    /* RECENT TABLE */
-    .recent { margin-top: 28px; }
+    /* ═══════════════════════════════════════════
+       STATS
+    ══════════════════════════════════════════ */
+    .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 26px; }
+    .stat-card { background: var(--white); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
+    .stat-num  { font-size: 26px; font-weight: 900; color: var(--red); line-height: 1; }
+    .stat-lbl  { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    /* ═══════════════════════════════════════════
+       ARSIP TABLE
+    ══════════════════════════════════════════ */
+    .recent { margin-top: 28px; overflow-x: auto; }
     .sec-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
     .sec-title { font-size: 15px; font-weight: 700; }
     .see-all { font-size: 12px; color: var(--red); cursor: pointer; }
-    .doc-table { width: 100%; border-collapse: collapse; background: var(--white); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+    .doc-table { width: 100%; border-collapse: collapse; background: var(--white); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); min-width: 600px; }
     .doc-table th { background: var(--bg); padding: 9px 14px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
     .doc-table td { padding: 11px 14px; font-size: 12px; border-bottom: 1px solid var(--border); }
     .doc-table tr:last-child td { border-bottom: none; }
@@ -149,254 +302,411 @@
     .badge-sent     { background: #E8F0FF; color: #2255CC; }
     .badge-archived { background: #F0F0F0; color: #999; }
     .doc-num { font-family: monospace; font-size: 11px; color: var(--red); }
-    .act { color: var(--red); font-size: 12px; cursor: pointer; }
+    .act { color: var(--red); font-size: 12px; cursor: pointer; text-decoration: none; }
     .act:hover { text-decoration: underline; }
 
-    /* TOAST */
+    /* ═══════════════════════════════════════════
+       BOTTOM NAV (mobile only)
+    ══════════════════════════════════════════ */
+    .bottomnav {
+      display: none; position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--white); border-top: 1px solid var(--border);
+      z-index: 300; padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+    .bottomnav-inner {
+      display: flex; align-items: stretch; height: 56px;
+    }
+    .bn-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 3px; background: none; border: none;
+      cursor: pointer; font-size: 10px; font-weight: 700;
+      color: var(--muted); padding: 6px 0; transition: color .12s;
+    }
+    .bn-item.active { color: var(--red); }
+    .bn-icon { font-size: 20px; line-height: 1; }
+
+    /* ═══════════════════════════════════════════
+       TOAST
+    ══════════════════════════════════════════ */
     .toast {
       position: fixed; bottom: 24px; right: 24px;
       background: var(--gray); color: white;
       padding: 12px 18px; border-radius: 8px; font-size: 12.5px;
       box-shadow: 0 4px 20px rgba(0,0,0,.2);
       transform: translateY(70px); opacity: 0;
-      transition: transform .28s, opacity .28s; z-index: 999;
+      transition: transform .28s, opacity .28s; z-index: 9998;
     }
     .toast.show { transform: translateY(0); opacity: 1; }
     .toast.ok   { border-left: 4px solid var(--success); }
 
-    /* STATS BAR */
-    .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 26px; }
-    .stat-card { background: var(--white); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
-    .stat-num  { font-size: 26px; font-weight: 900; color: var(--red); line-height: 1; }
-    .stat-lbl  { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
+    /* ═══════════════════════════════════════════
+       MOBILE (≤768px)
+    ══════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      /* Nav */
+      .nav-user   { display: none; }
+      .nav-title  { font-size: 13px; }
+      .btn-logout { display: none; } /* logout ada di sidebar mobile */
+
+      /* Sidebar becomes fixed drawer */
+      .sidebar {
+        position: fixed; top: var(--topnav-h); left: 0; bottom: 0;
+        width: 260px !important; z-index: 500;
+        transform: translateX(-100%);
+        transition: transform .25s cubic-bezier(.4,0,.2,1);
+        overflow-y: auto; box-shadow: 4px 0 20px rgba(0,0,0,.15);
+        padding-bottom: env(safe-area-inset-bottom, 80px);
+      }
+      .sidebar.open { transform: translateX(0); }
+      .sb-toprow { display: flex; }
+      .sb-text  { display: block !important; }
+      .sb-label { display: block !important; }
+      .sb-logout-wrap { display: block !important; }
+
+      /* Main */
+      .main { padding: 16px 14px 80px; }
+      .stats { grid-template-columns: repeat(2,1fr); gap: 10px; margin-bottom: 18px; }
+      .stat-card { padding: 12px 14px; }
+      .stat-num  { font-size: 22px; }
+      .stat-lbl  { font-size: 10px; }
+
+      /* Hide tab bar (replaced by bottom nav) */
+      .tabs { display: none; }
+
+      /* Doc grid */
+      .doc-grid { grid-template-columns: repeat(3,1fr); gap: 8px; }
+      .doc-card { padding: 12px 6px 10px; }
+      .doc-card-icon { font-size: 20px; }
+      .doc-card-name { font-size: 10px; }
+
+      /* Form */
+      .fgrid { grid-template-columns: 1fr; gap: 12px; }
+      .form-card { padding: 18px 16px; }
+      .form-actions { gap: 8px; }
+      .btn { padding: 10px 14px; font-size: 12px; }
+
+      /* Mobile back button */
+      .mobile-back { display: flex; }
+
+      /* Bottom nav */
+      .bottomnav { display: block; }
+      .toast { bottom: 72px; }
+
+      /* Page title */
+      .page-title { font-size: 18px; }
+
+      /* Arsip filter */
+      #arsipFilterBar { flex-direction: column; }
+      #arsipSearch { min-width: unset !important; }
+    }
   </style>
 </head>
 <body>
 
-<nav class="topnav">
-  <a class="nav-brand" href="#">
-    <div class="nav-logo">RI<span style="opacity:.7">F</span></div>
-    <div>
-      <div class="nav-title">RIFIM OS</div>
-      <div class="nav-module">Smart Office</div>
+<!-- ═══════════════════════════════════════════
+     LOGIN SCREEN
+════════════════════════════════════════════ -->
+<div id="loginScreen" style="display:none">
+  <div class="login-card">
+    <img src="/branding/logo/rifim-logo.png" class="login-logo-img" alt="RIFIM"
+      onerror="this.style.display='none';document.getElementById('loginLogoMark').style.display='flex'">
+    <div class="login-logo-mark" id="loginLogoMark">
+      <svg width="44" height="44" viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg">
+        <rect width="34" height="34" rx="7" fill="white"/>
+        <text x="17" y="25" text-anchor="middle" fill="#C40000" font-family="'Arial Black',Arial" font-weight="900" font-size="19">R</text>
+      </svg>
     </div>
-  </a>
-  <div class="nav-user">Bobby Rahman M.B &nbsp;·&nbsp; Direktur Utama</div>
+    <div class="login-title">RIFIM OS</div>
+    <div class="login-sub">Smart Office<br>PT. RIFIM Internasional Gemilang</div>
+
+    <div class="login-field">
+      <label>Email Akun</label>
+      <input type="email" id="loginEmail" placeholder="email@rifim.co.id"
+        autocomplete="email" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-error" id="loginError"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Masuk ke RIFIM OS</button>
+    <div class="login-footer">Akses terbatas untuk pengguna yang <span>diotorisasi</span></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     APP WRAPPER
+════════════════════════════════════════════ -->
+<div id="app" style="display:none">
+
+<!-- Backdrop -->
+<div id="sbBackdrop"></div>
+
+<!-- TOP NAV -->
+<nav class="topnav">
+  <div class="nav-left">
+    <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <a class="nav-brand" href="#">
+      <div class="logo-mark-nav">
+        <img src="/branding/logo/rifim-logo.png" alt="RIFIM"
+          onerror="this.outerHTML='<svg width=\'34\' height=\'34\' viewBox=\'0 0 34 34\' xmlns=\'http://www.w3.org/2000/svg\'><rect width=\'34\' height=\'34\' rx=\'7\' fill=\'%23C40000\'/><text x=\'17\' y=\'25\' text-anchor=\'middle\' fill=\'white\' font-family=\'Arial Black,Arial\' font-weight=\'900\' font-size=\'18\'>R</text></svg>'">
+      </div>
+      <div>
+        <div class="nav-title">RIFIM OS</div>
+        <div class="nav-module">Smart Office</div>
+      </div>
+    </a>
+  </div>
+  <div class="nav-right">
+    <span id="navUser" class="nav-user"></span>
+    <button class="btn-logout" onclick="doLogout()">↩ Keluar</button>
+  </div>
 </nav>
 
-<div class="layout">
+<div class="layout" id="mainLayout">
 
-  <!-- SIDEBAR -->
-  <aside class="sidebar">
-    <div class="sb-label" style="margin-top:0">Menu</div>
-    <a class="sb-item active" href="#" onclick="showTab('buat')">
-      <span class="sb-icon">⚡</span> Buat Dokumen
+  <!-- ─────────────────────── SIDEBAR ─────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+
+    <!-- Mobile header row dalam sidebar -->
+    <div class="sb-toprow">
+      <div class="sb-toprow-brand">
+        <svg width="26" height="26" viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg">
+          <rect width="34" height="34" rx="7" fill="#C40000"/>
+          <text x="17" y="25" text-anchor="middle" fill="white" font-family="'Arial Black',Arial" font-weight="900" font-size="18">R</text>
+        </svg>
+        <span>RIFIM OS</span>
+      </div>
+      <button class="sb-close-btn" onclick="closeSidebar()">✕</button>
+    </div>
+
+    <div class="sb-label" style="margin-top:8px">Menu</div>
+    <a class="sb-item active" id="sbItemBuat" href="#"
+      onclick="switchTab('buat');closeSidebar();return false">
+      <span class="sb-icon">⚡</span><span class="sb-text">Buat Dokumen</span>
     </a>
-    <a class="sb-item" href="#" onclick="showTab('arsip')">
-      <span class="sb-icon">📁</span> Arsip Dokumen
+    <a class="sb-item" id="sbItemArsip" href="#"
+      onclick="switchTab('arsip');closeSidebar();return false">
+      <span class="sb-icon">📁</span><span class="sb-text">Arsip Dokumen</span>
     </a>
-    <a class="sb-item" href="#">
-      <span class="sb-icon">🔢</span> Penomoran
+    <a class="sb-item" href="#" onclick="closeSidebar();return false">
+      <span class="sb-icon">🔢</span><span class="sb-text">Penomoran</span>
     </a>
 
     <div class="sb-label">Kategori</div>
-    <a class="sb-item" href="#" onclick="filterCat('Korespondensi')">
-      <span class="sb-icon">📨</span> Korespondensi
+    <a class="sb-item" href="#" onclick="filterCat('Korespondensi');closeSidebar();return false">
+      <span class="sb-icon">📨</span><span class="sb-text">Korespondensi</span>
     </a>
-    <a class="sb-item" href="#" onclick="filterCat('Keuangan')">
-      <span class="sb-icon">💰</span> Keuangan
+    <a class="sb-item" href="#" onclick="filterCat('Keuangan');closeSidebar();return false">
+      <span class="sb-icon">💰</span><span class="sb-text">Keuangan</span>
     </a>
-    <a class="sb-item" href="#" onclick="filterCat('Kerjasama')">
-      <span class="sb-icon">🤝</span> Kerjasama
+    <a class="sb-item" href="#" onclick="filterCat('Kerjasama');closeSidebar();return false">
+      <span class="sb-icon">🤝</span><span class="sb-text">Kerjasama</span>
     </a>
-    <a class="sb-item" href="#" onclick="filterCat('HR / SDM')">
-      <span class="sb-icon">👥</span> HR / SDM
+    <a class="sb-item" href="#" onclick="filterCat('HR / SDM');closeSidebar();return false">
+      <span class="sb-icon">👥</span><span class="sb-text">HR / SDM</span>
     </a>
-    <a class="sb-item" href="#" onclick="filterCat('Operasional')">
-      <span class="sb-icon">✅</span> Operasional
+    <a class="sb-item" href="#" onclick="filterCat('Operasional');closeSidebar();return false">
+      <span class="sb-icon">✅</span><span class="sb-text">Operasional</span>
     </a>
 
     <div class="sb-label">Sistem</div>
-    <a class="sb-item" href="#"><span class="sb-icon">⚙️</span> Pengaturan</a>
+    <a class="sb-item" href="#" onclick="closeSidebar();return false">
+      <span class="sb-icon">⚙️</span><span class="sb-text">Pengaturan</span>
+    </a>
+
+    <div class="sb-logout-wrap">
+      <a class="sb-item sb-logout-item" href="#" onclick="doLogout();return false">
+        <span class="sb-icon">↩</span><span class="sb-text">Keluar</span>
+      </a>
+    </div>
   </aside>
 
-  <!-- MAIN -->
+  <!-- ─────────────────────── MAIN ─────────────────────── -->
   <main class="main">
+
+    <!-- Mobile back (hanya tampil di HP saat form aktif) -->
+    <div id="mobileBack" class="mobile-back">
+      <button onclick="goBack()">← Kembali ke Pilih Dokumen</button>
+    </div>
 
     <!-- STATS -->
     <div class="stats">
       <div class="stat-card">
-        <div class="stat-num">47</div>
-        <div class="stat-lbl">Total Dokumen Bulan Ini</div>
+        <div class="stat-num" id="statBulanIni">—</div>
+        <div class="stat-lbl">Total Bulan Ini</div>
       </div>
       <div class="stat-card">
         <div class="stat-num">20</div>
-        <div class="stat-lbl">Jenis Dokumen Aktif</div>
+        <div class="stat-lbl">Jenis Dokumen</div>
       </div>
       <div class="stat-card">
-        <div class="stat-num">12</div>
+        <div class="stat-num" id="statDraft">—</div>
         <div class="stat-lbl">Draft Belum Selesai</div>
       </div>
       <div class="stat-card">
-        <div class="stat-num">3</div>
-        <div class="stat-lbl">Menunggu TTD</div>
+        <div class="stat-num" id="statTotal">—</div>
+        <div class="stat-lbl">Total Dokumen</div>
       </div>
     </div>
 
-    <!-- TABS -->
+    <!-- TABS (desktop only) -->
     <div class="tabs">
-      <div class="tab active" onclick="showTab('buat',this)">⚡ Buat Dokumen</div>
-      <div class="tab" onclick="showTab('arsip',this)">📁 Arsip</div>
+      <div class="tab active" id="tabBuat" onclick="switchTab('buat',this)">⚡ Buat Dokumen</div>
+      <div class="tab" id="tabArsip"       onclick="switchTab('arsip',this)">📁 Arsip</div>
     </div>
 
-    <!-- TAB: BUAT DOKUMEN -->
+    <!-- ═══ TAB: BUAT DOKUMEN ═══ -->
     <div id="tab-buat">
       <div class="page-title">Buat Dokumen Baru</div>
       <div class="page-sub">Pilih jenis dokumen — nomor dibuat otomatis oleh sistem.</div>
 
-      <!-- KORESPONDENSI -->
-      <div class="cat-section">
-        <div class="cat-title">📨 Korespondensi</div>
-        <div class="doc-grid">
-          <div class="doc-card selected" onclick="selectDoc(this,'SURAT','Surat Resmi','📨')">
-            <div class="doc-card-icon">📨</div>
-            <div class="doc-card-name">Surat Resmi</div>
-            <div class="doc-card-code">SURAT</div>
-          </div>
-          <div class="doc-card" onclick="selectDoc(this,'ST','Surat Tugas','📋')">
-            <div class="doc-card-icon">📋</div>
-            <div class="doc-card-name">Surat Tugas</div>
-            <div class="doc-card-code">ST</div>
-          </div>
-          <div class="doc-card" onclick="selectDoc(this,'SIZ','Surat Izin','🗓')">
-            <div class="doc-card-icon">🗓</div>
-            <div class="doc-card-name">Surat Izin</div>
-            <div class="doc-card-code">SIZ</div>
-          </div>
-          <div class="doc-card" onclick="selectDoc(this,'SKT','Surat Keterangan','📃')">
-            <div class="doc-card-icon">📃</div>
-            <div class="doc-card-name">Surat Keterangan</div>
-            <div class="doc-card-code">SKT</div>
-          </div>
-          <div class="doc-card" onclick="selectDoc(this,'BA','Berita Acara','📰')">
-            <div class="doc-card-icon">📰</div>
-            <div class="doc-card-name">Berita Acara</div>
-            <div class="doc-card-code">BA</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- KEUANGAN -->
-      <div class="cat-section">
-        <div class="cat-title">💰 Keuangan</div>
-        <div class="doc-grid">
-          <div class="doc-card" onclick="selectDoc(this,'INV','Invoice','🧾')">
-            <div class="doc-card-icon">🧾</div>
-            <div class="doc-card-name">Invoice</div>
-            <div class="doc-card-code">INV</div>
-          </div>
-          <div class="doc-card" onclick="selectDoc(this,'KWT','Kwitansi','💰')">
-            <div class="doc-card-icon">💰</div>
-            <div class="doc-card-name">Kwitansi</div>
-            <div class="doc-card-code">KWT</div>
+      <!-- Doc type grid section (hidden on mobile when form shown) -->
+      <div id="docTypeSection">
+        <!-- KORESPONDENSI -->
+        <div class="cat-section">
+          <div class="cat-title">📨 Korespondensi</div>
+          <div class="doc-grid">
+            <div class="doc-card selected" onclick="selectDoc(this,'SURAT','Surat Resmi','📨')">
+              <div class="doc-card-icon">📨</div>
+              <div class="doc-card-name">Surat Resmi</div>
+              <div class="doc-card-code">SURAT</div>
+            </div>
+            <div class="doc-card" onclick="selectDoc(this,'ST','Surat Tugas','📋')">
+              <div class="doc-card-icon">📋</div>
+              <div class="doc-card-name">Surat Tugas</div>
+              <div class="doc-card-code">ST</div>
+            </div>
+            <div class="doc-card" onclick="selectDoc(this,'SIZ','Surat Izin','🗓')">
+              <div class="doc-card-icon">🗓</div>
+              <div class="doc-card-name">Surat Izin</div>
+              <div class="doc-card-code">SIZ</div>
+            </div>
+            <div class="doc-card" onclick="selectDoc(this,'SKT','Surat Keterangan','📃')">
+              <div class="doc-card-icon">📃</div>
+              <div class="doc-card-name">Surat Keterangan</div>
+              <div class="doc-card-code">SKT</div>
+            </div>
+            <div class="doc-card" onclick="selectDoc(this,'BA','Berita Acara','📰')">
+              <div class="doc-card-icon">📰</div>
+              <div class="doc-card-name">Berita Acara</div>
+              <div class="doc-card-code">BA</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- KERJASAMA -->
-      <div class="cat-section">
-        <div class="cat-title">🤝 Kerjasama</div>
-        <div class="doc-grid">
-          <div class="doc-card" onclick="selectDoc(this,'PROP','Proposal','📊')">
-            <div class="doc-card-icon">📊</div>
-            <div class="doc-card-name">Proposal</div>
-            <div class="doc-card-code">PROP</div>
-          </div>
-          <div class="doc-card" onclick="selectDoc(this,'CP','Company Profile','🏢')">
-            <div class="doc-card-icon">🏢</div>
-            <div class="doc-card-name">Company Profile</div>
-            <div class="doc-card-code">CP</div>
-          </div>
-          <div class="doc-card" onclick="selectDoc(this,'MOU','MoU','🤝')">
-            <div class="doc-card-icon">🤝</div>
-            <div class="doc-card-name">MoU</div>
-            <div class="doc-card-code">MOU</div>
-          </div>
-          <div class="doc-card" onclick="selectDoc(this,'PKS','Perjanjian Kerjasama','📑')">
-            <div class="doc-card-icon">📑</div>
-            <div class="doc-card-name">Perjanjian Kerjasama</div>
-            <div class="doc-card-code">PKS</div>
+        <!-- KEUANGAN -->
+        <div class="cat-section">
+          <div class="cat-title">💰 Keuangan</div>
+          <div class="doc-grid">
+            <div class="doc-card" onclick="selectDoc(this,'INV','Invoice','🧾')">
+              <div class="doc-card-icon">🧾</div>
+              <div class="doc-card-name">Invoice</div>
+              <div class="doc-card-code">INV</div>
+            </div>
+            <div class="doc-card" onclick="selectDoc(this,'KWT','Kwitansi','💰')">
+              <div class="doc-card-icon">💰</div>
+              <div class="doc-card-name">Kwitansi</div>
+              <div class="doc-card-code">KWT</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- HR / SDM -->
-      <div class="cat-section">
-        <div class="cat-title">👥 HR / SDM</div>
-        <div class="doc-grid">
-          <div class="doc-card" onclick="selectDoc(this,'SP1','Surat Peringatan 1','⚠️')">
-            <div class="doc-card-icon">⚠️</div>
-            <div class="doc-card-name">SP 1</div>
-            <div class="doc-card-code">SP1</div>
-          </div>
-          <div class="doc-card" onclick="selectDoc(this,'SP2','Surat Peringatan 2','🔴')">
-            <div class="doc-card-icon">🔴</div>
-            <div class="doc-card-name">SP 2</div>
-            <div class="doc-card-code">SP2</div>
-          </div>
-          <div class="doc-card" onclick="selectDoc(this,'SP3','Surat Peringatan 3','🚫')">
-            <div class="doc-card-icon">🚫</div>
-            <div class="doc-card-name">SP 3</div>
-            <div class="doc-card-code">SP3</div>
-          </div>
-          <div class="doc-card" onclick="selectDoc(this,'PKWT','Kontrak PKWT','📝')">
-            <div class="doc-card-icon">📝</div>
-            <div class="doc-card-name">Kontrak PKWT</div>
-            <div class="doc-card-code">PKWT</div>
-          </div>
-          <div class="doc-card" onclick="selectDoc(this,'SPG','Surat Pengangkatan','🎖')">
-            <div class="doc-card-icon">🎖</div>
-            <div class="doc-card-name">Pengangkatan</div>
-            <div class="doc-card-code">SPG</div>
-          </div>
-          <div class="doc-card" onclick="selectDoc(this,'SMT','Surat Mutasi','🔄')">
-            <div class="doc-card-icon">🔄</div>
-            <div class="doc-card-name">Mutasi</div>
-            <div class="doc-card-code">SMT</div>
-          </div>
-          <div class="doc-card" onclick="selectDoc(this,'PHK','Surat PHK','📤')">
-            <div class="doc-card-icon">📤</div>
-            <div class="doc-card-name">Surat PHK</div>
-            <div class="doc-card-code">PHK</div>
-          </div>
-          <div class="doc-card" onclick="selectDoc(this,'PI','Pakta Integritas','🛡')">
-            <div class="doc-card-icon">🛡</div>
-            <div class="doc-card-name">Pakta Integritas</div>
-            <div class="doc-card-code">PI</div>
+        <!-- KERJASAMA -->
+        <div class="cat-section">
+          <div class="cat-title">🤝 Kerjasama</div>
+          <div class="doc-grid">
+            <div class="doc-card" onclick="selectDoc(this,'PROP','Proposal','📊')">
+              <div class="doc-card-icon">📊</div>
+              <div class="doc-card-name">Proposal</div>
+              <div class="doc-card-code">PROP</div>
+            </div>
+            <div class="doc-card" onclick="selectDoc(this,'CP','Company Profile','🏢')">
+              <div class="doc-card-icon">🏢</div>
+              <div class="doc-card-name">Company Profile</div>
+              <div class="doc-card-code">CP</div>
+            </div>
+            <div class="doc-card" onclick="selectDoc(this,'MOU','MoU','🤝')">
+              <div class="doc-card-icon">🤝</div>
+              <div class="doc-card-name">MoU</div>
+              <div class="doc-card-code">MOU</div>
+            </div>
+            <div class="doc-card" onclick="selectDoc(this,'PKS','Perjanjian Kerjasama','📑')">
+              <div class="doc-card-icon">📑</div>
+              <div class="doc-card-name">Perjanjian Kerjasama</div>
+              <div class="doc-card-code">PKS</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- OPERASIONAL -->
-      <div class="cat-section">
-        <div class="cat-title">✅ Operasional</div>
-        <div class="doc-grid">
-          <div class="doc-card" onclick="selectDoc(this,'FCO','Form Checklist','✅')">
-            <div class="doc-card-icon">✅</div>
-            <div class="doc-card-name">Form Checklist Operasional</div>
-            <div class="doc-card-code">FCO</div>
+        <!-- HR / SDM -->
+        <div class="cat-section">
+          <div class="cat-title">👥 HR / SDM</div>
+          <div class="doc-grid">
+            <div class="doc-card" onclick="selectDoc(this,'SP1','Surat Peringatan 1','⚠️')">
+              <div class="doc-card-icon">⚠️</div>
+              <div class="doc-card-name">SP 1</div>
+              <div class="doc-card-code">SP1</div>
+            </div>
+            <div class="doc-card" onclick="selectDoc(this,'SP2','Surat Peringatan 2','🔴')">
+              <div class="doc-card-icon">🔴</div>
+              <div class="doc-card-name">SP 2</div>
+              <div class="doc-card-code">SP2</div>
+            </div>
+            <div class="doc-card" onclick="selectDoc(this,'SP3','Surat Peringatan 3','🚫')">
+              <div class="doc-card-icon">🚫</div>
+              <div class="doc-card-name">SP 3</div>
+              <div class="doc-card-code">SP3</div>
+            </div>
+            <div class="doc-card" onclick="selectDoc(this,'PKWT','Kontrak PKWT','📝')">
+              <div class="doc-card-icon">📝</div>
+              <div class="doc-card-name">Kontrak PKWT</div>
+              <div class="doc-card-code">PKWT</div>
+            </div>
+            <div class="doc-card" onclick="selectDoc(this,'SPG','Surat Pengangkatan','🎖')">
+              <div class="doc-card-icon">🎖</div>
+              <div class="doc-card-name">Pengangkatan</div>
+              <div class="doc-card-code">SPG</div>
+            </div>
+            <div class="doc-card" onclick="selectDoc(this,'SMT','Surat Mutasi','🔄')">
+              <div class="doc-card-icon">🔄</div>
+              <div class="doc-card-name">Mutasi</div>
+              <div class="doc-card-code">SMT</div>
+            </div>
+            <div class="doc-card" onclick="selectDoc(this,'PHK','Surat PHK','📤')">
+              <div class="doc-card-icon">📤</div>
+              <div class="doc-card-name">Surat PHK</div>
+              <div class="doc-card-code">PHK</div>
+            </div>
+            <div class="doc-card" onclick="selectDoc(this,'PI','Pakta Integritas','🛡')">
+              <div class="doc-card-icon">🛡</div>
+              <div class="doc-card-name">Pakta Integritas</div>
+              <div class="doc-card-code">PI</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- FORM -->
-      <div class="panel-wrap show" id="formPanel">
+        <!-- OPERASIONAL -->
+        <div class="cat-section">
+          <div class="cat-title">✅ Operasional</div>
+          <div class="doc-grid">
+            <div class="doc-card" onclick="selectDoc(this,'FCO','Form Checklist','✅')">
+              <div class="doc-card-icon">✅</div>
+              <div class="doc-card-name">Form Checklist Operasional</div>
+              <div class="doc-card-code">FCO</div>
+            </div>
+          </div>
+        </div>
+      </div><!-- end #docTypeSection -->
+
+      <!-- FORM PANEL -->
+      <div class="panel-wrap" id="formPanel">
         <div class="form-card">
           <div class="form-header">
             <div class="form-header-icon" id="fIcon">📨</div>
             <div>
               <div class="form-header-title" id="fTitle">Surat Resmi</div>
-              <div class="form-header-sub" id="fSub">Isi formulir di bawah — semua field wajib kecuali lampiran</div>
+              <div class="form-header-sub"   id="fSub">Isi formulir di bawah — semua field wajib kecuali lampiran</div>
             </div>
           </div>
 
@@ -404,7 +714,7 @@
           <div class="fgrid">
             <div class="field">
               <label>Nomor Dokumen (Otomatis)</label>
-              <div class="doc-num-box" id="docNum">001/RIFIM/SURAT/VII/2026</div>
+              <div class="doc-num-box" id="docNum">—/RIFIM/SURAT/VII/2026</div>
               <span class="field-hint">Di-generate saat klik Generate</span>
             </div>
             <div class="field">
@@ -441,17 +751,16 @@
             <button class="btn btn-ghost"     onclick="clearForm()">Bersihkan</button>
           </div>
         </div>
-      </div>
+      </div><!-- end formPanel -->
 
     </div><!-- end tab-buat -->
 
-    <!-- TAB: ARSIP -->
+    <!-- ═══ TAB: ARSIP ═══ -->
     <div id="tab-arsip" style="display:none">
       <div class="page-title">Arsip Dokumen</div>
       <div class="page-sub">Data real-time dari Google Sheets database.</div>
 
-      <!-- Filter bar -->
-      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center" id="arsipFilterBar">
         <input id="arsipSearch" type="text" placeholder="Cari nomor, perihal, penerima..."
           style="flex:1;min-width:200px;padding:9px 14px;border:1.5px solid #E0C0C0;border-radius:8px;font-size:13px;outline:none"
           oninput="debounceArsip()" />
@@ -469,43 +778,57 @@
         </button>
       </div>
 
-      <!-- Loading -->
       <div id="arsipLoading" style="display:none;text-align:center;padding:48px 0;color:#999;font-size:14px">
         Memuat data dari database…
       </div>
-
-      <!-- Empty state -->
       <div id="arsipEmpty" style="display:none;text-align:center;padding:48px 0;color:#aaa">
         <div style="font-size:36px;margin-bottom:12px">📭</div>
         <div style="font-size:14px">Belum ada dokumen yang ditemukan.</div>
       </div>
 
-      <!-- Table -->
       <div class="recent" style="margin-top:0" id="arsipTableWrap">
         <table class="doc-table">
           <thead>
             <tr>
               <th>Nomor</th><th>Jenis</th><th>Perihal</th>
-              <th>Penerima / Karyawan</th><th>Tanggal</th>
-              <th>Status</th><th></th>
+              <th>Penerima</th><th>Tanggal</th><th>Status</th><th></th>
             </tr>
           </thead>
           <tbody id="arsipBody"></tbody>
         </table>
       </div>
-
-      <!-- Footer info -->
       <div id="arsipFooter" style="margin-top:10px;font-size:12px;color:#999;text-align:right"></div>
-    </div>
+    </div><!-- end tab-arsip -->
 
   </main>
-</div>
+</div><!-- end .layout -->
 
+<!-- BOTTOM NAV (mobile) -->
+<nav class="bottomnav">
+  <div class="bottomnav-inner">
+    <button class="bn-item active" id="bn-buat" onclick="switchTab('buat');setActiveBN('bn-buat')">
+      <div class="bn-icon">⚡</div><span>Buat</span>
+    </button>
+    <button class="bn-item" id="bn-arsip" onclick="switchTab('arsip');setActiveBN('bn-arsip')">
+      <div class="bn-icon">📁</div><span>Arsip</span>
+    </button>
+    <button class="bn-item" id="bn-nomor">
+      <div class="bn-icon">🔢</div><span>Nomor</span>
+    </button>
+    <button class="bn-item" id="bn-settings">
+      <div class="bn-icon">⚙️</div><span>Setelan</span>
+    </button>
+  </div>
+</nav>
+
+</div><!-- end #app -->
+
+<!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <!-- ── Result Modal ───────────────────────────────────────── -->
-<div id="resultOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:16px;padding:36px 40px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3);position:relative">
+<div id="resultOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9990;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:16px;padding:36px 32px;max-width:460px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);position:relative">
     <div style="text-align:center;margin-bottom:24px">
       <div style="font-size:48px;margin-bottom:12px">✅</div>
       <div style="font-size:20px;font-weight:900;color:#1A1A1A;margin-bottom:6px">Dokumen Berhasil Dibuat!</div>
@@ -528,7 +851,7 @@
 </div>
 
 <!-- ── Loading Overlay ────────────────────────────────────── -->
-<div id="loadingOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:998;align-items:center;justify-content:center">
+<div id="loadingOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9980;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:16px;padding:40px 48px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <div style="font-size:40px;margin-bottom:14px;animation:spin 1s linear infinite;display:inline-block">⚙️</div>
     <div style="font-size:16px;font-weight:700;color:#1A1A1A;margin-bottom:6px">Memproses Dokumen...</div>
@@ -536,27 +859,162 @@
   </div>
 </div>
 
-<style>
-@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-</style>
-
 <script>
   // ── CONFIG ───────────────────────────────────────────────────
-  // Isi setelah deploy GAS sebagai Web App:
-  // Apps Script → Deploy → Manage Deployments → copy Web App URL
   const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx9_RVyi_58XIeSH-fvrg7CpsUJUpOP5Mim0Q5IDiBiQI7d--WboYhgt7MF6JQl32dW/exec';
+  const ALLOWED_EMAILS  = ['rifiminternasionalgemilang@gmail.com'];
 
-  // ── Document type dynamic fields ─────────────────────────────
-  // id harus cocok dengan nama placeholder di template (lowercase version)
+  // ── AUTH ─────────────────────────────────────────────────────
+  function checkAuth() {
+    try {
+      const raw = localStorage.getItem('rifim_auth');
+      if (raw) {
+        const a = JSON.parse(raw);
+        if (a && a.email && (Date.now() - a.ts) < 7 * 86400000) {
+          applyAuth(a); return;
+        }
+      }
+    } catch(_) {}
+    showLoginScreen();
+  }
+
+  function showLoginScreen() {
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    setTimeout(() => document.getElementById('loginEmail').focus(), 100);
+  }
+
+  async function doLogin() {
+    const emailRaw = document.getElementById('loginEmail').value || '';
+    const email    = emailRaw.trim().toLowerCase();
+    if (!email) { setLoginErr('Masukkan alamat email Anda.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setLoginErr('Format email tidak valid.'); return; }
+
+    const btn = document.getElementById('loginBtn');
+    btn.disabled    = true;
+    btn.textContent = 'Memverifikasi...';
+    document.getElementById('loginError').textContent = '';
+
+    try {
+      const res  = await fetch(`${GAS_WEB_APP_URL}?action=auth&email=${encodeURIComponent(email)}`);
+      const data = await res.json();
+      if (data.success) {
+        storeAuth({ email, name: data.user.name, role: data.user.role });
+      } else {
+        setLoginErr(data.message || 'Email tidak diizinkan untuk mengakses sistem ini.');
+      }
+    } catch (_) {
+      // Fallback offline: cek lokal
+      if (ALLOWED_EMAILS.includes(email)) {
+        storeAuth({ email, name: 'Bobby Rahman M.B', role: 'Direktur Utama' });
+      } else {
+        setLoginErr('Email tidak diizinkan. Hubungi administrator RIFIM OS.');
+      }
+    }
+    btn.disabled    = false;
+    btn.textContent = 'Masuk ke RIFIM OS';
+  }
+
+  function storeAuth(user) {
+    const a = { ...user, ts: Date.now() };
+    localStorage.setItem('rifim_auth', JSON.stringify(a));
+    applyAuth(a);
+  }
+
+  function setLoginErr(msg) {
+    document.getElementById('loginError').textContent = msg;
+    document.getElementById('loginBtn').disabled    = false;
+    document.getElementById('loginBtn').textContent = 'Masuk ke RIFIM OS';
+  }
+
+  function applyAuth(auth) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display         = 'block';
+    document.getElementById('navUser').textContent       = auth.name + ' · ' + auth.role;
+    initApp();
+  }
+
+  function doLogout() {
+    if (!confirm('Keluar dari RIFIM OS?')) return;
+    localStorage.removeItem('rifim_auth');
+    closeSidebar();
+    showLoginScreen();
+    document.getElementById('loginEmail').value = '';
+  }
+
+  // ── SIDEBAR ──────────────────────────────────────────────────
+  let _sbOpen      = false;
+  let _sbCollapsed = false;
+
+  function toggleSidebar() {
+    if (window.innerWidth <= 768) {
+      _sbOpen = !_sbOpen;
+      document.getElementById('sidebar').classList.toggle('open', _sbOpen);
+      document.getElementById('sbBackdrop').classList.toggle('show', _sbOpen);
+    } else {
+      _sbCollapsed = !_sbCollapsed;
+      document.getElementById('mainLayout').classList.toggle('sb-collapsed', _sbCollapsed);
+    }
+  }
+
+  function closeSidebar() {
+    _sbOpen = false;
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sbBackdrop').classList.remove('show');
+  }
+
+  // ── TABS ─────────────────────────────────────────────────────
+  function switchTab(name, tabEl) {
+    document.getElementById('tab-buat').style.display  = name === 'buat'  ? 'block' : 'none';
+    document.getElementById('tab-arsip').style.display = name === 'arsip' ? 'block' : 'none';
+
+    // Desktop tab highlights
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    const targetTab = tabEl || document.getElementById('tab' + name.charAt(0).toUpperCase() + name.slice(1));
+    if (targetTab) targetTab.classList.add('active');
+
+    // Sidebar highlights
+    document.querySelectorAll('.sb-item').forEach(s => s.classList.remove('active'));
+    const sbEl = document.getElementById('sbItem' + name.charAt(0).toUpperCase() + name.slice(1));
+    if (sbEl) sbEl.classList.add('active');
+
+    // Bottom nav
+    setActiveBN('bn-' + name);
+
+    // Reset mobile back when switching tabs
+    if (name !== 'buat') {
+      document.getElementById('mobileBack').style.display = 'none';
+      document.getElementById('docTypeSection').style.display = 'block';
+    }
+
+    if (name === 'arsip') loadArsip();
+  }
+
+  // ── BOTTOM NAV ───────────────────────────────────────────────
+  function setActiveBN(id) {
+    document.querySelectorAll('.bn-item').forEach(b => b.classList.remove('active'));
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active');
+  }
+
+  // ── MOBILE BACK ──────────────────────────────────────────────
+  function goBack() {
+    document.getElementById('mobileBack').style.display       = 'none';
+    document.getElementById('docTypeSection').style.display   = 'block';
+    document.getElementById('formPanel').classList.remove('show');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ── DOC FIELDS DEFINITION ────────────────────────────────────
   const DOC_FIELDS = {
     SURAT:  [{id:'recipient_name',label:'Penerima',ph:'PT. Nama Perusahaan'},{id:'recipient_address',label:'Alamat Penerima',ph:'Di Tempat / Kota Batam'},{id:'body',label:'Isi Surat',type:'textarea',ph:'Tuliskan isi surat...',full:true}],
     ST:     [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Operasional'},{id:'employee_dept',label:'Departemen',ph:'Operasional'},{id:'task_desc',label:'Uraian Tugas',type:'textarea',ph:'Melakukan survei lapangan...',full:true},{id:'task_location',label:'Lokasi Tugas',ph:'Kota Batam'},{id:'start_date',label:'Tanggal Mulai',type:'date'},{id:'end_date',label:'Tanggal Selesai',type:'date'}],
     SIZ:    [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Operasional'},{id:'leave_type',label:'Jenis Izin',type:'select',opts:['Sakit','Cuti Tahunan','Keperluan Keluarga','Lainnya']},{id:'start_date',label:'Tanggal Mulai',type:'date'},{id:'end_date',label:'Tanggal Selesai',type:'date'},{id:'leave_days',label:'Jumlah Hari',ph:'3'},{id:'reason',label:'Alasan',type:'textarea',full:true,ph:'Keterangan alasan...'}],
     SKT:    [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Operasional'},{id:'employee_dept',label:'Departemen',ph:'Operasional'},{id:'statement_purpose',label:'Keperluan / Pernyataan',type:'textarea',full:true,ph:'Bahwa yang bersangkutan benar-benar karyawan aktif...'}],
     BA:     [{id:'event_name',label:'Nama Kegiatan',ph:'Rapat Evaluasi Bulanan'},{id:'event_date',label:'Tanggal Kegiatan',type:'date'},{id:'event_time',label:'Waktu',ph:'09.00 — 12.00 WIB'},{id:'location',label:'Tempat',ph:'Kantor RIFIM, Batam'},{id:'attendees',label:'Peserta',type:'textarea',ph:'1. Nama — Jabatan\n2. Nama — Jabatan'},{id:'description',label:'Uraian Kegiatan',type:'textarea',ph:'Uraian kegiatan...'},{id:'result',label:'Hasil / Keputusan',type:'textarea',full:true,ph:'Keputusan yang diambil...'}],
-    INV:    [{id:'client_name',label:'Nama Klien',ph:'PT. Maxim Technology'},{id:'client_address',label:'Alamat Klien',ph:'Jakarta Selatan'},{id:'client_phone',label:'Telepon Klien',ph:'+62 21 ...'},{id:'due_date',label:'Jatuh Tempo',type:'date'},{id:'tax_percent',label:'PPN (%)',ph:'11'},{id:'items',label:'Rincian Layanan (HTML rows)',type:'textarea',ph:'<tr><td class="c">1</td><td>Jasa Promosi</td><td class="c">1</td><td class="r">Rp5.000.000</td><td class="r">Rp5.000.000</td></tr>',full:true},{id:'subtotal',label:'Subtotal',ph:'Rp 5.000.000'},{id:'tax_amount',label:'Jumlah PPN',ph:'Rp 550.000'},{id:'grand_total',label:'Grand Total',ph:'Rp 5.550.000'},{id:'bank_name',label:'Nama Bank',ph:'Bank BCA'},{id:'bank_account',label:'No. Rekening',ph:'1234 5678 90'},{id:'bank_holder',label:'Atas Nama',ph:'PT. Rifim Internasional Gemilang'},{id:'payment_terms',label:'Syarat Pembayaran',ph:'Maks. 14 hari'},{id:'notes',label:'Catatan',ph:'Mohon cantumkan nomor invoice pada bukti transfer'}],
-    KWT:    [{id:'payer_name',label:'Nama Pembayar',ph:'PT. Maxim Technology'},{id:'amount',label:'Jumlah',ph:'Rp 7.000.000'},{id:'amount_text',label:'Terbilang',ph:'Tujuh Juta Rupiah'},{id:'payment_purpose',label:'Keterangan Pembayaran',ph:'Jasa Promosi Bulan Juni 2026'},{id:'payment_detail',label:'Rincian',type:'textarea',ph:'- Item 1: Rp X\n- Item 2: Rp Y'},{id:'payment_date',label:'Tanggal Bayar',type:'date'}],
-    PROP:   [{id:'recipient_name',label:'Ditujukan Kepada',ph:'Bpk/Ibu Manager'},{id:'recipient_title',label:'Jabatan Penerima',ph:'General Manager'},{id:'recipient_company',label:'Perusahaan Penerima',ph:'PT. Nama Perusahaan'},{id:'recipient_address',label:'Alamat',ph:'Kota'},{id:'project_name',label:'Nama Proyek / Program',ph:'Kampanye Digital Maxim Q3 2026'},{id:'background',label:'Latar Belakang',type:'textarea',ph:'Uraikan latar belakang...'},{id:'objectives',label:'Tujuan Kerjasama',type:'textarea',ph:'...'},{id:'scope_items',label:'Lingkup / Penawaran',type:'textarea',ph:'<div class="offer-item">1. Jasa ...</div>',full:true},{id:'timeline',label:'Timeline',ph:'3 Bulan (Agustus — Oktober 2026)'},{id:'budget',label:'Estimasi Anggaran',ph:'Rp 25.000.000'}],
+    INV:    [{id:'client_name',label:'Nama Klien',ph:'PT. Maxim Technology'},{id:'client_address',label:'Alamat Klien',ph:'Jakarta Selatan'},{id:'client_phone',label:'Telepon Klien',ph:'+62 21 ...'},{id:'due_date',label:'Jatuh Tempo',type:'date'},{id:'tax_percent',label:'PPN (%)',ph:'11'},{id:'items',label:'Rincian Layanan (HTML rows)',type:'textarea',ph:'<tr><td>1</td><td>Jasa Promosi</td><td>1</td><td>Rp5.000.000</td><td>Rp5.000.000</td></tr>',full:true},{id:'subtotal',label:'Subtotal',ph:'Rp 5.000.000'},{id:'tax_amount',label:'Jumlah PPN',ph:'Rp 550.000'},{id:'grand_total',label:'Grand Total',ph:'Rp 5.550.000'},{id:'bank_name',label:'Nama Bank',ph:'Bank BCA'},{id:'bank_account',label:'No. Rekening',ph:'1234 5678 90'},{id:'bank_holder',label:'Atas Nama',ph:'PT. Rifim Internasional Gemilang'},{id:'payment_terms',label:'Syarat Pembayaran',ph:'Maks. 14 hari'},{id:'notes',label:'Catatan',ph:'Mohon cantumkan nomor invoice'}],
+    KWT:    [{id:'payer_name',label:'Nama Pembayar',ph:'PT. Maxim Technology'},{id:'amount',label:'Jumlah',ph:'Rp 7.000.000'},{id:'amount_text',label:'Terbilang',ph:'Tujuh Juta Rupiah'},{id:'payment_purpose',label:'Keterangan',ph:'Jasa Promosi Bulan Juni 2026'},{id:'payment_detail',label:'Rincian',type:'textarea',ph:'- Item 1: Rp X\n- Item 2: Rp Y'},{id:'payment_date',label:'Tanggal Bayar',type:'date'}],
+    PROP:   [{id:'recipient_name',label:'Ditujukan Kepada',ph:'Bpk/Ibu Manager'},{id:'recipient_title',label:'Jabatan Penerima',ph:'General Manager'},{id:'recipient_company',label:'Perusahaan Penerima',ph:'PT. Nama Perusahaan'},{id:'recipient_address',label:'Alamat',ph:'Kota'},{id:'project_name',label:'Nama Proyek / Program',ph:'Kampanye Digital Maxim Q3 2026'},{id:'background',label:'Latar Belakang',type:'textarea',ph:'Uraikan latar belakang...'},{id:'objectives',label:'Tujuan Kerjasama',type:'textarea',ph:'...'},{id:'scope_items',label:'Lingkup / Penawaran',type:'textarea',ph:'1. Jasa ...',full:true},{id:'timeline',label:'Timeline',ph:'3 Bulan (Agustus — Oktober 2026)'},{id:'budget',label:'Estimasi Anggaran',ph:'Rp 25.000.000'}],
     CP:     [{id:'recipient_name',label:'Ditujukan Kepada',ph:'PT. Nama Perusahaan'},{id:'services',label:'Layanan Utama',type:'textarea',ph:'✔ Promosi Digital\n✔ Aktivasi Lapangan'},{id:'vision',label:'Visi',ph:'Menjadi mitra bisnis terpercaya...'},{id:'mission',label:'Misi',type:'textarea',ph:'1. ...\n2. ...'},{id:'strengths',label:'Keunggulan',type:'textarea',full:true,ph:'Kami memiliki...'}],
     MOU:    [{id:'party_b_name',label:'Nama Pihak Kedua',ph:'PT. Nama Mitra'},{id:'party_b_pic',label:'Diwakili oleh',ph:'Nama Direktur'},{id:'party_b_title',label:'Jabatan',ph:'Direktur Utama'},{id:'party_b_address',label:'Alamat Pihak Kedua',ph:'Kota'},{id:'scope',label:'Lingkup Kerjasama',type:'textarea',ph:'Para pihak sepakat...',full:true},{id:'duration',label:'Jangka Waktu',ph:'12 Bulan'},{id:'end_date',label:'Tanggal Berakhir',type:'date'},{id:'rights_obligations',label:'Hak & Kewajiban',type:'textarea',ph:'...'},{id:'signing_day',label:'Hari Penandatanganan',ph:'Rabu'},{id:'signing_date',label:'Tanggal TTD',type:'date'}],
     PKS:    [{id:'party_b_name',label:'Nama Pihak Kedua',ph:'PT. Nama Mitra'},{id:'party_b_pic',label:'Diwakili oleh',ph:'Nama Direktur'},{id:'party_b_title',label:'Jabatan',ph:'Direktur Utama'},{id:'scope',label:'Lingkup Pekerjaan',type:'textarea',ph:'...',full:true},{id:'value',label:'Nilai Kerjasama',ph:'Rp 50.000.000'},{id:'payment_terms',label:'Mekanisme Pembayaran',ph:'30 hari setelah invoice'},{id:'duration',label:'Durasi',ph:'6 Bulan'},{id:'end_date',label:'Tanggal Berakhir',type:'date'},{id:'rights_obligations',label:'Hak & Kewajiban',type:'textarea',ph:'...'},{id:'signing_day',label:'Hari Penandatanganan',ph:'Rabu'},{id:'signing_date',label:'Tanggal TTD',type:'date'}],
@@ -568,42 +1026,56 @@
     SMT:    [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Operasional'},{id:'from_dept',label:'Dari Departemen',ph:'Operasional Batam'},{id:'to_dept',label:'Ke Departemen',ph:'Operasional Balikpapan'},{id:'new_location',label:'Lokasi Baru',ph:'Balikpapan'},{id:'effective_date',label:'Berlaku Mulai',type:'date'}],
     PHK:    [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Lapangan'},{id:'employee_dept',label:'Departemen',ph:'Operasional'},{id:'join_date',label:'Tanggal Bergabung',type:'date'},{id:'last_working_day',label:'Hari Kerja Terakhir',type:'date'},{id:'phk_reason',label:'Alasan PHK',type:'textarea',full:true,ph:'Uraikan alasan PHK...'}],
     PI:     [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'employee_position',label:'Jabatan',ph:'Supervisor'},{id:'employee_dept',label:'Departemen',ph:'Operasional'}],
-    FCO:    [{id:'checklist_type',label:'Jenis Checklist',type:'select',opts:['Operasional Harian','Checklist Kendaraan','Checklist Kantor','Checklist Event']},{id:'officer_name',label:'Nama Petugas',ph:'Ahmad Fauzi'},{id:'officer_title',label:'Jabatan Petugas',ph:'Supervisor'},{id:'check_date',label:'Tanggal',type:'date'},{id:'period',label:'Periode',ph:'Juli 2026'},{id:'location',label:'Lokasi',ph:'Kantor RIFIM Batam'},{id:'checklist_items',label:'Item Checklist (HTML rows)',type:'textarea',ph:'<tr><td>1</td><td>Item pemeriksaan</td><td style="text-align:center">✅</td><td>Normal</td></tr>',full:true},{id:'notes',label:'Catatan & Temuan',type:'textarea',ph:'Tidak ada temuan berarti...'}],
+    FCO:    [{id:'checklist_type',label:'Jenis Checklist',type:'select',opts:['Operasional Harian','Checklist Kendaraan','Checklist Kantor','Checklist Event']},{id:'officer_name',label:'Nama Petugas',ph:'Ahmad Fauzi'},{id:'officer_title',label:'Jabatan Petugas',ph:'Supervisor'},{id:'check_date',label:'Tanggal',type:'date'},{id:'period',label:'Periode',ph:'Juli 2026'},{id:'location',label:'Lokasi',ph:'Kantor RIFIM Batam'},{id:'checklist_items',label:'Item Checklist',type:'textarea',ph:'1. Item pemeriksaan — Status',full:true},{id:'notes',label:'Catatan & Temuan',type:'textarea',ph:'Tidak ada temuan berarti...'}],
   };
 
-  const MONTHS     = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+  const MONTHS      = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
   let   currentCode = 'SURAT';
   let   lastResult  = null;
 
-  // ── Pilih jenis dokumen ──────────────────────────────────────
+  // ── INIT APP ─────────────────────────────────────────────────
+  function initApp() {
+    document.getElementById('docDate').value = new Date().toISOString().split('T')[0];
+    updateDocNum();
+    renderDynFields('SURAT');
+  }
+
+  // ── SELECT DOC ────────────────────────────────────────────────
   function selectDoc(el, code, label, icon) {
     document.querySelectorAll('.doc-card').forEach(c => c.classList.remove('selected'));
     el.classList.add('selected');
     currentCode = code;
-    document.getElementById('fIcon').textContent   = icon;
-    document.getElementById('fTitle').textContent  = label;
-    document.getElementById('fSub').textContent    = `Isi formulir di bawah untuk membuat ${label}`;
+    document.getElementById('fIcon').textContent  = icon;
+    document.getElementById('fTitle').textContent = label;
+    document.getElementById('fSub').textContent   = `Isi formulir di bawah untuk membuat ${label}`;
     updateDocNum();
     renderDynFields(code);
     document.getElementById('formPanel').classList.add('show');
-    document.getElementById('formPanel').scrollIntoView({behavior:'smooth', block:'nearest'});
+
+    if (window.innerWidth <= 768) {
+      // Mobile: show form only, hide doc grid, show back button
+      document.getElementById('mobileBack').style.display     = 'flex';
+      document.getElementById('docTypeSection').style.display = 'none';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      document.getElementById('formPanel').scrollIntoView({ behavior:'smooth', block:'nearest' });
+    }
   }
 
-  // ── Preview nomor (dari GAS peek atau estimasi lokal) ────────
+  // ── PREVIEW NOMOR ─────────────────────────────────────────────
   async function updateDocNum() {
     const el  = document.getElementById('docNum');
     const now = new Date();
     el.textContent = `—/RIFIM/${currentCode}/${MONTHS[now.getMonth()]}/${now.getFullYear()}`;
-
     if (!GAS_WEB_APP_URL) return;
     try {
       const res  = await fetch(`${GAS_WEB_APP_URL}?action=peek&code=${currentCode}`);
       const data = await res.json();
       if (data.success) el.textContent = data.nextNumber;
-    } catch(_) { /* biarkan estimasi lokal */ }
+    } catch(_) {}
   }
 
-  // ── Render form dinamis ──────────────────────────────────────
+  // ── RENDER DYNAMIC FIELDS ─────────────────────────────────────
   function renderDynFields(code) {
     const fields    = DOC_FIELDS[code] || [];
     const container = document.getElementById('dynFields');
@@ -622,31 +1094,23 @@
   }
 
   function buildField(f) {
-    if (f.type === 'textarea') {
+    if (f.type === 'textarea')
       return `<div class="field"><label>${f.label}</label><textarea id="${f.id}" placeholder="${f.ph||''}"></textarea></div>`;
-    }
     if (f.type === 'select') {
       const opts = f.opts.map(o => `<option>${o}</option>`).join('');
       return `<div class="field"><label>${f.label}</label><select id="${f.id}">${opts}</select></div>`;
     }
-    if (f.type === 'date') {
+    if (f.type === 'date')
       return `<div class="field"><label>${f.label}</label><input type="date" id="${f.id}"></div>`;
-    }
     return `<div class="field"><label>${f.label}</label><input type="text" id="${f.id}" placeholder="${f.ph||''}"></div>`;
   }
 
-  // ── GENERATE DOKUMEN ─────────────────────────────────────────
+  // ── GENERATE DOKUMEN ──────────────────────────────────────────
   async function generateDoc() {
-    if (!GAS_WEB_APP_URL) {
-      showToast('⚙️ GAS_WEB_APP_URL belum diisi — deploy Web App dulu di Apps Script', false);
-      return;
-    }
-
-    // Validasi field wajib
+    if (!GAS_WEB_APP_URL) { showToast('GAS_WEB_APP_URL belum diisi', false); return; }
     const subject = document.getElementById('subject').value.trim();
     if (!subject) { showToast('⚠️ Perihal / Judul wajib diisi', false); return; }
 
-    // Kumpulkan semua dynamic field sebagai extra object
     const extra = {};
     (DOC_FIELDS[currentCode] || []).forEach(f => {
       const el = document.getElementById(f.id);
@@ -655,7 +1119,7 @@
 
     const input = {
       documentType:  currentCode,
-      subject:       subject,
+      subject,
       attachment:    document.getElementById('attachment').value.trim() || '-',
       documentDate:  document.getElementById('docDate').value,
       directorName:  document.getElementById('signerName').value.trim(),
@@ -663,27 +1127,19 @@
       extra,
     };
 
-    // Loading state
     setLoading(true, 'Menghubungi engine RIFIM OS...');
     const btn = document.querySelector('.btn.btn-primary');
-    btn.disabled   = true;
-    btn.textContent = '⏳ Memproses...';
+    btn.disabled = true; btn.textContent = '⏳ Memproses...';
 
     try {
       setLoading(true, 'Membuat dokumen & mengisi data...');
-      const res = await fetch(GAS_WEB_APP_URL, {
-        method:  'POST',
-        headers: { 'Content-Type': 'text/plain' }, // hindari CORS preflight
-        body:    JSON.stringify(input),
-      });
-
+      const res    = await fetch(GAS_WEB_APP_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(input) });
       const result = await res.json();
       setLoading(false);
-
       if (result.success) {
         lastResult = result;
         showResult(result);
-        updateDocNum(); // refresh nomor berikutnya
+        updateDocNum();
       } else {
         showToast('❌ ' + (result.message || 'Gagal membuat dokumen'), false);
       }
@@ -691,18 +1147,13 @@
       setLoading(false);
       showToast('❌ Koneksi gagal: ' + err.message, false);
     } finally {
-      btn.disabled    = false;
-      btn.textContent = '⚡ Generate Dokumen';
+      btn.disabled = false; btn.textContent = '⚡ Generate Dokumen';
     }
   }
 
-  // ── Preview (buka doc terakhir yang dibuat) ──────────────────
   function previewDoc() {
-    if (lastResult && lastResult.gdocUrl) {
-      window.open(lastResult.gdocUrl, '_blank');
-    } else {
-      showToast('Belum ada dokumen yang dibuat di sesi ini', false);
-    }
+    if (lastResult && lastResult.gdocUrl) window.open(lastResult.gdocUrl, '_blank');
+    else showToast('Belum ada dokumen yang dibuat di sesi ini', false);
   }
 
   function clearForm() {
@@ -711,36 +1162,20 @@
     showToast('Form dikosongkan', false);
   }
 
-  // ── Result modal ─────────────────────────────────────────────
-  function showResult(result) {
-    document.getElementById('resultDocNum').textContent  = result.documentNumber || '—';
-    document.getElementById('resultGdocBtn').href        = result.gdocUrl  || '#';
-    document.getElementById('resultPdfBtn').href         = result.pdfUrl   || '#';
-    document.getElementById('resultOverlay').style.display = 'flex';
+  function showResult(r) {
+    document.getElementById('resultDocNum').textContent         = r.documentNumber || '—';
+    document.getElementById('resultGdocBtn').href               = r.gdocUrl  || '#';
+    document.getElementById('resultPdfBtn').href                = r.pdfUrl   || '#';
+    document.getElementById('resultOverlay').style.display      = 'flex';
   }
-  function closeResult() {
-    document.getElementById('resultOverlay').style.display = 'none';
-  }
+  function closeResult() { document.getElementById('resultOverlay').style.display = 'none'; }
 
-  // ── Loading overlay ──────────────────────────────────────────
   function setLoading(show, msg) {
-    const ov = document.getElementById('loadingOverlay');
-    ov.style.display = show ? 'flex' : 'none';
+    document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
     if (msg) document.getElementById('loadingStatus').textContent = msg;
   }
 
-  // ── Tab & filter ─────────────────────────────────────────────
-  function showTab(name, el) {
-    document.getElementById('tab-buat').style.display  = name === 'buat'  ? 'block' : 'none';
-    document.getElementById('tab-arsip').style.display = name === 'arsip' ? 'block' : 'none';
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    if (el) el.classList.add('active');
-    if (name === 'arsip') loadArsip();
-  }
-
-  function filterCat(cat) { showToast(`Filter: ${cat}`, false); }
-
-  // ── Arsip real-time ──────────────────────────────────────────
+  // ── ARSIP REAL-TIME ───────────────────────────────────────────
   let _arsipTimer;
   function debounceArsip() {
     clearTimeout(_arsipTimer);
@@ -751,10 +1186,7 @@
   const STATUS_BADGE = { DRAFT:'badge-draft', FINAL:'badge-final', SENT:'badge-sent', ARCHIVED:'badge-archived' };
 
   async function loadArsip() {
-    if (!GAS_WEB_APP_URL) {
-      showToast('GAS URL belum diisi di konstanta GAS_WEB_APP_URL', false);
-      return;
-    }
+    if (!GAS_WEB_APP_URL) return;
     const search = (document.getElementById('arsipSearch').value || '').trim();
     const status = document.getElementById('arsipStatus').value;
 
@@ -767,48 +1199,36 @@
       const url  = `${GAS_WEB_APP_URL}?action=arsip&status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}&limit=150`;
       const res  = await fetch(url);
       const data = await res.json();
-
       document.getElementById('arsipLoading').style.display = 'none';
-
       if (!data.success) { showToast('Gagal: ' + data.message, false); return; }
-
-      if (!data.docs || data.docs.length === 0) {
-        document.getElementById('arsipEmpty').style.display = 'block';
-        return;
-      }
+      if (!data.docs || !data.docs.length) { document.getElementById('arsipEmpty').style.display = 'block'; return; }
 
       document.getElementById('arsipTableWrap').style.display = 'block';
-
-      const tbody = document.getElementById('arsipBody');
-      tbody.innerHTML = data.docs.map(doc => {
+      document.getElementById('arsipBody').innerHTML = data.docs.map(doc => {
         const tgl = doc.document_date
           ? new Date(doc.document_date).toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' })
           : '—';
-        const badgeCls = STATUS_BADGE[doc.status] || 'badge-draft';
-        const badgeTxt = STATUS_LABEL[doc.status] || doc.status;
-        const links = [
+        const cls  = STATUS_BADGE[doc.status] || 'badge-draft';
+        const lbl  = STATUS_LABEL[doc.status] || doc.status;
+        const lnks = [
           doc.gdoc_url ? `<a class="act" href="${doc.gdoc_url}" target="_blank">Doc ↗</a>` : '',
           doc.pdf_url  ? `<a class="act" href="${doc.pdf_url}"  target="_blank">PDF ↗</a>` : '',
         ].filter(Boolean).join(' ');
         return `<tr>
           <td class="doc-num">${doc.document_number || '—'}</td>
-          <td>${doc.document_type || '—'}</td>
-          <td>${doc.subject || '—'}</td>
-          <td>${doc.recipient_name || '—'}</td>
+          <td>${doc.document_type   || '—'}</td>
+          <td>${doc.subject         || '—'}</td>
+          <td>${doc.recipient_name  || '—'}</td>
           <td>${tgl}</td>
-          <td><span class="badge ${badgeCls}">${badgeTxt}</span></td>
-          <td>${links || '—'}</td>
+          <td><span class="badge ${cls}">${lbl}</span></td>
+          <td>${lnks || '—'}</td>
         </tr>`;
       }).join('');
 
-      const shown = data.docs.length;
-      const total = data.total;
+      const shown = data.docs.length, total = data.total;
       document.getElementById('arsipFooter').textContent =
-        shown < total
-          ? `Menampilkan ${shown} dari ${total} dokumen`
-          : `Total: ${total} dokumen`;
+        shown < total ? `Menampilkan ${shown} dari ${total} dokumen` : `Total: ${total} dokumen`;
 
-      // Update stat cards jika ada data stats
       if (data.stats) _updateStatCards(data.stats);
 
     } catch (err) {
@@ -817,11 +1237,17 @@
     }
   }
 
-  function _updateStatCards(stats) {
-    const cards = document.querySelectorAll('.stat-value');
-    if (cards[0]) cards[0].textContent = stats.bulan_ini ?? '—';
-    if (cards[2]) cards[2].textContent = stats.draft     ?? '—';
+  function _updateStatCards(s) {
+    const b = document.getElementById('statBulanIni');
+    const d = document.getElementById('statDraft');
+    const t = document.getElementById('statTotal');
+    if (b) b.textContent = s.bulan_ini ?? '—';
+    if (d) d.textContent = s.draft     ?? '—';
+    if (t) t.textContent = s.total     ?? '—';
   }
+
+  // ── MISC ─────────────────────────────────────────────────────
+  function filterCat(cat) { showToast(`Filter: ${cat}`, false); }
 
   function showToast(msg, ok) {
     const t = document.getElementById('toast');
@@ -830,10 +1256,8 @@
     setTimeout(() => t.className = 'toast', 3500);
   }
 
-  // ── Init ──────────────────────────────────────────────────────
-  document.getElementById('docDate').value = new Date().toISOString().split('T')[0];
-  updateDocNum();
-  renderDynFields('SURAT');
+  // ── BOOT ─────────────────────────────────────────────────────
+  checkAuth();
 </script>
 </body>
 </html>

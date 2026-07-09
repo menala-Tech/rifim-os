@@ -1,0 +1,20 @@
+{
+  "name": "RIFIM OS",
+  "short_name": "RIFIM OS",
+  "description": "Smart Office — PT. RIFIM Internasional Gemilang",
+  "start_url": "/smart-office",
+  "display": "standalone",
+  "background_color": "#2B2B2B",
+  "theme_color": "#C40000",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/branding/icon/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "id"
+}

@@ -63,6 +63,33 @@ function doGet(e) {
     }
   }
 
+  if (action === 'auth') {
+    try {
+      const email  = ((e.parameter.email || '').toLowerCase()).trim();
+      const config = getCompanyConfig();
+      const companyEmail = (config.company_email || '').toLowerCase().trim();
+      if (email && email === companyEmail) {
+        return ContentService
+          .createTextOutput(JSON.stringify({
+            success: true,
+            user: {
+              name:  config.director_name  || 'Bobby Rahman M.B',
+              role:  config.director_title || 'Direktur Utama',
+              email: email,
+            },
+          }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      return ContentService
+        .createTextOutput(JSON.stringify({ success: false, message: 'Email tidak diizinkan.' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ success: false, message: err.message }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
   if (action === 'arsip') {
     try {
       const options = {
