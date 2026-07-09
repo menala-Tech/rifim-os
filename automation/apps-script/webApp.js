@@ -65,10 +65,24 @@ function doGet(e) {
 
   if (action === 'auth') {
     try {
-      const email  = ((e.parameter.email || '').toLowerCase()).trim();
-      const config = getCompanyConfig();
-      const companyEmail = (config.company_email || '').toLowerCase().trim();
-      if (email && email === companyEmail) {
+      var email  = ((e.parameter.email || '').toLowerCase()).trim();
+      var config = getCompanyConfig();
+
+      // Bangun daftar email yang diizinkan:
+      // 1. company_email (email utama perusahaan)
+      // 2. allowed_emails (daftar tambahan, dipisah koma di Google Sheets)
+      var allowedList = [];
+      if (config.company_email) {
+        allowedList.push(config.company_email.toLowerCase().trim());
+      }
+      if (config.allowed_emails) {
+        config.allowed_emails.split(',').forEach(function(e) {
+          var trimmed = e.toLowerCase().trim();
+          if (trimmed) allowedList.push(trimmed);
+        });
+      }
+
+      if (email && allowedList.indexOf(email) > -1) {
         return ContentService
           .createTextOutput(JSON.stringify({
             success: true,
