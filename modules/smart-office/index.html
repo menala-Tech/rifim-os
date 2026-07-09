@@ -1218,19 +1218,32 @@
 
   function _wireAutoTerbilang(code) {
     var map = _TERBILANG_MAP[code];
-    if (!map || !map.dst) return;
+    if (!map) return;
     var srcEl = document.getElementById(map.src);
-    var dstEl = document.getElementById(map.dst);
-    if (!srcEl || !dstEl) return;
+    if (!srcEl) return;
     srcEl.addEventListener('input', function() {
-      var t = terbilangIDR(srcEl.value);
-      if (t) dstEl.value = t;
+      // Format sebagai Rp.X.XXX.XXX
+      var digits = srcEl.value.replace(/[^0-9]/g, '');
+      srcEl.value = digits ? _rupiahFmt(digits) : '';
+      // Auto-fill terbilang
+      if (map.dst) {
+        var dstEl = document.getElementById(map.dst);
+        if (dstEl) { var t = terbilangIDR(digits); if (t) dstEl.value = t; }
+      }
     });
   }
 
+  function _rupiahFmt(digits) {
+    var s = String(parseInt(digits, 10) || 0);
+    var out = '', mod = s.length % 3;
+    out += s.slice(0, mod);
+    for (var i = mod; i < s.length; i += 3) { if (out) out += '.'; out += s.slice(i, i+3); }
+    return 'Rp.' + out;
+  }
+
   function terbilangIDR(str) {
-    var clean = String(str).replace(/[Rp\s]/g, '').replace(/\./g, '').replace(',', '.');
-    var num   = Math.floor(parseFloat(clean));
+    var clean = String(str).replace(/[^0-9]/g, '');
+    var num   = parseInt(clean, 10);
     if (isNaN(num) || num <= 0) return '';
     var words = _terbilangNum(num) || 'nol';
     return words.charAt(0).toUpperCase() + words.slice(1) + ' rupiah';
