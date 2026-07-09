@@ -1206,6 +1206,50 @@
       html += `<div class="fgrid full">${buildField(f)}</div>`;
     });
     container.innerHTML = html;
+    _wireAutoTerbilang(code);
+  }
+
+  // ── AUTO TERBILANG ────────────────────────────────────────────
+  // Mapping: source field id → target field id (per doc code)
+  var _TERBILANG_MAP = {
+    KWT: { src: 'amount',      dst: 'amount_text' },
+    INV: { src: 'grand_total', dst: null },          // INV tidak punya terbilang field
+  };
+
+  function _wireAutoTerbilang(code) {
+    var map = _TERBILANG_MAP[code];
+    if (!map || !map.dst) return;
+    var srcEl = document.getElementById(map.src);
+    var dstEl = document.getElementById(map.dst);
+    if (!srcEl || !dstEl) return;
+    srcEl.addEventListener('input', function() {
+      var t = terbilangIDR(srcEl.value);
+      if (t) dstEl.value = t;
+    });
+  }
+
+  function terbilangIDR(str) {
+    var clean = String(str).replace(/[Rp\s]/g, '').replace(/\./g, '').replace(',', '.');
+    var num   = Math.floor(parseFloat(clean));
+    if (isNaN(num) || num <= 0) return '';
+    var words = _terbilangNum(num) || 'nol';
+    return words.charAt(0).toUpperCase() + words.slice(1) + ' rupiah';
+  }
+
+  function _terbilangNum(n) {
+    if (n === 0) return '';
+    var s = ['','satu','dua','tiga','empat','lima','enam','tujuh','delapan','sembilan'];
+    if (n < 10)  return s[n];
+    if (n === 10) return 'sepuluh';
+    if (n === 11) return 'sebelas';
+    if (n < 20)  return s[n - 10] + ' belas';
+    if (n < 100) return s[Math.floor(n/10)] + ' puluh' + (n%10 ? ' '+s[n%10] : '');
+    if (n < 200) return 'seratus' + (n%100 ? ' '+_terbilangNum(n%100) : '');
+    if (n < 1000) return s[Math.floor(n/100)]+' ratus'+(n%100 ? ' '+_terbilangNum(n%100) : '');
+    if (n < 2000) return 'seribu'+(n%1000 ? ' '+_terbilangNum(n%1000) : '');
+    if (n < 1e6)  return _terbilangNum(Math.floor(n/1000))+' ribu'+(n%1000 ? ' '+_terbilangNum(n%1000) : '');
+    if (n < 1e9)  return _terbilangNum(Math.floor(n/1e6))+' juta'+(n%1e6 ? ' '+_terbilangNum(n%1e6) : '');
+    return _terbilangNum(Math.floor(n/1e9))+' miliar'+(n%1e9 ? ' '+_terbilangNum(n%1e9) : '');
   }
 
   function buildField(f) {
