@@ -73,15 +73,15 @@ Jika ada jawaban "Ya" → redesign sebelum coding.
 
 | Engine | Purpose | Status |
 |--------|---------|--------|
-| Document Engine | Generate semua jenis dokumen | ⏳ Phase 1 |
-| Placeholder Engine | Replace placeholder di template | ⏳ Phase 1 |
-| Numbering Engine | Auto-generate nomor dokumen | ⏳ Phase 1 |
-| PDF Engine | Convert ke PDF | ⏳ Phase 1 |
-| Drive Manager | Kelola Google Drive | ⏳ Phase 1 |
-| Database Layer | Abstraksi akses database | ⏳ Phase 1 |
-| Notification Engine | Email & WhatsApp | ⏳ Phase 2 |
-| QR Engine | Generate QR code | ⏳ Phase 1 |
-| Auth Engine | Authentication & role | ⏳ Phase 2 |
+| Document Engine | Generate semua jenis dokumen | ✅ Phase 1 Done |
+| Placeholder Engine | Replace placeholder di template | ✅ Phase 1 Done |
+| Numbering Engine | Auto-generate nomor dokumen | ✅ Phase 1 Done |
+| PDF Engine | Convert ke PDF | ✅ Phase 1 Done |
+| Drive Manager | Kelola Google Drive | ✅ Phase 1 Done |
+| Database Layer | Abstraksi akses database | ✅ Phase 1 Done |
+| Notification Engine | Email & WhatsApp | ✅ Phase 2 Done |
+| QR Engine | Generate QR code | ✅ Phase 1 Done |
+| Auth Engine | Authentication & role | ✅ Phase 2 Done |
 
 ---
 

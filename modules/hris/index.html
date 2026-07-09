@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1a1a2e">
+<title>RIFIM OS — HRIS</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+/* ─── RESET & BASE ─── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --primary:#1a1a2e;--accent:#e94560;--accent2:#0f3460;
+  --bg:#f0f2f5;--card:#fff;--border:#e0e0e0;
+  --text:#222;--muted:#888;--success:#27ae60;--warning:#e67e22;--danger:#e74c3c;
+  --font:'Segoe UI',system-ui,sans-serif;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
+button{cursor:pointer;font-family:var(--font)}
+input,select,textarea{font-family:var(--font)}
+a{color:var(--accent2);text-decoration:none}
+
+/* ─── AUTH GATE ─── */
+#auth-gate{
+  position:fixed;inset:0;background:var(--primary);
+  display:flex;align-items:center;justify-content:center;z-index:9999;
+}
+.auth-box{
+  background:#fff;border-radius:16px;padding:40px;width:360px;
+  box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;
+}
+.auth-box h1{font-size:24px;margin-bottom:4px;color:var(--primary)}
+.auth-box p{color:var(--muted);font-size:14px;margin-bottom:24px}
+.auth-box input{
+  width:100%;padding:12px;border:1px solid var(--border);border-radius:8px;
+  font-size:14px;margin-bottom:12px;
+}
+.auth-box button{
+  width:100%;padding:12px;background:var(--accent);color:#fff;
+  border:none;border-radius:8px;font-size:14px;font-weight:600;
+}
+.auth-box button:hover{background:#c0392b}
+#auth-error{color:var(--danger);font-size:13px;margin-top:8px;display:none}
+
+/* ─── HEADER ─── */
+#app{display:none;flex-direction:column;min-height:100vh}
+header{
+  background:var(--primary);color:#fff;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;height:56px;position:sticky;top:0;z-index:100;
+  box-shadow:0 2px 8px rgba(0,0,0,.3);
+}
+.header-left{display:flex;align-items:center;gap:12px}
+.header-logo{font-size:18px;font-weight:700;letter-spacing:1px}
+.header-module{
+  background:var(--accent);color:#fff;font-size:11px;font-weight:600;
+  padding:2px 8px;border-radius:4px;letter-spacing:.5px;
+}
+.header-right{display:flex;align-items:center;gap:12px}
+#company-badge{
+  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);
+  color:#fff;font-size:12px;padding:4px 10px;border-radius:6px;font-weight:600;
+}
+#user-badge{font-size:12px;opacity:.8}
+#btn-logout{
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
+  color:#fff;padding:4px 12px;border-radius:6px;font-size:12px;
+}
+
+/* ─── NAV TABS ─── */
+nav{
+  background:#fff;border-bottom:2px solid var(--border);
+  display:flex;padding:0 24px;overflow-x:auto;
+  position:sticky;top:56px;z-index:99;box-shadow:0 2px 4px rgba(0,0,0,.05);
+}
+nav button{
+  padding:14px 20px;border:none;background:none;color:var(--muted);
+  font-size:14px;font-weight:500;border-bottom:2px solid transparent;
+  margin-bottom:-2px;white-space:nowrap;transition:all .15s;
+}
+nav button:hover{color:var(--primary)}
+nav button.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+
+/* ─── MAIN CONTENT ─── */
+main{flex:1;padding:24px;max-width:1400px;width:100%;margin:0 auto}
+
+/* ─── CARDS ─── */
+.card{background:var(--card);border-radius:12px;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
+.card-header{
+  padding:16px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.card-header h3{font-size:15px;font-weight:600}
+.card-body{padding:20px}
+
+/* ─── STATS ROW ─── */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:20px}
+.stat-card{
+  background:var(--card);border-radius:12px;border:1px solid var(--border);
+  padding:20px;text-align:center;
+}
+.stat-num{font-size:32px;font-weight:700;color:var(--primary)}
+.stat-label{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* ─── TOOLBAR ─── */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.toolbar input,.toolbar select{
+  padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;
+}
+.toolbar input{flex:1;min-width:160px}
+
+/* ─── BUTTONS ─── */
+.btn{
+  padding:8px 16px;border-radius:8px;border:none;font-size:13px;font-weight:600;
+  cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px;
+}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#c0392b}
+.btn-secondary{background:var(--accent2);color:#fff}
+.btn-secondary:hover{background:#0a2a50}
+.btn-success{background:var(--success);color:#fff}
+.btn-warning{background:var(--warning);color:#fff}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-ghost:hover{background:var(--bg)}
+.btn-sm{padding:5px 10px;font-size:12px}
+
+/* ─── TABLE ─── */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{
+  background:#f8f9fa;padding:10px 12px;text-align:left;
+  font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.5px;border-bottom:2px solid var(--border);white-space:nowrap;
+}
+td{padding:10px 12px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+tr:hover td{background:#fafafa}
+tr:last-child td{border-bottom:none}
+
+/* ─── BADGE / CHIP ─── */
+.badge{
+  display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;
+}
+.badge-aktif{background:#d5f5e3;color:#1e8449}
+.badge-nonaktif,.badge-resign,.badge-phk{background:#fde8e8;color:#c0392b}
+.badge-pkwt{background:#e8f4fd;color:#2980b9}
+.badge-pkwtt{background:#e8fdf0;color:#27ae60}
+.badge-pending{background:#fef9e7;color:#d4ac0d}
+.badge-disetujui{background:#d5f5e3;color:#1e8449}
+.badge-ditolak{background:#fde8e8;color:#c0392b}
+.badge-draft{background:#f5eef8;color:#7d3c98}
+.badge-final{background:#d5f5e3;color:#1e8449}
+
+/* ─── MODAL ─── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+.modal-overlay.open{display:flex}
+.modal{
+  background:#fff;border-radius:16px;width:100%;max-width:640px;
+  max-height:90vh;display:flex;flex-direction:column;
+  box-shadow:0 20px 60px rgba(0,0,0,.4);
+}
+.modal-header{
+  padding:20px 24px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.modal-header h3{font-size:16px;font-weight:700}
+.modal-close{background:none;border:none;font-size:20px;color:var(--muted);cursor:pointer}
+.modal-body{padding:24px;overflow-y:auto;flex:1}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
+
+/* ─── FORM ─── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-grid.cols-1{grid-template-columns:1fr}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-group label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase}
+.form-group input,.form-group select,.form-group textarea{
+  padding:10px 12px;border:1px solid var(--border);border-radius:8px;
+  font-size:13px;width:100%;
+}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{
+  outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(233,69,96,.1);
+}
+.form-span-2{grid-column:1/-1}
+.required::after{content:' *';color:var(--danger)}
+
+/* ─── DETAIL PANEL ─── */
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.detail-item{display:flex;flex-direction:column;gap:2px}
+.detail-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.detail-value{font-size:14px}
+
+/* ─── TABS ─── */
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* ─── EMPTY STATE ─── */
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state svg{width:48px;height:48px;margin-bottom:12px;opacity:.4}
+.empty-state p{font-size:14px}
+
+/* ─── LOADING ─── */
+.loading{text-align:center;padding:40px;color:var(--muted);font-size:14px}
+
+/* ─── TOAST ─── */
+#toast{
+  position:fixed;bottom:24px;right:24px;
+  background:#222;color:#fff;padding:12px 20px;border-radius:10px;
+  font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;
+  max-width:360px;
+}
+#toast.show{opacity:1}
+#toast.success{background:var(--success)}
+#toast.error{background:var(--danger)}
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:640px){
+  main{padding:12px}
+  .form-grid{grid-template-columns:1fr}
+  .detail-grid{grid-template-columns:1fr}
+  header{padding:0 12px}
+  nav button{padding:12px 14px;font-size:13px}
+}
+</style>
+</head>
+<body>
+
+<!-- ─── AUTH GATE ─── -->
+<div id="auth-gate">
+  <div class="auth-box">
+    <h1>RIFIM OS</h1>
+    <p>Human Resource Information System</p>
+    <input type="email" id="auth-email" placeholder="Email perusahaan Anda" autocomplete="email">
+    <button onclick="doLogin()">Masuk ke HRIS</button>
+    <div id="auth-error"></div>
+  </div>
+</div>
+
+<!-- ─── APP ─── -->
+<div id="app">
+  <header>
+    <div class="header-left">
+      <span class="header-logo">RIFIM OS</span>
+      <span class="header-module">HRIS</span>
+    </div>
+    <div class="header-right">
+      <select id="company-selector" onchange="onCompanyChange()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:4px 10px;border-radius:6px;font-size:12px">
+        <option value="ALL">Semua Perusahaan</option>
+        <option value="RIFIM">PT. RIFIM</option>
+        <option value="MIG">PT. MIG</option>
+        <option value="LAILAN">CV. LAILAN</option>
+      </select>
+      <span id="user-badge">–</span>
+      <button class="btn-ghost" id="btn-logout" onclick="doLogout()" style="color:#fff;border-color:rgba(255,255,255,.2)">Keluar</button>
+    </div>
+  </header>
+
+  <nav>
+    <button class="active" onclick="switchTab('karyawan', this)">👥 Karyawan</button>
+    <button onclick="switchTab('kontrak', this)">📋 Kontrak</button>
+    <button onclick="switchTab('absensi', this)">📅 Absensi</button>
+    <button onclick="switchTab('cuti', this)">🏖️ Cuti</button>
+    <button onclick="switchTab('payroll', this)">💰 Payroll</button>
+  </nav>
+
+  <main>
+
+    <!-- ═══ TAB: KARYAWAN ═══ -->
+    <div id="tab-karyawan" class="tab-content active">
+      <div class="stats-row" id="stats-karyawan">
+        <div class="stat-card"><div class="stat-num" id="stat-total">–</div><div class="stat-label">Total Karyawan</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-aktif">–</div><div class="stat-label">Aktif</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-pkwt">–</div><div class="stat-label">PKWT</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-pkwtt">–</div><div class="stat-label">PKWTT</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Data Karyawan</h3>
+          <button class="btn btn-primary" onclick="openModal('modal-add-employee')">+ Tambah Karyawan</button>
+        </div>
+        <div class="card-body">
+          <div class="toolbar">
+            <input type="text" id="search-emp" placeholder="Cari nama / ID / jabatan…" oninput="filterEmployees()">
+            <select id="filter-status" onchange="filterEmployees()">
+              <option value="ALL">Semua Status</option>
+              <option value="AKTIF">Aktif</option>
+              <option value="NONAKTIF">Nonaktif</option>
+              <option value="RESIGN">Resign</option>
+              <option value="PHK">PHK</option>
+            </select>
+            <select id="filter-type" onchange="filterEmployees()">
+              <option value="ALL">Semua Tipe</option>
+              <option value="PKWT">PKWT</option>
+              <option value="PKWTT">PKWTT</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table id="table-employees">
+              <thead>
+                <tr>
+                  <th>ID</th><th>Nama</th><th>Jabatan</th><th>Departemen</th>
+                  <th>Perusahaan</th><th>Tipe</th><th>Status</th><th>Bergabung</th><th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-employees">
+                <tr><td colspan="9" class="loading">Memuat data…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB: KONTRAK ═══ -->
+    <div id="tab-kontrak" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <h3>Manajemen Kontrak</h3>
+          <button class="btn btn-primary" onclick="openModal('modal-add-contract')">+ Kontrak Baru</button>
+        </div>
+        <div class="card-body">
+          <div class="toolbar">
+            <input type="text" id="search-contract" placeholder="Cari ID karyawan…" oninput="filterContracts()">
+            <select id="filter-contract-status" onchange="filterContracts()">
+              <option value="ALL">Semua Status</option>
+              <option value="AKTIF">Aktif</option>
+              <option value="SELESAI">Selesai</option>
+              <option value="DIBATALKAN">Dibatalkan</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID Karyawan</th><th>Nama</th><th>Jenis Kontrak</th>
+                  <th>Mulai</th><th>Selesai</th><th>No. Dokumen</th><th>Status</th><th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-contracts">
+                <tr><td colspan="8" class="loading">Memuat data…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB: ABSENSI ═══ -->
+    <div id="tab-absensi" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <h3>Rekap Absensi</h3>
+          <button class="btn btn-primary" onclick="openModal('modal-add-attendance')">+ Catat Absensi</button>
+        </div>
+        <div class="card-body">
+          <div class="toolbar">
+            <input type="text" id="search-att-emp" placeholder="ID Karyawan…" style="max-width:200px">
+            <input type="date" id="att-date-from">
+            <input type="date" id="att-date-to">
+            <button class="btn btn-secondary" onclick="loadAttendance()">Tampilkan</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID Karyawan</th><th>Tanggal</th><th>Masuk</th><th>Keluar</th><th>Status</th><th>Keterangan</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-attendance">
+                <tr><td colspan="6" class="empty-state"><p>Pilih karyawan dan rentang tanggal lalu klik Tampilkan.</p></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB: CUTI ═══ -->
+    <div id="tab-cuti" class="tab-content">
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-num" id="stat-cuti-pending" style="color:var(--warning)">–</div><div class="stat-label">Pending</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-cuti-approved" style="color:var(--success)">–</div><div class="stat-label">Disetujui</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-cuti-rejected" style="color:var(--danger)">–</div><div class="stat-label">Ditolak</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>Pengajuan Cuti</h3>
+          <button class="btn btn-primary" onclick="openModal('modal-apply-leave')">+ Ajukan Cuti</button>
+        </div>
+        <div class="card-body">
+          <div class="toolbar">
+            <select id="filter-leave-status" onchange="filterLeave()">
+              <option value="ALL">Semua Status</option>
+              <option value="PENDING">Pending</option>
+              <option value="DISETUJUI">Disetujui</option>
+              <option value="DITOLAK">Ditolak</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID Karyawan</th><th>Nama</th><th>Jenis</th>
+                  <th>Mulai</th><th>Selesai</th><th>Hari</th><th>Alasan</th><th>Status</th><th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-leave">
+                <tr><td colspan="9" class="loading">Memuat data…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB: PAYROLL ═══ -->
+    <div id="tab-payroll" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <h3>Payroll</h3>
+          <button class="btn btn-primary" onclick="openModal('modal-add-payroll')">+ Buat Payroll</button>
+        </div>
+        <div class="card-body">
+          <div class="toolbar">
+            <select id="filter-payroll-month">
+              <option value="">Semua Bulan</option>
+              <option value="1">Januari</option><option value="2">Februari</option>
+              <option value="3">Maret</option><option value="4">April</option>
+              <option value="5">Mei</option><option value="6">Juni</option>
+              <option value="7">Juli</option><option value="8">Agustus</option>
+              <option value="9">September</option><option value="10">Oktober</option>
+              <option value="11">November</option><option value="12">Desember</option>
+            </select>
+            <select id="filter-payroll-year"></select>
+            <button class="btn btn-secondary" onclick="loadPayroll()">Tampilkan</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID Karyawan</th><th>Nama</th><th>Periode</th>
+                  <th>Gaji Pokok</th><th>Tunjangan</th><th>Potongan</th><th>Total</th>
+                  <th>No. Dokumen</th><th>Status</th><th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-payroll">
+                <tr><td colspan="10" class="loading">Memuat data…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ─── MODALS ─── -->
+
+<!-- Modal: Tambah Karyawan -->
+<div class="modal-overlay" id="modal-add-employee">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Tambah Karyawan</h3>
+      <button class="modal-close" onclick="closeModal('modal-add-employee')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="required">ID Karyawan</label>
+          <input id="emp-id" placeholder="mis: RIF-001" type="text">
+        </div>
+        <div class="form-group">
+          <label class="required">Nama Lengkap</label>
+          <input id="emp-name" placeholder="Nama karyawan" type="text">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input id="emp-email" placeholder="email@perusahaan.com" type="email">
+        </div>
+        <div class="form-group">
+          <label>No. HP</label>
+          <input id="emp-phone" placeholder="08xx" type="text">
+        </div>
+        <div class="form-group">
+          <label class="required">Perusahaan</label>
+          <select id="emp-company">
+            <option value="RIFIM">PT. RIFIM Internasional Gemilang</option>
+            <option value="MIG">PT. Menala Internasional Gemilang</option>
+            <option value="LAILAN">CV. Lailan Kalilan Indonesia</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="required">Tipe Kontrak</label>
+          <select id="emp-type">
+            <option value="PKWT">PKWT (Kontrak)</option>
+            <option value="PKWTT">PKWTT (Tetap)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Jabatan</label>
+          <input id="emp-position" placeholder="Staff Admin, Sopir, dll" type="text">
+        </div>
+        <div class="form-group">
+          <label>Departemen</label>
+          <input id="emp-department" placeholder="Operasional, Keuangan, dll" type="text">
+        </div>
+        <div class="form-group">
+          <label>Cabang</label>
+          <input id="emp-branch" placeholder="Batam, Jakarta, dll" type="text">
+        </div>
+        <div class="form-group">
+          <label class="required">Tanggal Bergabung</label>
+          <input id="emp-join" type="date">
+        </div>
+        <div class="form-group">
+          <label>Tanggal Berakhir Kontrak</label>
+          <input id="emp-end" type="date">
+        </div>
+        <div class="form-group">
+          <label>Gaji Pokok (Rp)</label>
+          <input id="emp-salary" type="number" placeholder="0" min="0">
+        </div>
+        <div class="form-group">
+          <label>NIK KTP</label>
+          <input id="emp-nik" placeholder="16 digit NIK" type="text" maxlength="16">
+        </div>
+        <div class="form-group">
+          <label>NPWP</label>
+          <input id="emp-npwp" placeholder="xx.xxx.xxx.x-xxx.xxx" type="text">
+        </div>
+        <div class="form-group">
+          <label>Bank</label>
+          <select id="emp-bank">
+            <option value="">-- Pilih Bank --</option>
+            <option>BCA</option><option>BRI</option><option>BNI</option>
+            <option>Mandiri</option><option>BSI</option><option>CIMB</option><option>Danamon</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>No. Rekening</label>
+          <input id="emp-account" placeholder="No. rekening" type="text">
+        </div>
+        <div class="form-group form-span-2">
+          <label>Alamat</label>
+          <textarea id="emp-address" rows="2" placeholder="Alamat lengkap"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-employee')">Batal</button>
+      <button class="btn btn-primary" onclick="submitAddEmployee()">Simpan Karyawan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Kontrak Baru -->
+<div class="modal-overlay" id="modal-add-contract">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Buat Kontrak Baru</h3>
+      <button class="modal-close" onclick="closeModal('modal-add-contract')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="required">ID Karyawan</label>
+          <input id="ct-emp-id" placeholder="Mis: RIF-001" type="text">
+        </div>
+        <div class="form-group">
+          <label class="required">Jenis Kontrak</label>
+          <select id="ct-type">
+            <option value="PKWT">PKWT — Perjanjian Kerja Waktu Tertentu</option>
+            <option value="SPG">SPG — Surat Perjanjian Kerja</option>
+            <option value="SMT">SMT — Surat Magang/Training</option>
+            <option value="PI">PI — Perjanjian Insentif</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="required">Tanggal Mulai</label>
+          <input id="ct-start" type="date">
+        </div>
+        <div class="form-group">
+          <label>Tanggal Selesai</label>
+          <input id="ct-end" type="date">
+        </div>
+        <div class="form-group form-span-2">
+          <label>Catatan</label>
+          <textarea id="ct-notes" rows="2" placeholder="Catatan tambahan…"></textarea>
+        </div>
+        <div class="form-group form-span-2">
+          <label>
+            <input type="checkbox" id="ct-generate-doc">
+            Generate dokumen otomatis via Document Engine
+          </label>
+        </div>
+        <div id="ct-doc-fields" class="form-span-2" style="display:none">
+          <div class="form-grid cols-1">
+            <div class="form-group">
+              <label>Perihal / Posisi</label>
+              <input id="ct-subject" placeholder="Sopir, Staf Admin, dll" type="text">
+            </div>
+            <div class="form-group">
+              <label>Perusahaan</label>
+              <select id="ct-company">
+                <option value="RIFIM">RIFIM</option>
+                <option value="MIG">MIG</option>
+                <option value="LAILAN">LAILAN</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-contract')">Batal</button>
+      <button class="btn btn-primary" onclick="submitAddContract()">Simpan Kontrak</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Catat Absensi -->
+<div class="modal-overlay" id="modal-add-attendance">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h3>Catat Absensi</h3>
+      <button class="modal-close" onclick="closeModal('modal-add-attendance')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="required">ID Karyawan</label>
+          <input id="att-emp-id" placeholder="Mis: RIF-001" type="text">
+        </div>
+        <div class="form-group">
+          <label class="required">Tanggal</label>
+          <input id="att-date" type="date">
+        </div>
+        <div class="form-group">
+          <label>Jam Masuk</label>
+          <input id="att-in" type="time">
+        </div>
+        <div class="form-group">
+          <label>Jam Keluar</label>
+          <input id="att-out" type="time">
+        </div>
+        <div class="form-group">
+          <label class="required">Status</label>
+          <select id="att-status">
+            <option value="HADIR">Hadir</option>
+            <option value="IZIN">Izin</option>
+            <option value="SAKIT">Sakit</option>
+            <option value="ALPHA">Alpha</option>
+            <option value="CUTI">Cuti</option>
+            <option value="DINAS">Dinas</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Keterangan</label>
+          <input id="att-notes" placeholder="Opsional" type="text">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-attendance')">Batal</button>
+      <button class="btn btn-primary" onclick="submitAddAttendance()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Ajukan Cuti -->
+<div class="modal-overlay" id="modal-apply-leave">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h3>Ajukan Cuti</h3>
+      <button class="modal-close" onclick="closeModal('modal-apply-leave')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="required">ID Karyawan</label>
+          <input id="lv-emp-id" placeholder="Mis: RIF-001" type="text">
+        </div>
+        <div class="form-group">
+          <label class="required">Jenis Cuti</label>
+          <select id="lv-type">
+            <option value="CUTI_TAHUNAN">Cuti Tahunan</option>
+            <option value="SAKIT">Sakit</option>
+            <option value="IZIN">Izin</option>
+            <option value="DINAS">Dinas</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="required">Tanggal Mulai</label>
+          <input id="lv-start" type="date" oninput="calcLeaveDays()">
+        </div>
+        <div class="form-group">
+          <label class="required">Tanggal Selesai</label>
+          <input id="lv-end" type="date" oninput="calcLeaveDays()">
+        </div>
+        <div class="form-group form-span-2">
+          <label>Total Hari Kerja: <strong id="lv-days">–</strong></label>
+        </div>
+        <div class="form-group form-span-2">
+          <label>Alasan / Keterangan</label>
+          <textarea id="lv-reason" rows="2" placeholder="Keperluan cuti…"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-apply-leave')">Batal</button>
+      <button class="btn btn-primary" onclick="submitApplyLeave()">Kirim Pengajuan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Buat Payroll -->
+<div class="modal-overlay" id="modal-add-payroll">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h3>Buat Data Payroll</h3>
+      <button class="modal-close" onclick="closeModal('modal-add-payroll')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="required">ID Karyawan</label>
+          <input id="pay-emp-id" placeholder="Mis: RIF-001" type="text">
+        </div>
+        <div class="form-group">
+          <label class="required">Periode</label>
+          <select id="pay-month">
+            <option value="1">Januari</option><option value="2">Februari</option>
+            <option value="3">Maret</option><option value="4">April</option>
+            <option value="5">Mei</option><option value="6">Juni</option>
+            <option value="7">Juli</option><option value="8">Agustus</option>
+            <option value="9">September</option><option value="10">Oktober</option>
+            <option value="11">November</option><option value="12">Desember</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="required">Tahun</label>
+          <input id="pay-year" type="number" min="2024" max="2035" value="2026">
+        </div>
+        <div class="form-group">
+          <label class="required">Gaji Pokok (Rp)</label>
+          <input id="pay-base" type="number" placeholder="0" min="0">
+        </div>
+        <div class="form-group">
+          <label>Tunjangan (Rp)</label>
+          <input id="pay-allowance" type="number" placeholder="0" min="0" value="0">
+        </div>
+        <div class="form-group">
+          <label>Potongan (Rp)</label>
+          <input id="pay-deduction" type="number" placeholder="0" min="0" value="0">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-payroll')">Batal</button>
+      <button class="btn btn-primary" onclick="submitAddPayroll()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Detail Karyawan -->
+<div class="modal-overlay" id="modal-employee-detail">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="detail-emp-name">–</h3>
+      <button class="modal-close" onclick="closeModal('modal-employee-detail')">✕</button>
+    </div>
+    <div class="modal-body" id="modal-detail-body">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-employee-detail')">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════════════════
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbx9_RVyi_58XIeSH-fvrg7CpsUJUpOP5Mim0Q5IDiBiQI7d--WboYhgt7MF6JQl32dW/exec';
+
+// ════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════
+let currentUser  = null;
+let allEmployees = [];
+let allContracts = [];
+let allLeave     = [];
+let allPayroll   = [];
+let selectedCompany = 'ALL';
+
+// ════════════════════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════════════════════
+async function doLogin() {
+  const email = document.getElementById('auth-email').value.trim();
+  if (!email) return showAuthError('Masukkan email Anda.');
+
+  try {
+    const res  = await gasGet({ action: 'auth', email });
+    if (res.success) {
+      currentUser = res.user;
+      document.getElementById('auth-gate').style.display = 'none';
+      document.getElementById('app').style.display       = 'flex';
+      document.getElementById('user-badge').textContent  = res.user.full_name + ' (' + res.user.role + ')';
+      sessionStorage.setItem('hris_user', JSON.stringify(res.user));
+      initApp();
+    } else {
+      showAuthError(res.message || 'Akses ditolak.');
+    }
+  } catch (e) {
+    showAuthError('Gagal terhubung ke server.');
+  }
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function doLogout() {
+  sessionStorage.removeItem('hris_user');
+  location.reload();
+}
+
+document.getElementById('auth-email').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// Auto-login jika session masih ada
+(function checkSession() {
+  const saved = sessionStorage.getItem('hris_user');
+  if (saved) {
+    try {
+      currentUser = JSON.parse(saved);
+      document.getElementById('auth-gate').style.display = 'none';
+      document.getElementById('app').style.display       = 'flex';
+      document.getElementById('user-badge').textContent  = currentUser.full_name + ' (' + currentUser.role + ')';
+      initApp();
+    } catch(e) { sessionStorage.removeItem('hris_user'); }
+  }
+})();
+
+// ════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════
+function initApp() {
+  // Set tahun di filter payroll
+  const yearSel = document.getElementById('filter-payroll-year');
+  for (let y = 2024; y <= 2030; y++) {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    if (y === new Date().getFullYear()) opt.selected = true;
+    yearSel.appendChild(opt);
+  }
+  // Set tanggal default absensi
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('att-date-from').value = today.slice(0,7) + '-01';
+  document.getElementById('att-date-to').value   = today;
+  document.getElementById('att-date').value      = today;
+  document.getElementById('lv-start').value      = today;
+  document.getElementById('lv-end').value        = today;
+  document.getElementById('emp-join').value      = today;
+
+  loadEmployees();
+}
+
+function onCompanyChange() {
+  selectedCompany = document.getElementById('company-selector').value;
+  loadEmployees();
+}
+
+// ════════════════════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════════════════════
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  btn.classList.add('active');
+
+  if (tab === 'kontrak')  loadContracts();
+  if (tab === 'absensi')  {} // user klik Tampilkan manual
+  if (tab === 'cuti')     loadLeave();
+  if (tab === 'payroll')  loadPayroll();
+}
+
+// ════════════════════════════════════════════════════════════
+// KARYAWAN
+// ════════════════════════════════════════════════════════════
+async function loadEmployees() {
+  const tbody = document.getElementById('tbody-employees');
+  tbody.innerHTML = '<tr><td colspan="9" class="loading">Memuat data karyawan…</td></tr>';
+
+  const res = await gasGet({ action: 'hris_employees', company_code: selectedCompany, status: 'ALL' });
+  if (!res.success) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><p>' + (res.message || 'Gagal memuat data.') + '</p></td></tr>';
+    return;
+  }
+  allEmployees = res.employees || [];
+  renderEmployees(allEmployees);
+  updateEmpStats(allEmployees);
+}
+
+function renderEmployees(rows) {
+  const tbody = document.getElementById('tbody-employees');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><p>Belum ada karyawan.</p></td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td><strong>${r.employee_id}</strong></td>
+      <td>${r.full_name}</td>
+      <td>${r.position || '–'}</td>
+      <td>${r.department || '–'}</td>
+      <td><span class="badge badge-aktif">${r.company_code}</span></td>
+      <td><span class="badge badge-${r.employment_type.toLowerCase()}">${r.employment_type}</span></td>
+      <td><span class="badge badge-${r.status.toLowerCase()}">${r.status}</span></td>
+      <td>${fmtDate(r.join_date)}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="viewEmployee('${r.employee_id}')">Detail</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterEmployees() {
+  const q       = document.getElementById('search-emp').value.toLowerCase();
+  const status  = document.getElementById('filter-status').value;
+  const type    = document.getElementById('filter-type').value;
+  const rows    = allEmployees.filter(r =>
+    (status === 'ALL' || r.status === status) &&
+    (type   === 'ALL' || r.employment_type === type) &&
+    (!q || r.full_name.toLowerCase().includes(q) ||
+           r.employee_id.toLowerCase().includes(q) ||
+           (r.position || '').toLowerCase().includes(q))
+  );
+  renderEmployees(rows);
+}
+
+function updateEmpStats(rows) {
+  document.getElementById('stat-total').textContent = rows.length;
+  document.getElementById('stat-aktif').textContent = rows.filter(r => r.status === 'AKTIF').length;
+  document.getElementById('stat-pkwt').textContent  = rows.filter(r => r.employment_type === 'PKWT').length;
+  document.getElementById('stat-pkwtt').textContent = rows.filter(r => r.employment_type === 'PKWTT').length;
+}
+
+async function viewEmployee(empId) {
+  const emp = allEmployees.find(r => r.employee_id === empId);
+  if (!emp) return;
+  document.getElementById('detail-emp-name').textContent = emp.full_name;
+  document.getElementById('modal-detail-body').innerHTML = `
+    <div class="detail-grid">
+      ${dRow('ID Karyawan', emp.employee_id)}
+      ${dRow('Status', `<span class="badge badge-${emp.status.toLowerCase()}">${emp.status}</span>`)}
+      ${dRow('Jabatan', emp.position || '–')}
+      ${dRow('Departemen', emp.department || '–')}
+      ${dRow('Perusahaan', emp.company_code)}
+      ${dRow('Tipe Kontrak', `<span class="badge badge-${emp.employment_type.toLowerCase()}">${emp.employment_type}</span>`)}
+      ${dRow('Bergabung', fmtDate(emp.join_date))}
+      ${dRow('Berakhir', emp.end_date ? fmtDate(emp.end_date) : '–')}
+      ${dRow('Email', emp.email || '–')}
+      ${dRow('No. HP', emp.phone || '–')}
+      ${dRow('NIK', emp.nik || '–')}
+      ${dRow('NPWP', emp.npwp || '–')}
+      ${dRow('Bank', emp.bank_name ? emp.bank_name + ' — ' + (emp.bank_account || '–') : '–')}
+      ${dRow('Gaji Pokok', emp.salary_base ? 'Rp ' + fmtNum(emp.salary_base) : '–')}
+      ${dRow('Cabang', emp.branch || '–')}
+    </div>
+    ${emp.address ? `<div style="margin-top:12px"><div class="detail-label">Alamat</div><div class="detail-value">${emp.address}</div></div>` : ''}
+  `;
+  openModal('modal-employee-detail');
+}
+
+async function submitAddEmployee() {
+  const data = {
+    employee_id:     document.getElementById('emp-id').value.trim().toUpperCase(),
+    full_name:       document.getElementById('emp-name').value.trim(),
+    email:           document.getElementById('emp-email').value.trim(),
+    phone:           document.getElementById('emp-phone').value.trim(),
+    company_code:    document.getElementById('emp-company').value,
+    employment_type: document.getElementById('emp-type').value,
+    position:        document.getElementById('emp-position').value.trim(),
+    department:      document.getElementById('emp-department').value.trim(),
+    branch:          document.getElementById('emp-branch').value.trim(),
+    join_date:       document.getElementById('emp-join').value,
+    end_date:        document.getElementById('emp-end').value || null,
+    salary_base:     parseFloat(document.getElementById('emp-salary').value) || 0,
+    nik:             document.getElementById('emp-nik').value.trim(),
+    npwp:            document.getElementById('emp-npwp').value.trim(),
+    bank_name:       document.getElementById('emp-bank').value,
+    bank_account:    document.getElementById('emp-account').value.trim(),
+    address:         document.getElementById('emp-address').value.trim(),
+    status:          'AKTIF',
+  };
+  if (!data.employee_id || !data.full_name || !data.company_code || !data.join_date) {
+    return showToast('Lengkapi field wajib.', 'error');
+  }
+  const res = await gasPost({ hrisAction: 'add_employee', data });
+  if (res.success) {
+    showToast('Karyawan berhasil ditambahkan!', 'success');
+    closeModal('modal-add-employee');
+    loadEmployees();
+  } else {
+    showToast('Gagal: ' + res.message, 'error');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// KONTRAK
+// ════════════════════════════════════════════════════════════
+async function loadContracts() {
+  const tbody = document.getElementById('tbody-contracts');
+  tbody.innerHTML = '<tr><td colspan="8" class="loading">Memuat kontrak…</td></tr>';
+  const res = await gasGet({ action: 'hris_contracts' });
+  if (!res.success) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><p>' + res.message + '</p></td></tr>';
+    return;
+  }
+  allContracts = res.contracts || [];
+  renderContracts(allContracts);
+}
+
+function renderContracts(rows) {
+  const tbody = document.getElementById('tbody-contracts');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><p>Belum ada kontrak.</p></td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const emp    = allEmployees.find(e => e.employee_id === r.employee_id);
+    const empName = emp ? emp.full_name : r.employee_id;
+    return `<tr>
+      <td>${r.employee_id}</td>
+      <td>${empName}</td>
+      <td>${r.contract_type}</td>
+      <td>${fmtDate(r.start_date)}</td>
+      <td>${r.end_date ? fmtDate(r.end_date) : '–'}</td>
+      <td>${r.document_number || '–'}
+        ${r.gdoc_url ? ` <a href="${r.gdoc_url}" target="_blank" title="Lihat Dokumen">📄</a>` : ''}
+        ${r.pdf_url  ? ` <a href="${r.pdf_url}"  target="_blank" title="Download PDF">📥</a>` : ''}
+      </td>
+      <td><span class="badge badge-${r.status.toLowerCase()}">${r.status}</span></td>
+      <td><span style="color:var(--muted);font-size:12px">${fmtDate(r.created_at)}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function filterContracts() {
+  const q      = document.getElementById('search-contract').value.toLowerCase();
+  const status = document.getElementById('filter-contract-status').value;
+  const rows   = allContracts.filter(r =>
+    (status === 'ALL' || r.status === status) &&
+    (!q || r.employee_id.toLowerCase().includes(q))
+  );
+  renderContracts(rows);
+}
+
+document.getElementById('ct-generate-doc').addEventListener('change', function() {
+  document.getElementById('ct-doc-fields').style.display = this.checked ? 'block' : 'none';
+});
+
+async function submitAddContract() {
+  const empId  = document.getElementById('ct-emp-id').value.trim().toUpperCase();
+  const ctType = document.getElementById('ct-type').value;
+  const start  = document.getElementById('ct-start').value;
+  const end    = document.getElementById('ct-end').value;
+  const notes  = document.getElementById('ct-notes').value.trim();
+  const genDoc = document.getElementById('ct-generate-doc').checked;
+
+  if (!empId || !ctType || !start) return showToast('Lengkapi field wajib.', 'error');
+
+  const emp = allEmployees.find(e => e.employee_id === empId);
+  if (!emp) return showToast('Karyawan tidak ditemukan.', 'error');
+
+  let docNum = '', gdocUrl = '', pdfUrl = '';
+
+  if (genDoc) {
+    const subject = document.getElementById('ct-subject').value.trim() || emp.position;
+    const company = document.getElementById('ct-company').value;
+    showToast('Membuat dokumen…');
+    const docRes = await gasPost({
+      documentType:  ctType,
+      subject:       'Perjanjian Kerja — ' + emp.full_name,
+      company_code:  company,
+      documentDate:  start,
+      recipientName: emp.full_name,
+      extra: {
+        nama_karyawan: emp.full_name,
+        jabatan:       subject,
+        tanggal_mulai: start,
+        tanggal_selesai: end || '',
+      },
+    });
+    if (docRes.success) {
+      docNum   = docRes.documentNumber;
+      gdocUrl  = docRes.gdocUrl;
+      pdfUrl   = docRes.pdfUrl;
+    }
+  }
+
+  const res = await gasPost({
+    hrisAction: 'add_contract',
+    data: {
+      employee_id:     empId,
+      contract_type:   ctType,
+      start_date:      start,
+      end_date:        end || null,
+      status:          'AKTIF',
+      notes:           notes,
+      document_number: docNum,
+      gdoc_url:        gdocUrl,
+      pdf_url:         pdfUrl,
+    },
+  });
+
+  if (res.success) {
+    showToast(genDoc && docNum ? 'Kontrak + dokumen berhasil dibuat! No: ' + docNum : 'Kontrak berhasil disimpan.', 'success');
+    closeModal('modal-add-contract');
+    loadContracts();
+  } else {
+    showToast('Gagal: ' + res.message, 'error');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// ABSENSI
+// ════════════════════════════════════════════════════════════
+async function loadAttendance() {
+  const tbody   = document.getElementById('tbody-attendance');
+  const empId   = document.getElementById('search-att-emp').value.trim().toUpperCase();
+  const dateFrom = document.getElementById('att-date-from').value;
+  const dateTo   = document.getElementById('att-date-to').value;
+
+  tbody.innerHTML = '<tr><td colspan="6" class="loading">Memuat absensi…</td></tr>';
+  const res = await gasGet({ action: 'hris_attendance', employee_id: empId, date_from: dateFrom, date_to: dateTo });
+  if (!res.success) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><p>' + res.message + '</p></td></tr>';
+    return;
+  }
+  const rows = res.attendance || [];
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><p>Tidak ada data absensi pada rentang ini.</p></td></tr>';
+    return;
+  }
+  const statusColor = { HADIR:'aktif', IZIN:'pending', SAKIT:'warning', ALPHA:'ditolak', CUTI:'pkwt', DINAS:'disetujui' };
+  tbody.innerHTML = rows.map(r => `<tr>
+    <td>${r.employee_id}</td>
+    <td>${fmtDate(r.attendance_date)}</td>
+    <td>${r.check_in || '–'}</td>
+    <td>${r.check_out || '–'}</td>
+    <td><span class="badge badge-${statusColor[r.status] || 'pkwt'}">${r.status}</span></td>
+    <td>${r.notes || '–'}</td>
+  </tr>`).join('');
+}
+
+async function submitAddAttendance() {
+  const data = {
+    employee_id:     document.getElementById('att-emp-id').value.trim().toUpperCase(),
+    attendance_date: document.getElementById('att-date').value,
+    check_in:        document.getElementById('att-in').value  || null,
+    check_out:       document.getElementById('att-out').value || null,
+    status:          document.getElementById('att-status').value,
+    notes:           document.getElementById('att-notes').value.trim(),
+  };
+  if (!data.employee_id || !data.attendance_date) return showToast('Lengkapi field wajib.', 'error');
+  const res = await gasPost({ hrisAction: 'add_attendance', data });
+  if (res.success) {
+    showToast('Absensi berhasil dicatat.', 'success');
+    closeModal('modal-add-attendance');
+  } else {
+    showToast('Gagal: ' + res.message, 'error');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// CUTI
+// ════════════════════════════════════════════════════════════
+async function loadLeave() {
+  const tbody = document.getElementById('tbody-leave');
+  tbody.innerHTML = '<tr><td colspan="9" class="loading">Memuat cuti…</td></tr>';
+  const res = await gasGet({ action: 'hris_leave_requests' });
+  if (!res.success) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><p>' + res.message + '</p></td></tr>';
+    return;
+  }
+  allLeave = res.leave_requests || [];
+  document.getElementById('stat-cuti-pending').textContent  = allLeave.filter(r => r.status === 'PENDING').length;
+  document.getElementById('stat-cuti-approved').textContent = allLeave.filter(r => r.status === 'DISETUJUI').length;
+  document.getElementById('stat-cuti-rejected').textContent = allLeave.filter(r => r.status === 'DITOLAK').length;
+  renderLeave(allLeave);
+}
+
+function renderLeave(rows) {
+  const tbody = document.getElementById('tbody-leave');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><p>Belum ada pengajuan cuti.</p></td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const emp     = allEmployees.find(e => e.employee_id === r.employee_id);
+    const empName = emp ? emp.full_name : r.employee_id;
+    const canApprove = r.status === 'PENDING' && canUserApprove();
+    return `<tr>
+      <td>${r.employee_id}</td>
+      <td>${empName}</td>
+      <td>${r.leave_type.replace('_', ' ')}</td>
+      <td>${fmtDate(r.start_date)}</td>
+      <td>${fmtDate(r.end_date)}</td>
+      <td>${r.total_days} hari</td>
+      <td>${r.reason || '–'}</td>
+      <td><span class="badge badge-${r.status.toLowerCase()}">${r.status}</span></td>
+      <td>
+        ${canApprove ? `
+          <button class="btn btn-success btn-sm" onclick="approveLeave('${r.id}','DISETUJUI')">✓</button>
+          <button class="btn btn-danger btn-sm"  onclick="approveLeave('${r.id}','DITOLAK')">✗</button>
+        ` : '–'}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterLeave() {
+  const status = document.getElementById('filter-leave-status').value;
+  renderLeave(status === 'ALL' ? allLeave : allLeave.filter(r => r.status === status));
+}
+
+function canUserApprove() {
+  return currentUser && ['ADMIN','DIREKTUR','KOORDINATOR'].includes(currentUser.role);
+}
+
+async function approveLeave(leaveId, status) {
+  const res = await gasPost({
+    hrisAction:  'approve_leave',
+    leave_id:    leaveId,
+    status:      status,
+    approved_by: currentUser ? currentUser.email : 'admin',
+  });
+  if (res.success) {
+    showToast('Cuti ' + status.toLowerCase() + '.', 'success');
+    loadLeave();
+  } else {
+    showToast('Gagal: ' + res.message, 'error');
+  }
+}
+
+function calcLeaveDays() {
+  const s = document.getElementById('lv-start').value;
+  const e = document.getElementById('lv-end').value;
+  if (!s || !e) return;
+  let count = 0, d = new Date(s), end = new Date(e);
+  while (d <= end) { if (d.getDay() !== 0 && d.getDay() !== 6) count++; d.setDate(d.getDate()+1); }
+  document.getElementById('lv-days').textContent = count + ' hari kerja';
+}
+
+async function submitApplyLeave() {
+  const s   = document.getElementById('lv-start').value;
+  const e   = document.getElementById('lv-end').value;
+  let days  = 0;
+  if (s && e) { let d = new Date(s), end = new Date(e); while (d <= end) { if (d.getDay() !== 0 && d.getDay() !== 6) days++; d.setDate(d.getDate()+1); } }
+  const data = {
+    employee_id: document.getElementById('lv-emp-id').value.trim().toUpperCase(),
+    leave_type:  document.getElementById('lv-type').value,
+    start_date:  s,
+    end_date:    e,
+    total_days:  days,
+    reason:      document.getElementById('lv-reason').value.trim(),
+  };
+  if (!data.employee_id || !data.start_date || !data.end_date) return showToast('Lengkapi field wajib.', 'error');
+  const res = await gasPost({ hrisAction: 'apply_leave', data });
+  if (res.success) {
+    showToast('Pengajuan cuti berhasil dikirim.', 'success');
+    closeModal('modal-apply-leave');
+    loadLeave();
+  } else {
+    showToast('Gagal: ' + res.message, 'error');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// PAYROLL
+// ════════════════════════════════════════════════════════════
+async function loadPayroll() {
+  const tbody = document.getElementById('tbody-payroll');
+  tbody.innerHTML = '<tr><td colspan="10" class="loading">Memuat payroll…</td></tr>';
+  const opts = {
+    action:       'hris_payroll',
+    period_month: document.getElementById('filter-payroll-month').value,
+    period_year:  document.getElementById('filter-payroll-year').value,
+  };
+  const res = await gasGet(opts);
+  if (!res.success) {
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><p>' + res.message + '</p></td></tr>';
+    return;
+  }
+  allPayroll = res.payroll || [];
+  if (!allPayroll.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><p>Belum ada data payroll.</p></td></tr>';
+    return;
+  }
+  const MONTHS = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  tbody.innerHTML = allPayroll.map(r => {
+    const emp = allEmployees.find(e => e.employee_id === r.employee_id);
+    const empName = emp ? emp.full_name : r.employee_id;
+    return `<tr>
+      <td>${r.employee_id}</td>
+      <td>${empName}</td>
+      <td>${MONTHS[r.period_month]} ${r.period_year}</td>
+      <td>Rp ${fmtNum(r.salary_base)}</td>
+      <td>Rp ${fmtNum(r.allowances)}</td>
+      <td>Rp ${fmtNum(r.deductions)}</td>
+      <td><strong>Rp ${fmtNum(r.total_salary)}</strong></td>
+      <td>${r.document_number || '–'}
+        ${r.gdoc_url ? `<a href="${r.gdoc_url}" target="_blank">📄</a>` : ''}
+        ${r.pdf_url  ? `<a href="${r.pdf_url}"  target="_blank">📥</a>` : ''}
+      </td>
+      <td><span class="badge badge-${r.status.toLowerCase()}">${r.status}</span></td>
+      <td>${r.status === 'DRAFT' ? `<button class="btn btn-success btn-sm" onclick="finalizePayroll('${r.id}','${r.employee_id}','${r.period_month}','${r.period_year}')">Finalisasi</button>` : '–'}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function submitAddPayroll() {
+  const data = {
+    employee_id:  document.getElementById('pay-emp-id').value.trim().toUpperCase(),
+    period_month: parseInt(document.getElementById('pay-month').value),
+    period_year:  parseInt(document.getElementById('pay-year').value),
+    salary_base:  parseFloat(document.getElementById('pay-base').value) || 0,
+    allowances:   parseFloat(document.getElementById('pay-allowance').value) || 0,
+    deductions:   parseFloat(document.getElementById('pay-deduction').value) || 0,
+  };
+  if (!data.employee_id || !data.salary_base) return showToast('Lengkapi ID karyawan dan gaji pokok.', 'error');
+  const res = await gasPost({ hrisAction: 'add_payroll', data });
+  if (res.success) {
+    showToast('Data payroll berhasil disimpan.', 'success');
+    closeModal('modal-add-payroll');
+    loadPayroll();
+  } else {
+    showToast('Gagal: ' + res.message, 'error');
+  }
+}
+
+async function finalizePayroll(payrollId, empId, month, year) {
+  if (!confirm('Finalisasi slip gaji ini? Status akan berubah menjadi FINAL.')) return;
+  const res = await gasPost({ hrisAction: 'finalize_payroll', payroll_id: payrollId });
+  if (res.success) {
+    showToast('Payroll difinalisasi.', 'success');
+    loadPayroll();
+  } else {
+    showToast('Gagal: ' + res.message, 'error');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// GAS API HELPERS
+// ════════════════════════════════════════════════════════════
+async function gasGet(params) {
+  const url = GAS_URL + '?' + new URLSearchParams(params).toString();
+  try {
+    const res = await fetch(url);
+    return await res.json();
+  } catch (e) {
+    return { success: false, message: 'Koneksi gagal: ' + e.message };
+  }
+}
+
+async function gasPost(body) {
+  try {
+    const res = await fetch(GAS_URL, {
+      method:  'POST',
+      body:    JSON.stringify(body),
+    });
+    return await res.json();
+  } catch (e) {
+    return { success: false, message: 'Koneksi gagal: ' + e.message };
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// MODAL
+// ════════════════════════════════════════════════════════════
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+
+// ════════════════════════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════════════════════════
+let toastTimer;
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = 'show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = ''; }, 3000);
+}
+
+// ════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════
+function fmtDate(str) {
+  if (!str) return '–';
+  const d = new Date(str);
+  return d.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+function fmtNum(n) {
+  return Number(n || 0).toLocaleString('id-ID');
+}
+
+function dRow(label, value) {
+  return `<div class="detail-item"><div class="detail-label">${label}</div><div class="detail-value">${value}</div></div>`;
+}
+</script>
+</body>
+</html>
