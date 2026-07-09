@@ -81,38 +81,49 @@ function _validateInput(input) {
 
 /**
  * Ambil Template Google Doc ID berdasarkan jenis dokumen.
- * Key di company_config: gdoc_template_surat, gdoc_template_inv, dll.
+ *
+ * Prioritas:
+ * 1. sheet document_types → kolom template_gdoc_id (per baris, paling fleksibel)
+ * 2. company_config → gdoc_template_* (fallback, 6 template shared)
  * @private
  */
 function _getTemplateId(docType, config) {
-  // Map kode dokumen → key di company_config
-  const KEY_MAP = {
-    SURAT: 'gdoc_template_surat',
-    ST:    'gdoc_template_surat',
-    SIZ:   'gdoc_template_surat',
-    SKT:   'gdoc_template_surat',
-    BA:    'gdoc_template_surat',
-    FCO:   'gdoc_template_surat',
-    PROP:  'gdoc_template_surat',
-    CP:    'gdoc_template_surat',
+  // Coba baca dari sheet document_types dulu
+  try {
+    var dtSheet = _getDB().getSheetByName('document_types');
+    if (dtSheet) {
+      var dtData = dtSheet.getDataRange().getValues();
+      for (var i = 1; i < dtData.length; i++) {
+        if (String(dtData[i][0]).trim() === docType) {
+          var id = String(dtData[i][4] || '').trim(); // kolom E = template_gdoc_id
+          if (id) return id;
+          break;
+        }
+      }
+    }
+  } catch (_) { /* fallthrough ke company_config */ }
+
+  // Fallback: company_config
+  var KEY_MAP = {
+    SURAT: 'gdoc_template_surat', ST:   'gdoc_template_surat',
+    SIZ:   'gdoc_template_surat', SKT:  'gdoc_template_surat',
+    BA:    'gdoc_template_surat', FCO:  'gdoc_template_surat',
+    PROP:  'gdoc_template_surat', CP:   'gdoc_template_surat',
     INV:   'gdoc_template_inv',
     KWT:   'gdoc_template_kwt',
-    MOU:   'gdoc_template_mou',
-    PKS:   'gdoc_template_mou',
-    SP1:   'gdoc_template_sp',
-    SP2:   'gdoc_template_sp',
-    SP3:   'gdoc_template_sp',
-    PHK:   'gdoc_template_sp',
-    PKWT:  'gdoc_template_pkwt',
-    SPG:   'gdoc_template_pkwt',
-    SMT:   'gdoc_template_pkwt',
-    PI:    'gdoc_template_pkwt',
+    MOU:   'gdoc_template_mou',   PKS:  'gdoc_template_mou',
+    SP1:   'gdoc_template_sp',    SP2:  'gdoc_template_sp',
+    SP3:   'gdoc_template_sp',    PHK:  'gdoc_template_sp',
+    PKWT:  'gdoc_template_pkwt',  SPG:  'gdoc_template_pkwt',
+    SMT:   'gdoc_template_pkwt',  PI:   'gdoc_template_pkwt',
   };
-  const key = KEY_MAP[docType];
+  var key = KEY_MAP[docType];
   if (!key) throw new Error('Tidak ada mapping template untuk: ' + docType);
-  const id = config[key];
-  if (!id) throw new Error('Template ID belum diisi untuk key "' + key + '" di sheet company_config.');
-  return id;
+  var cfId = config[key];
+  if (!cfId) throw new Error(
+    'Template belum dibuat. Jalankan createAllTemplates() di Apps Script terlebih dahulu.'
+  );
+  return cfId;
 }
 
 /**

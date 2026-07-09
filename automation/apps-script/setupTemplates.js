@@ -13,15 +13,30 @@
  *   gdoc_template_mou   → MOU, Perjanjian Kerjasama
  */
 
-function setupAllTemplates() {
-  var config    = getCompanyConfig();
-  var rootId    = config['drive_root_folder_id'] || DRIVE_ROOT_FOLDER_ID;
-  var root      = DriveApp.getFolderById(rootId);
-  var tplFolder = _getOrCreateFolder(root, 'Templates');
+/**
+ * Jalankan fungsi ini SATU KALI dari Apps Script Editor:
+ * Pilih createAllTemplates → klik Run
+ */
+function createAllTemplates() {
+  var config = getCompanyConfig();
+
+  // Cari / buat folder Templates di Drive
+  var tplFolder;
+  var rootId = config['drive_root_folder_id'];
+  if (rootId) {
+    try {
+      tplFolder = _getOrCreateFolder(DriveApp.getFolderById(rootId), 'Templates');
+    } catch(_) {
+      tplFolder = _getRootTemplateFolder();
+    }
+  } else {
+    tplFolder = _getRootTemplateFolder();
+  }
 
   Logger.log('📁 Templates folder: ' + tplFolder.getId());
   Logger.log('=== Membuat Google Doc Templates ===');
 
+  // Buat 6 template
   var ids = {};
   ids['gdoc_template_surat'] = _makeSuratTemplate(config, tplFolder);
   ids['gdoc_template_inv']   = _makeInvoiceTemplate(config, tplFolder);
@@ -30,11 +45,64 @@ function setupAllTemplates() {
   ids['gdoc_template_pkwt']  = _makePKWTTemplate(config, tplFolder);
   ids['gdoc_template_mou']   = _makeMOUTemplate(config, tplFolder);
 
+  // Simpan ke company_config (backward compat)
   _saveTemplateIds(ids);
+
+  // ✨ Isi kolom template_gdoc_id di sheet document_types
+  _fillDocumentTypesSheet(ids);
 
   Logger.log('=== Semua template selesai ===');
   Object.keys(ids).forEach(function(k) { Logger.log(k + ' → ' + ids[k]); });
-  Logger.log('Cek sheet company_config untuk konfirmasi.');
+
+  resetConfigCache();
+  Logger.log('✅ Selesai! Cek sheet document_types kolom E (template_gdoc_id).');
+}
+
+// Alias lama agar tidak break jika ada yang sudah save fungsi ini
+function setupAllTemplates() { createAllTemplates(); }
+
+/**
+ * Buat / cari folder "RIFIM OS — Templates" di root Drive
+ */
+function _getRootTemplateFolder() {
+  var name = 'RIFIM OS — Templates';
+  var iter = DriveApp.getFoldersByName(name);
+  return iter.hasNext() ? iter.next() : DriveApp.createFolder(name);
+}
+
+/**
+ * Isi kolom template_gdoc_id (kolom E, index 5) di sheet document_types
+ */
+function _fillDocumentTypesSheet(ids) {
+  var CODE_TO_ID = {
+    SURAT: ids['gdoc_template_surat'], ST: ids['gdoc_template_surat'],
+    SIZ:   ids['gdoc_template_surat'], SKT: ids['gdoc_template_surat'],
+    BA:    ids['gdoc_template_surat'], FCO: ids['gdoc_template_surat'],
+    PROP:  ids['gdoc_template_surat'], CP:  ids['gdoc_template_surat'],
+    INV:   ids['gdoc_template_inv'],
+    KWT:   ids['gdoc_template_kwt'],
+    SP1:   ids['gdoc_template_sp'],  SP2: ids['gdoc_template_sp'],
+    SP3:   ids['gdoc_template_sp'],  PHK: ids['gdoc_template_sp'],
+    PKWT:  ids['gdoc_template_pkwt'], SPG: ids['gdoc_template_pkwt'],
+    SMT:   ids['gdoc_template_pkwt'], PI:  ids['gdoc_template_pkwt'],
+    MOU:   ids['gdoc_template_mou'], PKS: ids['gdoc_template_mou'],
+  };
+
+  var sheet = _getDB().getSheetByName('document_types');
+  if (!sheet) { Logger.log('⚠️ Sheet document_types tidak ditemukan.'); return; }
+
+  var data = sheet.getDataRange().getValues();
+  // Header row: code(0) label(1) category(2) folder_name(3) template_gdoc_id(4) is_active(5)
+  for (var i = 1; i < data.length; i++) {
+    var code = String(data[i][0] || '').trim();
+    if (!code) continue;
+    var id = CODE_TO_ID[code];
+    if (id) {
+      sheet.getRange(i + 1, 5).setValue(id); // kolom E
+      Logger.log('  document_types[' + code + '] → ' + id);
+    }
+  }
+  Logger.log('✅ document_types.template_gdoc_id diisi.');
 }
 
 
