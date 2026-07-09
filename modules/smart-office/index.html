@@ -1161,6 +1161,7 @@
     updateDocNum();
     renderDynFields('SURAT');
     loadCompanies();
+    loadStaffList();
   }
 
   // ── COMPANY SELECTOR ─────────────────────────────────────────
@@ -1183,10 +1184,11 @@
     if (!bar || !pills) return;
     pills.innerHTML = companies.map((c, i) =>
       `<button onclick="selectCompany('${c.code}')" id="cpill-${c.code}"
-         style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);
-                background:${i===0?'var(--accent)':'var(--bg)'};
-                color:${i===0?'#fff':'var(--text)'};
-                font-size:12px;font-weight:700;cursor:pointer;transition:all .2s">
+         style="padding:6px 14px;border-radius:20px;
+                border:2px solid ${i===0?'var(--accent)':'var(--border)'};
+                background:${i===0?'rgba(196,0,0,0.07)':'var(--bg)'};
+                color:${i===0?'var(--accent)':'var(--text)'};
+                font-size:12px;font-weight:${i===0?'800':'600'};cursor:pointer;transition:all .2s">
          ${c.name}
        </button>`
     ).join('');
@@ -1198,15 +1200,70 @@
   function selectCompany(code) {
     document.querySelectorAll('#companyPills button').forEach(b => {
       const isActive = b.id === 'cpill-' + code;
-      b.style.background = isActive ? 'var(--accent)' : 'var(--bg)';
-      b.style.color      = isActive ? '#fff' : 'var(--text)';
+      b.style.border     = isActive ? '2px solid var(--accent)' : '2px solid var(--border)';
+      b.style.background = isActive ? 'rgba(196,0,0,0.07)' : 'var(--bg)';
+      b.style.color      = isActive ? 'var(--accent)' : 'var(--text)';
+      b.style.fontWeight = isActive ? '800' : '600';
     });
-    // Ambil data company dari pills (sudah di-cache di _companiesCache)
     const found = (_companiesCache || []).find(c => c.code === code);
     if (found) { _activeCompany = found; updateDocNum(); }
   }
 
   var _companiesCache = null;
+  var _staffList      = [];
+
+  // ── STAFF AUTOCOMPLETE ────────────────────────────────────────
+  async function loadStaffList() {
+    if (!GAS_WEB_APP_URL) return;
+    try {
+      const res  = await fetch(`${GAS_WEB_APP_URL}?action=staff_list`);
+      const data = await res.json();
+      if (data.success && data.staff) _staffList = data.staff;
+    } catch(_) {}
+  }
+
+  function _wireStaffAutocomplete() {
+    const nameEl = document.getElementById('employee_name');
+    if (!nameEl || !_staffList.length) return;
+
+    // Buat/update datalist
+    let dl = document.getElementById('_dl_staff');
+    if (!dl) { dl = document.createElement('datalist'); dl.id = '_dl_staff'; document.body.appendChild(dl); }
+    dl.innerHTML = _staffList.map(s => `<option value="${s.nama}">`).join('');
+    nameEl.setAttribute('list', '_dl_staff');
+    nameEl.setAttribute('autocomplete', 'off');
+
+    // Auto-fill saat nama dipilih
+    nameEl.addEventListener('change', function() {
+      const s = _staffList.find(x => x.nama.toLowerCase() === nameEl.value.toLowerCase());
+      if (!s) return;
+      const fill = (id, v) => { const el = document.getElementById(id); if (el && !el.value) el.value = v; };
+      fill('employee_id',       s.id);
+      fill('employee_position', s.jabatan);
+      fill('employee_dept',     s.cabang);
+      fill('task_location',     s.cabang);
+    });
+
+    // Datalist untuk Lokasi Tugas (unique cabang)
+    const locEl = document.getElementById('task_location');
+    if (locEl) {
+      const unique = [...new Set(_staffList.map(s => s.cabang).filter(Boolean))].sort();
+      let dlLoc = document.getElementById('_dl_cabang');
+      if (!dlLoc) { dlLoc = document.createElement('datalist'); dlLoc.id = '_dl_cabang'; document.body.appendChild(dlLoc); }
+      dlLoc.innerHTML = unique.map(c => `<option value="${c}">`).join('');
+      locEl.setAttribute('list', '_dl_cabang');
+    }
+
+    // Datalist untuk Jabatan (unique)
+    const jabEl = document.getElementById('employee_position');
+    if (jabEl) {
+      const uniqueJab = [...new Set(_staffList.map(s => s.jabatan).filter(Boolean))].sort();
+      let dlJab = document.getElementById('_dl_jabatan');
+      if (!dlJab) { dlJab = document.createElement('datalist'); dlJab.id = '_dl_jabatan'; document.body.appendChild(dlJab); }
+      dlJab.innerHTML = uniqueJab.map(j => `<option value="${j}">`).join('');
+      jabEl.setAttribute('list', '_dl_jabatan');
+    }
+  }
 
   // ── SELECT DOC ────────────────────────────────────────────────
   function selectDoc(el, code, label, icon) {
@@ -1261,6 +1318,7 @@
     });
     container.innerHTML = html;
     _wireAutoTerbilang(code);
+    _wireStaffAutocomplete();
   }
 
   // ── AUTO TERBILANG ────────────────────────────────────────────

@@ -49,6 +49,35 @@ function doPost(e) {
 function doGet(e) {
   const action = e && e.parameter && e.parameter.action;
 
+  if (action === 'staff_list') {
+    try {
+      var STAFF_SS_ID = '1fcraq3QHqIaD-13Ebzt6stT9aA6j_loTXeAtpNX12kw';
+      var staffSS    = SpreadsheetApp.openById(STAFF_SS_ID);
+      var staffSheet = staffSS.getSheetByName('MASTER DATA STAFF');
+      if (!staffSheet) throw new Error('Sheet MASTER DATA STAFF tidak ditemukan.');
+      var rows  = staffSheet.getDataRange().getValues();
+      var staff = [];
+      for (var i = 1; i < rows.length; i++) {
+        var nama = String(rows[i][1] || '').trim();
+        if (!nama) continue;
+        staff.push({
+          nama:    nama,
+          id:      String(rows[i][4] || '').trim(),   // ID Staff (col E)
+          jabatan: String(rows[i][5] || '').trim(),   // Jabatan  (col F)
+          cabang:  String(rows[i][3] || '').trim(),   // ID Cabang (col D)
+          email:   String(rows[i][0] || '').trim(),   // Email (col A)
+        });
+      }
+      return ContentService
+        .createTextOutput(JSON.stringify({ success: true, staff: staff }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ success: false, message: err.message }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
   if (action === 'companies') {
     try {
       var list = getCompanies().map(function(c) {

@@ -115,20 +115,16 @@ function _makeDocBody(doc, config) {
   body.clear();
   body.setMarginTop(50).setMarginBottom(72).setMarginLeft(80).setMarginRight(72);
 
-  var name    = config['company_name']    || 'PT. RIFIM INTERNASIONAL GEMILANG';
-  var address = config['company_address'] || 'Fanindo Blok S No. 20, Tanjung Uncang, Kota Batam';
-  var phone   = config['company_phone']   || '+62 821 7010 2349';
-  var email   = config['company_email']   || 'rifiminternasionalgemilang@gmail.com';
-
-  var p1 = body.appendParagraph(name);
+  // Gunakan {{PLACEHOLDER}} agar nama & alamat diganti saat generate per perusahaan
+  var p1 = body.appendParagraph('{{COMPANY_NAME}}');
   p1.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
   p1.editAsText().setFontFamily('Arial').setFontSize(14).setBold(true).setForegroundColor('#C40000');
 
-  var p2 = body.appendParagraph(address);
+  var p2 = body.appendParagraph('{{COMPANY_ADDRESS}}');
   p2.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
   p2.editAsText().setFontFamily('Arial').setFontSize(9).setBold(false).setForegroundColor('#444444');
 
-  var p3 = body.appendParagraph('Telp: ' + phone + '   |   Email: ' + email);
+  var p3 = body.appendParagraph('Telp: {{COMPANY_PHONE}}   |   Email: {{COMPANY_EMAIL}}');
   p3.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
   p3.editAsText().setFontFamily('Arial').setFontSize(9).setForegroundColor('#444444');
 
@@ -200,7 +196,7 @@ function _makeSuratTemplate(config, folder) {
   _sp(body);
 
   _line(body, 'Hormat kami,', 11);
-  _line(body, 'PT. RIFIM INTERNASIONAL GEMILANG', 11, true);
+  _line(body, '{{COMPANY_NAME}}', 11, true);
   _sp(body); _sp(body); _sp(body);
 
   _line(body, '{{DIRECTOR_NAME}}', 11, true);
@@ -262,7 +258,7 @@ function _makeInvoiceTemplate(config, folder) {
 
   _sp(body); _sp(body);
   _line(body, 'Hormat kami,', 11);
-  _line(body, 'PT. RIFIM INTERNASIONAL GEMILANG', 11, true);
+  _line(body, '{{COMPANY_NAME}}', 11, true);
   _sp(body); _sp(body); _sp(body);
 
   _line(body, '{{DIRECTOR_NAME}}', 11, true);
@@ -306,7 +302,7 @@ function _makeKwitansiTemplate(config, folder) {
         DocumentApp.HorizontalAlignment.RIGHT);
   _sp(body);
   _line(body, 'Yang menerima,', 11);
-  _line(body, 'PT. RIFIM INTERNASIONAL GEMILANG', 11, true);
+  _line(body, '{{COMPANY_NAME}}', 11, true);
   _sp(body); _sp(body); _sp(body);
 
   _line(body, '{{DIRECTOR_NAME}}', 11, true);
@@ -332,7 +328,7 @@ function _makeSPTemplate(config, folder) {
         DocumentApp.HorizontalAlignment.CENTER);
 
   _sp(body);
-  _line(body, 'Yang bertanda tangan di bawah ini, Pimpinan PT. RIFIM INTERNASIONAL GEMILANG,', 11);
+  _line(body, 'Yang bertanda tangan di bawah ini, Pimpinan {{COMPANY_NAME}}, menerangkan bahwa:', 11);
   _line(body, 'dengan ini memberikan teguran/peringatan resmi kepada karyawan:', 11);
 
   _sp(body);
@@ -354,7 +350,7 @@ function _makeSPTemplate(config, folder) {
 
   var tbl = body.appendTable([
     ['Pimpinan Perusahaan,', 'Karyawan yang bersangkutan,'],
-    ['PT. RIFIM INTERNASIONAL GEMILANG', ''],
+    ['{{COMPANY_NAME}}', ''],
     ['', ''],
     ['', ''],
     ['', ''],
@@ -388,7 +384,7 @@ function _makePKWTTemplate(config, folder) {
 
   _sp(body);
   _line(body, 'PIHAK PERTAMA', 11, true, '#C40000');
-  _line(body, 'Perusahaan\t: PT. RIFIM INTERNASIONAL GEMILANG', 11);
+  _line(body, 'Perusahaan\t: {{COMPANY_NAME}}', 11);
   _line(body, 'Diwakili\t\t: {{DIRECTOR_NAME}}', 11);
   _line(body, 'Jabatan\t\t: {{DIRECTOR_TITLE}}', 11);
 
@@ -414,7 +410,7 @@ function _makePKWTTemplate(config, folder) {
 
   var tbl = body.appendTable([
     ['PIHAK PERTAMA', 'PIHAK KEDUA'],
-    ['PT. RIFIM INTERNASIONAL GEMILANG', ''],
+    ['{{COMPANY_NAME}}', ''],
     ['', ''],
     ['', ''],
     ['', ''],
@@ -448,7 +444,7 @@ function _makeMOUTemplate(config, folder) {
 
   _sp(body);
   _line(body, 'PIHAK PERTAMA', 11, true, '#C40000');
-  _line(body, 'Perusahaan\t: PT. RIFIM INTERNASIONAL GEMILANG', 11);
+  _line(body, 'Perusahaan\t: {{COMPANY_NAME}}', 11);
   _line(body, 'Diwakili\t\t: {{DIRECTOR_NAME}}', 11);
   _line(body, 'Jabatan\t\t: {{DIRECTOR_TITLE}}', 11);
   _line(body, 'Alamat\t\t: {{COMPANY_ADDRESS}}', 11);
@@ -473,7 +469,7 @@ function _makeMOUTemplate(config, folder) {
   _sp(body); _sp(body);
   var tbl = body.appendTable([
     ['PIHAK PERTAMA', 'PIHAK KEDUA'],
-    ['PT. RIFIM INTERNASIONAL GEMILANG', '{{PARTY_B_NAME}}'],
+    ['{{COMPANY_NAME}}', '{{PARTY_B_NAME}}'],
     ['', ''],
     ['', ''],
     ['', ''],
