@@ -3,88 +3,884 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RIFIM OS</title>
+  <meta name="theme-color" content="#C40000">
+  <meta name="description" content="PT. RIFIM Internasional Gemilang — Vendor Operasional terpercaya di Kota Batam. Solusi promosi, rekrutmen, dan manajemen operasional profesional.">
+  <meta property="og:title" content="RIFIM Group — PT. RIFIM Internasional Gemilang">
+  <meta property="og:description" content="Membangun Hari Ini, Menginspirasi Masa Depan. Vendor Operasional profesional di Batam.">
+  <meta property="og:image" content="/branding/logo/rifim-logo.png">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/branding/icon/icon-192.png">
+  <title>RIFIM Group — PT. RIFIM Internasional Gemilang</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: Arial, Helvetica, sans-serif;
-      background: #F5F5F7;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+
+    :root {
+      --red:    #C40000;
+      --red-dk: #8B0000;
+      --red-lt: #FF1A1A;
+      --dark:   #111111;
+      --dark2:  #1E1E1E;
+      --gray:   #2B2B2B;
+      --mid:    #666666;
+      --light:  #F8F8F8;
+      --border: #E8E8E8;
+      --white:  #FFFFFF;
     }
-    .card {
-      background: #fff;
-      border-radius: 16px;
-      padding: 48px 56px;
-      text-align: center;
-      box-shadow: 0 4px 32px rgba(0,0,0,.1);
-      max-width: 480px;
-      width: 90%;
+
+    html { scroll-behavior: smooth; }
+    body { font-family: Arial, Helvetica, sans-serif; color: var(--dark); background: var(--white); overflow-x: hidden; }
+    img  { max-width: 100%; display: block; }
+
+    /* ── UTILITY ── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    .section    { padding: 90px 0; }
+    .section-sm { padding: 60px 0; }
+
+    /* ── NAV ── */
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 900;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 40px; height: 64px;
+      background: transparent;
+      transition: background .3s, box-shadow .3s;
     }
-    .logo {
-      width: 64px; height: 64px;
-      background: #C40000;
-      border-radius: 14px;
-      display: inline-flex; align-items: center; justify-content: center;
-      font-weight: 900; font-size: 20px; color: white;
+    .nav.scrolled {
+      background: var(--white);
+      box-shadow: 0 2px 20px rgba(0,0,0,.1);
+    }
+    .nav.scrolled .nav-link  { color: var(--dark); }
+    .nav.scrolled .nav-brand-name { color: var(--dark); }
+    .nav.scrolled .nav-brand-sub  { color: var(--mid); }
+
+    .nav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .nav-brand-logo {
+      height: 36px; width: auto; object-fit: contain;
+      filter: brightness(0) invert(1);
+      transition: filter .3s;
+    }
+    .nav.scrolled .nav-brand-logo { filter: none; }
+    .nav-brand-logo-fallback {
+      width: 36px; height: 36px; background: var(--red);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    }
+    .nav-brand-name {
+      font-size: 16px; font-weight: 900; color: white; letter-spacing: .3px;
+      transition: color .3s;
+    }
+    .nav-brand-sub {
+      font-size: 9px; color: rgba(255,255,255,.55); letter-spacing: 1px;
+      text-transform: uppercase; margin-top: 1px;
+      transition: color .3s;
+    }
+
+    .nav-links { display: flex; align-items: center; gap: 32px; }
+    .nav-link {
+      font-size: 13px; font-weight: 700; color: rgba(255,255,255,.85);
+      text-decoration: none; letter-spacing: .3px;
+      transition: color .15s;
+    }
+    .nav-link:hover { color: var(--red-lt); }
+    .nav.scrolled .nav-link:hover { color: var(--red); }
+
+    .nav-cta {
+      padding: 9px 20px; background: var(--red); color: white !important;
+      border-radius: 7px; font-size: 13px; font-weight: 700; text-decoration: none;
+      transition: background .15s;
+    }
+    .nav-cta:hover { background: var(--red-dk) !important; color: white !important; }
+
+    .hamburger-nav {
+      display: none; background: transparent; border: none; cursor: pointer;
+      padding: 6px; border-radius: 6px;
+    }
+    .hamburger-nav span {
+      display: block; width: 22px; height: 2px;
+      background: white; border-radius: 2px; margin: 5px 0;
+      transition: background .3s, transform .2s;
+    }
+    .nav.scrolled .hamburger-nav span { background: var(--dark); }
+
+    /* Mobile nav drawer */
+    .mobile-nav {
+      display: none; position: fixed; inset: 0; z-index: 890;
+      background: var(--white); flex-direction: column;
+      align-items: center; justify-content: center; gap: 28px;
+    }
+    .mobile-nav.open { display: flex; }
+    .mobile-nav a { font-size: 22px; font-weight: 900; color: var(--dark); text-decoration: none; }
+    .mobile-nav a:hover { color: var(--red); }
+    .mobile-nav-close {
+      position: absolute; top: 18px; right: 20px;
+      background: none; border: none; font-size: 28px; cursor: pointer; color: var(--mid);
+    }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative; min-height: 100vh;
+      background: var(--dark); overflow: hidden;
+      display: flex; align-items: center;
+    }
+    .hero-bg {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 70% 50%, #3A0000 0%, transparent 70%),
+                  linear-gradient(135deg, #1A0000 0%, #111111 60%);
+    }
+    /* Red geometric accent */
+    .hero-accent {
+      position: absolute; top: -80px; right: -80px;
+      width: 500px; height: 500px;
+      border: 120px solid rgba(196,0,0,.12);
+      border-radius: 50%;
+    }
+    .hero-accent-2 {
+      position: absolute; bottom: -60px; left: -60px;
+      width: 300px; height: 300px;
+      background: rgba(196,0,0,.06); border-radius: 50%;
+    }
+    .hero-line {
+      position: absolute; top: 0; left: 42%; width: 1px; height: 100%;
+      background: linear-gradient(to bottom, transparent, rgba(196,0,0,.3), transparent);
+    }
+
+    .hero-content {
+      position: relative; z-index: 2;
+      padding: 120px 0 80px;
+    }
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 11px; font-weight: 700; letter-spacing: 2.5px;
+      text-transform: uppercase; color: var(--red-lt); margin-bottom: 20px;
+    }
+    .hero-eyebrow::before {
+      content: ''; display: block; width: 28px; height: 2px; background: var(--red);
+    }
+    .hero-title {
+      font-size: clamp(36px, 6vw, 68px);
+      font-weight: 900; color: var(--white);
+      line-height: 1.05; letter-spacing: -1px;
       margin-bottom: 20px;
+      max-width: 700px;
     }
-    h1 { font-size: 28px; font-weight: 900; color: #1A1A1A; margin-bottom: 6px; }
-    p  { font-size: 13px; color: #777; margin-bottom: 32px; }
-    .modules { display: flex; flex-direction: column; gap: 10px; }
-    a.mod {
-      display: flex; align-items: center; gap: 12px;
-      padding: 14px 18px; border-radius: 10px;
-      border: 1.5px solid #E0E0E0;
-      text-decoration: none; color: #1A1A1A;
-      font-weight: 700; font-size: 13px;
-      transition: border-color .12s, background .12s;
+    .hero-title span { color: var(--red-lt); }
+    .hero-tagline {
+      font-size: clamp(15px, 2vw, 19px); color: rgba(255,255,255,.55);
+      margin-bottom: 40px; max-width: 520px; line-height: 1.7;
     }
-    a.mod:hover { border-color: #C40000; background: #FFF8F8; }
-    a.mod.primary { background: #C40000; color: white; border-color: #C40000; }
-    a.mod.primary:hover { background: #A00000; }
-    .icon { font-size: 20px; width: 24px; text-align: center; }
-    .badge {
-      margin-left: auto; font-size: 9px; font-weight: 700;
-      letter-spacing: 1px; text-transform: uppercase;
-      padding: 2px 8px; border-radius: 20px;
-      background: rgba(255,255,255,.25); color: inherit;
-      border: 1px solid rgba(255,255,255,.35);
+    .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
+    .btn-hero-primary {
+      padding: 14px 32px; background: var(--red); color: white;
+      border: none; border-radius: 8px; font-size: 14px; font-weight: 700;
+      text-decoration: none; cursor: pointer;
+      transition: background .15s, transform .1s;
     }
-    .badge-dark { background: #E8F0FF; color: #2255CC; border-color: #C0D0FF; }
-    .ver { margin-top: 28px; font-size: 10px; color: #bbb; }
+    .btn-hero-primary:hover { background: #E00000; transform: translateY(-1px); }
+    .btn-hero-outline {
+      padding: 14px 32px; background: transparent;
+      border: 1.5px solid rgba(255,255,255,.3); color: rgba(255,255,255,.85);
+      border-radius: 8px; font-size: 14px; font-weight: 700; text-decoration: none;
+      transition: border-color .15s, color .15s, transform .1s;
+    }
+    .btn-hero-outline:hover { border-color: white; color: white; transform: translateY(-1px); }
+
+    .hero-scroll {
+      position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%);
+      z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 6px;
+      font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+      color: rgba(255,255,255,.3); text-decoration: none;
+    }
+    .hero-scroll-line {
+      width: 1px; height: 40px;
+      background: linear-gradient(to bottom, rgba(255,255,255,.3), transparent);
+    }
+
+    /* ── STRIP / TICKER ── */
+    .strip {
+      background: var(--red); overflow: hidden; padding: 14px 0;
+    }
+    .strip-inner {
+      display: flex; gap: 56px; white-space: nowrap;
+      animation: marquee 20s linear infinite;
+    }
+    .strip-item {
+      font-size: 11.5px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; color: rgba(255,255,255,.8);
+      display: flex; align-items: center; gap: 14px; flex-shrink: 0;
+    }
+    .strip-dot { width: 5px; height: 5px; background: rgba(255,255,255,.5); border-radius: 50%; }
+    @keyframes marquee { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+
+    /* ── TENTANG KAMI ── */
+    .about { background: var(--white); }
+    .about-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center;
+    }
+    .label-tag {
+      font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--red); margin-bottom: 14px;
+    }
+    .section-title {
+      font-size: clamp(26px, 4vw, 38px); font-weight: 900;
+      color: var(--dark); line-height: 1.15; margin-bottom: 18px;
+      letter-spacing: -.5px;
+    }
+    .section-body {
+      font-size: 15px; color: var(--mid); line-height: 1.85; margin-bottom: 14px;
+    }
+    .about-visual {
+      position: relative;
+    }
+    .about-card-main {
+      background: var(--dark); border-radius: 16px; padding: 36px;
+      position: relative; overflow: hidden;
+    }
+    .about-card-main::before {
+      content: ''; position: absolute; top: -40px; right: -40px;
+      width: 160px; height: 160px;
+      background: rgba(196,0,0,.25); border-radius: 50%;
+    }
+    .about-card-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--red-lt); margin-bottom: 24px; }
+    .about-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .about-stat-num {
+      font-size: 38px; font-weight: 900; color: white; line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .about-stat-num span { font-size: 22px; color: var(--red-lt); }
+    .about-stat-lbl { font-size: 12px; color: rgba(255,255,255,.45); margin-top: 4px; }
+
+    .about-badge {
+      position: absolute; bottom: -18px; left: 28px;
+      background: var(--red); color: white;
+      border-radius: 10px; padding: 14px 20px;
+      font-size: 12px; font-weight: 700; line-height: 1.5;
+      box-shadow: 0 10px 30px rgba(196,0,0,.4);
+    }
+    .about-badge-num { font-size: 22px; font-weight: 900; display: block; }
+
+    /* ── LAYANAN ── */
+    .services { background: var(--light); }
+    .services-header { text-align: center; max-width: 600px; margin: 0 auto 56px; }
+    .services-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+    }
+    .service-card {
+      background: var(--white); border-radius: 14px; padding: 32px 28px;
+      border: 1.5px solid var(--border);
+      transition: border-color .15s, box-shadow .15s, transform .15s;
+    }
+    .service-card:hover {
+      border-color: var(--red); box-shadow: 0 8px 30px rgba(196,0,0,.1);
+      transform: translateY(-3px);
+    }
+    .service-icon {
+      width: 52px; height: 52px; background: #FFF0F0; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px; font-size: 24px;
+    }
+    .service-title { font-size: 16px; font-weight: 900; margin-bottom: 10px; color: var(--dark); }
+    .service-body  { font-size: 13.5px; color: var(--mid); line-height: 1.75; }
+
+    /* ── NUMBERS ── */
+    .numbers { background: var(--dark); }
+    .numbers-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 2px; background: rgba(255,255,255,.07); border-radius: 16px; overflow: hidden;
+    }
+    .number-cell {
+      background: var(--dark2); padding: 44px 28px; text-align: center;
+      border-radius: 0;
+    }
+    .number-val {
+      font-size: 52px; font-weight: 900; color: white; line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .number-val span { color: var(--red-lt); font-size: 34px; }
+    .number-label { font-size: 12.5px; color: rgba(255,255,255,.4); margin-top: 10px; }
+
+    /* ── KEUNGGULAN ── */
+    .pillars { background: var(--white); }
+    .pillars-header { text-align: center; max-width: 600px; margin: 0 auto 56px; }
+    .pillars-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+    .pillar {
+      padding: 36px 28px; border-radius: 14px;
+      background: var(--light); border-top: 4px solid var(--red);
+    }
+    .pillar-num {
+      font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--red); margin-bottom: 16px;
+    }
+    .pillar-title { font-size: 18px; font-weight: 900; margin-bottom: 12px; }
+    .pillar-body  { font-size: 13.5px; color: var(--mid); line-height: 1.75; }
+
+    /* ── CTA SECTION ── */
+    .cta-section {
+      background: var(--red);
+      position: relative; overflow: hidden;
+    }
+    .cta-section::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 80% at 80% 50%, rgba(0,0,0,.3), transparent);
+    }
+    .cta-inner { position: relative; z-index: 1; text-align: center; }
+    .cta-title { font-size: clamp(26px, 4vw, 40px); font-weight: 900; color: white; margin-bottom: 14px; }
+    .cta-sub   { font-size: 16px; color: rgba(255,255,255,.7); margin-bottom: 36px; }
+    .cta-btns  { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+    .btn-cta-white {
+      padding: 14px 32px; background: white; color: var(--red);
+      border: none; border-radius: 8px; font-size: 14px; font-weight: 700;
+      text-decoration: none; transition: opacity .15s;
+    }
+    .btn-cta-white:hover { opacity: .92; }
+    .btn-cta-outline {
+      padding: 14px 32px; background: transparent;
+      border: 2px solid rgba(255,255,255,.5); color: white;
+      border-radius: 8px; font-size: 14px; font-weight: 700; text-decoration: none;
+      transition: border-color .15s;
+    }
+    .btn-cta-outline:hover { border-color: white; }
+
+    /* ── KONTAK ── */
+    .contact { background: var(--light); }
+    .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: start; }
+    .contact-info { display: flex; flex-direction: column; gap: 24px; }
+    .contact-item {
+      display: flex; align-items: flex-start; gap: 14px;
+    }
+    .contact-icon {
+      width: 44px; height: 44px; background: #FFF0F0; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 19px; flex-shrink: 0;
+    }
+    .contact-item-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--mid); margin-bottom: 3px; }
+    .contact-item-val   { font-size: 14px; font-weight: 700; color: var(--dark); line-height: 1.5; }
+    .contact-item-val a { color: var(--red); text-decoration: none; }
+    .contact-item-val a:hover { text-decoration: underline; }
+
+    .contact-form-card {
+      background: var(--white); border-radius: 16px; padding: 36px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.07);
+    }
+    .form-title { font-size: 18px; font-weight: 900; margin-bottom: 24px; }
+    .cf-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 16px; }
+    .cf-field label { font-size: 11px; font-weight: 700; color: var(--gray); }
+    .cf-field input, .cf-field textarea, .cf-field select {
+      border: 1.5px solid var(--border); border-radius: 8px;
+      padding: 10px 13px; font-size: 13.5px; outline: none;
+      color: var(--dark); font-family: Arial, sans-serif;
+      transition: border-color .12s;
+    }
+    .cf-field input:focus, .cf-field textarea:focus, .cf-field select:focus { border-color: var(--red); }
+    .cf-field textarea { min-height: 100px; resize: vertical; }
+    .cf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .btn-submit {
+      width: 100%; padding: 13px; background: var(--red); color: white;
+      border: none; border-radius: 8px; font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: background .15s;
+    }
+    .btn-submit:hover { background: var(--red-dk); }
+    #formSuccess { display: none; text-align: center; padding: 20px 0; }
+    #formSuccess .check { font-size: 40px; margin-bottom: 10px; }
+    #formSuccess p { font-size: 14px; color: var(--mid); }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--dark); color: rgba(255,255,255,.5);
+      padding: 60px 0 0;
+    }
+    .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 48px; padding-bottom: 48px; }
+    .footer-brand-logo { height: 32px; object-fit: contain; margin-bottom: 14px; filter: brightness(0) invert(1); opacity: .6; }
+    .footer-brand-logo-fallback {
+      width: 36px; height: 36px; background: var(--red); border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 900; color: white; margin-bottom: 14px;
+    }
+    .footer-brand-name { font-size: 14px; font-weight: 900; color: white; margin-bottom: 6px; }
+    .footer-brand-desc { font-size: 12.5px; line-height: 1.7; max-width: 280px; }
+    .footer-col-title { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,.7); margin-bottom: 16px; }
+    .footer-link { display: block; font-size: 13px; color: rgba(255,255,255,.45); text-decoration: none; padding: 4px 0; transition: color .12s; }
+    .footer-link:hover { color: white; }
+    .footer-bottom {
+      border-top: 1px solid rgba(255,255,255,.07); padding: 20px 0;
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 11.5px;
+    }
+    .footer-os-link {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 16px; background: rgba(255,255,255,.06); border-radius: 7px;
+      color: rgba(255,255,255,.5); text-decoration: none; font-size: 11.5px; font-weight: 700;
+      border: 1px solid rgba(255,255,255,.1);
+      transition: background .12s, color .12s;
+    }
+    .footer-os-link:hover { background: rgba(255,255,255,.12); color: white; }
+
+    /* ── MOBILE ── */
+    @media (max-width: 768px) {
+      .nav { padding: 0 20px; }
+      .nav-links { display: none; }
+      .hamburger-nav { display: block; }
+
+      .section    { padding: 60px 0; }
+      .section-sm { padding: 40px 0; }
+
+      .hero-content  { padding: 100px 0 60px; }
+      .hero-accent   { display: none; }
+      .hero-actions  { flex-direction: column; }
+      .btn-hero-primary, .btn-hero-outline { text-align: center; }
+
+      .about-grid   { grid-template-columns: 1fr; gap: 40px; }
+      .about-badge  { display: none; }
+
+      .services-grid { grid-template-columns: 1fr; gap: 16px; }
+
+      .numbers-grid  { grid-template-columns: repeat(2, 1fr); }
+      .number-val    { font-size: 38px; }
+
+      .pillars-grid  { grid-template-columns: 1fr; gap: 16px; }
+
+      .contact-grid  { grid-template-columns: 1fr; gap: 36px; }
+
+      .footer-grid   { grid-template-columns: 1fr; gap: 32px; }
+      .footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
+
+      .cta-btns { flex-direction: column; align-items: center; }
+      .btn-cta-white, .btn-cta-outline { width: 100%; max-width: 280px; text-align: center; }
+    }
+
+    @media (max-width: 480px) {
+      .numbers-grid { grid-template-columns: 1fr 1fr; }
+      .cf-row { grid-template-columns: 1fr; }
+      .about-stats-grid { grid-template-columns: 1fr 1fr; }
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="logo">RI<span style="opacity:.7">F</span></div>
-    <h1>RIFIM OS</h1>
-    <p>Enterprise Operating System — PT. RIFIM Internasional Gemilang</p>
-    <div class="modules">
-      <a class="mod primary" href="/modules/smart-office/index.html">
-        <span class="icon">⚡</span>
-        Smart Office
-        <span class="badge">LIVE</span>
-      </a>
-      <a class="mod" href="#" style="opacity:.45;cursor:not-allowed">
-        <span class="icon">👥</span>
-        HRIS
-        <span class="badge badge-dark">Segera</span>
-      </a>
-      <a class="mod" href="#" style="opacity:.45;cursor:not-allowed">
-        <span class="icon">💰</span>
-        Finance
-        <span class="badge badge-dark">Segera</span>
-      </a>
-      <a class="mod" href="#" style="opacity:.45;cursor:not-allowed">
-        <span class="icon">🤝</span>
-        CRM
-        <span class="badge badge-dark">Segera</span>
-      </a>
+
+<!-- ══════════════════════════════════════════════
+     NAVBAR
+══════════════════════════════════════════════ -->
+<nav class="nav" id="navbar">
+  <a class="nav-brand" href="/">
+    <img src="/branding/logo/rifim-logo.png" class="nav-brand-logo" alt="RIFIM"
+      onerror="this.style.display='none';document.getElementById('navLogoFallback').style.display='flex'">
+    <div id="navLogoFallback" class="nav-brand-logo-fallback" style="display:none">
+      <svg width="20" height="20" viewBox="0 0 34 34"><rect width="34" height="34" rx="7" fill="#C40000"/><text x="17" y="24" text-anchor="middle" fill="white" font-family="Arial Black,Arial" font-weight="900" font-size="18">R</text></svg>
     </div>
-    <div class="ver">v1.0.0 — Sprint 0 · Juli 2026</div>
+    <div>
+      <div class="nav-brand-name">RIFIM Group</div>
+      <div class="nav-brand-sub">Batam, Indonesia</div>
+    </div>
+  </a>
+
+  <div class="nav-links">
+    <a class="nav-link" href="#tentang">Tentang</a>
+    <a class="nav-link" href="#layanan">Layanan</a>
+    <a class="nav-link" href="#keunggulan">Keunggulan</a>
+    <a class="nav-link" href="#kontak">Kontak</a>
+    <a class="nav-link nav-cta" href="/smart-office">⚡ RIFIM OS</a>
   </div>
+
+  <button class="hamburger-nav" onclick="toggleMobileNav()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+<!-- Mobile Nav -->
+<div class="mobile-nav" id="mobileNav">
+  <button class="mobile-nav-close" onclick="toggleMobileNav()">✕</button>
+  <a href="#tentang"    onclick="toggleMobileNav()">Tentang</a>
+  <a href="#layanan"    onclick="toggleMobileNav()">Layanan</a>
+  <a href="#keunggulan" onclick="toggleMobileNav()">Keunggulan</a>
+  <a href="#kontak"     onclick="toggleMobileNav()">Kontak</a>
+  <a href="/smart-office" style="color:#C40000">⚡ RIFIM OS</a>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     HERO
+══════════════════════════════════════════════ -->
+<section class="hero" id="home">
+  <div class="hero-bg"></div>
+  <div class="hero-accent"></div>
+  <div class="hero-accent-2"></div>
+  <div class="hero-line"></div>
+
+  <div class="container">
+    <div class="hero-content">
+      <div class="hero-eyebrow">Vendor Operasional Profesional · Batam</div>
+      <h1 class="hero-title">
+        Membangun<br>
+        <span>Hari Ini,</span><br>
+        Menginspirasi<br>Masa Depan
+      </h1>
+      <p class="hero-tagline">
+        PT. RIFIM Internasional Gemilang — mitra operasional terpercaya untuk solusi promosi, rekrutmen, dan manajemen SDM di Kota Batam.
+      </p>
+      <div class="hero-actions">
+        <a class="btn-hero-primary" href="#kontak">Hubungi Kami</a>
+        <a class="btn-hero-outline" href="#layanan">Lihat Layanan ↓</a>
+      </div>
+    </div>
+  </div>
+
+  <a class="hero-scroll" href="#tentang">
+    <div class="hero-scroll-line"></div>
+    Scroll
+  </a>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     STRIP / TICKER
+══════════════════════════════════════════════ -->
+<div class="strip">
+  <div class="strip-inner">
+    <!-- Dua set identik untuk looping seamless -->
+    <div class="strip-item"><span>Vendor Operasional</span><span class="strip-dot"></span></div>
+    <div class="strip-item"><span>Promosi & Aktivasi Lapangan</span><span class="strip-dot"></span></div>
+    <div class="strip-item"><span>Rekrutmen Driver</span><span class="strip-dot"></span></div>
+    <div class="strip-item"><span>Manajemen Armada</span><span class="strip-dot"></span></div>
+    <div class="strip-item"><span>Pelatihan SDM</span><span class="strip-dot"></span></div>
+    <div class="strip-item"><span>Kota Batam</span><span class="strip-dot"></span></div>
+    <div class="strip-item"><span>Vendor Operasional</span><span class="strip-dot"></span></div>
+    <div class="strip-item"><span>Promosi & Aktivasi Lapangan</span><span class="strip-dot"></span></div>
+    <div class="strip-item"><span>Rekrutmen Driver</span><span class="strip-dot"></span></div>
+    <div class="strip-item"><span>Manajemen Armada</span><span class="strip-dot"></span></div>
+    <div class="strip-item"><span>Pelatihan SDM</span><span class="strip-dot"></span></div>
+    <div class="strip-item"><span>Kota Batam</span><span class="strip-dot"></span></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     TENTANG KAMI
+══════════════════════════════════════════════ -->
+<section class="about section" id="tentang">
+  <div class="container">
+    <div class="about-grid">
+      <div>
+        <div class="label-tag">Tentang Kami</div>
+        <h2 class="section-title">Solusi Operasional Terpercaya di Batam</h2>
+        <p class="section-body">
+          PT. RIFIM Internasional Gemilang adalah perusahaan vendor operasional yang berpusat di Kota Batam, Kepulauan Riau. Kami hadir sebagai mitra strategis untuk berbagai kebutuhan operasional, promosi, dan pengelolaan sumber daya manusia.
+        </p>
+        <p class="section-body">
+          Dengan pengalaman bertahun-tahun di industri operasional, kami dipercaya sebagai mitra resmi untuk mendukung ekosistem bisnis lokal dengan standar pelayanan yang tinggi dan solusi yang terukur.
+        </p>
+        <p style="font-size:13px;color:#999;margin-top:8px">
+          📍 Fanindo Blok S No. 20, Tanjung Uncang, Batu Aji, Kota Batam
+        </p>
+      </div>
+
+      <div class="about-visual">
+        <div class="about-card-main">
+          <div class="about-card-label">Pencapaian Kami</div>
+          <div class="about-stats-grid">
+            <div>
+              <div class="about-stat-num">5<span>+</span></div>
+              <div class="about-stat-lbl">Tahun beroperasi</div>
+            </div>
+            <div>
+              <div class="about-stat-num">300<span>+</span></div>
+              <div class="about-stat-lbl">Mitra driver aktif</div>
+            </div>
+            <div>
+              <div class="about-stat-num">50<span>+</span></div>
+              <div class="about-stat-lbl">Klien terlayani</div>
+            </div>
+            <div>
+              <div class="about-stat-num">1K<span>+</span></div>
+              <div class="about-stat-lbl">Dokumen terkelola</div>
+            </div>
+          </div>
+        </div>
+        <div class="about-badge">
+          <span class="about-badge-num">★ 4.9</span>
+          Rating Kepuasan Klien
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     LAYANAN
+══════════════════════════════════════════════ -->
+<section class="services section" id="layanan">
+  <div class="container">
+    <div class="services-header">
+      <div class="label-tag" style="text-align:center">Layanan Kami</div>
+      <h2 class="section-title">Solusi Lengkap untuk Kebutuhan Operasional</h2>
+      <p style="font-size:14.5px;color:#777;line-height:1.75;margin-top:10px">Kami menyediakan layanan terintegrasi yang dirancang khusus untuk mendukung pertumbuhan bisnis Anda secara efisien dan profesional.</p>
+    </div>
+    <div class="services-grid">
+      <div class="service-card">
+        <div class="service-icon">📣</div>
+        <div class="service-title">Aktivasi & Promosi</div>
+        <p class="service-body">Kampanye promosi lapangan dan digital yang efektif untuk meningkatkan jangkauan pengguna dan awareness merek secara terukur.</p>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🚗</div>
+        <div class="service-title">Rekrutmen Driver</div>
+        <p class="service-body">Seleksi, verifikasi, dan penempatan mitra pengemudi berkualitas dengan standar penilaian ketat untuk produktivitas optimal.</p>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🔧</div>
+        <div class="service-title">Manajemen Armada</div>
+        <p class="service-body">Pengelolaan dan pemantauan kendaraan operasional secara sistematis, termasuk jadwal perawatan dan laporan performa armada.</p>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">👥</div>
+        <div class="service-title">Pelatihan SDM</div>
+        <p class="service-body">Program pelatihan terstruktur untuk peningkatan kompetensi mitra dan karyawan — mulai orientasi hingga pengembangan profesional.</p>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">⚙️</div>
+        <div class="service-title">Dukungan Operasional</div>
+        <p class="service-body">Layanan bantuan teknis dan administratif harian untuk memastikan kelancaran operasional bisnis tanpa gangguan.</p>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">📄</div>
+        <div class="service-title">Administrasi & Dokumen</div>
+        <p class="service-body">Pengelolaan surat, kontrak, dan administrasi perusahaan secara digital melalui sistem RIFIM OS yang terintegrasi.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     NUMBERS
+══════════════════════════════════════════════ -->
+<section class="numbers section-sm">
+  <div class="container">
+    <div class="numbers-grid">
+      <div class="number-cell">
+        <div class="number-val">300<span>+</span></div>
+        <div class="number-label">Mitra Driver Terdaftar</div>
+      </div>
+      <div class="number-cell">
+        <div class="number-val">50<span>+</span></div>
+        <div class="number-label">Klien Aktif</div>
+      </div>
+      <div class="number-cell">
+        <div class="number-val">5<span>+</span></div>
+        <div class="number-label">Tahun Pengalaman</div>
+      </div>
+      <div class="number-cell">
+        <div class="number-val">99<span>%</span></div>
+        <div class="number-label">Tingkat Kepuasan</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     KEUNGGULAN
+══════════════════════════════════════════════ -->
+<section class="pillars section" id="keunggulan">
+  <div class="container">
+    <div class="pillars-header">
+      <div class="label-tag" style="text-align:center">Mengapa RIFIM</div>
+      <h2 class="section-title">Tiga Pilar Keunggulan Kami</h2>
+    </div>
+    <div class="pillars-grid">
+      <div class="pillar">
+        <div class="pillar-num">01 — Profesional</div>
+        <div class="pillar-title">Tim Berpengalaman</div>
+        <p class="pillar-body">Setiap anggota tim kami memiliki keahlian khusus di bidangnya, didukung pengalaman operasional bertahun-tahun di pasar Batam dan sekitarnya.</p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-num">02 — Terukur</div>
+        <div class="pillar-title">Hasil yang Dapat Diukur</div>
+        <p class="pillar-body">Setiap program dan kampanye kami dilengkapi laporan performa berkala sehingga klien dapat memantau kemajuan secara transparan dan akuntabel.</p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-num">03 — Digital</div>
+        <div class="pillar-title">Sistem Berbasis Teknologi</div>
+        <p class="pillar-body">Kami menggunakan RIFIM OS — platform digital in-house untuk pengelolaan dokumen, SDM, dan operasional secara efisien dan paperless.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     CTA
+══════════════════════════════════════════════ -->
+<section class="cta-section section-sm">
+  <div class="container">
+    <div class="cta-inner">
+      <h2 class="cta-title">Siap Bekerja Sama dengan RIFIM?</h2>
+      <p class="cta-sub">Hubungi tim kami sekarang dan diskusikan kebutuhan operasional bisnis Anda.</p>
+      <div class="cta-btns">
+        <a class="btn-cta-white" href="#kontak">Kirim Pesan</a>
+        <a class="btn-cta-outline" href="https://wa.me/6282170102349?text=Halo%20RIFIM%2C%20saya%20ingin%20mengetahui%20lebih%20lanjut%20tentang%20layanan%20Anda." target="_blank">WhatsApp Langsung ↗</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     KONTAK
+══════════════════════════════════════════════ -->
+<section class="contact section" id="kontak">
+  <div class="container">
+    <div class="label-tag">Hubungi Kami</div>
+    <h2 class="section-title" style="margin-bottom:40px">Kami Siap Membantu Anda</h2>
+    <div class="contact-grid">
+      <div>
+        <div class="contact-info">
+          <div class="contact-item">
+            <div class="contact-icon">📍</div>
+            <div>
+              <div class="contact-item-label">Alamat</div>
+              <div class="contact-item-val">Fanindo Blok S No. 20<br>Tanjung Uncang, Batu Aji<br>Kota Batam, Kepulauan Riau</div>
+            </div>
+          </div>
+          <div class="contact-item">
+            <div class="contact-icon">📱</div>
+            <div>
+              <div class="contact-item-label">Telepon / WhatsApp</div>
+              <div class="contact-item-val">
+                <a href="https://wa.me/6282170102349" target="_blank">+62 821 7010 2349</a>
+              </div>
+            </div>
+          </div>
+          <div class="contact-item">
+            <div class="contact-icon">✉️</div>
+            <div>
+              <div class="contact-item-label">Email</div>
+              <div class="contact-item-val">
+                <a href="mailto:rifiminternasionalgemilang@gmail.com">rifiminternasionalgemilang@gmail.com</a>
+              </div>
+            </div>
+          </div>
+          <div class="contact-item">
+            <div class="contact-icon">🌐</div>
+            <div>
+              <div class="contact-item-label">Website</div>
+              <div class="contact-item-val">www.rifimgroup.com</div>
+            </div>
+          </div>
+          <div class="contact-item">
+            <div class="contact-icon">⏰</div>
+            <div>
+              <div class="contact-item-label">Jam Operasional</div>
+              <div class="contact-item-val">Senin – Sabtu, 08.00 – 17.00 WIB</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="contact-form-card">
+        <div class="form-title">Kirim Pesan</div>
+        <div id="contactForm">
+          <div class="cf-row">
+            <div class="cf-field">
+              <label>Nama Lengkap</label>
+              <input type="text" id="cfName" placeholder="Budi Santoso">
+            </div>
+            <div class="cf-field">
+              <label>Perusahaan</label>
+              <input type="text" id="cfCompany" placeholder="PT. Nama Perusahaan">
+            </div>
+          </div>
+          <div class="cf-field">
+            <label>Email</label>
+            <input type="email" id="cfEmail" placeholder="email@perusahaan.com">
+          </div>
+          <div class="cf-field">
+            <label>Layanan yang Diminati</label>
+            <select id="cfService">
+              <option value="">-- Pilih Layanan --</option>
+              <option>Aktivasi & Promosi</option>
+              <option>Rekrutmen Driver</option>
+              <option>Manajemen Armada</option>
+              <option>Pelatihan SDM</option>
+              <option>Dukungan Operasional</option>
+              <option>Administrasi & Dokumen</option>
+              <option>Lainnya</option>
+            </select>
+          </div>
+          <div class="cf-field">
+            <label>Pesan</label>
+            <textarea id="cfMessage" placeholder="Ceritakan kebutuhan operasional Anda..."></textarea>
+          </div>
+          <button class="btn-submit" onclick="submitContact()">Kirim Pesan →</button>
+        </div>
+        <div id="formSuccess">
+          <div class="check">✅</div>
+          <p>Pesan berhasil dikirim!<br>Tim kami akan menghubungi Anda dalam 1×24 jam.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════════ -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <img src="/branding/logo/rifim-logo.png" class="footer-brand-logo" alt="RIFIM"
+          onerror="this.style.display='none';document.getElementById('ftLogoFallback').style.display='flex'">
+        <div class="footer-brand-logo-fallback" id="ftLogoFallback" style="display:none">R</div>
+        <div class="footer-brand-name">PT. RIFIM Internasional Gemilang</div>
+        <p class="footer-brand-desc">Membangun Hari Ini, Menginspirasi Masa Depan. Vendor Operasional profesional di Kota Batam.</p>
+      </div>
+      <div>
+        <div class="footer-col-title">Layanan</div>
+        <a class="footer-link" href="#layanan">Aktivasi & Promosi</a>
+        <a class="footer-link" href="#layanan">Rekrutmen Driver</a>
+        <a class="footer-link" href="#layanan">Manajemen Armada</a>
+        <a class="footer-link" href="#layanan">Pelatihan SDM</a>
+        <a class="footer-link" href="#layanan">Dukungan Operasional</a>
+      </div>
+      <div>
+        <div class="footer-col-title">Navigasi</div>
+        <a class="footer-link" href="#tentang">Tentang Kami</a>
+        <a class="footer-link" href="#keunggulan">Keunggulan</a>
+        <a class="footer-link" href="#kontak">Kontak</a>
+        <a class="footer-link" href="https://wa.me/6282170102349" target="_blank">WhatsApp</a>
+        <a class="footer-link" href="mailto:rifiminternasionalgemilang@gmail.com">Email</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div>© 2026 PT. RIFIM Internasional Gemilang. Hak cipta dilindungi.</div>
+      <a class="footer-os-link" href="/smart-office">⚡ Masuk ke RIFIM OS</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Navbar scroll effect
+  const navbar = document.getElementById('navbar');
+  window.addEventListener('scroll', () => {
+    navbar.classList.toggle('scrolled', window.scrollY > 60);
+  }, { passive: true });
+
+  // Mobile nav
+  function toggleMobileNav() {
+    document.getElementById('mobileNav').classList.toggle('open');
+  }
+
+  // Contact form (no backend — opens WhatsApp/email)
+  function submitContact() {
+    const name    = document.getElementById('cfName').value.trim();
+    const company = document.getElementById('cfCompany').value.trim();
+    const email   = document.getElementById('cfEmail').value.trim();
+    const service = document.getElementById('cfService').value;
+    const message = document.getElementById('cfMessage').value.trim();
+
+    if (!name || !email || !message) {
+      alert('Harap isi Nama, Email, dan Pesan terlebih dahulu.');
+      return;
+    }
+
+    const waMsg = encodeURIComponent(
+      `Halo RIFIM,\n\nNama    : ${name}\nPerusahaan: ${company || '—'}\nEmail   : ${email}\nLayanan : ${service || '—'}\n\nPesan:\n${message}`
+    );
+    window.open(`https://wa.me/6282170102349?text=${waMsg}`, '_blank');
+
+    document.getElementById('contactForm').style.display = 'none';
+    document.getElementById('formSuccess').style.display = 'block';
+  }
+</script>
 </body>
 </html>
