@@ -898,17 +898,22 @@
     btn.textContent = 'Memverifikasi...';
     document.getElementById('loginError').textContent = '';
 
+    const localAllowed = ALLOWED_EMAILS.includes(email);
+
     try {
       const res  = await fetch(`${GAS_WEB_APP_URL}?action=auth&email=${encodeURIComponent(email)}`);
       const data = await res.json();
       if (data.success) {
         storeAuth({ email, name: data.user.name, role: data.user.role });
+      } else if (localAllowed) {
+        // GAS menolak tapi email ada di daftar lokal — izinkan masuk
+        storeAuth({ email, name: 'Bobby Rahman M.B', role: 'Direktur Utama' });
       } else {
         setLoginErr(data.message || 'Email tidak diizinkan untuk mengakses sistem ini.');
       }
     } catch (_) {
-      // Fallback offline: cek lokal
-      if (ALLOWED_EMAILS.includes(email)) {
+      // Jaringan gagal — pakai daftar lokal
+      if (localAllowed) {
         storeAuth({ email, name: 'Bobby Rahman M.B', role: 'Direktur Utama' });
       } else {
         setLoginErr('Email tidak diizinkan. Hubungi administrator RIFIM OS.');
