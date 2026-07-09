@@ -831,15 +831,17 @@ function showAuthError(msg) {
 
 function doLogout() {
   sessionStorage.removeItem('hris_user');
-  location.reload();
+  localStorage.removeItem('rifim_auth');
+  window.location.href = '/portal';
 }
 
 document.getElementById('auth-email').addEventListener('keydown', e => {
   if (e.key === 'Enter') doLogin();
 });
 
-// Auto-login jika session masih ada
+// Auto-login: cek session HRIS atau SSO dari portal
 (function checkSession() {
+  // 1. Session HRIS sendiri
   const saved = sessionStorage.getItem('hris_user');
   if (saved) {
     try {
@@ -848,7 +850,24 @@ document.getElementById('auth-email').addEventListener('keydown', e => {
       document.getElementById('app').style.display       = 'flex';
       document.getElementById('user-badge').textContent  = currentUser.full_name + ' (' + currentUser.role + ')';
       initApp();
+      return;
     } catch(e) { sessionStorage.removeItem('hris_user'); }
+  }
+  // 2. SSO dari portal (localStorage)
+  const portalRaw = localStorage.getItem('rifim_auth');
+  if (portalRaw) {
+    try {
+      const auth = JSON.parse(portalRaw);
+      if (Date.now() - (auth.ts || 0) < 8 * 60 * 60 * 1000) {
+        currentUser = auth;
+        sessionStorage.setItem('hris_user', JSON.stringify(auth));
+        document.getElementById('auth-gate').style.display = 'none';
+        document.getElementById('app').style.display       = 'flex';
+        document.getElementById('user-badge').textContent  = auth.full_name + ' (' + auth.role + ')';
+        initApp();
+        return;
+      }
+    } catch(e) { localStorage.removeItem('rifim_auth'); }
   }
 })();
 
