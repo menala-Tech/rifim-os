@@ -306,6 +306,39 @@
     .act:hover { text-decoration: underline; }
 
     /* ═══════════════════════════════════════════
+       PENOMORAN TAB
+    ══════════════════════════════════════════ */
+    .nomor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr)); gap: 12px; }
+    .nomor-card {
+      background: var(--white); border: 1.5px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+      transition: border-color .12s;
+    }
+    .nomor-card:hover { border-color: var(--red); }
+    .nomor-icon { font-size: 22px; flex-shrink: 0; }
+    .nomor-name { font-size: 11.5px; color: var(--text); font-weight: 700; margin-bottom: 3px; }
+    .nomor-next { font-size: 10px; color: var(--muted); font-family: monospace; word-break: break-all; }
+    .nomor-badge { margin-left: auto; background: var(--red); color: white; border-radius: 20px; padding: 3px 9px; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+
+    /* ═══════════════════════════════════════════
+       SETTINGS TAB
+    ══════════════════════════════════════════ */
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .settings-card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 24px; }
+    .settings-card-title { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; border-bottom: 1px solid var(--border); padding-bottom: 9px; }
+    .settings-row { display: flex; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-lbl { color: var(--muted); min-width: 80px; flex-shrink: 0; font-size: 11.5px; }
+    .settings-val { color: var(--text); font-weight: 700; word-break: break-all; font-size: 12px; }
+    .email-chip { display: inline-flex; align-items: center; background: #FFF0F0; color: var(--red); border-radius: 20px; padding: 5px 13px; font-size: 11.5px; font-weight: 700; margin: 3px 3px 3px 0; border: 1px solid #F0C0C0; }
+
+    /* Category filter chip */
+    .cat-chip { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; background: #FFF0F0; border: 1.5px solid #E0C0C0; border-radius: 20px; font-size: 12px; font-weight: 700; color: var(--red); margin-bottom: 10px; }
+    .cat-chip-x { cursor: pointer; font-size: 15px; line-height: 1; opacity: .7; }
+    .cat-chip-x:hover { opacity: 1; }
+
+    /* ═══════════════════════════════════════════
        BOTTOM NAV (mobile only)
     ══════════════════════════════════════════ */
     .bottomnav {
@@ -344,6 +377,10 @@
     /* ═══════════════════════════════════════════
        MOBILE (≤768px)
     ══════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      .settings-grid { grid-template-columns: 1fr; }
+      .nomor-grid    { grid-template-columns: repeat(2,1fr); }
+    }
     @media (max-width: 768px) {
       /* Nav */
       .nav-user   { display: none; }
@@ -489,7 +526,8 @@
       onclick="switchTab('arsip');closeSidebar();return false">
       <span class="sb-icon">📁</span><span class="sb-text">Arsip Dokumen</span>
     </a>
-    <a class="sb-item" href="#" onclick="closeSidebar();return false">
+    <a class="sb-item" id="sbItemNomor" href="#"
+      onclick="switchTab('nomor');closeSidebar();return false">
       <span class="sb-icon">🔢</span><span class="sb-text">Penomoran</span>
     </a>
 
@@ -511,7 +549,8 @@
     </a>
 
     <div class="sb-label">Sistem</div>
-    <a class="sb-item" href="#" onclick="closeSidebar();return false">
+    <a class="sb-item" id="sbItemSettings" href="#"
+      onclick="switchTab('settings');closeSidebar();return false">
       <span class="sb-icon">⚙️</span><span class="sb-text">Pengaturan</span>
     </a>
 
@@ -552,8 +591,10 @@
 
     <!-- TABS (desktop only) -->
     <div class="tabs">
-      <div class="tab active" id="tabBuat" onclick="switchTab('buat',this)">⚡ Buat Dokumen</div>
-      <div class="tab" id="tabArsip"       onclick="switchTab('arsip',this)">📁 Arsip</div>
+      <div class="tab active" id="tabBuat"     onclick="switchTab('buat',this)">⚡ Buat Dokumen</div>
+      <div class="tab"        id="tabArsip"    onclick="switchTab('arsip',this)">📁 Arsip</div>
+      <div class="tab"        id="tabNomor"    onclick="switchTab('nomor',this)">🔢 Penomoran</div>
+      <div class="tab"        id="tabSettings" onclick="switchTab('settings',this)">⚙️ Pengaturan</div>
     </div>
 
     <!-- ═══ TAB: BUAT DOKUMEN ═══ -->
@@ -760,6 +801,10 @@
       <div class="page-title">Arsip Dokumen</div>
       <div class="page-sub">Data real-time dari Google Sheets database.</div>
 
+      <div id="arsipCatChip" style="display:none" class="cat-chip">
+        <span id="arsipCatLabel"></span>
+        <span class="cat-chip-x" onclick="clearCatFilter()">✕</span>
+      </div>
       <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center" id="arsipFilterBar">
         <input id="arsipSearch" type="text" placeholder="Cari nomor, perihal, penerima..."
           style="flex:1;min-width:200px;padding:9px 14px;border:1.5px solid #E0C0C0;border-radius:8px;font-size:13px;outline:none"
@@ -800,6 +845,63 @@
       <div id="arsipFooter" style="margin-top:10px;font-size:12px;color:#999;text-align:right"></div>
     </div><!-- end tab-arsip -->
 
+    <!-- ═══ TAB: PENOMORAN ═══ -->
+    <div id="tab-nomor" style="display:none">
+      <div class="page-title">Penomoran Dokumen</div>
+      <div class="page-sub">Nomor urut berikutnya untuk setiap jenis dokumen.</div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+        <button onclick="loadNomor()" style="padding:8px 18px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer">↺ Refresh</button>
+      </div>
+      <div id="nomorLoading" style="text-align:center;padding:48px 0;color:#999;font-size:14px">Memuat nomor dari sistem…</div>
+      <div id="nomorGrid" class="nomor-grid" style="display:none"></div>
+    </div><!-- end tab-nomor -->
+
+    <!-- ═══ TAB: PENGATURAN ═══ -->
+    <div id="tab-settings" style="display:none">
+      <div class="page-title">Pengaturan Sistem</div>
+      <div class="page-sub">Konfigurasi perusahaan dan informasi sistem RIFIM OS.</div>
+      <div class="settings-grid" style="margin-top:4px">
+
+        <div class="settings-card">
+          <div class="settings-card-title">📍 Profil Perusahaan</div>
+          <div class="settings-row"><span class="settings-lbl">Nama</span><span class="settings-val">PT. RIFIM Internasional Gemilang</span></div>
+          <div class="settings-row"><span class="settings-lbl">Alamat</span><span class="settings-val">Fanindo Blok S No. 20, Tanjung Uncang, Batu Aji, Kota Batam</span></div>
+          <div class="settings-row"><span class="settings-lbl">Telepon</span><span class="settings-val">+62 821 7010 2349</span></div>
+          <div class="settings-row"><span class="settings-lbl">Email</span><span class="settings-val">rifiminternasionalgemilang@gmail.com</span></div>
+          <div class="settings-row"><span class="settings-lbl">Direktur</span><span class="settings-val">Bobby Rahman M.B — Direktur Utama</span></div>
+        </div>
+
+        <div class="settings-card">
+          <div class="settings-card-title">🔒 Email yang Diizinkan</div>
+          <div id="emailList"></div>
+          <div style="margin-top:12px;font-size:11px;color:#aaa;line-height:1.7">
+            Tambah email: Google Sheets →<br>
+            sheet <b style="color:#666">company_config</b> → key <b style="color:#666">allowed_emails</b><br>
+            (pisah dengan koma)
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <div class="settings-card-title">⚙️ Info Sistem</div>
+          <div class="settings-row"><span class="settings-lbl">Versi</span><span class="settings-val">v1.0.0 Sprint 1</span></div>
+          <div class="settings-row"><span class="settings-lbl">Platform</span><span class="settings-val">Vercel + Google Apps Script</span></div>
+          <div class="settings-row"><span class="settings-lbl">Database</span><span class="settings-val">Google Sheets</span></div>
+          <div class="settings-row"><span class="settings-lbl">Domain</span><span class="settings-val">rifim-os.vercel.app</span></div>
+          <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+            <button onclick="checkGasHealth()" style="padding:8px 14px;background:var(--bg);color:var(--gray);border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">🔗 Cek Koneksi GAS</button>
+          </div>
+          <div id="gasStatus" style="margin-top:10px;font-size:12px;min-height:18px"></div>
+        </div>
+
+        <div class="settings-card">
+          <div class="settings-card-title">🚪 Sesi Aktif</div>
+          <div id="sessionInfo" style="font-size:12.5px;color:var(--muted);line-height:2"></div>
+          <button onclick="doLogout()" style="margin-top:18px;width:100%;padding:11px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">↩ Keluar dari RIFIM OS</button>
+        </div>
+
+      </div>
+    </div><!-- end tab-settings -->
+
   </main>
 </div><!-- end .layout -->
 
@@ -812,10 +914,10 @@
     <button class="bn-item" id="bn-arsip" onclick="switchTab('arsip');setActiveBN('bn-arsip')">
       <div class="bn-icon">📁</div><span>Arsip</span>
     </button>
-    <button class="bn-item" id="bn-nomor">
+    <button class="bn-item" id="bn-nomor" onclick="switchTab('nomor');setActiveBN('bn-nomor')">
       <div class="bn-icon">🔢</div><span>Nomor</span>
     </button>
-    <button class="bn-item" id="bn-settings">
+    <button class="bn-item" id="bn-settings" onclick="switchTab('settings');setActiveBN('bn-settings')">
       <div class="bn-icon">⚙️</div><span>Setelan</span>
     </button>
   </div>
@@ -973,29 +1075,34 @@
 
   // ── TABS ─────────────────────────────────────────────────────
   function switchTab(name, tabEl) {
-    document.getElementById('tab-buat').style.display  = name === 'buat'  ? 'block' : 'none';
-    document.getElementById('tab-arsip').style.display = name === 'arsip' ? 'block' : 'none';
+    ['buat','arsip','nomor','settings'].forEach(t => {
+      const el = document.getElementById('tab-' + t);
+      if (el) el.style.display = (t === name) ? 'block' : 'none';
+    });
 
     // Desktop tab highlights
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    const targetTab = tabEl || document.getElementById('tab' + name.charAt(0).toUpperCase() + name.slice(1));
+    const cap = name.charAt(0).toUpperCase() + name.slice(1);
+    const targetTab = tabEl || document.getElementById('tab' + cap);
     if (targetTab) targetTab.classList.add('active');
 
     // Sidebar highlights
     document.querySelectorAll('.sb-item').forEach(s => s.classList.remove('active'));
-    const sbEl = document.getElementById('sbItem' + name.charAt(0).toUpperCase() + name.slice(1));
+    const sbEl = document.getElementById('sbItem' + cap);
     if (sbEl) sbEl.classList.add('active');
 
     // Bottom nav
     setActiveBN('bn-' + name);
 
-    // Reset mobile back when switching tabs
+    // Reset mobile back when switching away from buat
     if (name !== 'buat') {
       document.getElementById('mobileBack').style.display = 'none';
       document.getElementById('docTypeSection').style.display = 'block';
     }
 
-    if (name === 'arsip') loadArsip();
+    if (name === 'arsip')    loadArsip();
+    if (name === 'nomor')    loadNomor();
+    if (name === 'settings') loadSettings();
   }
 
   // ── BOTTOM NAV ───────────────────────────────────────────────
@@ -1209,6 +1316,21 @@
       const data = await res.json();
       document.getElementById('arsipLoading').style.display = 'none';
       if (!data.success) { showToast('Gagal: ' + data.message, false); return; }
+
+      // Category chip
+      const chipEl    = document.getElementById('arsipCatChip');
+      const chipLabel = document.getElementById('arsipCatLabel');
+      if (_arsipCategory) {
+        chipEl.style.display = 'inline-flex';
+        chipLabel.textContent = '📂 ' + _arsipCategory;
+        // Filter client-side by document_code
+        const codes = CATEGORY_MAP[_arsipCategory] || [];
+        data.docs  = (data.docs || []).filter(d => codes.includes(d.document_code));
+        data.total = data.docs.length;
+      } else {
+        chipEl.style.display = 'none';
+      }
+
       if (!data.docs || !data.docs.length) { document.getElementById('arsipEmpty').style.display = 'block'; return; }
 
       document.getElementById('arsipTableWrap').style.display = 'block';
@@ -1254,8 +1376,131 @@
     if (t) t.textContent = s.total     ?? '—';
   }
 
+  // ── CATEGORY FILTER ──────────────────────────────────────────
+  const CATEGORY_MAP = {
+    'Korespondensi': ['SURAT','ST','SIZ','SKT','BA'],
+    'Keuangan':      ['INV','KWT'],
+    'Kerjasama':     ['PROP','CP','MOU','PKS'],
+    'HR / SDM':      ['SP1','SP2','SP3','PKWT','SPG','SMT','PHK','PI'],
+    'Operasional':   ['FCO'],
+  };
+  let _arsipCategory = null;
+
+  function filterCat(cat) {
+    _arsipCategory = cat;
+    switchTab('arsip');
+  }
+
+  function clearCatFilter() {
+    _arsipCategory = null;
+    document.getElementById('arsipCatChip').style.display = 'none';
+    loadArsip();
+  }
+
+  // ── PENOMORAN ────────────────────────────────────────────────
+  const NOMOR_META = {
+    SURAT:['Surat Resmi','📨'], ST:['Surat Tugas','📋'], SIZ:['Surat Izin','🗓'],
+    SKT:['Surat Keterangan','📃'], BA:['Berita Acara','📰'],
+    INV:['Invoice','🧾'], KWT:['Kwitansi','💰'],
+    PROP:['Proposal','📊'], CP:['Company Profile','🏢'], MOU:['MoU','🤝'], PKS:['Perjanjian Kerjasama','📑'],
+    SP1:['SP 1','⚠️'], SP2:['SP 2','🔴'], SP3:['SP 3','🚫'],
+    PKWT:['Kontrak PKWT','📝'], SPG:['Pengangkatan','🎖'], SMT:['Mutasi','🔄'],
+    PHK:['Surat PHK','📤'], PI:['Pakta Integritas','🛡'], FCO:['Form Checklist','✅'],
+  };
+  const ALL_CODES = ['SURAT','ST','SIZ','SKT','BA','INV','KWT','PROP','CP','MOU','PKS','SP1','SP2','SP3','PKWT','SPG','SMT','PHK','PI','FCO'];
+  const MONTHS_ROM = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+
+  async function loadNomor() {
+    document.getElementById('nomorLoading').style.display = 'block';
+    document.getElementById('nomorGrid').style.display    = 'none';
+
+    const now = new Date();
+    const m   = MONTHS_ROM[now.getMonth()];
+    const y   = now.getFullYear();
+
+    const results = await Promise.all(ALL_CODES.map(async code => {
+      try {
+        const res  = await fetch(`${GAS_WEB_APP_URL}?action=peek&code=${code}`);
+        const data = await res.json();
+        return { code, next: data.success ? data.nextNumber : `001/RIFIM/${code}/${m}/${y}` };
+      } catch(_) {
+        return { code, next: `—/RIFIM/${code}/${m}/${y}` };
+      }
+    }));
+
+    document.getElementById('nomorLoading').style.display = 'none';
+    document.getElementById('nomorGrid').style.display    = 'grid';
+    document.getElementById('nomorGrid').innerHTML = results.map(r => {
+      const [name, icon] = NOMOR_META[r.code] || [r.code, '📄'];
+      return `<div class="nomor-card" onclick="selectFromNomor('${r.code}')">
+        <div class="nomor-icon">${icon}</div>
+        <div style="min-width:0;flex:1">
+          <div class="nomor-name">${name}</div>
+          <div class="nomor-next">${r.next}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function selectFromNomor(code) {
+    const meta = NOMOR_META[code];
+    if (!meta) return;
+    switchTab('buat');
+    const card = document.querySelector(`.doc-card[onclick*="'${code}'"]`);
+    if (card) card.click();
+  }
+
+  // ── SETTINGS ─────────────────────────────────────────────────
+  function loadSettings() {
+    // Email list
+    const emailListEl = document.getElementById('emailList');
+    if (emailListEl) {
+      emailListEl.innerHTML = ALLOWED_EMAILS.map(e =>
+        `<div class="email-chip">✓ ${e}</div>`
+      ).join('');
+    }
+
+    // Session info
+    const sessEl = document.getElementById('sessionInfo');
+    if (sessEl) {
+      try {
+        const auth      = JSON.parse(localStorage.getItem('rifim_auth') || '{}');
+        const loginDate = auth.ts ? new Date(auth.ts).toLocaleString('id-ID') : '—';
+        const expDate   = auth.ts ? new Date(auth.ts + 7*86400000).toLocaleDateString('id-ID') : '—';
+        sessEl.innerHTML = `
+          <div><b>Pengguna:</b> ${auth.name  || '—'}</div>
+          <div><b>Jabatan:</b>  ${auth.role  || '—'}</div>
+          <div><b>Email:</b>    ${auth.email || '—'}</div>
+          <div><b>Login:</b>    ${loginDate}</div>
+          <div><b>Berlaku s/d:</b> ${expDate}</div>
+        `;
+      } catch(_) {
+        sessEl.textContent = 'Tidak ada sesi aktif.';
+      }
+    }
+  }
+
+  async function checkGasHealth() {
+    const el = document.getElementById('gasStatus');
+    el.textContent  = 'Memeriksa koneksi…';
+    el.style.color  = '#999';
+    try {
+      const res  = await fetch(GAS_WEB_APP_URL);
+      const data = await res.json();
+      if (data.success) {
+        el.textContent = '✅ GAS terhubung — ' + (data.app || 'RIFIM OS');
+        el.style.color = '#1A8A4A';
+      } else {
+        el.textContent = '⚠️ GAS merespons tapi ada masalah';
+        el.style.color = '#CC8800';
+      }
+    } catch(_) {
+      el.textContent = '❌ Tidak dapat terhubung ke GAS';
+      el.style.color = '#C40000';
+    }
+  }
+
   // ── MISC ─────────────────────────────────────────────────────
-  function filterCat(cat) { showToast(`Filter: ${cat}`, false); }
 
   function showToast(msg, ok) {
     const t = document.getElementById('toast');
