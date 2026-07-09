@@ -54,7 +54,7 @@ function generateDocument(input) {
     }
     const docPrefix  = company && company.doc_prefix ? String(company.doc_prefix) : 'RIFIM';
     const docNumber  = generateDocumentNumber(input.documentType, docPrefix);
-    const templateId = _getTemplateId(input.documentType, config);
+    const templateId = _getTemplateId(input.documentType, config, input.company_code);
     const docCopy    = getTemplateCopy(templateId, docNumber);
     const data       = buildPlaceholderData(input, config, docNumber);
 
@@ -96,27 +96,49 @@ function _validateInput(input) {
  * Ambil Template Google Doc ID berdasarkan jenis dokumen.
  *
  * Prioritas:
+ * 0. companies sheet → kolom tpl_* (template khusus perusahaan, mis. MIG dengan logo)
  * 1. sheet document_types → kolom template_gdoc_id (per baris, paling fleksibel)
  * 2. company_config → gdoc_template_* (fallback, 6 template shared)
  * @private
  */
-function _getTemplateId(docType, config) {
-  // Coba baca dari sheet document_types dulu
+function _getTemplateId(docType, config, companyCode) {
+  var CO_KEY_MAP = {
+    SURAT:'tpl_surat', ST:'tpl_surat', SIZ:'tpl_surat', SKT:'tpl_surat',
+    BA:'tpl_surat', FCO:'tpl_surat', PROP:'tpl_surat', CP:'tpl_surat',
+    INV:'tpl_inv', KWT:'tpl_kwt',
+    SP1:'tpl_sp', SP2:'tpl_sp', SP3:'tpl_sp', PHK:'tpl_sp',
+    PKWT:'tpl_pkwt', SPG:'tpl_pkwt', SMT:'tpl_pkwt', PI:'tpl_pkwt',
+    MOU:'tpl_mou', PKS:'tpl_mou',
+  };
+
+  // Prioritas 0: template spesifik perusahaan (companies sheet kolom tpl_*)
+  if (companyCode) {
+    try {
+      var company = getCompanyByCode(companyCode);
+      if (company) {
+        var coKey   = CO_KEY_MAP[docType];
+        var coTplId = coKey ? String(company[coKey] || '').trim() : '';
+        if (coTplId) return coTplId;
+      }
+    } catch (_) { /* fall through */ }
+  }
+
+  // Prioritas 1: sheet document_types → kolom E = template_gdoc_id
   try {
     var dtSheet = _getDB().getSheetByName('document_types');
     if (dtSheet) {
       var dtData = dtSheet.getDataRange().getValues();
       for (var i = 1; i < dtData.length; i++) {
         if (String(dtData[i][0]).trim() === docType) {
-          var id = String(dtData[i][4] || '').trim(); // kolom E = template_gdoc_id
+          var id = String(dtData[i][4] || '').trim();
           if (id) return id;
           break;
         }
       }
     }
-  } catch (_) { /* fallthrough ke company_config */ }
+  } catch (_) { /* fall through */ }
 
-  // Fallback: company_config
+  // Prioritas 2: company_config (gdoc_template_*)
   var KEY_MAP = {
     SURAT: 'gdoc_template_surat', ST:   'gdoc_template_surat',
     SIZ:   'gdoc_template_surat', SKT:  'gdoc_template_surat',
