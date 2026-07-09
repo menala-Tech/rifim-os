@@ -50,12 +50,30 @@ function doGet(e) {
   const action = e && e.parameter && e.parameter.action;
 
   if (action === 'peek') {
-    // Preview nomor dokumen berikutnya tanpa increment
     const code = e.parameter.code || 'SURAT';
     try {
       const nextNum = peekNextDocumentNumber(code);
       return ContentService
         .createTextOutput(JSON.stringify({ success: true, nextNumber: nextNum }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ success: false, message: err.message }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  if (action === 'arsip') {
+    try {
+      const options = {
+        status: e.parameter.status || 'ALL',
+        search: e.parameter.search || '',
+        page:   e.parameter.page   || 1,
+        limit:  e.parameter.limit  || 100,
+      };
+      const result = getDocumentList(options);
+      return ContentService
+        .createTextOutput(JSON.stringify(Object.assign({ success: true }, result)))
         .setMimeType(ContentService.MimeType.JSON);
     } catch (err) {
       return ContentService

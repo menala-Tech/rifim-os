@@ -144,9 +144,10 @@
     .doc-table tr:last-child td { border-bottom: none; }
     .doc-table tr:hover td { background: var(--bg); }
     .badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 10px; font-weight: 700; }
-    .badge-draft  { background: #F5F5F5; color: #666; }
-    .badge-final  { background: #E8F5EE; color: var(--success); }
-    .badge-sent   { background: #E8F0FF; color: #2255CC; }
+    .badge-draft    { background: #F5F5F5; color: #666; }
+    .badge-final    { background: #E8F5EE; color: var(--success); }
+    .badge-sent     { background: #E8F0FF; color: #2255CC; }
+    .badge-archived { background: #F0F0F0; color: #999; }
     .doc-num { font-family: monospace; font-size: 11px; color: var(--red); }
     .act { color: var(--red); font-size: 12px; cursor: pointer; }
     .act:hover { text-decoration: underline; }
@@ -447,8 +448,40 @@
     <!-- TAB: ARSIP -->
     <div id="tab-arsip" style="display:none">
       <div class="page-title">Arsip Dokumen</div>
-      <div class="page-sub">Semua dokumen tersimpan otomatis ke Google Drive & database.</div>
-      <div class="recent" style="margin-top:0">
+      <div class="page-sub">Data real-time dari Google Sheets database.</div>
+
+      <!-- Filter bar -->
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+        <input id="arsipSearch" type="text" placeholder="Cari nomor, perihal, penerima..."
+          style="flex:1;min-width:200px;padding:9px 14px;border:1.5px solid #E0C0C0;border-radius:8px;font-size:13px;outline:none"
+          oninput="debounceArsip()" />
+        <select id="arsipStatus" onchange="loadArsip()"
+          style="padding:9px 12px;border:1.5px solid #E0C0C0;border-radius:8px;font-size:13px;background:#fff;cursor:pointer">
+          <option value="ALL">Semua Status</option>
+          <option value="DRAFT">Draft</option>
+          <option value="FINAL">Final</option>
+          <option value="SENT">Terkirim</option>
+          <option value="ARCHIVED">Diarsip</option>
+        </select>
+        <button onclick="loadArsip()"
+          style="padding:9px 16px;background:#C40000;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">
+          ↺ Refresh
+        </button>
+      </div>
+
+      <!-- Loading -->
+      <div id="arsipLoading" style="display:none;text-align:center;padding:48px 0;color:#999;font-size:14px">
+        Memuat data dari database…
+      </div>
+
+      <!-- Empty state -->
+      <div id="arsipEmpty" style="display:none;text-align:center;padding:48px 0;color:#aaa">
+        <div style="font-size:36px;margin-bottom:12px">📭</div>
+        <div style="font-size:14px">Belum ada dokumen yang ditemukan.</div>
+      </div>
+
+      <!-- Table -->
+      <div class="recent" style="margin-top:0" id="arsipTableWrap">
         <table class="doc-table">
           <thead>
             <tr>
@@ -457,45 +490,12 @@
               <th>Status</th><th></th>
             </tr>
           </thead>
-          <tbody>
-            <tr>
-              <td class="doc-num">045/RIFIM/SURAT/VI/2026</td>
-              <td>Surat Resmi</td><td>Penawaran Kerjasama Marketing</td>
-              <td>PT. Teknologi Perdana</td><td>15 Jun 2026</td>
-              <td><span class="badge badge-sent">Terkirim</span></td>
-              <td><a class="act">Buka ↗</a></td>
-            </tr>
-            <tr>
-              <td class="doc-num">012/RIFIM/INV/VI/2026</td>
-              <td>Invoice</td><td>Jasa Promosi Maxim — Jun 2026</td>
-              <td>PT. Maxim Technology</td><td>30 Jun 2026</td>
-              <td><span class="badge badge-final">Final</span></td>
-              <td><a class="act">Buka ↗</a></td>
-            </tr>
-            <tr>
-              <td class="doc-num">003/RIFIM/PKWT/VI/2026</td>
-              <td>Kontrak PKWT</td><td>Kontrak Kerja 6 Bulan</td>
-              <td>Ahmad Fauzi</td><td>1 Jun 2026</td>
-              <td><span class="badge badge-final">Final</span></td>
-              <td><a class="act">Buka ↗</a></td>
-            </tr>
-            <tr>
-              <td class="doc-num">001/RIFIM/SP1/V/2026</td>
-              <td>SP 1</td><td>Pelanggaran Disiplin</td>
-              <td>Budi Santoso</td><td>10 Mei 2026</td>
-              <td><span class="badge badge-sent">Terkirim</span></td>
-              <td><a class="act">Buka ↗</a></td>
-            </tr>
-            <tr>
-              <td class="doc-num">044/RIFIM/SURAT/VI/2026</td>
-              <td>Surat Resmi</td><td>Permohonan Kerjasama</td>
-              <td>CV. Maju Bersama</td><td>10 Jun 2026</td>
-              <td><span class="badge badge-draft">Draft</span></td>
-              <td><a class="act">Buka ↗</a></td>
-            </tr>
-          </tbody>
+          <tbody id="arsipBody"></tbody>
         </table>
       </div>
+
+      <!-- Footer info -->
+      <div id="arsipFooter" style="margin-top:10px;font-size:12px;color:#999;text-align:right"></div>
     </div>
 
   </main>
@@ -735,9 +735,93 @@
     document.getElementById('tab-arsip').style.display = name === 'arsip' ? 'block' : 'none';
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     if (el) el.classList.add('active');
+    if (name === 'arsip') loadArsip();
   }
 
   function filterCat(cat) { showToast(`Filter: ${cat}`, false); }
+
+  // ── Arsip real-time ──────────────────────────────────────────
+  let _arsipTimer;
+  function debounceArsip() {
+    clearTimeout(_arsipTimer);
+    _arsipTimer = setTimeout(loadArsip, 450);
+  }
+
+  const STATUS_LABEL = { DRAFT:'Draft', FINAL:'Final', SENT:'Terkirim', ARCHIVED:'Diarsip' };
+  const STATUS_BADGE = { DRAFT:'badge-draft', FINAL:'badge-final', SENT:'badge-sent', ARCHIVED:'badge-archived' };
+
+  async function loadArsip() {
+    if (!GAS_WEB_APP_URL) {
+      showToast('GAS URL belum diisi di konstanta GAS_WEB_APP_URL', false);
+      return;
+    }
+    const search = (document.getElementById('arsipSearch').value || '').trim();
+    const status = document.getElementById('arsipStatus').value;
+
+    document.getElementById('arsipLoading').style.display   = 'block';
+    document.getElementById('arsipEmpty').style.display     = 'none';
+    document.getElementById('arsipTableWrap').style.display = 'none';
+    document.getElementById('arsipFooter').textContent      = '';
+
+    try {
+      const url  = `${GAS_WEB_APP_URL}?action=arsip&status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}&limit=150`;
+      const res  = await fetch(url);
+      const data = await res.json();
+
+      document.getElementById('arsipLoading').style.display = 'none';
+
+      if (!data.success) { showToast('Gagal: ' + data.message, false); return; }
+
+      if (!data.docs || data.docs.length === 0) {
+        document.getElementById('arsipEmpty').style.display = 'block';
+        return;
+      }
+
+      document.getElementById('arsipTableWrap').style.display = 'block';
+
+      const tbody = document.getElementById('arsipBody');
+      tbody.innerHTML = data.docs.map(doc => {
+        const tgl = doc.document_date
+          ? new Date(doc.document_date).toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' })
+          : '—';
+        const badgeCls = STATUS_BADGE[doc.status] || 'badge-draft';
+        const badgeTxt = STATUS_LABEL[doc.status] || doc.status;
+        const links = [
+          doc.gdoc_url ? `<a class="act" href="${doc.gdoc_url}" target="_blank">Doc ↗</a>` : '',
+          doc.pdf_url  ? `<a class="act" href="${doc.pdf_url}"  target="_blank">PDF ↗</a>` : '',
+        ].filter(Boolean).join(' ');
+        return `<tr>
+          <td class="doc-num">${doc.document_number || '—'}</td>
+          <td>${doc.document_type || '—'}</td>
+          <td>${doc.subject || '—'}</td>
+          <td>${doc.recipient_name || '—'}</td>
+          <td>${tgl}</td>
+          <td><span class="badge ${badgeCls}">${badgeTxt}</span></td>
+          <td>${links || '—'}</td>
+        </tr>`;
+      }).join('');
+
+      const shown = data.docs.length;
+      const total = data.total;
+      document.getElementById('arsipFooter').textContent =
+        shown < total
+          ? `Menampilkan ${shown} dari ${total} dokumen`
+          : `Total: ${total} dokumen`;
+
+      // Update stat cards jika ada data stats
+      if (data.stats) _updateStatCards(data.stats);
+
+    } catch (err) {
+      document.getElementById('arsipLoading').style.display = 'none';
+      showToast('❌ Gagal memuat arsip: ' + err.message, false);
+    }
+  }
+
+  function _updateStatCards(stats) {
+    const cards = document.querySelectorAll('.stat-value');
+    if (cards[0]) cards[0].textContent = stats.bulan_ini ?? '—';
+    if (cards[2]) cards[2].textContent = stats.draft     ?? '—';
+  }
 
   function showToast(msg, ok) {
     const t = document.getElementById('toast');
