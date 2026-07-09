@@ -39,8 +39,21 @@ function generateDocument(input) {
   try {
     _validateInput(input);
 
-    const config     = getCompanyConfig();
-    const docNumber  = generateDocumentNumber(input.documentType);
+    var config  = getCompanyConfig();
+    var company = input.company_code ? getCompanyByCode(input.company_code) : null;
+    if (company) {
+      config = Object.assign({}, config, {
+        company_name:    company.name,
+        company_address: company.address,
+        company_phone:   company.phone,
+        company_email:   company.email,
+        company_city:    company.city || config.company_city,
+        director_name:   company.director_name,
+        director_title:  company.director_title,
+      });
+    }
+    const docPrefix  = company && company.doc_prefix ? String(company.doc_prefix) : 'RIFIM';
+    const docNumber  = generateDocumentNumber(input.documentType, docPrefix);
     const templateId = _getTemplateId(input.documentType, config);
     const docCopy    = getTemplateCopy(templateId, docNumber);
     const data       = buildPlaceholderData(input, config, docNumber);

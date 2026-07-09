@@ -49,10 +49,26 @@ function doPost(e) {
 function doGet(e) {
   const action = e && e.parameter && e.parameter.action;
 
-  if (action === 'peek') {
-    const code = e.parameter.code || 'SURAT';
+  if (action === 'companies') {
     try {
-      const nextNum = peekNextDocumentNumber(code);
+      var list = getCompanies().map(function(c) {
+        return { code: c.code, name: c.name, director_name: c.director_name, director_title: c.director_title, doc_prefix: c.doc_prefix };
+      });
+      return ContentService
+        .createTextOutput(JSON.stringify({ success: true, companies: list }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ success: false, message: err.message }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  if (action === 'peek') {
+    const code   = e.parameter.code   || 'SURAT';
+    const prefix = e.parameter.prefix || 'RIFIM';
+    try {
+      const nextNum = peekNextDocumentNumber(code, prefix);
       return ContentService
         .createTextOutput(JSON.stringify({ success: true, nextNumber: nextNum }))
         .setMimeType(ContentService.MimeType.JSON);

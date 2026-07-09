@@ -51,3 +51,35 @@ function getCompanyConfig() {
 function resetConfigCache() {
   _configCache = null;
 }
+
+/**
+ * Ambil daftar semua perusahaan dari sheet companies.
+ * @returns {Array<object>}
+ */
+function getCompanies() {
+  var sheet = _getDB().getSheetByName('companies');
+  if (!sheet) return [];
+  var data    = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var list    = [];
+  for (var i = 1; i < data.length; i++) {
+    if (!data[i][0]) continue;
+    var company = {};
+    headers.forEach(function(h, j) { company[String(h).trim()] = data[i][j]; });
+    if (String(company.is_active).toUpperCase() !== 'FALSE') list.push(company);
+  }
+  return list;
+}
+
+/**
+ * Ambil data satu perusahaan berdasarkan code.
+ * @param {string} code  - RIFIM / MIG / LAILAN
+ * @returns {object|null}
+ */
+function getCompanyByCode(code) {
+  var list = getCompanies();
+  for (var i = 0; i < list.length; i++) {
+    if (String(list[i].code).trim() === String(code).trim()) return list[i];
+  }
+  return null;
+}

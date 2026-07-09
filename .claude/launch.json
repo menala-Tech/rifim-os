@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "RIFIM OS Preview",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "start", "templates/smart-office/invoice/invoice-preview.html"],
+      "port": 5500
+    }
+  ]
+}

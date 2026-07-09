@@ -14,7 +14,8 @@ const MONTHS_ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','X
  * @param {string} documentCode  - INV / SURAT / PKWT / SP1 / dll
  * @returns {string}             - mis. "012/RIFIM/INV/VII/2026"
  */
-function generateDocumentNumber(documentCode) {
+function generateDocumentNumber(documentCode, prefix) {
+  prefix = prefix || 'RIFIM';
   const sheet = _getDB().getSheetByName('numbering_sequences');
   if (!sheet) throw new Error('Sheet numbering_sequences tidak ditemukan.');
 
@@ -43,7 +44,7 @@ function generateDocumentNumber(documentCode) {
 
       // Format: "012/RIFIM/INV/VII/2026"
       const seq = String(nextSeq).padStart(3, '0');
-      return seq + '/RIFIM/' + documentCode + '/' + roman + '/' + year;
+      return seq + '/' + prefix + '/' + documentCode + '/' + roman + '/' + year;
     }
   }
 
@@ -55,7 +56,8 @@ function generateDocumentNumber(documentCode) {
  * @param {string} documentCode
  * @returns {string}
  */
-function peekNextDocumentNumber(documentCode) {
+function peekNextDocumentNumber(documentCode, prefix) {
+  prefix = prefix || 'RIFIM';
   const sheet = _getDB().getSheetByName('numbering_sequences');
   const now   = new Date();
   const year  = now.getFullYear();
@@ -69,8 +71,8 @@ function peekNextDocumentNumber(documentCode) {
       const rowMonth = Number(data[i][2]);
       const isNew    = (rowYear !== year || rowMonth !== month);
       const nextSeq  = isNew ? 1 : Number(data[i][4]) + 1;
-      return String(nextSeq).padStart(3, '0') + '/RIFIM/' + documentCode + '/' + roman + '/' + year;
+      return String(nextSeq).padStart(3, '0') + '/' + prefix + '/' + documentCode + '/' + roman + '/' + year;
     }
   }
-  return '001/RIFIM/' + documentCode + '/' + roman + '/' + year;
+  return '001/' + prefix + '/' + documentCode + '/' + roman + '/' + year;
 }

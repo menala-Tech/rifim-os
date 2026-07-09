@@ -602,6 +602,12 @@
       <div class="page-title">Buat Dokumen Baru</div>
       <div class="page-sub">Pilih jenis dokumen — nomor dibuat otomatis oleh sistem.</div>
 
+      <!-- Company Selector -->
+      <div id="companySelectorBar" style="display:none;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Atas Nama Perusahaan</div>
+        <div id="companyPills" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      </div>
+
       <!-- Doc type grid section (hidden on mobile when form shown) -->
       <div id="docTypeSection">
         <!-- KORESPONDENSI -->
@@ -1145,15 +1151,62 @@
   };
 
   const MONTHS      = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
-  let   currentCode = 'SURAT';
-  let   lastResult  = null;
+  let   currentCode    = 'SURAT';
+  let   lastResult     = null;
+  let   _activeCompany = null;   // {code, name, director_name, director_title, doc_prefix}
 
   // ── INIT APP ─────────────────────────────────────────────────
   function initApp() {
     document.getElementById('docDate').value = new Date().toISOString().split('T')[0];
     updateDocNum();
     renderDynFields('SURAT');
+    loadCompanies();
   }
+
+  // ── COMPANY SELECTOR ─────────────────────────────────────────
+  async function loadCompanies() {
+    if (!GAS_WEB_APP_URL) return;
+    try {
+      const res  = await fetch(`${GAS_WEB_APP_URL}?action=companies`);
+      const data = await res.json();
+      if (!data.success || !data.companies || data.companies.length <= 1) return;
+      _companiesCache  = data.companies;
+      _activeCompany   = data.companies[0];
+      _renderCompanyPills(data.companies);
+      updateDocNum();
+    } catch(_) {}
+  }
+
+  function _renderCompanyPills(companies) {
+    const bar   = document.getElementById('companySelectorBar');
+    const pills = document.getElementById('companyPills');
+    if (!bar || !pills) return;
+    pills.innerHTML = companies.map((c, i) =>
+      `<button onclick="selectCompany('${c.code}')" id="cpill-${c.code}"
+         style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);
+                background:${i===0?'var(--accent)':'var(--bg)'};
+                color:${i===0?'#fff':'var(--text)'};
+                font-size:12px;font-weight:700;cursor:pointer;transition:all .2s">
+         ${c.name}
+       </button>`
+    ).join('');
+    bar.style.display = 'block';
+    // Default pilih perusahaan pertama
+    _activeCompany = companies[0];
+  }
+
+  function selectCompany(code) {
+    document.querySelectorAll('#companyPills button').forEach(b => {
+      const isActive = b.id === 'cpill-' + code;
+      b.style.background = isActive ? 'var(--accent)' : 'var(--bg)';
+      b.style.color      = isActive ? '#fff' : 'var(--text)';
+    });
+    // Ambil data company dari pills (sudah di-cache di _companiesCache)
+    const found = (_companiesCache || []).find(c => c.code === code);
+    if (found) { _activeCompany = found; updateDocNum(); }
+  }
+
+  var _companiesCache = null;
 
   // ── SELECT DOC ────────────────────────────────────────────────
   function selectDoc(el, code, label, icon) {
@@ -1179,12 +1232,13 @@
 
   // ── PREVIEW NOMOR ─────────────────────────────────────────────
   async function updateDocNum() {
-    const el  = document.getElementById('docNum');
-    const now = new Date();
-    el.textContent = `—/RIFIM/${currentCode}/${MONTHS[now.getMonth()]}/${now.getFullYear()}`;
+    const el     = document.getElementById('docNum');
+    const now    = new Date();
+    const prefix = _activeCompany ? _activeCompany.doc_prefix : 'RIFIM';
+    el.textContent = `—/${prefix}/${currentCode}/${MONTHS[now.getMonth()]}/${now.getFullYear()}`;
     if (!GAS_WEB_APP_URL) return;
     try {
-      const res  = await fetch(`${GAS_WEB_APP_URL}?action=peek&code=${currentCode}`);
+      const res  = await fetch(`${GAS_WEB_APP_URL}?action=peek&code=${currentCode}&prefix=${prefix}`);
       const data = await res.json();
       if (data.success) el.textContent = data.nextNumber;
     } catch(_) {}
@@ -1291,6 +1345,7 @@
 
     const input = {
       documentType:  currentCode,
+      company_code:  _activeCompany ? _activeCompany.code : 'RIFIM',
       subject,
       attachment:    document.getElementById('attachment').value.trim() || '-',
       documentDate:  document.getElementById('docDate').value,
