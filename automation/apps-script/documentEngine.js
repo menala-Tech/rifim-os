@@ -61,8 +61,9 @@ function generateDocument(input) {
     replacePlaceholders(docCopy.getId(), data);
 
     const finalDoc   = saveDocument(docCopy, input.documentType, docNumber);
+    const qrUrl      = embedQrInDoc(finalDoc.getId(), finalDoc.getUrl());
     const pdfFile    = exportToPDF(finalDoc.getId(), input.documentType, docNumber);
-    const record     = _buildRecord(input, config, docNumber, finalDoc, pdfFile);
+    const record     = _buildRecord(input, config, docNumber, finalDoc, pdfFile, qrUrl);
 
     saveDocumentRecord(record);
 
@@ -165,7 +166,7 @@ function _getTemplateId(docType, config, companyCode) {
  * Buat record untuk disimpan ke database.
  * @private
  */
-function _buildRecord(input, config, docNumber, finalDoc, pdfFile) {
+function _buildRecord(input, config, docNumber, finalDoc, pdfFile, qrUrl) {
   const now = new Date().toISOString();
   return {
     id:               'DOC-' + Date.now(),
@@ -181,7 +182,7 @@ function _buildRecord(input, config, docNumber, finalDoc, pdfFile) {
     status:           'FINAL',
     gdoc_url:         finalDoc.getUrl(),
     pdf_url:          pdfFile.getUrl(),
-    qr_url:           '',
+    qr_url:           qrUrl || '',
     created_by:       Session.getActiveUser().getEmail(),
     created_at:       now,
     updated_at:       now,

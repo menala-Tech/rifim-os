@@ -22,6 +22,36 @@ function notifSendEmail(to, subject, htmlBody, opts) {
 }
 
 /**
+ * Notifikasi dokumen berhasil dibuat di Smart Office.
+ * Dipanggil dari webApp.js setelah generateDocument() sukses.
+ *
+ * @param {{ documentNumber, documentType, subject, gdocUrl, pdfUrl, createdBy }} params
+ */
+function notifDocumentCreated(params) {
+  var subject = '[RIFIM OS] Dokumen Dibuat — ' + params.documentNumber;
+  var html = _emailTemplate({
+    title:   'Dokumen Berhasil Dibuat',
+    content:
+      '<p>Dokumen baru telah berhasil dibuat melalui RIFIM Smart Office.</p>' +
+      '<table style="border-collapse:collapse;width:100%">' +
+      _tr('Nomor Dokumen', params.documentNumber) +
+      _tr('Jenis Dokumen', params.documentType)   +
+      _tr('Perihal',       params.subject)         +
+      _tr('Dibuat Oleh',   params.createdBy || '-') +
+      '</table>' +
+      '<p style="margin-top:16px">' +
+      (params.gdocUrl ? '<a href="' + params.gdocUrl + '" style="display:inline-block;margin-right:12px;padding:8px 16px;background:#1a1a2e;color:white;text-decoration:none;border-radius:4px;">📄 Buka Google Doc</a>' : '') +
+      (params.pdfUrl  ? '<a href="' + params.pdfUrl  + '" style="display:inline-block;padding:8px 16px;background:#C40000;color:white;text-decoration:none;border-radius:4px;">📥 Download PDF</a>' : '') +
+      '</p>',
+  });
+  try {
+    notifSendEmail('rifiminternationalgemilang@gmail.com', subject, html, { name: 'RIFIM Smart Office' });
+  } catch (err) {
+    Logger.log('notifDocumentCreated gagal (non-fatal): ' + err.message);
+  }
+}
+
+/**
  * Notifikasi kontrak karyawan hampir berakhir.
  * Dipanggil dari time-based trigger (tiap hari).
  */

@@ -49,6 +49,14 @@ function doPost(e) {
         result.documentNumber || '', input.subject || '',
         by.name || '', by.email || '',
         'Tipe: ' + (input.documentType || '') + ' · ' + (input.company_code || ''));
+      notifDocumentCreated({
+        documentNumber: result.documentNumber || '',
+        documentType:   DOCUMENT_TYPES[input.documentType] ? DOCUMENT_TYPES[input.documentType].label : (input.documentType || ''),
+        subject:        input.subject || '',
+        gdocUrl:        result.gdocUrl || '',
+        pdfUrl:         result.pdfUrl  || '',
+        createdBy:      by.name || by.email || '',
+      });
     }
     return _json(result);
 
