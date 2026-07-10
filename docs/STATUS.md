@@ -39,7 +39,7 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | 6 | Iuran Rifim Batam | ✅ Excel dibaca langsung — 156 row, status DISPENSASI/NON AKTIF/NEW/parsial, split 50/25/25 | ✅ Analisa Mendalam |
 | 7 | RADMS (Airport Queue System) | ⚠️ Nama file saja | ⏳ Belum mendalam |
 | 8 | Database Staff | ⚠️ Link saja | ⏳ Belum mendalam |
-| 9 | Perhitungan Gaji (Payroll + Lembur) | ✅ Semua (kirimWA, notifikasi, utils, config, lembur) | ✅ Analisa Mendalam |
+| 9 | Perhitungan Gaji Staff (user: Batch 7) | ✅ GAS script + Spreadsheet aktual dibaca — 6 sheet, 28 staff, Rp75.418.000/bulan, cutover absensi 1 Jul 2026 | ✅ Analisa Mendalam |
 | 10 | Pendapatan / Pembagian | ⚠️ Screenshot saja | ⏳ Belum mendalam |
 | 11 | Finance Pemasukan & Pengeluaran | ✅ Semua (whatsapp, email, utilities, config) | ✅ Analisa Mendalam |
 
@@ -51,7 +51,7 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | 2 — DB Driver External | — | — | Master driver (type=external, zone=non_airport), CRUD admin, lookup ID Maxim | Laporan driver per cabang | — | Jumlah driver aktif |
 | 3 — DB Driver Airport | — | — | Master driver (type=konvensional/ask, zone=airport), 6 cabang, 2 tipe driver | Laporan driver per bandara | — | Jumlah driver airport |
 | 4 — Potongan Order | — | — | feeEngine (per cabang), driverBalance (debit saldo airport), DB_Kinerja (order/hari), laporan Management Bandara | CONFIG_FEE_KANTOR, fee perusahaan | — | Kinerja cabang real-time |
-| 9 — Payroll | — | Payroll, Absensi, Kontrak | Performa ops | Gaji, Lembur, Bonus | — | KPI cabang |
+| 9 — Payroll (Batch 7) | — | Payroll, Absensi (dari Pengisian Saldo sejak 1 Jul), Kasbon | Performa ops | Gaji Rp75.4jt/bln, Lembur, Bonus, Rekap Cabang | — | Total pengeluaran 28 staff |
 | 11 — Finance | — | — | — | Pemasukan/Pengeluaran, PDF, rekap | — | Revenue, margin |
 
 ---
