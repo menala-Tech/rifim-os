@@ -34,7 +34,7 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | 1 | Isi Saldo + Absensi + Target Staff | ✅ Semua (Main, Matching, MonitoringSaldo, Absensi, DBDriverSync, LaporanCabang, Reliability) | ✅ Analisa Mendalam |
 | 2 | Database Driver External | ✅ Spreadsheet dibaca langsung | ✅ Analisa Mendalam |
 | 3 | Database Driver Airport | ✅ Spreadsheet dibaca langsung (6 sheet, 50+ driver/cabang) | ✅ Analisa Mendalam |
-| 4 | Potongan Order (Input Dock + CONFIG_FEE_KANTOR + DB_Kinerja Driver) | ✅ PANDUAN SISTEM terbaca; GAS script pending (Chrome offline) | ✅ Analisa Mendalam |
+| 4 | Potongan Order (Input Dock 1/2/3 + CONFIG_FEE_KANTOR + DB_Driver Kinerja + LOG SISTEM) | ✅ Excel dibaca langsung — semua 17 sheet (CONFIG, DOCK, REKAP, LOG, MONITORING, branch sheets) | ✅ Analisa Mendalam |
 | 5 | Potongan Daily | ⚠️ Screenshot saja | ⏳ Belum mendalam |
 | 6 | Iuran Rifim Batam | ⚠️ Screenshot saja | ⏳ Belum mendalam |
 | 7 | RADMS (Airport Queue System) | ⚠️ Nama file saja | ⏳ Belum mendalam |
