@@ -215,6 +215,17 @@ tr:last-child td{border-bottom:none}
 #toast.success{background:var(--success)}
 #toast.error{background:var(--danger)}
 
+/* ─── PHOTO UPLOAD ─── */
+.photo-upload-box{
+  border:2px dashed var(--border);border-radius:8px;padding:16px;
+  text-align:center;cursor:pointer;color:var(--muted);font-size:13px;
+  transition:border-color .15s;min-height:64px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.photo-upload-box:hover{border-color:var(--accent);color:var(--accent)}
+.form-group input[readonly]{background:#f5f5f5;color:#888;cursor:not-allowed}
+.id-hint{font-size:11px;color:var(--muted);margin-top:2px}
+
 /* ─── RESPONSIVE ─── */
 @media(max-width:640px){
   main{padding:12px}
@@ -279,7 +290,7 @@ tr:last-child td{border-bottom:none}
       <div class="card">
         <div class="card-header">
           <h3>Data Karyawan</h3>
-          <button class="btn btn-primary" onclick="openModal('modal-add-employee')">+ Tambah Karyawan</button>
+          <button class="btn btn-primary" onclick="openAddEmployeeModal()">+ Tambah Karyawan</button>
         </div>
         <div class="card-body">
           <div class="toolbar">
@@ -471,7 +482,8 @@ tr:last-child td{border-bottom:none}
       <div class="form-grid">
         <div class="form-group">
           <label class="required">ID Karyawan</label>
-          <input id="emp-id" placeholder="mis: RIF-001" type="text">
+          <input id="emp-id" type="text" readonly>
+          <span class="id-hint">ID dibuat otomatis berdasarkan perusahaan</span>
         </div>
         <div class="form-group">
           <label class="required">Nama Lengkap</label>
@@ -487,7 +499,7 @@ tr:last-child td{border-bottom:none}
         </div>
         <div class="form-group">
           <label class="required">Perusahaan</label>
-          <select id="emp-company">
+          <select id="emp-company" onchange="onEmpCompanyChange()">
             <option value="RIFIM">PT. RIFIM Internasional Gemilang</option>
             <option value="MIG">PT. Menala Internasional Gemilang</option>
             <option value="LAILAN">CV. Lailan Kalilan Indonesia</option>
@@ -495,42 +507,76 @@ tr:last-child td{border-bottom:none}
         </div>
         <div class="form-group">
           <label class="required">Tipe Kontrak</label>
-          <select id="emp-type">
+          <select id="emp-type" onchange="onEmpTypeChange()">
             <option value="PKWT">PKWT (Kontrak)</option>
             <option value="PKWTT">PKWTT (Tetap)</option>
           </select>
         </div>
         <div class="form-group">
           <label>Jabatan</label>
-          <input id="emp-position" placeholder="Staff Admin, Sopir, dll" type="text">
+          <select id="emp-position">
+            <option value="">-- Pilih Jabatan --</option>
+            <option>STAFF KONTER</option>
+            <option>PICKUP POINT</option>
+            <option>KOORDINATOR</option>
+            <option>STAFF ADMIN</option>
+            <option>MANAGER OPERASIONAL</option>
+            <option>MANAGER KEUANGAN</option>
+            <option>MANAGER ADMINISTRASI</option>
+          </select>
         </div>
         <div class="form-group">
           <label>Departemen</label>
-          <input id="emp-department" placeholder="Operasional, Keuangan, dll" type="text">
+          <select id="emp-department">
+            <option value="">-- Pilih Departemen --</option>
+            <option>Administrasi</option>
+            <option>Operasional</option>
+            <option>Keuangan</option>
+          </select>
         </div>
-        <div class="form-group">
+        <div class="form-group form-span-2">
           <label>Cabang</label>
-          <input id="emp-branch" placeholder="Batam, Jakarta, dll" type="text">
+          <select id="emp-branch">
+            <option value="">-- Pilih Cabang --</option>
+            <option>ID Rifim Airport Jambi</option>
+            <option>ID Rifim Airport Batam</option>
+            <option>ID Rifim Airport Balikpapan</option>
+            <option>ID Rifim Airport Pekanbaru</option>
+            <option>ID Rifim Airport Manado</option>
+            <option>ID Rifim Airport Makassar</option>
+            <option>ID Rifim Airport Soeta</option>
+            <option>Head Office</option>
+          </select>
         </div>
         <div class="form-group">
           <label class="required">Tanggal Bergabung</label>
           <input id="emp-join" type="date">
         </div>
-        <div class="form-group">
+        <div class="form-group" id="emp-end-group">
           <label>Tanggal Berakhir Kontrak</label>
           <input id="emp-end" type="date">
         </div>
-        <div class="form-group">
+        <div class="form-group form-span-2">
           <label>Gaji Pokok (Rp)</label>
-          <input id="emp-salary" type="number" placeholder="0" min="0">
+          <input id="emp-salary" type="text" inputmode="numeric" placeholder="Rp 0" oninput="formatSalaryInput(this)">
         </div>
-        <div class="form-group">
-          <label>NIK KTP</label>
-          <input id="emp-nik" placeholder="16 digit NIK" type="text" maxlength="16">
+        <div class="form-group form-span-2">
+          <label>Foto KTP</label>
+          <div class="photo-upload-box" onclick="document.getElementById('emp-photo-ktp').click()">
+            <img id="ktp-preview" src="" alt="" style="display:none;max-height:90px;border-radius:4px">
+            <span id="ktp-placeholder">📎 Klik untuk upload foto KTP</span>
+          </div>
+          <input type="file" id="emp-photo-ktp" accept="image/*" style="display:none" onchange="previewPhoto(this,'ktp-preview','ktp-placeholder','emp-ktp-data')">
+          <input type="hidden" id="emp-ktp-data">
         </div>
-        <div class="form-group">
-          <label>NPWP</label>
-          <input id="emp-npwp" placeholder="xx.xxx.xxx.x-xxx.xxx" type="text">
+        <div class="form-group form-span-2">
+          <label>Foto 2×3</label>
+          <div class="photo-upload-box" onclick="document.getElementById('emp-photo-23').click()">
+            <img id="photo23-preview" src="" alt="" style="display:none;max-height:90px;border-radius:4px">
+            <span id="photo23-placeholder">📎 Klik untuk upload foto 2×3</span>
+          </div>
+          <input type="file" id="emp-photo-23" accept="image/*" style="display:none" onchange="previewPhoto(this,'photo23-preview','photo23-placeholder','emp-photo23-data')">
+          <input type="hidden" id="emp-photo23-data">
         </div>
         <div class="form-group">
           <label>Bank</label>
@@ -552,7 +598,7 @@ tr:last-child td{border-bottom:none}
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-add-employee')">Batal</button>
-      <button class="btn btn-primary" onclick="submitAddEmployee()">Simpan Karyawan</button>
+      <button class="btn btn-primary" id="btn-save-employee" onclick="submitAddEmployee()">Simpan Karyawan</button>
     </div>
   </div>
 </div>
@@ -919,6 +965,59 @@ function switchTab(tab, btn) {
 }
 
 // ════════════════════════════════════════════════════════════
+// EMPLOYEE ID AUTO-GENERATE
+// ════════════════════════════════════════════════════════════
+const EMP_PREFIX = { RIFIM: 'RIF', MIG: 'MIG', LAILAN: 'LAI' };
+const EMP_START  = { RIFIM: 23, MIG: 25, LAILAN: 26 };
+
+function generateEmployeeId(companyCode) {
+  const prefix = EMP_PREFIX[companyCode] || companyCode.substring(0,3).toUpperCase();
+  const floor  = (EMP_START[companyCode] || 1) - 1;
+  let maxNum = floor;
+  allEmployees.filter(e => e.company_code === companyCode).forEach(e => {
+    const m = (e.employee_id || '').match(/(\d+)$/);
+    if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+  });
+  return prefix + String(maxNum + 1).padStart(4, '0');
+}
+
+function openAddEmployeeModal() {
+  const company = document.getElementById('emp-company').value;
+  document.getElementById('emp-id').value = generateEmployeeId(company);
+  onEmpTypeChange();
+  openModal('modal-add-employee');
+}
+
+function onEmpCompanyChange() {
+  const company = document.getElementById('emp-company').value;
+  document.getElementById('emp-id').value = generateEmployeeId(company);
+}
+
+function onEmpTypeChange() {
+  const type = document.getElementById('emp-type').value;
+  document.getElementById('emp-end-group').style.display = type === 'PKWT' ? '' : 'none';
+}
+
+function formatSalaryInput(el) {
+  const raw = el.value.replace(/\D/g, '');
+  el.dataset.raw = raw;
+  el.value = raw ? 'Rp ' + parseInt(raw).toLocaleString('id-ID') : '';
+}
+
+function previewPhoto(input, previewId, placeholderId, hiddenId) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById(previewId).src = e.target.result;
+    document.getElementById(previewId).style.display = 'block';
+    document.getElementById(placeholderId).style.display = 'none';
+    document.getElementById(hiddenId).value = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ════════════════════════════════════════════════════════════
 // KARYAWAN
 // ════════════════════════════════════════════════════════════
 async function loadEmployees() {
@@ -1007,6 +1106,12 @@ async function viewEmployee(empId) {
 }
 
 async function submitAddEmployee() {
+  const btn = document.getElementById('btn-save-employee');
+  if (btn.disabled) return;
+
+  const salaryEl  = document.getElementById('emp-salary');
+  const salaryRaw = parseInt(salaryEl.dataset.raw || salaryEl.value.replace(/\D/g,'')) || 0;
+
   const data = {
     employee_id:     document.getElementById('emp-id').value.trim().toUpperCase(),
     full_name:       document.getElementById('emp-name').value.trim(),
@@ -1014,26 +1119,41 @@ async function submitAddEmployee() {
     phone:           document.getElementById('emp-phone').value.trim(),
     company_code:    document.getElementById('emp-company').value,
     employment_type: document.getElementById('emp-type').value,
-    position:        document.getElementById('emp-position').value.trim(),
-    department:      document.getElementById('emp-department').value.trim(),
-    branch:          document.getElementById('emp-branch').value.trim(),
+    position:        document.getElementById('emp-position').value,
+    department:      document.getElementById('emp-department').value,
+    branch:          document.getElementById('emp-branch').value,
     join_date:       document.getElementById('emp-join').value,
     end_date:        document.getElementById('emp-end').value || null,
-    salary_base:     parseFloat(document.getElementById('emp-salary').value) || 0,
-    nik:             document.getElementById('emp-nik').value.trim(),
-    npwp:            document.getElementById('emp-npwp').value.trim(),
+    salary_base:     salaryRaw,
+    photo_ktp:       document.getElementById('emp-ktp-data').value || null,
+    photo_2x3:       document.getElementById('emp-photo23-data').value || null,
     bank_name:       document.getElementById('emp-bank').value,
     bank_account:    document.getElementById('emp-account').value.trim(),
     address:         document.getElementById('emp-address').value.trim(),
     status:          'AKTIF',
   };
+
   if (!data.employee_id || !data.full_name || !data.company_code || !data.join_date) {
-    return showToast('Lengkapi field wajib.', 'error');
+    return showToast('Lengkapi field wajib: Nama dan Tanggal Bergabung.', 'error');
   }
+
+  btn.disabled = true;
+  btn.textContent = 'Menyimpan…';
   const res = await gasPost({ hrisAction: 'add_employee', data });
+  btn.disabled = false;
+  btn.textContent = 'Simpan Karyawan';
+
   if (res.success) {
     showToast('Karyawan berhasil ditambahkan!', 'success');
     closeModal('modal-add-employee');
+    // Reset form
+    ['emp-name','emp-email','emp-phone','emp-account','emp-address'].forEach(id => { document.getElementById(id).value = ''; });
+    ['emp-salary'].forEach(id => { const el = document.getElementById(id); el.value = ''; el.dataset.raw = ''; });
+    ['emp-ktp-data','emp-photo23-data'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('ktp-preview').style.display = 'none';
+    document.getElementById('ktp-placeholder').style.display = '';
+    document.getElementById('photo23-preview').style.display = 'none';
+    document.getElementById('photo23-placeholder').style.display = '';
     loadEmployees();
   } else {
     showToast('Gagal: ' + res.message, 'error');
