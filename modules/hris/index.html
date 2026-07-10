@@ -292,7 +292,10 @@ tr:last-child td{border-bottom:none}
       <div class="card">
         <div class="card-header">
           <h3>Data Karyawan</h3>
-          <button class="btn btn-primary" onclick="openAddEmployeeModal()">+ Tambah Karyawan</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary" onclick="exportEmployeesCSV()">⬇ Export CSV</button>
+            <button class="btn btn-primary" onclick="openAddEmployeeModal()">+ Tambah Karyawan</button>
+          </div>
         </div>
         <div class="card-body">
           <div class="toolbar">
@@ -370,7 +373,16 @@ tr:last-child td{border-bottom:none}
         </div>
         <div class="card-body">
           <div class="toolbar">
-            <input type="text" id="search-att-emp" placeholder="ID Karyawan…" style="max-width:200px">
+            <input type="text" id="search-att-emp" placeholder="ID / Nama Karyawan…" style="max-width:200px">
+            <select id="filter-att-dept">
+              <option value="ALL">Semua Departemen</option>
+              <option value="Operasional">Operasional</option>
+              <option value="Administrasi">Administrasi</option>
+              <option value="Keuangan">Keuangan</option>
+              <option value="HRD">HRD</option>
+              <option value="IT">IT</option>
+              <option value="Marketing">Marketing</option>
+            </select>
             <input type="date" id="att-date-from">
             <input type="date" id="att-date-to">
             <button class="btn btn-secondary" onclick="loadAttendance()">Tampilkan</button>
@@ -379,11 +391,11 @@ tr:last-child td{border-bottom:none}
             <table>
               <thead>
                 <tr>
-                  <th>ID Karyawan</th><th>Tanggal</th><th>Masuk</th><th>Keluar</th><th>Status</th><th>Keterangan</th>
+                  <th>ID Karyawan</th><th>Nama</th><th>Departemen</th><th>Tanggal</th><th>Masuk</th><th>Keluar</th><th>Status</th><th>Keterangan</th>
                 </tr>
               </thead>
               <tbody id="tbody-attendance">
-                <tr><td colspan="6" class="empty-state"><p>Pilih karyawan dan rentang tanggal lalu klik Tampilkan.</p></td></tr>
+                <tr><td colspan="8" class="empty-state"><p>Pilih karyawan dan rentang tanggal lalu klik Tampilkan.</p></td></tr>
               </tbody>
             </table>
           </div>
@@ -1178,6 +1190,36 @@ function filterEmployees() {
   renderEmployees(rows);
 }
 
+function exportEmployeesCSV() {
+  const q      = document.getElementById('search-emp').value.toLowerCase();
+  const status = document.getElementById('filter-status').value;
+  const type   = document.getElementById('filter-type').value;
+  const rows   = allEmployees.filter(r =>
+    (status === 'ALL' || r.status === status) &&
+    (type   === 'ALL' || r.employment_type === type) &&
+    (!q || r.full_name.toLowerCase().includes(q) ||
+           r.employee_id.toLowerCase().includes(q) ||
+           (r.position || '').toLowerCase().includes(q))
+  );
+  if (!rows.length) { showToast('Tidak ada data untuk diekspor.', 'error'); return; }
+
+  const headers = ['ID Karyawan','Nama','Jabatan','Departemen','Perusahaan','Tipe','Status','Tgl Bergabung','Email','No HP','Gaji Pokok','Cabang'];
+  const csvRows = [headers, ...rows.map(r => [
+    r.employee_id, r.full_name, r.position || '', r.department || '',
+    r.company_code, r.employment_type, r.status,
+    r.join_date ? r.join_date.slice(0,10) : '',
+    r.email || '', r.phone || '',
+    r.salary_base || '', r.branch || '',
+  ])];
+  const csv = csvRows.map(row => row.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'karyawan_' + selectedCompany + '_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click(); URL.revokeObjectURL(url);
+  showToast('CSV berhasil diunduh (' + rows.length + ' karyawan).', 'success');
+}
+
 function updateEmpStats(rows) {
   document.getElementById('stat-total').textContent = rows.length;
   document.getElementById('stat-aktif').textContent = rows.filter(r => r.status === 'AKTIF').length;
@@ -1487,31 +1529,48 @@ async function submitAddContract() {
 // ABSENSI
 // ════════════════════════════════════════════════════════════
 async function loadAttendance() {
-  const tbody   = document.getElementById('tbody-attendance');
-  const empId   = document.getElementById('search-att-emp').value.trim().toUpperCase();
+  const tbody    = document.getElementById('tbody-attendance');
+  const query    = document.getElementById('search-att-emp').value.trim().toUpperCase();
+  const dept     = document.getElementById('filter-att-dept').value;
   const dateFrom = document.getElementById('att-date-from').value;
   const dateTo   = document.getElementById('att-date-to').value;
 
-  tbody.innerHTML = '<tr><td colspan="6" class="loading">Memuat absensi…</td></tr>';
+  const empId = allEmployees.find(e =>
+    e.employee_id === query || e.full_name.toUpperCase().includes(query)
+  )?.employee_id || query;
+
+  tbody.innerHTML = '<tr><td colspan="8" class="loading">Memuat absensi…</td></tr>';
   const res = await gasGet({ action: 'hris_attendance', employee_id: empId, date_from: dateFrom, date_to: dateTo });
   if (!res.success) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><p>' + res.message + '</p></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><p>' + res.message + '</p></td></tr>';
     return;
   }
-  const rows = res.attendance || [];
+  let rows = res.attendance || [];
+
+  if (dept !== 'ALL') {
+    const deptEmpIds = new Set(allEmployees.filter(e => e.department === dept).map(e => e.employee_id));
+    rows = rows.filter(r => deptEmpIds.has(r.employee_id));
+  }
+
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><p>Tidak ada data absensi pada rentang ini.</p></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><p>Tidak ada data absensi pada filter ini.</p></td></tr>';
     return;
   }
+  const empMap = Object.fromEntries(allEmployees.map(e => [e.employee_id, e]));
   const statusColor = { HADIR:'aktif', IZIN:'pending', SAKIT:'warning', ALPHA:'ditolak', CUTI:'pkwt', DINAS:'disetujui' };
-  tbody.innerHTML = rows.map(r => `<tr>
-    <td>${r.employee_id}</td>
-    <td>${fmtDate(r.attendance_date)}</td>
-    <td>${r.check_in || '–'}</td>
-    <td>${r.check_out || '–'}</td>
-    <td><span class="badge badge-${statusColor[r.status] || 'pkwt'}">${r.status}</span></td>
-    <td>${r.notes || '–'}</td>
-  </tr>`).join('');
+  tbody.innerHTML = rows.map(r => {
+    const emp = empMap[r.employee_id] || {};
+    return `<tr>
+      <td>${r.employee_id}</td>
+      <td>${emp.full_name || '–'}</td>
+      <td>${emp.department || '–'}</td>
+      <td>${fmtDate(r.attendance_date)}</td>
+      <td>${r.check_in || '–'}</td>
+      <td>${r.check_out || '–'}</td>
+      <td><span class="badge badge-${statusColor[r.status] || 'pkwt'}">${r.status}</span></td>
+      <td>${r.notes || '–'}</td>
+    </tr>`;
+  }).join('');
 }
 
 async function submitAddAttendance() {

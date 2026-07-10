@@ -2,7 +2,7 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-07-10
+> Last updated: 2026-07-10 (Sprint 2 progress)
 
 ---
 
@@ -70,11 +70,18 @@ Status: ✅ Selesai
 
 ## Pending
 
-### Smart Office
-- [ ] QR Code pada dokumen (field `qr_url` sudah ada, belum diisi)
-- [ ] Email notifikasi (`notificationEngine.js` ada, belum diintegrasikan)
+### HRIS — Sprint 2 (sedang dikerjakan)
+- [x] Export rekap karyawan CSV (tombol di tab Karyawan)
+- [x] Filter absensi per departemen + tampilkan nama karyawan di tabel
+- [ ] Integrate PKWT generation dengan employee data (modal sudah ada, perlu test end-to-end)
+- [ ] Filter absensi per cabang (planned Sprint 3)
+- [ ] Setup GAS trigger untuk `notifCheckExpiringContracts()`
 
-### Modul Baru (Sprint 1+)
+### Smart Office
+- [x] QR Code pada dokumen — `qrEngine.js` + embed di PDF
+- [x] Email notifikasi — `notificationEngine.js` diintegrasikan ke `webApp.js`
+
+### Modul Baru (Sprint 3+)
 - [ ] **RAOS** — driver, staff, pickup point, KPI
 - [ ] **Finance** — cash flow, fee kantor, saldo driver, budget, laporan
 - [ ] **CRM** — airport, vendor, partner, client

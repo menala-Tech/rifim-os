@@ -8,10 +8,13 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
-### Planned
-- Template dokumen: Kwitansi, SP1/SP2/SP3, Proposal, MoU
-- QR Code pada dokumen
-- Email notifikasi
+### In Progress — HRIS Sprint 2
+- [x] Export rekap karyawan CSV (filter sesuai tampilan aktif)
+- [x] Filter absensi per departemen + kolom nama karyawan di tabel absensi
+- [ ] Test PKWT generation end-to-end dari kontrak baru
+- [ ] Setup trigger notifCheckExpiringContracts()
+
+### Planned — Sprint 3+
 - Modul RAOS (driver, staff, pickup point, KPI)
 - Modul Finance (cash flow, saldo driver, budget)
 - Modul CRM (airport, vendor, partner, client)
