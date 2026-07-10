@@ -44,7 +44,7 @@
 
 ### STEP 5 — Verifikasi Sheet
 
-Spreadsheet sekarang punya **4 sheet**:
+Spreadsheet sekarang punya **6 sheet**:
 
 | Sheet | Isi |
 |---|---|
@@ -52,6 +52,8 @@ Spreadsheet sekarang punya **4 sheet**:
 | `numbering_sequences` | Penomoran otomatis per jenis dokumen |
 | `company_config` | Konfigurasi perusahaan & Google Drive IDs |
 | `doc_types` | Referensi 20 jenis dokumen |
+| `employees` | Data karyawan sync dari HRIS (Supabase) |
+| `activity_log` | Log semua aktivitas: LOGIN, LOGOUT, TAMBAH, EDIT, RESIGN, BUAT DOKUMEN |
 
 ---
 
