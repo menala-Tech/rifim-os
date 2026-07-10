@@ -253,10 +253,12 @@ tr:last-child td{border-bottom:none}
 <div id="app">
   <header>
     <div class="header-left">
+      <img src="/branding/logo/rifim-logo.png" alt="RIFIM" style="height:30px;object-fit:contain;filter:brightness(0) invert(1)" onerror="this.style.display='none'">
       <span class="header-logo">RIFIM OS</span>
       <span class="header-module">HRIS</span>
     </div>
     <div class="header-right">
+      <button class="btn-ghost" onclick="window.location.href='/portal'" style="color:#fff;border-color:rgba(255,255,255,.2);font-size:12px">← Portal</button>
       <select id="company-selector" onchange="onCompanyChange()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:4px 10px;border-radius:6px;font-size:12px">
         <option value="ALL">Semua Perusahaan</option>
         <option value="RIFIM">PT. RIFIM</option>
@@ -823,6 +825,122 @@ tr:last-child td{border-bottom:none}
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-employee-detail')">Tutup</button>
+      <button class="btn btn-warning" onclick="confirmResign()" id="btn-resign-emp">Resign</button>
+      <button class="btn btn-primary" onclick="openEditModal()" id="btn-edit-emp">✏️ Edit</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Edit Karyawan -->
+<div class="modal-overlay" id="modal-edit-employee">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="edit-emp-title">Edit Karyawan</h3>
+      <button class="modal-close" onclick="closeModal('modal-edit-employee')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>ID Karyawan</label>
+          <input id="edit-emp-id" type="text" readonly>
+        </div>
+        <div class="form-group">
+          <label class="required">Nama Lengkap</label>
+          <input id="edit-emp-name" type="text">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input id="edit-emp-email" type="email">
+        </div>
+        <div class="form-group">
+          <label>No. HP</label>
+          <input id="edit-emp-phone" type="text">
+        </div>
+        <div class="form-group">
+          <label class="required">Tipe Kontrak</label>
+          <select id="edit-emp-type" onchange="onEditTypeChange()">
+            <option value="PKWT">PKWT (Kontrak)</option>
+            <option value="PKWTT">PKWTT (Tetap)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="edit-emp-status">
+            <option value="AKTIF">AKTIF</option>
+            <option value="NONAKTIF">NONAKTIF</option>
+            <option value="RESIGN">RESIGN</option>
+            <option value="PHK">PHK</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Jabatan</label>
+          <select id="edit-emp-position">
+            <option value="">-- Pilih Jabatan --</option>
+            <option>STAFF KONTER</option>
+            <option>PICKUP POINT</option>
+            <option>KOORDINATOR</option>
+            <option>STAFF ADMIN</option>
+            <option>MANAGER OPERASIONAL</option>
+            <option>MANAGER KEUANGAN</option>
+            <option>MANAGER ADMINISTRASI</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Departemen</label>
+          <select id="edit-emp-department">
+            <option value="">-- Pilih Departemen --</option>
+            <option>Administrasi</option>
+            <option>Operasional</option>
+            <option>Keuangan</option>
+          </select>
+        </div>
+        <div class="form-group form-span-2">
+          <label>Cabang</label>
+          <select id="edit-emp-branch">
+            <option value="">-- Pilih Cabang --</option>
+            <option>ID Rifim Airport Jambi</option>
+            <option>ID Rifim Airport Batam</option>
+            <option>ID Rifim Airport Balikpapan</option>
+            <option>ID Rifim Airport Pekanbaru</option>
+            <option>ID Rifim Airport Manado</option>
+            <option>ID Rifim Airport Makassar</option>
+            <option>ID Rifim Airport Soeta</option>
+            <option>Head Office</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tanggal Bergabung</label>
+          <input id="edit-emp-join" type="date">
+        </div>
+        <div class="form-group" id="edit-emp-end-group">
+          <label>Tanggal Berakhir Kontrak</label>
+          <input id="edit-emp-end" type="date">
+        </div>
+        <div class="form-group form-span-2">
+          <label>Gaji Pokok (Rp)</label>
+          <input id="edit-emp-salary" type="text" inputmode="numeric" placeholder="Rp 0" oninput="formatSalaryInput(this)">
+        </div>
+        <div class="form-group">
+          <label>Bank</label>
+          <select id="edit-emp-bank">
+            <option value="">-- Pilih Bank --</option>
+            <option>BCA</option><option>BRI</option><option>BNI</option>
+            <option>Mandiri</option><option>BSI</option><option>CIMB</option><option>Danamon</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>No. Rekening</label>
+          <input id="edit-emp-account" type="text">
+        </div>
+        <div class="form-group form-span-2">
+          <label>Alamat</label>
+          <textarea id="edit-emp-address" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-employee')">Batal</button>
+      <button class="btn btn-primary" id="btn-save-edit" onclick="submitEditEmployee()">Simpan Perubahan</button>
     </div>
   </div>
 </div>
@@ -838,11 +956,12 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbx9_RVyi_58XIeSH-fvrg7C
 // ════════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════════
-let currentUser  = null;
-let allEmployees = [];
-let allContracts = [];
-let allLeave     = [];
-let allPayroll   = [];
+let currentUser    = null;
+let currentViewEmp = null;
+let allEmployees   = [];
+let allContracts   = [];
+let allLeave       = [];
+let allPayroll     = [];
 let selectedCompany = localStorage.getItem('rifim_company') || 'ALL';
 
 // ════════════════════════════════════════════════════════════
@@ -877,7 +996,7 @@ function showAuthError(msg) {
 
 function doLogout() {
   sessionStorage.removeItem('hris_user');
-  localStorage.removeItem('rifim_auth');
+  // Jangan hapus rifim_auth — session Portal tetap aktif
   window.location.href = '/portal';
 }
 
@@ -885,9 +1004,8 @@ document.getElementById('auth-email').addEventListener('keydown', e => {
   if (e.key === 'Enter') doLogin();
 });
 
-// Auto-login: cek session HRIS atau SSO dari portal
+// Auto-login: cek session HRIS di tab ini saja (bukan SSO portal)
 (function checkSession() {
-  // 1. Session HRIS sendiri
   const saved = sessionStorage.getItem('hris_user');
   if (saved) {
     try {
@@ -896,25 +1014,9 @@ document.getElementById('auth-email').addEventListener('keydown', e => {
       document.getElementById('app').style.display       = 'flex';
       document.getElementById('user-badge').textContent  = currentUser.full_name + ' (' + currentUser.role + ')';
       initApp();
-      return;
     } catch(e) { sessionStorage.removeItem('hris_user'); }
   }
-  // 2. SSO dari portal (localStorage)
-  const portalRaw = localStorage.getItem('rifim_auth');
-  if (portalRaw) {
-    try {
-      const auth = JSON.parse(portalRaw);
-      if (Date.now() - (auth.ts || 0) < 8 * 60 * 60 * 1000) {
-        currentUser = auth;
-        sessionStorage.setItem('hris_user', JSON.stringify(auth));
-        document.getElementById('auth-gate').style.display = 'none';
-        document.getElementById('app').style.display       = 'flex';
-        document.getElementById('user-badge').textContent  = auth.full_name + ' (' + auth.role + ')';
-        initApp();
-        return;
-      }
-    } catch(e) { localStorage.removeItem('rifim_auth'); }
-  }
+  // Masuk ke HRIS selalu perlu login email tersendiri
 })();
 
 // ════════════════════════════════════════════════════════════
@@ -1081,6 +1183,7 @@ function updateEmpStats(rows) {
 async function viewEmployee(empId) {
   const emp = allEmployees.find(r => r.employee_id === empId);
   if (!emp) return;
+  currentViewEmp = emp;
   document.getElementById('detail-emp-name').textContent = emp.full_name;
   document.getElementById('modal-detail-body').innerHTML = `
     <div class="detail-grid">
@@ -1094,15 +1197,108 @@ async function viewEmployee(empId) {
       ${dRow('Berakhir', emp.end_date ? fmtDate(emp.end_date) : '–')}
       ${dRow('Email', emp.email || '–')}
       ${dRow('No. HP', emp.phone || '–')}
-      ${dRow('NIK', emp.nik || '–')}
-      ${dRow('NPWP', emp.npwp || '–')}
       ${dRow('Bank', emp.bank_name ? emp.bank_name + ' — ' + (emp.bank_account || '–') : '–')}
       ${dRow('Gaji Pokok', emp.salary_base ? 'Rp ' + fmtNum(emp.salary_base) : '–')}
       ${dRow('Cabang', emp.branch || '–')}
     </div>
     ${emp.address ? `<div style="margin-top:12px"><div class="detail-label">Alamat</div><div class="detail-value">${emp.address}</div></div>` : ''}
+    ${(emp.photo_ktp || emp.photo_2x3) ? `<div style="margin-top:16px;display:flex;gap:12px">
+      ${emp.photo_ktp  ? `<div><div class="detail-label" style="margin-bottom:4px">Foto KTP</div><img src="${emp.photo_ktp}"  style="max-height:100px;border-radius:6px;border:1px solid #eee"></div>` : ''}
+      ${emp.photo_2x3  ? `<div><div class="detail-label" style="margin-bottom:4px">Foto 2×3</div><img src="${emp.photo_2x3}" style="max-height:100px;border-radius:6px;border:1px solid #eee"></div>` : ''}
+    </div>` : ''}
   `;
+  // Sembunyikan Resign jika sudah RESIGN/PHK
+  document.getElementById('btn-resign-emp').style.display =
+    (emp.status === 'RESIGN' || emp.status === 'PHK') ? 'none' : '';
   openModal('modal-employee-detail');
+}
+
+function openEditModal() {
+  const emp = currentViewEmp;
+  if (!emp) return;
+  closeModal('modal-employee-detail');
+  document.getElementById('edit-emp-title').textContent = 'Edit — ' + emp.full_name;
+  document.getElementById('edit-emp-id').value       = emp.employee_id;
+  document.getElementById('edit-emp-name').value     = emp.full_name;
+  document.getElementById('edit-emp-email').value    = emp.email || '';
+  document.getElementById('edit-emp-phone').value    = emp.phone || '';
+  document.getElementById('edit-emp-type').value     = emp.employment_type || 'PKWT';
+  document.getElementById('edit-emp-status').value   = emp.status || 'AKTIF';
+  document.getElementById('edit-emp-join').value     = emp.join_date || '';
+  document.getElementById('edit-emp-end').value      = emp.end_date || '';
+  document.getElementById('edit-emp-account').value  = emp.bank_account || '';
+  document.getElementById('edit-emp-address').value  = emp.address || '';
+
+  const salaryEl = document.getElementById('edit-emp-salary');
+  salaryEl.dataset.raw = emp.salary_base || '';
+  salaryEl.value = emp.salary_base ? 'Rp ' + parseInt(emp.salary_base).toLocaleString('id-ID') : '';
+
+  // Dropdown: set value yang cocok
+  ['edit-emp-position','edit-emp-department','edit-emp-branch','edit-emp-bank'].forEach(id => {
+    const el  = document.getElementById(id);
+    const key = id.replace('edit-emp-','').replace('position','position').replace('department','department').replace('branch','branch').replace('bank','bank_name');
+    const val = emp[key] || emp[id.replace('edit-emp-','')] || '';
+    el.value  = val;
+  });
+  // fallback bank
+  document.getElementById('edit-emp-bank').value = emp.bank_name || '';
+
+  onEditTypeChange();
+  openModal('modal-edit-employee');
+}
+
+function onEditTypeChange() {
+  const type = document.getElementById('edit-emp-type').value;
+  document.getElementById('edit-emp-end-group').style.display = type === 'PKWT' ? '' : 'none';
+}
+
+async function submitEditEmployee() {
+  const btn = document.getElementById('btn-save-edit');
+  if (btn.disabled) return;
+  const salaryEl  = document.getElementById('edit-emp-salary');
+  const salaryRaw = parseInt(salaryEl.dataset.raw || salaryEl.value.replace(/\D/g,'')) || 0;
+  const data = {
+    full_name:       document.getElementById('edit-emp-name').value.trim(),
+    email:           document.getElementById('edit-emp-email').value.trim(),
+    phone:           document.getElementById('edit-emp-phone').value.trim(),
+    employment_type: document.getElementById('edit-emp-type').value,
+    status:          document.getElementById('edit-emp-status').value,
+    position:        document.getElementById('edit-emp-position').value,
+    department:      document.getElementById('edit-emp-department').value,
+    branch:          document.getElementById('edit-emp-branch').value,
+    join_date:       document.getElementById('edit-emp-join').value,
+    end_date:        document.getElementById('edit-emp-end').value || null,
+    salary_base:     salaryRaw,
+    bank_name:       document.getElementById('edit-emp-bank').value,
+    bank_account:    document.getElementById('edit-emp-account').value.trim(),
+    address:         document.getElementById('edit-emp-address').value.trim(),
+  };
+  if (!data.full_name) return showToast('Nama tidak boleh kosong.', 'error');
+  btn.disabled = true; btn.textContent = 'Menyimpan…';
+  const empId = document.getElementById('edit-emp-id').value;
+  const res   = await gasPost({ hrisAction: 'update_employee', employee_id: empId, data });
+  btn.disabled = false; btn.textContent = 'Simpan Perubahan';
+  if (res.success) {
+    showToast('Data karyawan berhasil diperbarui.', 'success');
+    closeModal('modal-edit-employee');
+    loadEmployees();
+  } else {
+    showToast('Gagal: ' + res.message, 'error');
+  }
+}
+
+async function confirmResign() {
+  const emp = currentViewEmp;
+  if (!emp) return;
+  if (!confirm('Tandai ' + emp.full_name + ' sebagai RESIGN?\nStatus akan berubah menjadi RESIGN.')) return;
+  const res = await gasPost({ hrisAction: 'update_employee', employee_id: emp.employee_id, data: { status: 'RESIGN' } });
+  if (res.success) {
+    showToast(emp.full_name + ' ditandai RESIGN.', 'success');
+    closeModal('modal-employee-detail');
+    loadEmployees();
+  } else {
+    showToast('Gagal: ' + res.message, 'error');
+  }
 }
 
 async function submitAddEmployee() {

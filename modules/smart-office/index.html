@@ -1051,11 +1051,10 @@
   }
 
   function doLogout() {
-    if (!confirm('Keluar dari RIFIM OS?')) return;
-    localStorage.removeItem('rifim_auth');
-    closeSidebar();
-    showLoginScreen();
-    document.getElementById('loginEmail').value = '';
+    if (!confirm('Keluar dari Smart Office?')) return;
+    // Jangan hapus rifim_auth — session Portal tetap aktif
+    sessionStorage.removeItem('so_user');
+    window.location.href = '/portal';
   }
 
   // ── SIDEBAR ──────────────────────────────────────────────────
