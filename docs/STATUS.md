@@ -32,7 +32,7 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | Batch | Sistem | Script Dibaca | Status |
 |-------|--------|--------------|--------|
 | 1 | Isi Saldo + Absensi + Target Staff | ✅ Semua (Main, Matching, MonitoringSaldo, Absensi, DBDriverSync, LaporanCabang, Reliability) | ✅ Analisa Mendalam |
-| 2 | Database Driver External | ⚠️ Screenshot saja | ⏳ Belum mendalam |
+| 2 | Database Driver External | ✅ Spreadsheet dibaca langsung | ✅ Analisa Mendalam |
 | 3 | Database Driver Airport | ⚠️ Screenshot saja | ⏳ Belum mendalam |
 | 4 | Potongan Order (CONFIG_FEE_KANTOR) | ⚠️ Screenshot saja | ⏳ Belum mendalam |
 | 5 | Potongan Daily | ⚠️ Screenshot saja | ⏳ Belum mendalam |
@@ -48,6 +48,7 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | Batch | Smart Office | HRIS | RAOS | Finance | CRM | Dashboard |
 |-------|-------------|------|------|---------|-----|-----------|
 | 1 — Isi Saldo | — | Absensi, KPI | Monitoring saldo, SLA alert | Nominal per cabang | — | Target staff |
+| 2 — DB Driver External | — | — | Master driver (type=external), CRUD admin, lookup ID Maxim | Laporan driver per cabang | — | Jumlah driver aktif |
 | 9 — Payroll | — | Payroll, Absensi, Kontrak | Performa ops | Gaji, Lembur, Bonus | — | KPI cabang |
 | 11 — Finance | — | — | — | Pemasukan/Pengeluaran, PDF, rekap | — | Revenue, margin |
 
