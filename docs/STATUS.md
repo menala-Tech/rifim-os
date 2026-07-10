@@ -38,9 +38,9 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | 5 | Potongan Daily | ✅ Excel dibaca langsung (XML parsing) — 3 sheet: Jambi Luar+Airport, Manado, Pekanbaru | ✅ Analisa Mendalam |
 | 6 | Iuran Rifim Batam | ✅ Excel dibaca langsung — 156 row, status DISPENSASI/NON AKTIF/NEW/parsial, split 50/25/25 | ✅ Analisa Mendalam |
 | 7 | RADMS (Airport Queue System) | ⚠️ Nama file saja | ⏳ Belum mendalam |
-| 8 | Database Staff | ⚠️ Link saja | ⏳ Belum mendalam |
+| 8 | Database Staff | ✅ Excel dibaca (9 sheet) — SSoT 30 staff, KPI 5 pilar harian, grade A+-E, MASTER TARGET per cabang | ✅ Analisa Mendalam |
 | 9 | Perhitungan Gaji Staff (user: Batch 7) | ✅ GAS script + Spreadsheet aktual dibaca — 6 sheet, 28 staff, Rp75.418.000/bulan, cutover absensi 1 Jul 2026 | ✅ Analisa Mendalam |
-| 10 | Pendapatan / Pembagian | ⚠️ Screenshot saja | ⏳ Belum mendalam |
+| 10 | Pendapatan FEE External | ✅ Excel dibaca — revenue Rp3.973.500/bulan dari fee manajemen akun driver (ASK, saldo, akun baru, surcharge) | ✅ Analisa Mendalam |
 | 11 | Finance Pemasukan & Pengeluaran | ✅ Semua (whatsapp, email, utilities, config) | ✅ Analisa Mendalam |
 
 ### Mapping Batch → Modul RIFIM OS (Sementara)
