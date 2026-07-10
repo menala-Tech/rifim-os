@@ -76,9 +76,16 @@ Status: 🔄 In Progress
 - [x] Tabel absensi tampilkan kolom Nama + Departemen
 - [x] Search absensi by nama (input `ID / Nama Karyawan…`)
 
+### Selesai (Lanjutan)
+- [x] `waEngine.js` — WA Engine umum (Fonnte) untuk semua modul: send ke nomor, send ke grup, batch send, template HRIS/Finance/RAOS/Smart Office
+- [x] `notificationEngine.js` — update: WA terintegrasi di semua notifikasi (dokumen baru, kontrak berakhir, slip gaji, cuti, payroll siap, Finance harian/bulanan, saldo driver rendah)
+- [x] `configLoader.js` — update: RIFIM_BRANCHES, CABANG_BEBAS_DENDA, dokumentasi setup Fonnte
+
 ### Belum Selesai
+- [ ] Jalankan `setupWaEngine('4QpkJarRsMd848m8Snye', '120363428871368682@g.us')` dari GAS Editor (sekali)
 - [ ] Test PKWT generation end-to-end dari modal "Kontrak Baru"
 - [ ] Setup GAS time trigger `notifCheckExpiringContracts()` (tiap hari)
+- [ ] Setup GAS trigger `setupTriggerPayrollSiap()` (hari ke-28 jam 08:00)
 
 ---
 

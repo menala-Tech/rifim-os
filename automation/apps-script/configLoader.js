@@ -83,3 +83,38 @@ function getCompanyByCode(code) {
   }
   return null;
 }
+
+// ─── Cabang Operasional ───────────────────────────────────────
+
+/**
+ * Daftar cabang resmi PT. RIFIM Internasional Gemilang.
+ * Dipakai oleh RAOS, Finance, Payroll untuk normalisasi nama cabang.
+ */
+var RIFIM_BRANCHES = [
+  'ID Rifim Airport Batam',
+  'ID Rifim Batam',
+  'ID Rifim Airport Pekanbaru',
+  'ID Rifim Airport Jambi',
+  'ID Rifim Jambi Luar',
+  'ID Rifim Airport Balikpapan',
+  'ID Rifim Airport Manado',
+  'Operasional',
+  'ID Rifim Airport Makassar',
+  'ID Massage Batam/Jakarta',
+];
+
+/** Cabang yang bebas denda keterlambatan (Payroll). */
+var CABANG_BEBAS_DENDA = ['ID Rifim Airport Jambi', 'ID Rifim Airport Manado'];
+
+// ─── WhatsApp / Fonnte Setup ──────────────────────────────────
+//
+// FONNTE_TOKEN dan WA_GROUP_ID disimpan di PropertiesService (BUKAN hardcode di sini).
+// Jalankan fungsi berikut SEKALI dari GAS Editor untuk mendaftarkan nilainya:
+//
+//   setupWaEngine('4QpkJarRsMd848m8Snye', '120363428871368682@g.us');
+//
+// Untuk mengambil nilai dari kode lain, gunakan fungsi di waEngine.js:
+//   _getFonnteToken()  → FONNTE_TOKEN
+//   _getWaGroupId()    → WA_GROUP_ID
+//
+// ─────────────────────────────────────────────────────────────

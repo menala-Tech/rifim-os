@@ -1,6 +1,12 @@
 /**
  * RIFIM OS — Notification Engine
  * Phase 2 Engine: Email & WhatsApp Notifications
+ *
+ * Email  → GmailApp (langsung, tanpa token eksternal)
+ * WA     → waEngine.js (Fonnte API)
+ *
+ * Setiap fungsi notifXxx() kirim dua kanal sekaligus: email + WA.
+ * WA selalu try/catch non-fatal agar kegagalan WA tidak block email.
  */
 
 /**
@@ -47,7 +53,17 @@ function notifDocumentCreated(params) {
   try {
     notifSendEmail('rifiminternationalgemilang@gmail.com', subject, html, { name: 'RIFIM Smart Office' });
   } catch (err) {
-    Logger.log('notifDocumentCreated gagal (non-fatal): ' + err.message);
+    Logger.log('notifDocumentCreated email gagal (non-fatal): ' + err.message);
+  }
+  try {
+    waSendToGroup(waBuildPesanDokumenBaru({
+      nomorDokumen: params.documentNumber,
+      jenisDokumen: params.documentType,
+      perihal:      params.subject,
+      createdBy:    params.createdBy,
+    }));
+  } catch (errWa) {
+    Logger.log('notifDocumentCreated WA gagal (non-fatal): ' + errWa.message);
   }
 }
 
@@ -79,6 +95,16 @@ function notifCheckExpiringContracts() {
         '<p style="margin-top:16px">Mohon segera ditindaklanjuti.</p>',
     });
     notifSendEmail('rifiminternationalgemilang@gmail.com', subject, html);
+    try {
+      waSendToGroup(waBuildPesanKontrakHampirBerakhir({
+        namaKaryawan:  emp.full_name,
+        idKaryawan:    emp.employee_id,
+        tanggalBerakhir: c.end_date,
+        sisaHari:      daysLeft,
+      }));
+    } catch (errWa) {
+      Logger.log('notifCheckExpiringContracts WA gagal (non-fatal): ' + errWa.message);
+    }
   });
 }
 
@@ -104,6 +130,18 @@ function notifLeaveStatusChanged(employee, leave) {
   });
   if (employee.email) notifSendEmail(employee.email, subject, html);
   notifSendEmail('rifiminternationalgemilang@gmail.com', subject, html, { name: 'RIFIM OS HRIS' });
+  // WA ke grup — khusus yang DISETUJUI agar tidak spam
+  if (leave.status === 'DISETUJUI') {
+    try {
+      waSendToGroup(
+        '📋 *Cuti Disetujui*\n' + employee.full_name + '\n' +
+        leave.leave_type + ' — ' + leave.start_date + ' s/d ' + leave.end_date +
+        ' (' + leave.total_days + ' hari)\n_RIFIM OS — HRIS_'
+      );
+    } catch (errWa) {
+      Logger.log('notifLeaveStatusChanged WA gagal (non-fatal): ' + errWa.message);
+    }
+  }
 }
 
 /**
@@ -123,6 +161,125 @@ function notifPayslipReady(employee, payroll) {
       (payroll.pdf_url  ? '<p><a href="' + payroll.pdf_url  + '" style="color:#1a1a2e">📥 Download PDF</a></p>'   : ''),
   });
   if (employee.email) notifSendEmail(employee.email, subject, html);
+  // WA ke nomor individu (jika nomor HP tersedia)
+  if (employee.phone) {
+    try {
+      waSendToNumber(
+        waNormalisasiNomor(employee.phone),
+        waBuildPesanSlipGaji(employee.full_name, period, payroll.pdf_url || payroll.gdoc_url || '-')
+      );
+    } catch (errWa) {
+      Logger.log('notifPayslipReady WA gagal (non-fatal): ' + errWa.message);
+    }
+  }
+}
+
+/**
+ * Notifikasi payroll siap diproses (akhir bulan, trigger bulanan).
+ * Setup trigger via: ScriptApp.newTrigger('notifPayrollSiapDiproses').timeBased().onMonthDay(28).atHour(8).create()
+ *
+ * @param {{ periode, jumlahStaff, estimasiTotal, jumlahCabang }} params
+ */
+function notifPayrollSiapDiproses(params) {
+  params = params || {};
+  var period = params.periode || waFormatPeriode(new Date());
+  var subject = '[RIFIM OS] Payroll Siap Diproses — ' + period;
+  var html = _emailTemplate({
+    title: 'Payroll Siap Diproses',
+    content:
+      '<p>Yth. Tim Keuangan & HRD,</p>' +
+      '<p>Proses penggajian untuk periode <strong>' + period + '</strong> siap dijalankan.</p>' +
+      '<table style="border-collapse:collapse;width:100%">' +
+      _tr('Periode',    period) +
+      _tr('Jumlah Staff',  (params.jumlahStaff  || '-') + ' orang') +
+      _tr('Jumlah Cabang', (params.jumlahCabang || '-')) +
+      _tr('Estimasi Total', params.estimasiTotal ? 'Rp ' + Number(params.estimasiTotal).toLocaleString('id-ID') : '-') +
+      '</table>' +
+      '<p style="margin-top:16px">Segera jalankan <strong>Hitung Gaji</strong> dan <strong>Tutup Buku</strong> bulan ini.</p>',
+  });
+  try {
+    notifSendEmail('rifiminternationalgemilang@gmail.com', subject, html, { name: 'RIFIM OS Payroll' });
+  } catch (err) {
+    Logger.log('notifPayrollSiapDiproses email gagal (non-fatal): ' + err.message);
+  }
+  try {
+    waSendToGroup(waBuildPesanPayrollSiap({
+      periode:       period,
+      jumlahStaff:   params.jumlahStaff   || 0,
+      jumlahCabang:  params.jumlahCabang  || 0,
+      estimasiTotal: params.estimasiTotal || 0,
+    }));
+  } catch (errWa) {
+    Logger.log('notifPayrollSiapDiproses WA gagal (non-fatal): ' + errWa.message);
+  }
+}
+
+/**
+ * Buat trigger bulanan untuk notifPayrollSiapDiproses (hari ke-28 jam 08:00).
+ * Jalankan SEKALI dari GAS Editor.
+ */
+function setupTriggerPayrollSiap() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'notifPayrollSiapDiproses') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('notifPayrollSiapDiproses')
+    .timeBased().onMonthDay(28).atHour(8).inTimezone('Asia/Jakarta').create();
+  Logger.log('Trigger notifPayrollSiapDiproses aktif: hari ke-28 jam 08:00 WIB');
+}
+
+/**
+ * Notifikasi rekap keuangan harian ke grup WA + email admin.
+ * Dipanggil dari Finance module.
+ *
+ * @param {Array<{nama, pemasukan, pengeluaran, net, status}>} cabangList
+ * @param {string} tanggal
+ */
+function notifRekapFinanceHarian(cabangList, tanggal) {
+  try {
+    waSendToGroup(waBuildRingkasanHarian(cabangList, tanggal));
+  } catch (errWa) {
+    Logger.log('notifRekapFinanceHarian WA gagal (non-fatal): ' + errWa.message);
+  }
+}
+
+/**
+ * Notifikasi rekap keuangan bulanan ke grup WA + email admin.
+ * Dipanggil dari Finance module.
+ *
+ * @param {Array<{nama, pemasukan, pengeluaran, net, margin, status}>} cabangList
+ * @param {string} bulan
+ */
+function notifRekapFinanceBulanan(cabangList, bulan) {
+  try {
+    waSendToGroup(waBuildRingkasanBulanan(cabangList, bulan));
+  } catch (errWa) {
+    Logger.log('notifRekapFinanceBulanan WA gagal (non-fatal): ' + errWa.message);
+  }
+}
+
+/**
+ * Notifikasi saldo driver rendah (RAOS).
+ *
+ * @param {{ namaDriver, idDriver, saldo, cabang, noWA? }} params
+ */
+function notifSaldoDriverRendah(params) {
+  // Kirim ke grup manajemen
+  try {
+    waSendToGroup(waBuildPesanSaldoRendah(params));
+  } catch (errWa) {
+    Logger.log('notifSaldoDriverRendah grup WA gagal (non-fatal): ' + errWa.message);
+  }
+  // Kirim ke driver langsung (jika ada nomor WA)
+  if (params.noWA) {
+    try {
+      waSendToNumber(
+        waNormalisasiNomor(params.noWA),
+        waBuildPesanSaldoRendah(params)
+      );
+    } catch (errWa2) {
+      Logger.log('notifSaldoDriverRendah driver WA gagal (non-fatal): ' + errWa2.message);
+    }
+  }
 }
 
 // ─── Private Helpers ─────────────────────────────────────────────
