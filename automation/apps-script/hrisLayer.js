@@ -15,11 +15,24 @@ var SUPABASE_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co';
  * Ganti 'PASTE_SERVICE_ROLE_KEY_HERE' dengan key dari Supabase Dashboard → Settings → API.
  */
 function setupHrisConfig() {
+  // URL HARUS format: https://[project-id].supabase.co
+  // BUKAN URL dashboard: https://supabase.com/dashboard/project/...
+  var correctUrl = 'https://vlievtojpmrbsmzlqswl.supabase.co';
   PropertiesService.getScriptProperties().setProperties({
-    'SUPABASE_URL':         SUPABASE_URL,
+    'SUPABASE_URL':         correctUrl,
     'SUPABASE_SERVICE_KEY': 'PASTE_SERVICE_ROLE_KEY_HERE',
   });
-  Logger.log('HRIS config tersimpan. Ganti SUPABASE_SERVICE_KEY dengan nilai asli!');
+  Logger.log('URL tersimpan: ' + correctUrl);
+  Logger.log('Ganti SUPABASE_SERVICE_KEY dengan service_role key asli, lalu run lagi!');
+}
+
+function verifyHrisConfig() {
+  var props = PropertiesService.getScriptProperties();
+  var url   = props.getProperty('SUPABASE_URL') || '(tidak ada)';
+  var key   = props.getProperty('SUPABASE_SERVICE_KEY') || '(tidak ada)';
+  Logger.log('SUPABASE_URL  : ' + url);
+  Logger.log('SERVICE_KEY   : ' + (key.length > 10 ? key.substring(0,12) + '...' : key));
+  Logger.log('URL valid?    : ' + (url === 'https://vlievtojpmrbsmzlqswl.supabase.co' ? 'YA' : 'SALAH - harus https://vlievtojpmrbsmzlqswl.supabase.co'));
 }
 
 // ─── EMPLOYEES ────────────────────────────────────────────────────
