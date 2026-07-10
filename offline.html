@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#C40000">
+  <title>RIFIM OS — Offline</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --red:   #C40000;
+      --dark:  #111111;
+      --dark2: #1E1E1E;
+      --mid:   #666666;
+      --white: #FFFFFF;
+    }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--dark);
+      color: var(--white);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      text-align: center;
+      max-width: 420px;
+      width: 100%;
+    }
+    .logo-box {
+      width: 64px; height: 64px;
+      background: var(--red);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 28px;
+      font-size: 32px; font-weight: 900; color: white;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(196,0,0,.15);
+      border: 1px solid rgba(196,0,0,.4);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 12px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; color: #FF6B6B;
+      margin-bottom: 24px;
+    }
+    .pulse {
+      width: 8px; height: 8px;
+      background: #FF6B6B;
+      border-radius: 50%;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: .4; transform: scale(.7); }
+    }
+    h1 {
+      font-size: 28px; font-weight: 900;
+      margin-bottom: 12px; line-height: 1.2;
+    }
+    h1 span { color: var(--red); }
+    p {
+      font-size: 14px; color: rgba(255,255,255,.5);
+      line-height: 1.75; margin-bottom: 36px;
+    }
+    .tips {
+      background: #1E1E1E;
+      border-radius: 12px;
+      padding: 20px 24px;
+      text-align: left;
+      margin-bottom: 32px;
+    }
+    .tips-title {
+      font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+      text-transform: uppercase; color: rgba(255,255,255,.4);
+      margin-bottom: 14px;
+    }
+    .tip {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 13px; color: rgba(255,255,255,.6);
+      padding: 6px 0;
+    }
+    .tip-icon { font-size: 16px; flex-shrink: 0; }
+    .btn-retry {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 13px 28px;
+      background: var(--red); color: white;
+      border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 700;
+      cursor: pointer; text-decoration: none;
+      transition: background .15s;
+    }
+    .btn-retry:hover { background: #a30000; }
+    .version {
+      margin-top: 32px;
+      font-size: 11px; color: rgba(255,255,255,.2);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo-box">R</div>
+
+    <div class="badge">
+      <div class="pulse"></div>
+      Tidak Ada Koneksi
+    </div>
+
+    <h1>RIFIM OS<br><span>Sedang Offline</span></h1>
+    <p>
+      Koneksi internet tidak tersedia saat ini.<br>
+      Data yang sudah diinput akan disimpan otomatis<br>
+      dan dikirim saat koneksi kembali.
+    </p>
+
+    <div class="tips">
+      <div class="tips-title">Yang bisa dilakukan</div>
+      <div class="tip"><span class="tip-icon">📶</span> Periksa koneksi WiFi atau data seluler</div>
+      <div class="tip"><span class="tip-icon">✈️</span> Pastikan mode pesawat tidak aktif</div>
+      <div class="tip"><span class="tip-icon">🔄</span> Coba reload halaman setelah koneksi tersambung</div>
+      <div class="tip"><span class="tip-icon">💾</span> Data input Anda aman — tersimpan di perangkat</div>
+    </div>
+
+    <button class="btn-retry" onclick="window.location.reload()">
+      ↺ &nbsp;Coba Lagi
+    </button>
+
+    <div class="version">RIFIM OS · PT. RIFIM Internasional Gemilang · Batam</div>
+  </div>
+
+  <script>
+    // Auto-reload when back online
+    window.addEventListener('online', () => window.location.reload());
+  </script>
+</body>
+</html>
