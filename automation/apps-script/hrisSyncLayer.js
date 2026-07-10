@@ -156,6 +156,8 @@ function getEmployeesFromSheet() {
       email:        String(row[idx['email']]         || '').trim(),
       company_code: String(row[idx['company_code']]  || '').trim(),
       status:       String(row[idx['status']]        || '').trim(),
+      salary_base:  String(row[idx['salary_base']]   || '').trim(),
+      join_date:    String(row[idx['join_date']]     || '').trim(),
     });
   }
   return list;

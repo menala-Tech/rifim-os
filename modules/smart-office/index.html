@@ -1150,7 +1150,7 @@
     SP1:    [{id:'employee_name',label:'Nama Karyawan',ph:'Budi Santoso'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2024-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Lapangan'},{id:'employee_dept',label:'Departemen',ph:'Operasional'},{id:'incident_date',label:'Tanggal Kejadian',type:'date'},{id:'violation',label:'Uraian Pelanggaran',type:'textarea',ph:'Karyawan yang bersangkutan terbukti...',full:true}],
     SP2:    [{id:'employee_name',label:'Nama Karyawan',ph:'Budi Santoso'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2024-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Lapangan'},{id:'previous_sp_number',label:'Nomor SP-1 Sebelumnya',ph:'001/RIFIM/SP1/IV/2026'},{id:'incident_date',label:'Tanggal Kejadian',type:'date'},{id:'violation',label:'Uraian Pelanggaran',type:'textarea',ph:'...',full:true}],
     SP3:    [{id:'employee_name',label:'Nama Karyawan',ph:'Budi Santoso'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2024-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Lapangan'},{id:'sp1_number',label:'Nomor SP-1',ph:'001/RIFIM/SP1/IV/2026'},{id:'sp2_number',label:'Nomor SP-2',ph:'001/RIFIM/SP2/V/2026'},{id:'incident_date',label:'Tanggal Kejadian',type:'date'},{id:'violation',label:'Uraian Pelanggaran',type:'textarea',ph:'...',full:true}],
-    PKWT:   [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id_card',label:'NIK / KTP',ph:'3172...'},{id:'employee_position',label:'Jabatan',ph:'Staff Operasional'},{id:'employee_dept',label:'Departemen',ph:'Operasional'},{id:'salary',label:'Gaji Pokok',ph:'Rp 3.500.000'},{id:'payday',label:'Tanggal Gajian',ph:'25'},{id:'work_hours',label:'Jam Kerja',ph:'8 jam'},{id:'work_days',label:'Hari Kerja',ph:'5'},{id:'contract_start',label:'Mulai Kontrak',type:'date'},{id:'contract_end',label:'Akhir Kontrak',type:'date'}],
+    PKWT:   [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIF0023'},{id:'employee_position',label:'Jabatan',ph:'Staff Operasional'},{id:'employee_dept',label:'Departemen',ph:'Operasional'},{id:'salary',label:'Gaji Pokok',ph:'Rp 3.500.000'},{id:'payday',label:'Tanggal Gajian',ph:'25'},{id:'work_hours',label:'Jam Kerja',ph:'8 jam'},{id:'work_days',label:'Hari Kerja',ph:'5'},{id:'contract_start',label:'Mulai Kontrak',type:'date'},{id:'contract_end',label:'Akhir Kontrak',type:'date'}],
     SPG:    [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'old_position',label:'Jabatan Lama',ph:'Staff Operasional'},{id:'new_position',label:'Jabatan Baru',ph:'Supervisor Operasional'},{id:'employee_dept',label:'Departemen',ph:'Operasional'},{id:'effective_date',label:'Berlaku Mulai',type:'date'}],
     SMT:    [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Operasional'},{id:'from_dept',label:'Dari Departemen',ph:'Operasional Batam'},{id:'to_dept',label:'Ke Departemen',ph:'Operasional Balikpapan'},{id:'new_location',label:'Lokasi Baru',ph:'Balikpapan'},{id:'effective_date',label:'Berlaku Mulai',type:'date'}],
     PHK:    [{id:'employee_name',label:'Nama Karyawan',ph:'Ahmad Fauzi'},{id:'employee_id',label:'ID Karyawan',ph:'RIG-2026-001'},{id:'employee_position',label:'Jabatan',ph:'Staff Lapangan'},{id:'employee_dept',label:'Departemen',ph:'Operasional'},{id:'join_date',label:'Tanggal Bergabung',type:'date'},{id:'last_working_day',label:'Hari Kerja Terakhir',type:'date'},{id:'phk_reason',label:'Alasan PHK',type:'textarea',full:true,ph:'Uraikan alasan PHK...'}],
@@ -1245,11 +1245,24 @@
     nameEl.addEventListener('change', function() {
       const s = _staffList.find(x => x.nama.toLowerCase() === nameEl.value.toLowerCase());
       if (!s) return;
-      const fill = (id, v) => { const el = document.getElementById(id); if (el && !el.value) el.value = v; };
-      fill('employee_id',       s.id);
-      fill('employee_position', s.jabatan);
-      fill('employee_dept',     s.cabang);
-      fill('task_location',     s.cabang);
+      // Field karyawan — selalu overwrite (data dari HRIS adalah sumber kebenaran)
+      const forceSet = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+      // Field opsional — hanya isi jika masih kosong
+      const softSet  = (id, v) => { const el = document.getElementById(id); if (el && !el.value) el.value = v; };
+
+      forceSet('employee_id',       s.id);
+      forceSet('employee_position', s.jabatan);
+      forceSet('employee_dept',     s.department);
+      forceSet('join_date',         s.join_date);
+
+      // Gaji: format Rp jika ada data
+      if (s.salary_base) {
+        forceSet('salary', 'Rp ' + parseInt(s.salary_base).toLocaleString('id-ID'));
+      }
+
+      // Field opsional
+      softSet('task_location', s.cabang);
+      softSet('from_dept',     s.department);
     });
 
     // Datalist untuk Lokasi Tugas (unique cabang)
