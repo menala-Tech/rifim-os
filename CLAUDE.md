@@ -79,8 +79,8 @@ Jika ada jawaban "Ya" → redesign sebelum coding.
 | PDF Engine | Convert ke PDF | ✅ Phase 1 Done |
 | Drive Manager | Kelola Google Drive | ✅ Phase 1 Done |
 | Database Layer | Abstraksi akses database | ✅ Phase 1 Done |
-| Notification Engine | Email & WhatsApp | ✅ Phase 2 Done |
-| QR Engine | Generate QR code | ✅ Phase 1 Done |
+| Notification Engine | Email & WhatsApp | ⏳ Pending |
+| QR Engine | Generate QR code | ⏳ Pending |
 | Auth Engine | Authentication & role | ✅ Phase 2 Done |
 
 ---
