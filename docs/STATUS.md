@@ -35,8 +35,8 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | 2 | Database Driver External | ✅ Spreadsheet dibaca langsung | ✅ Analisa Mendalam |
 | 3 | Database Driver Airport | ✅ Spreadsheet dibaca langsung (6 sheet, 50+ driver/cabang) | ✅ Analisa Mendalam |
 | 4 | Potongan Order (Input Dock 1/2/3 + CONFIG_FEE_KANTOR + DB_Driver Kinerja + LOG SISTEM) | ✅ Excel dibaca langsung — semua 17 sheet (CONFIG, DOCK, REKAP, LOG, MONITORING, branch sheets) | ✅ Analisa Mendalam |
-| 5 | Potongan Daily | ⚠️ Screenshot saja | ⏳ Belum mendalam |
-| 6 | Iuran Rifim Batam | ⚠️ Screenshot saja | ⏳ Belum mendalam |
+| 5 | Potongan Daily | ✅ Excel dibaca langsung (XML parsing) — 3 sheet: Jambi Luar+Airport, Manado, Pekanbaru | ✅ Analisa Mendalam |
+| 6 | Iuran Rifim Batam | ✅ Excel dibaca langsung — 156 row, status DISPENSASI/NON AKTIF/NEW/parsial, split 50/25/25 | ✅ Analisa Mendalam |
 | 7 | RADMS (Airport Queue System) | ⚠️ Nama file saja | ⏳ Belum mendalam |
 | 8 | Database Staff | ⚠️ Link saja | ⏳ Belum mendalam |
 | 9 | Perhitungan Gaji (Payroll + Lembur) | ✅ Semua (kirimWA, notifikasi, utils, config, lembur) | ✅ Analisa Mendalam |
@@ -149,8 +149,8 @@ Status: 🔄 In Progress
 | 2 | Database Driver External (manual input, source DB_Driver) | ✅ Dianalisa |
 | 3 | Database Driver Airport (6+ kota, struktur sama) | ✅ Dianalisa |
 | 4 | Potongan Order + CONFIG_FEE_KANTOR (formula per kota) | ✅ Dianalisa |
-| 5 | Potongan Daily (fee harian per cabang) | ✅ Dianalisa |
-| 6 | Iuran Rifim Batam (Rp100.000/bulan, split 50/25/25) | ✅ Dianalisa |
+| 5 | Potongan Daily — 3 sheet: Jambi (Rp5.000 kondisional), Manado (Rp10.000 semua driver), PKU (multi-tier) | ✅ Dianalisa mendalam |
+| 6 | Iuran Rifim Batam — 156 driver, status DISPENSASI/NON AKTIF/NEW, total Juni Rp10.353.000, split 50/25/25 | ✅ Dianalisa mendalam |
 | 7 | RADMS — Real-time Airport Driver Management System | ✅ Dianalisa |
 
 RADMS (Batch 7) sudah production:
