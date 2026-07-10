@@ -66,6 +66,66 @@ function syncHrisEmployeesToSheet() {
   return { synced: rows.length };
 }
 
+// ─── ACTIVITY LOG ────────────────────────────────────────────────────────────
+
+var ACTIVITY_LOG_SHEET_NAME = 'activity_log';
+var ACTIVITY_LOG_HEADERS = [
+  'timestamp', 'module', 'action', 'target_id',
+  'target_name', 'performed_by_name', 'performed_by_email', 'detail',
+];
+
+/**
+ * Jalankan sekali di GAS Editor untuk membuat sheet activity_log.
+ * Aman dijalankan berulang — hanya tambah header jika sheet kosong.
+ */
+function setupActivityLogSheet() {
+  var ss    = _getDB();
+  var sheet = ss.getSheetByName(ACTIVITY_LOG_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(ACTIVITY_LOG_SHEET_NAME);
+    Logger.log('Sheet activity_log dibuat.');
+  }
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, ACTIVITY_LOG_HEADERS.length).setValues([ACTIVITY_LOG_HEADERS]);
+    sheet.setFrozenRows(1);
+  }
+  Logger.log('Setup sheet activity_log selesai.');
+}
+
+/**
+ * Catat satu baris aktivitas. Gagal diam-diam — tidak boleh batalkan operasi utama.
+ * @param {string} module          - 'Portal' | 'HRIS' | 'Smart Office'
+ * @param {string} action          - 'LOGIN' | 'LOGOUT' | 'TAMBAH' | 'EDIT' | 'RESIGN' | 'PHK' | 'BUAT DOKUMEN'
+ * @param {string} targetId        - employee_id / document_number
+ * @param {string} targetName      - nama karyawan / judul dokumen
+ * @param {string} performedByName - nama user yang melakukan
+ * @param {string} performedByEmail
+ * @param {string} detail          - keterangan tambahan (field yang diubah, tipe dokumen, dsb)
+ */
+function logActivity(module, action, targetId, targetName, performedByName, performedByEmail, detail) {
+  try {
+    var ss    = _getDB();
+    var sheet = ss.getSheetByName(ACTIVITY_LOG_SHEET_NAME);
+    if (!sheet) {
+      setupActivityLogSheet();
+      sheet = ss.getSheetByName(ACTIVITY_LOG_SHEET_NAME);
+    }
+    var tsStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+    sheet.appendRow([
+      tsStr,
+      module           || '',
+      action           || '',
+      targetId         || '',
+      targetName       || '',
+      performedByName  || '',
+      performedByEmail || '',
+      detail           || '',
+    ]);
+  } catch (e) {
+    console.warn('logActivity gagal:', e.message);
+  }
+}
+
 /**
  * Ambil daftar karyawan dari sheet (dipakai Smart Office untuk dokumen).
  * @returns {Array<{ id, nama, jabatan, cabang, email, company_code, status }>}

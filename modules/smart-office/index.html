@@ -1011,7 +1011,7 @@
     const localAllowed = ALLOWED_EMAILS.includes(email);
 
     try {
-      const res  = await fetch(`${GAS_WEB_APP_URL}?action=auth&email=${encodeURIComponent(email)}`);
+      const res  = await fetch(`${GAS_WEB_APP_URL}?action=auth&source=Smart+Office&email=${encodeURIComponent(email)}`);
       const data = await res.json();
       if (data.success) {
         storeAuth({ email, name: data.user.name, role: data.user.role });
@@ -1054,7 +1054,14 @@
 
   function doLogout() {
     if (!confirm('Keluar dari Smart Office?')) return;
-    // Jangan hapus rifim_auth — session Portal tetap aktif
+    try {
+      const auth = JSON.parse(localStorage.getItem('rifim_auth') || '{}');
+      fetch(GAS_WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'log_activity', module: 'Smart Office',
+          action_type: 'LOGOUT', target_id: '', target_name: '',
+          performed_by: { name: auth.name || '', email: auth.email || '' }, detail: '' })
+      }).catch(() => {});
+    } catch(_) {}
     sessionStorage.removeItem('so_user');
     window.location.href = '/portal';
   }
@@ -1402,6 +1409,7 @@
       if (el) extra[f.id] = el.value;
     });
 
+    const _soAuth = JSON.parse(localStorage.getItem('rifim_auth') || '{}');
     const input = {
       documentType:  currentCode,
       company_code:  _activeCompany ? _activeCompany.code : 'RIFIM',
@@ -1411,6 +1419,7 @@
       directorName:  document.getElementById('signerName').value.trim(),
       directorTitle: document.getElementById('signerTitle').value.trim(),
       extra,
+      performed_by:  { name: _soAuth.name || '', email: _soAuth.email || '' },
     };
 
     setLoading(true, 'Menghubungi engine RIFIM OS...');

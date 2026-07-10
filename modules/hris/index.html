@@ -972,7 +972,7 @@ async function doLogin() {
   if (!email) return showAuthError('Masukkan email Anda.');
 
   try {
-    const res  = await gasGet({ action: 'auth', email });
+    const res  = await gasGet({ action: 'auth', email, source: 'HRIS' });
     if (res.success) {
       currentUser = res.user;
       document.getElementById('auth-gate').style.display = 'none';
@@ -995,8 +995,13 @@ function showAuthError(msg) {
 }
 
 function doLogout() {
+  try {
+    const u = currentUser || {};
+    gasPost({ action: 'log_activity', module: 'HRIS', action_type: 'LOGOUT',
+      target_id: '', target_name: '',
+      performed_by: { name: u.full_name || '', email: u.email || '' }, detail: '' });
+  } catch(_) {}
   sessionStorage.removeItem('hris_user');
-  // Jangan hapus rifim_auth — session Portal tetap aktif
   window.location.href = '/portal';
 }
 
@@ -1276,7 +1281,9 @@ async function submitEditEmployee() {
   if (!data.full_name) return showToast('Nama tidak boleh kosong.', 'error');
   btn.disabled = true; btn.textContent = 'Menyimpan…';
   const empId = document.getElementById('edit-emp-id').value;
-  const res   = await gasPost({ hrisAction: 'update_employee', employee_id: empId, data });
+  const res   = await gasPost({ hrisAction: 'update_employee', employee_id: empId,
+    target_name: data.full_name, data,
+    performed_by: { name: currentUser.full_name, email: currentUser.email } });
   btn.disabled = false; btn.textContent = 'Simpan Perubahan';
   if (res.success) {
     showToast('Data karyawan berhasil diperbarui.', 'success');
@@ -1291,7 +1298,9 @@ async function confirmResign() {
   const emp = currentViewEmp;
   if (!emp) return;
   if (!confirm('Tandai ' + emp.full_name + ' sebagai RESIGN?\nStatus akan berubah menjadi RESIGN.')) return;
-  const res = await gasPost({ hrisAction: 'update_employee', employee_id: emp.employee_id, data: { status: 'RESIGN' } });
+  const res = await gasPost({ hrisAction: 'update_employee', employee_id: emp.employee_id,
+    target_name: emp.full_name, data: { status: 'RESIGN' },
+    performed_by: { name: currentUser.full_name, email: currentUser.email } });
   if (res.success) {
     showToast(emp.full_name + ' ditandai RESIGN.', 'success');
     closeModal('modal-employee-detail');
@@ -1335,7 +1344,8 @@ async function submitAddEmployee() {
 
   btn.disabled = true;
   btn.textContent = 'Menyimpan…';
-  const res = await gasPost({ hrisAction: 'add_employee', data });
+  const res = await gasPost({ hrisAction: 'add_employee', data,
+    performed_by: { name: currentUser.full_name, email: currentUser.email } });
   btn.disabled = false;
   btn.textContent = 'Simpan Karyawan';
 

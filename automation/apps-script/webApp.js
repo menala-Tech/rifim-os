@@ -33,8 +33,24 @@ function doPost(e) {
       return _json(_handleHrisPost(input));
     }
 
+    // Log activity dari Portal / Smart Office (fire-and-forget dari frontend)
+    if (input.action === 'log_activity') {
+      const by = input.performed_by || {};
+      logActivity(input.module, input.action_type, input.target_id || '',
+        input.target_name || '', by.name || '', by.email || '', input.detail || '');
+      return _json({ success: true });
+    }
+
     // Default: Smart Office document generation
-    return _json(generateDocument(input));
+    const result = generateDocument(input);
+    if (result && result.success) {
+      const by = input.performed_by || {};
+      logActivity('Smart Office', 'BUAT DOKUMEN',
+        result.documentNumber || '', input.subject || '',
+        by.name || '', by.email || '',
+        'Tipe: ' + (input.documentType || '') + ' · ' + (input.company_code || ''));
+    }
+    return _json(result);
 
   } catch (err) {
     return _json({ success: false, message: 'Server error: ' + err.message });
@@ -46,11 +62,28 @@ function doPost(e) {
  * @private
  */
 function _handleHrisPost(input) {
+  var by = input.performed_by || {};
   switch (input.hrisAction) {
-    case 'add_employee':
-      return _syncAfterHrisWrite(hrisAddEmployee(input.data));
-    case 'update_employee':
-      return _syncAfterHrisWrite(hrisUpdateEmployee(input.employee_id, input.data));
+    case 'add_employee': {
+      var addResult = _syncAfterHrisWrite(hrisAddEmployee(input.data));
+      logActivity('HRIS', 'TAMBAH',
+        input.data.employee_id, input.data.full_name,
+        by.name, by.email,
+        (input.data.employment_type || '') + ' · ' + (input.data.position || '') + ' · ' + (input.data.branch || ''));
+      return addResult;
+    }
+    case 'update_employee': {
+      var updAction = (input.data && input.data.status === 'RESIGN') ? 'RESIGN'
+                    : (input.data && input.data.status === 'PHK')    ? 'PHK' : 'EDIT';
+      var updResult = _syncAfterHrisWrite(hrisUpdateEmployee(input.employee_id, input.data));
+      var updDetail = updAction !== 'EDIT'
+        ? 'status → ' + input.data.status
+        : Object.keys(input.data || {}).filter(function(k) { return k !== 'updated_at'; }).join(', ') + ' diperbarui';
+      logActivity('HRIS', updAction,
+        input.employee_id, input.target_name || input.employee_id,
+        by.name, by.email, updDetail);
+      return updResult;
+    }
     case 'add_contract':     return hrisAddContract(input.data);
     case 'add_attendance':   return hrisAddAttendance(input.data);
     case 'apply_leave':      return hrisApplyLeave(input.data);
@@ -130,9 +163,14 @@ function doGet(e) {
 
   if (action === 'auth') {
     try {
-      var email  = ((e.parameter.email || '').toLowerCase()).trim();
-      // Auth Engine (Phase 2) — returns role-aware user profile
+      var email      = ((e.parameter.email || '').toLowerCase()).trim();
+      var source     = e.parameter.source || 'Portal';
       var authResult = authVerifyUser(email);
+      if (authResult.success) {
+        logActivity(source, 'LOGIN', '', '',
+          authResult.user.full_name || '', email,
+          'Role: ' + (authResult.user.role || ''));
+      }
       return _json(authResult);
     } catch (err) {
       return _json({ success: false, message: err.message });

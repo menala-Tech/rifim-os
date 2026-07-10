@@ -265,7 +265,7 @@ async function doLogin() {
   btn.disabled = true;
   document.getElementById('auth-err').style.display = 'none';
   try {
-    const res  = await fetch(GAS_URL + '?' + new URLSearchParams({ action: 'auth', email }));
+    const res  = await fetch(GAS_URL + '?' + new URLSearchParams({ action: 'auth', source: 'Portal', email }));
     const data = await res.json();
     if (data.success) {
       const session = { ...data.user, email, ts: Date.now() };
@@ -301,6 +301,14 @@ function showPortal(user) {
 }
 
 function doLogout() {
+  try {
+    const u = JSON.parse(localStorage.getItem('rifim_auth') || '{}');
+    fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'log_activity', module: 'Portal',
+        action_type: 'LOGOUT', target_id: '', target_name: '',
+        performed_by: { name: u.full_name || u.name || '', email: u.email || '' }, detail: '' })
+    }).catch(() => {});
+  } catch(_) {}
   localStorage.removeItem('rifim_auth');
   localStorage.removeItem('rifim_company');
   location.reload();
