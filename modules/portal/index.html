@@ -19,14 +19,16 @@ body{font-family:var(--font);background:var(--dark);color:#fff;min-height:100vh;
 /* ─── AUTH GATE ─── */
 #auth-gate{
   flex:1;display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(145deg,#1A1A1A 0%,#3A0000 60%,#2B2B2B 100%);
+  background:
+    linear-gradient(145deg,rgba(26,26,26,.88) 0%,rgba(58,0,0,.88) 60%,rgba(43,43,43,.88) 100%),
+    url('/branding/logo/rifim-logo-building.png') center/cover no-repeat;
   padding:24px;min-height:100vh;
 }
 .auth-card{
   background:#fff;border-radius:20px;padding:48px 40px;width:100%;max-width:400px;
   box-shadow:0 24px 80px rgba(0,0,0,.6);text-align:center;
 }
-.auth-logo{width:72px;height:72px;margin:0 auto 12px;display:block;object-fit:contain}
+.auth-logo{max-width:220px;max-height:80px;width:auto;height:auto;margin:0 auto 12px;display:block;object-fit:contain}
 .auth-logo-fallback{
   width:72px;height:72px;background:var(--red);border-radius:16px;
   margin:0 auto 12px;display:flex;align-items:center;justify-content:center;
@@ -51,7 +53,9 @@ body{font-family:var(--font);background:var(--dark);color:#fff;min-height:100vh;
 
 /* ─── PORTAL APP ─── */
 #app{flex:1;display:none;flex-direction:column;min-height:100vh;
-  background:linear-gradient(145deg,#1A1A1A 0%,#3A0000 60%,#2B2B2B 100%);
+  background:
+    linear-gradient(145deg,rgba(26,26,26,.88) 0%,rgba(58,0,0,.88) 60%,rgba(43,43,43,.88) 100%),
+    url('/branding/logo/rifim-logo-building.png') center/cover no-repeat fixed;
 }
 
 /* ─── HEADER ─── */

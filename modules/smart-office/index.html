@@ -35,7 +35,9 @@
     ══════════════════════════════════════════ */
     #loginScreen {
       position: fixed; inset: 0; z-index: 9999;
-      background: linear-gradient(145deg, #1A1A1A 0%, #3A0000 60%, #2B2B2B 100%);
+      background:
+        linear-gradient(145deg, rgba(26,26,26,.88) 0%, rgba(58,0,0,.88) 60%, rgba(43,43,43,.88) 100%),
+        url('/branding/logo/rifim-logo-building.png') center/cover no-repeat;
       display: flex; align-items: center; justify-content: center; padding: 20px;
     }
     .login-card {
@@ -45,8 +47,8 @@
       text-align: center;
     }
     .login-logo-img {
-      max-width: 180px; max-height: 64px; object-fit: contain;
-      margin: 0 auto 8px; display: block;
+      max-width: 240px; max-height: 90px; object-fit: contain;
+      margin: 0 auto 12px; display: block;
     }
     .login-logo-mark {
       width: 72px; height: 72px; background: var(--red); border-radius: 18px;
