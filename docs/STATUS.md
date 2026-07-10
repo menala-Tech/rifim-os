@@ -2,7 +2,7 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-07-11 (Sprint 2 + Batch Analysis Protocol)
+> Last updated: 2026-07-11 (Sprint 2 selesai + 12 Batch Analisa + Supabase populated)
 
 ---
 
@@ -59,9 +59,21 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 
 ## Current Phase
 
-**Sprint 2 — HRIS Enhancement + RAOS Module Planning**
+**Sprint 3A — RAOS Module + Finance UI + Dashboard** 
 
-Status: 🔄 In Progress
+Status: 🟡 Siap Dimulai
+
+### Infrastruktur Data (Selesai)
+
+| Tabel Supabase | Baris | Status |
+|----------------|-------|--------|
+| `drivers` | 422 | ✅ Airport (konvensional+ASK) + External |
+| `employees` | 30 | ✅ RIF0001–RIF0030, semua cabang |
+| `employee_contracts` | 0 | Belum diisi |
+| `attendance` | 0 | Belum diisi |
+| `payroll` | 0 | Belum diisi |
+
+⚠️ `drivers` belum enable RLS — perlu policy sebelum aktifkan.
 
 ---
 
@@ -169,12 +181,22 @@ RADMS (Batch 7) sudah production:
 - [ ] Test PKWT generation end-to-end
 - [ ] Setup GAS trigger `notifCheckExpiringContracts()`
 
-### Modul Baru (Sprint 3+)
-- [ ] **RAOS** — integrasi RADMS + dashboard unified di RIFIM OS
-- [ ] **Finance** — cash flow, fee kantor, saldo driver, budget, laporan
+### Sprint 3A — Modul Baru (Siap Dimulai)
+- [ ] **RAOS** — saldoEngine, feeEngine (Order+Daily+Iuran), dashboard per cabang
+- [ ] **Finance UI** — cash flow viewer, tagihan tracker, rekap harian/bulanan
+- [ ] **Executive Dashboard** — agregasi KPI, revenue, operasional
+- [ ] **RLS drivers** — enable Row Level Security + policy untuk GAS service key
+
+### Sprint 3B+ (Backlog)
 - [ ] **CRM** — airport, vendor, partner, client
 - [ ] **AI Assistant** — document generator, SOP, business analysis
-- [ ] **Executive Dashboard** — KPI, revenue, finance, operasional
+
+### Sinkronisasi Antar Modul (Kesimpulan 12 Batch)
+- Finance = aggregator 4 sumber otomatis: Potongan Order + Saldo Fee + ASK Syafiq + FEE External
+- Pengisian Saldo = multi-role: saldo driver + absensi staff (sejak 1 Jul 2026) + pemasukan Finance
+- Database Staff = SSoT → consumer: Gaji (payroll.gs) + KPI (KPIAutoScore.gs) + HRIS (Supabase ✅)
+- RADMS = sistem mandiri production → perlu integrasi queue ke RIFIM OS Dashboard
+- Tagihan partner total: Rp172.9jt (AP Jambi/Manado, BIB Batam, Primkop/Puskopau BPN & PKU)
 
 ---
 
