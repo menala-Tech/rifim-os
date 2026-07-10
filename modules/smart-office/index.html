@@ -786,11 +786,17 @@
           <div class="fgrid">
             <div class="field">
               <label>Nama</label>
-              <input type="text" id="signerName" value="BOBBY RAHMAN M.B">
+              <input type="text" id="signerName" placeholder="Otomatis dari HRIS...">
             </div>
             <div class="field">
               <label>Jabatan</label>
-              <input type="text" id="signerTitle" value="Direktur Utama">
+              <select id="signerTitle" onchange="_onSignerTitleChange()">
+                <option value="Direktur Utama">Direktur Utama</option>
+                <option value="Manager Administrasi">Manager Administrasi</option>
+                <option value="Manager Operasional">Manager Operasional</option>
+                <option value="Manager Keuangan">Manager Keuangan</option>
+                <option value="Koordinator">Koordinator</option>
+              </select>
             </div>
           </div>
 
@@ -1226,8 +1232,21 @@
     try {
       const res  = await fetch(`${GAS_WEB_APP_URL}?action=staff_list`);
       const data = await res.json();
-      if (data.success && data.staff) _staffList = data.staff;
+      if (data.success && data.staff) {
+        _staffList = data.staff;
+        _onSignerTitleChange(); // auto-fill nama penanda tangan saat data HRIS siap
+      }
     } catch(_) {}
+  }
+
+  // Auto-fill nama penanda tangan berdasarkan jabatan yang dipilih
+  function _onSignerTitleChange() {
+    const titleEl = document.getElementById('signerTitle');
+    const nameEl  = document.getElementById('signerName');
+    if (!titleEl || !nameEl || !_staffList.length) return;
+    const title = titleEl.value.toLowerCase().trim();
+    const match = _staffList.find(s => (s.jabatan || '').toLowerCase().trim() === title);
+    if (match) nameEl.value = match.nama;
   }
 
   function _wireStaffAutocomplete() {
