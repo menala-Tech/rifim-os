@@ -47,8 +47,10 @@ function doPost(e) {
  */
 function _handleHrisPost(input) {
   switch (input.hrisAction) {
-    case 'add_employee':     return hrisAddEmployee(input.data);
-    case 'update_employee':  return hrisUpdateEmployee(input.employee_id, input.data);
+    case 'add_employee':
+      return _syncAfterHrisWrite(hrisAddEmployee(input.data));
+    case 'update_employee':
+      return _syncAfterHrisWrite(hrisUpdateEmployee(input.employee_id, input.data));
     case 'add_contract':     return hrisAddContract(input.data);
     case 'add_attendance':   return hrisAddAttendance(input.data);
     case 'apply_leave':      return hrisApplyLeave(input.data);
@@ -63,6 +65,16 @@ function _handleHrisPost(input) {
   }
 }
 
+/**
+ * Panggil sync ke spreadsheet setelah write ke Supabase.
+ * Jika sync gagal, operasi utama tetap berhasil.
+ * @private
+ */
+function _syncAfterHrisWrite(result) {
+  try { syncHrisEmployeesToSheet(); } catch (e) { console.warn('Sync sheet gagal:', e.message); }
+  return result;
+}
+
 function _json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
@@ -75,23 +87,7 @@ function doGet(e) {
 
   if (action === 'staff_list') {
     try {
-      var STAFF_SS_ID = '1fcraq3QHqIaD-13Ebzt6stT9aA6j_loTXeAtpNX12kw';
-      var staffSS    = SpreadsheetApp.openById(STAFF_SS_ID);
-      var staffSheet = staffSS.getSheetByName('MASTER DATA STAFF');
-      if (!staffSheet) throw new Error('Sheet MASTER DATA STAFF tidak ditemukan.');
-      var rows  = staffSheet.getDataRange().getValues();
-      var staff = [];
-      for (var i = 1; i < rows.length; i++) {
-        var nama = String(rows[i][1] || '').trim();
-        if (!nama) continue;
-        staff.push({
-          nama:    nama,
-          id:      String(rows[i][4] || '').trim(),   // ID Staff (col E)
-          jabatan: String(rows[i][5] || '').trim(),   // Jabatan  (col F)
-          cabang:  String(rows[i][3] || '').trim(),   // ID Cabang (col D)
-          email:   String(rows[i][0] || '').trim(),   // Email (col A)
-        });
-      }
+      var staff = getEmployeesFromSheet();
       return ContentService
         .createTextOutput(JSON.stringify({ success: true, staff: staff }))
         .setMimeType(ContentService.MimeType.JSON);
