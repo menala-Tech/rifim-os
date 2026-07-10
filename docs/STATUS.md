@@ -41,7 +41,8 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | 8 | Database Staff | ✅ Excel dibaca (9 sheet) — SSoT 30 staff, KPI 5 pilar harian, grade A+-E, MASTER TARGET per cabang | ✅ Analisa Mendalam |
 | 9 | Perhitungan Gaji Staff (user: Batch 7) | ✅ GAS script + Spreadsheet aktual dibaca — 6 sheet, 28 staff, Rp75.418.000/bulan, cutover absensi 1 Jul 2026 | ✅ Analisa Mendalam |
 | 10 | Pendapatan FEE External | ✅ Excel dibaca — revenue Rp3.973.500/bulan dari fee manajemen akun driver (ASK, saldo, akun baru, surcharge) | ✅ Analisa Mendalam |
-| 11 | Finance Pemasukan & Pengeluaran | ✅ Semua (whatsapp, email, utilities, config) | ✅ Analisa Mendalam |
+| 11 | Finance Pemasukan & Pengeluaran | ✅ Excel dibaca (17 sheet) — ~997 transaksi, cash flow per cabang, tagihan AP/BIB/Primkop Rp172.9jt, LIA form manual, GAS triggers, BUG duplikat ASK entries | ✅ Analisa Mendalam |
+| 12 | Form Jawaban ASK PT Syafiq | ✅ Excel dibaca (2 sheet) — 12 driver Batam, model komisi 100% ke 5 orang (Ferry/Lia/Pak Bos/Gusril/Nyonya), Rp5.65jt batch, auto-feed ke FINANCE | ✅ Analisa Mendalam |
 
 ### Mapping Batch → Modul RIFIM OS (Sementara)
 
