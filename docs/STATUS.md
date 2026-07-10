@@ -145,7 +145,7 @@ Status: 🔄 In Progress
 
 | Batch | Sistem | Status |
 |-------|--------|--------|
-| 1 | Pengisian Saldo Driver (isi-saldo.vercel.app) | ✅ Dianalisa |
+| 1 | Pengisian Saldo Driver (isi-saldo.vercel.app) | ✅ Excel + GAS semua dibaca — 13 sheet, dual verification flow, SLA 5 menit, TARGET_STAFF KPI, 7 cabang |
 | 2 | Database Driver External (manual input, source DB_Driver) | ✅ Dianalisa |
 | 3 | Database Driver Airport (6+ kota, struktur sama) | ✅ Dianalisa |
 | 4 | Potongan Order + CONFIG_FEE_KANTOR (formula per kota) | ✅ Dianalisa |
