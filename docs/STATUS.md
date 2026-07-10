@@ -2,15 +2,15 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-07-10 (Sprint 2 progress)
+> Last updated: 2026-07-10 (Sprint 2 HRIS + RAOS Analysis)
 
 ---
 
 ## Current Phase
 
-**Sprint 0 — Blueprint & Enterprise Foundation**
+**Sprint 2 — HRIS Enhancement + RAOS Module Planning**
 
-Status: ✅ Selesai
+Status: 🔄 In Progress
 
 ---
 
@@ -68,21 +68,51 @@ Status: ✅ Selesai
 
 ---
 
+## Sprint 2 — HRIS Enhancement (Sedang Dikerjakan)
+
+### Selesai
+- [x] Export rekap karyawan CSV (tombol di tab Karyawan, ikuti filter aktif, UTF-8 BOM)
+- [x] Filter absensi per departemen (dropdown di tab Absensi)
+- [x] Tabel absensi tampilkan kolom Nama + Departemen
+- [x] Search absensi by nama (input `ID / Nama Karyawan…`)
+
+### Belum Selesai
+- [ ] Test PKWT generation end-to-end dari modal "Kontrak Baru"
+- [ ] Setup GAS time trigger `notifCheckExpiringContracts()` (tiap hari)
+
+---
+
+## RAOS — Analisis Sistem Operasional (In Progress)
+
+> Analisis 7 batch sistem existing sebelum membangun modul RAOS
+
+| Batch | Sistem | Status |
+|-------|--------|--------|
+| 1 | Pengisian Saldo Driver (isi-saldo.vercel.app) | ✅ Dianalisa |
+| 2 | Database Driver External (manual input, source DB_Driver) | ✅ Dianalisa |
+| 3 | Database Driver Airport (6+ kota, struktur sama) | ✅ Dianalisa |
+| 4 | Potongan Order + CONFIG_FEE_KANTOR (formula per kota) | ✅ Dianalisa |
+| 5 | Potongan Daily (fee harian per cabang) | ✅ Dianalisa |
+| 6 | Iuran Rifim Batam (Rp100.000/bulan, split 50/25/25) | ✅ Dianalisa |
+| 7 | RADMS — Real-time Airport Driver Management System | ✅ Dianalisa |
+
+RADMS (Batch 7) sudah production:
+- `radms-driver.vercel.app` — Driver App (NIK + Nama)
+- `radms-dashboard.vercel.app` — Staff Dashboard (email+pass)
+- GAS: Driver.gs, Queue.gs, Auth.gs, KPI.gs, Attendance.gs, Report.gs, Notification.gs
+- Scale: 7 Cabang, 300+ Driver, 500+ Penjemputan/Hari
+- RAOS di RIFIM OS = integrasi + unified dashboard, bukan rebuild
+
+---
+
 ## Pending
 
-### HRIS — Sprint 2 (sedang dikerjakan)
-- [x] Export rekap karyawan CSV (tombol di tab Karyawan)
-- [x] Filter absensi per departemen + tampilkan nama karyawan di tabel
-- [ ] Integrate PKWT generation dengan employee data (modal sudah ada, perlu test end-to-end)
-- [ ] Filter absensi per cabang (planned Sprint 3)
-- [ ] Setup GAS trigger untuk `notifCheckExpiringContracts()`
-
-### Smart Office
-- [x] QR Code pada dokumen — `qrEngine.js` + embed di PDF
-- [x] Email notifikasi — `notificationEngine.js` diintegrasikan ke `webApp.js`
+### Sprint 2 (lanjutan)
+- [ ] Test PKWT generation end-to-end
+- [ ] Setup GAS trigger `notifCheckExpiringContracts()`
 
 ### Modul Baru (Sprint 3+)
-- [ ] **RAOS** — driver, staff, pickup point, KPI
+- [ ] **RAOS** — integrasi RADMS + dashboard unified di RIFIM OS
 - [ ] **Finance** — cash flow, fee kantor, saldo driver, budget, laporan
 - [ ] **CRM** — airport, vendor, partner, client
 - [ ] **AI Assistant** — document generator, SOP, business analysis
