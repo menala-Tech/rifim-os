@@ -158,6 +158,22 @@ docs(hris): update employee schema documentation
 
 ---
 
+## Protokol Analisa Batch (WAJIB — JANGAN DILANGGAR)
+
+Sebelum menulis SATU BARIS kode pun untuk modul RAOS / Finance / HRIS:
+
+1. **Baca semua script** batch yang dikirim user — lokal + link GAS
+2. **Analisa mendalam**: fungsi, data flow, integrasi antar modul
+3. **Update STATUS.md** — tabel batch, mapping ke modul
+4. **Push ke GitHub** setiap selesai analisa satu batch
+5. **Berikan mapping** ke: Smart Office → HRIS → RAOS → Finance → CRM → Dashboard Direktur
+6. **Tunggu "done"** dari user sebelum lanjut ke batch berikutnya
+7. **JANGAN mulai coding** sampai semua batch selesai dianalisa
+
+Pelanggaran protokol ini berarti kode yang ditulis tidak sesuai kebutuhan operasional nyata.
+
+---
+
 ## When Unsure
 
 Jika arsitektur tidak jelas:

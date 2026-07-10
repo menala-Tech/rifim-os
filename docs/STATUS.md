@@ -2,7 +2,54 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-07-10 (Sprint 2 HRIS + RAOS Analysis)
+> Last updated: 2026-07-11 (Sprint 2 + Batch Analysis Protocol)
+
+---
+
+## Protokol Analisa Batch (WAJIB DIIKUTI)
+
+> Berlaku mulai sesi ini. Setiap batch sistem existing yang dikirim user harus melalui alur ini sebelum ada kode yang ditulis.
+
+```
+User kirim Batch
+      ↓
+Claude baca SEMUA script lokal + link (tidak boleh parsial)
+      ↓
+Analisa mendalam: fungsi, data, alur, integrasi antar modul
+      ↓
+Simpan ke docs/STATUS.md + CLAUDE.md (lokal + push GitHub)
+      ↓
+Berikan mapping ke modul RIFIM OS:
+Smart Office → HRIS → RAOS → Finance → CRM → Dashboard Direktur
+      ↓
+Berikan saran urutan Build terbaik
+      ↓
+Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
+```
+
+### Status Analisa Batch
+
+| Batch | Sistem | Script Dibaca | Status |
+|-------|--------|--------------|--------|
+| 1 | Isi Saldo + Absensi + Target Staff | ✅ Semua (Main, Matching, MonitoringSaldo, Absensi, DBDriverSync, LaporanCabang, Reliability) | ✅ Analisa Mendalam |
+| 2 | Database Driver External | ⚠️ Screenshot saja | ⏳ Belum mendalam |
+| 3 | Database Driver Airport | ⚠️ Screenshot saja | ⏳ Belum mendalam |
+| 4 | Potongan Order (CONFIG_FEE_KANTOR) | ⚠️ Screenshot saja | ⏳ Belum mendalam |
+| 5 | Potongan Daily | ⚠️ Screenshot saja | ⏳ Belum mendalam |
+| 6 | Iuran Rifim Batam | ⚠️ Screenshot saja | ⏳ Belum mendalam |
+| 7 | RADMS (Airport Queue System) | ⚠️ Nama file saja | ⏳ Belum mendalam |
+| 8 | Database Staff | ⚠️ Link saja | ⏳ Belum mendalam |
+| 9 | Perhitungan Gaji (Payroll + Lembur) | ✅ Semua (kirimWA, notifikasi, utils, config, lembur) | ✅ Analisa Mendalam |
+| 10 | Pendapatan / Pembagian | ⚠️ Screenshot saja | ⏳ Belum mendalam |
+| 11 | Finance Pemasukan & Pengeluaran | ✅ Semua (whatsapp, email, utilities, config) | ✅ Analisa Mendalam |
+
+### Mapping Batch → Modul RIFIM OS (Sementara)
+
+| Batch | Smart Office | HRIS | RAOS | Finance | CRM | Dashboard |
+|-------|-------------|------|------|---------|-----|-----------|
+| 1 — Isi Saldo | — | Absensi, KPI | Monitoring saldo, SLA alert | Nominal per cabang | — | Target staff |
+| 9 — Payroll | — | Payroll, Absensi, Kontrak | Performa ops | Gaji, Lembur, Bonus | — | KPI cabang |
+| 11 — Finance | — | — | — | Pemasukan/Pengeluaran, PDF, rekap | — | Revenue, margin |
 
 ---
 
