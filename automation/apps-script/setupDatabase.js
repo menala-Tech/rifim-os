@@ -224,7 +224,14 @@ function _setupCompanyConfigSheet(ss) {
     ['pdf_export_enabled',  'true',                                       'Aktifkan export PDF otomatis'],
     ['email_notify_enabled','false',                                      'Kirim email notifikasi setelah generate'],
     ['qr_enabled',          'false',                                      'Generate QR Code (aktifkan setelah setup)'],
-    ['version',             '1.0.0',                                      'Versi RIFIM OS'],
+    // RAOS — Driver Database (ID sumber import, non-secret)
+    ['raos_ss_id',              '1jHeA-w1bM32S3-AU-ENN2UjiaCb4iLzRhaf4G7y4ozM', 'ID Spreadsheet RIFIM OS utama (=SPREADSHEET_ID)'],
+    ['db_driver_airport_ss_id', '1FEZxyHPx_GCQKw92hLSf6QxxkXgZn5R1sRswOYM_Tlc', 'ID file Database Driver Airport (sumber import)'],
+    ['db_driver_external_ss_id','1suoDC-RsWOgTHiLq4max6iIsWe39Ou-RMddRXl5DVJc', 'ID file Database Driver External (sumber import)'],
+    // Supabase (URL publik saja — SUPABASE_SERVICE_KEY di PropertiesService)
+    ['supabase_url',            'https://vlievtojpmrbsmzlqswl.supabase.co',       'URL Supabase project (publik, non-secret)'],
+    ['supabase_project_id',     'vlievtojpmrbsmzlqswl',                           'Project ID Supabase'],
+    ['version',             '0.4.0',                                      'Versi RIFIM OS'],
   ];
 
   sheet.getRange(2, 1, config.length, 3).setValues(config);
@@ -234,7 +241,7 @@ function _setupCompanyConfigSheet(ss) {
   sheet.getRange(2, 2, config.length, 1).setBackground('#FFFCFC');
 
   // Group sections with color bands
-  var sections = [[2,4,'#FFF0F0'],[5,9,'#FFF8F0'],[10,11,'#F0FFF0'],[12,14,'#F0F0FF'],[15,20,'#F0F8FF'],[21,26,'#FFFFF0']];
+  var sections = [[2,4,'#FFF0F0'],[5,9,'#FFF8F0'],[10,11,'#F0FFF0'],[12,14,'#F0F0FF'],[15,20,'#F0F8FF'],[21,27,'#FFFFF0'],[28,32,'#E8F4FD']];
   sections.forEach(function(s) {
     sheet.getRange(s[0], 1, s[1]-s[0]+1, 3).setBackground(s[2]);
   });
