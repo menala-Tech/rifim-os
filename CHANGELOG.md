@@ -15,11 +15,91 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/).
 - [ ] Setup trigger notifCheckExpiringContracts()
 
 ### Planned — Sprint 3+
-- Modul RAOS (driver, staff, pickup point, KPI)
 - Modul Finance (cash flow, saldo driver, budget)
 - Modul CRM (airport, vendor, partner, client)
 - Modul AI Assistant (document generator, SOP, business analysis)
 - Executive Dashboard (KPI, revenue, finance, operasional)
+- PWA integration: Database AIST + Database Potongan → Monitor Saldo / Order / Koordinator PWA
+
+---
+
+## [0.4.0] — 2026-07-12
+
+### Added — GAS: Branding Engine
+- `brandingEngine.js` — sisipkan logo perusahaan ke Google Sheet sebagai over-grid image (tampil di layar & PDF export)
+- `_getLogoBlob()` — ambil blob logo via Drive thumbnail URL (`sz=w400`) untuk hindari batas 2MB / 1M pixel GAS
+- `insertLogoKeSheet()` — insert logo ke sheet dengan auto-hapus logo lama di anchor yang sama
+- `buatHeaderSheet()` — header sheet 3-baris standar RIFIM OS (logo kiri + nama perusahaan + judul dokumen)
+- `setupBrandingLogos()` / `setupBrandingLogosDefault()` — simpan Drive File ID logo ke PropertiesService
+- `testInsertLogo()` — test semua 6 logo ke sheet TEST_LOGO
+- Drive File ID tersimpan di PropertiesService (tidak di-commit ke git): RIFIM, MENALA, LAILAN, MAXIM, RIFIM_GROUP, ICON
+
+### Added — GAS: Driver Layer RAOS
+- `raosDriverLayer.js` — layer lengkap data driver untuk RAOS
+- `raosGetDrivers()` / `raosAddDriver()` / `raosUpdateDriver()` — CRUD driver di Supabase tabel `drivers`
+- `syncDriversDariSupabase()` — pull semua driver dari Supabase, split ke sheet `Database Driver Airport` dan `Database Driver External`
+- `prosesInputDriverAirport()` / `prosesInputDriverExternal()` — proses sheet Input Driver → Supabase → mark OK/ERROR → auto-sync
+- `setupDriverSheets()` — buat sheet `Input Driver Airport` + `Input Driver External` dengan dropdown cabang/zone/tipe/status
+- `setupDriverSyncTrigger()` — trigger otomatis `syncDriversDariSupabase` setiap 6 jam
+
+### Added — GAS: Staff Sync HRIS
+- `hrisSyncLayer.js` diperluas dengan fungsi sync staff operasional:
+- `syncStaffKeDatabaseStaff()` — sync Supabase `employees` → sheet `Database Staff` (cache operasional RAOS/Finance/Payroll)
+- `setupDatabaseStaffSheet()` — buat sheet `Database Staff` dengan header + format standar
+- `setupInputStaffSheet()` — buat sheet `Input Staff` (form input admin) dengan dropdown jabatan/cabang/perusahaan/tipe/status
+- `prosesInputStaff()` — proses baris input → Supabase → auto-sync ke `employees` sheet + `Database Staff`
+- `setupStaffSyncTrigger()` — trigger otomatis `syncStaffKeDatabaseStaff` setiap 6 jam
+
+### Added — GAS: Laporan Engine Update
+- `raosLaporanEngine.js` — header laporan cabang diperbarui dengan logo RIFIM (row offset disesuaikan: data mulai baris 8)
+- `setupLaporanCabangSheet()` — buat area logo A1:A2, nama perusahaan B1:E1, subtitle B2:E2, filter baris 4-5, header baris 7
+
+### Added — GAS: Menu Engine Update
+- `raosMenuEngine.js` — tambah sub-menu `👤 HRIS — Staff` dan `🚗 RAOS — Driver` di menu utama `🚛 RIFIM OS`
+- Menu HRIS: Proses Input Staff, Sync Staff, Setup Sheet Input Staff, Setup Database Staff, Setup Trigger
+- Menu Driver: Proses Input Airport/External, Sync Driver, Setup Sheet, Setup Trigger
+
+### Added — GAS: OAuth Scopes
+- `appsscript.json` — tambah `oauthScopes` untuk Drive, Drive.file, external_request, gmail, scriptapp
+
+### Added — Branding Assets
+- `branding/logo/logo-rifim.png` — logo PT. RIFIM Internasional Gemilang
+- `branding/logo/logo-menala.png` — logo PT. Menala Internasional Gemilang
+- `branding/logo/logo-lailan.png` — logo CV. LailanKalilan Indonesia
+- `branding/logo/logo-maxim.png` — logo Maxim
+- `branding/logo/logo-rifim-group.jpg` — logo Rifim Group
+- `branding/logo/stempel-rifim.png` / `stempel-menala.png` / `stempel-lailan.png`
+
+### Added — PWA Apps
+- `apps/pwa/monitor-koordinator/` — Monitor Koordinator PWA (dipindah dari root)
+- `apps/pwa/monitor-order/` — Monitor Order PWA (dipindah dari root)
+- `apps/pwa/monitor-saldo/` — Monitor Saldo PWA (dipindah dari root)
+
+### Changed — CLAUDE.md
+- Tambah seksi "Working Directory (WAJIB)" — semua file HANYA di folder lokal proyek
+- Tambah seksi "Logo Perusahaan (WAJIB)" — mapping logo + aturan auto-ambil dari folder lokal
+
+### Changed — PROJECT_RULES.md
+- Tambah seksi "Logo & Branding Rules" — mapping logo + stempel + aturan penggunaan (rule 24-27)
+
+### Fixed
+- Blob terlalu besar di GAS: ganti `DriveApp.getFileById().getBlob()` → thumbnail URL Drive `sz=w400` + `UrlFetchApp.fetch()`
+- Submodule Git di folder PWA: hapus embedded `.git`, re-add sebagai file biasa
+- OAuth scope Drive: tambah `oauthScopes` di `appsscript.json` (penyebab error `getFileById on DriveApp`)
+
+### Architecture — Arsitektur Sinkronisasi Data
+Tiga alur sinkronisasi yang sudah diimplementasikan:
+
+```
+1. Code Flow       : Local → GitHub → (CI) → Google Apps Script
+2. Master Data     : Supabase ←→ Google Sheets (Database Staff / Database Driver)
+3. Transactional   : Input Sheet → Supabase → Database Sheet → PDF / WA
+```
+
+SSoT (Single Source of Truth):
+- Staff    : Supabase `employees` → sync ke `Database Staff` sheet
+- Driver   : Supabase `drivers`   → sync ke `Database Driver Airport` + `Database Driver External`
+- Operasional (Potongan, AIST) : Google Sheets sebagai transaksi harian
 
 ---
 

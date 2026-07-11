@@ -124,6 +124,9 @@ Jika ada jawaban "Ya" → redesign sebelum coding.
 | WA Engine | Fonnte API, templates per modul | ✅ Phase 3 Done |
 | QR Engine | Generate QR code | ✅ Phase 2 Done |
 | Auth Engine | Authentication & role | ✅ Phase 2 Done |
+| Branding Engine | Logo perusahaan ke Sheet (PDF-ready) | ✅ Sprint 2 Done |
+| Driver Layer | CRUD driver RAOS + sync Supabase→Sheet | ✅ Sprint 2 Done |
+| Staff Sync Layer | CRUD staff HRIS + sync Supabase→Sheet | ✅ Sprint 2 Done |
 
 ---
 
@@ -144,6 +147,21 @@ Setiap modul harus:
 - Desain schema agar bisa migrasi tanpa ubah arsitektur
 - Jangan hardcode Spreadsheet ID
 - Jangan duplikasi schema
+
+### Arsitektur Sinkronisasi Data (SSoT)
+
+```
+Supabase (SSoT)        Google Sheets (cache operasional)
+────────────────        ──────────────────────────────────
+employees          →    sheet "Database Staff"
+drivers (airport)  →    sheet "Database Driver Airport"
+drivers (external) →    sheet "Database Driver External"
+```
+
+- Input baru: melalui sheet `Input Staff` / `Input Driver Airport` / `Input Driver External`
+- Proses input: fungsi `prosesInputStaff()` / `prosesInputDriver()` → Supabase → auto-sync ke sheet
+- Auto-sync: trigger setiap 6 jam via `setupStaffSyncTrigger()` / `setupDriverSyncTrigger()`
+- Jangan edit `Database Staff` / `Database Driver` secara manual — data akan ditimpa saat sync
 
 ---
 

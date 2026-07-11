@@ -123,4 +123,45 @@ Format: `type(scope): description`
 
 ---
 
+## GAS Branding Engine Rules
+
+| # | Rule |
+|---|------|
+| 28 | Sisipkan logo ke sheet via `insertLogoKeSheet()` dari `brandingEngine.js` — jangan pakai `DriveApp.getFileById().getBlob()` langsung (batas 2MB/1M pixel) |
+| 29 | Ambil blob logo via Drive thumbnail URL `sz=w400` + `UrlFetchApp.fetch()` dengan OAuth token |
+| 30 | Drive File ID logo disimpan di GAS `PropertiesService` — jangan commit ke git |
+| 31 | Jalankan `setupBrandingLogosDefault()` dari GAS Editor setelah deploy untuk daftarkan semua logo |
+| 32 | Header sheet standar menggunakan `buatHeaderSheet(sheet, brandKey, judulDokumen, maxCol)` |
+
+---
+
+## Sinkronisasi Data Rules
+
+| # | Rule |
+|---|------|
+| 33 | SSoT data staff: Supabase `employees` → sync ke sheet `Database Staff` via `syncStaffKeDatabaseStaff()` |
+| 34 | SSoT data driver: Supabase `drivers` → sync ke sheet `Database Driver Airport` + `Database Driver External` via `syncDriversDariSupabase()` |
+| 35 | Input staff baru: melalui sheet `Input Staff` → `prosesInputStaff()` → Supabase → auto-sync |
+| 36 | Input driver baru: melalui sheet `Input Driver Airport/External` → `prosesInputDriver()` → Supabase → auto-sync |
+| 37 | Jangan edit sheet `Database Staff` / `Database Driver` secara manual — akan ditimpa saat sync |
+| 38 | Auto-sync terjadwal: setiap 6 jam via trigger GAS (`setupStaffSyncTrigger`, `setupDriverSyncTrigger`) |
+| 39 | Data PII (nama, HP, gaji, email, PIN staff/driver) — jangan commit ke GitHub dalam format apapun |
+
+---
+
+## Setup Awal GAS (Setelah Deploy)
+
+Urutan setup yang harus dijalankan **sekali** dari GAS Editor setelah deploy ke GAS:
+
+1. `setupBrandingLogosDefault()` — daftarkan Drive File ID semua logo
+2. `testInsertLogo()` — verifikasi logo terpasang (hapus sheet TEST_LOGO setelah selesai)
+3. `setupLaporanCabangSheet()` — terapkan header logo ke sheet Laporan Cabang
+4. `setupDatabaseStaffSheet()` — buat sheet Database Staff
+5. `setupInputStaffSheet()` — buat sheet Input Staff
+6. `setupDriverSheets()` — buat sheet Input Driver Airport + External
+7. `setupStaffSyncTrigger()` — pasang trigger auto-sync staff setiap 6 jam
+8. `setupDriverSyncTrigger()` — pasang trigger auto-sync driver setiap 6 jam
+
+---
+
 *Pelanggaran terhadap aturan ini harus didiskusikan sebelum implementasi.*
