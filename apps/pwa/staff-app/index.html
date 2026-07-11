@@ -28,6 +28,17 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     min-height: 100vh;
   }
+  /* Background Maxim di semua halaman — overlay navy agar teks terbaca */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: -1;
+    background: url('bg-maxim.jpg') center/cover no-repeat;
+  }
+  body::after {
+    content: '';
+    position: fixed; inset: 0; z-index: -1;
+    background: linear-gradient(180deg, rgba(15,23,42,0.93), rgba(15,23,42,0.88));
+  }
 
   header {
     background: linear-gradient(135deg, var(--red), #7a1414);
@@ -44,7 +55,13 @@
 
   /* ── LOGIN ─────────────────────────────── */
   #loginView { padding: 40px 22px; max-width: 400px; margin: 0 auto; }
-  #loginView .logo-big { display: block; width: 84px; height: 84px; border-radius: 18px; margin: 0 auto 16px; box-shadow: 0 4px 18px rgba(0,0,0,0.5); }
+  #loginView .login-card {
+    background: rgba(30,41,59,0.82); border: 1px solid var(--navy3);
+    border-radius: 18px; padding: 28px 22px 24px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    backdrop-filter: blur(6px);
+  }
+  #loginView .logo-big { display: block; width: 110px; height: 110px; object-fit: contain; border-radius: 20px; margin: 0 auto 16px; box-shadow: 0 4px 18px rgba(0,0,0,0.5); background: #fff; padding: 6px; }
   #loginView h2 { text-align: center; font-size: 19px; margin-bottom: 4px; }
   #loginView .tag { text-align: center; font-size: 11.5px; color: var(--text2); margin-bottom: 28px; }
   .field { margin-bottom: 14px; }
@@ -67,7 +84,8 @@
   /* ── TABS ──────────────────────────────── */
   nav {
     display: flex; position: fixed; bottom: 0; left: 0; right: 0;
-    background: var(--navy2); border-top: 1px solid var(--navy3); z-index: 20;
+    background: rgba(30,41,59,0.95); backdrop-filter: blur(8px);
+    border-top: 1px solid var(--navy3); z-index: 20;
     padding-bottom: env(safe-area-inset-bottom);
   }
   nav button {
@@ -150,25 +168,27 @@
 
 <!-- ═══ LOGIN ═══ -->
 <div id="loginView">
-  <img class="logo-big" src="icon-512.png" alt="RIFIM">
-  <h2>RIFIM STAFF</h2>
-  <div class="tag">PT RIFIM INTERNASIONAL GEMILANG</div>
-  <div class="field">
-    <label>ID Staff</label>
-    <input id="inStaffId" placeholder="RIF0001" autocapitalize="characters" autocomplete="username">
+  <div class="login-card">
+    <img class="logo-big" src="logo-rifim.png" alt="RIFIM">
+    <h2>RIFIM STAFF</h2>
+    <div class="tag">PT RIFIM INTERNASIONAL GEMILANG</div>
+    <div class="field">
+      <label>ID Staff</label>
+      <input id="inStaffId" placeholder="RIF0001" autocapitalize="characters" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>PIN</label>
+      <input id="inPin" type="password" inputmode="numeric" placeholder="••••••" autocomplete="current-password">
+    </div>
+    <button class="btn" id="btnLogin" onclick="doLogin()">Masuk</button>
+    <div class="err" id="loginErr"></div>
   </div>
-  <div class="field">
-    <label>PIN</label>
-    <input id="inPin" type="password" inputmode="numeric" placeholder="••••••" autocomplete="current-password">
-  </div>
-  <button class="btn" id="btnLogin" onclick="doLogin()">Masuk</button>
-  <div class="err" id="loginErr"></div>
 </div>
 
 <!-- ═══ APP ═══ -->
 <div id="appView" style="display:none">
   <header>
-    <img class="logo" src="icon-512.png" alt="RIFIM">
+    <img class="logo" src="logo-rifim.png" alt="RIFIM" style="background:#fff;padding:2px;object-fit:contain">
     <div class="titles">
       <h1 id="hdrNama">—</h1>
       <div class="sub" id="hdrCabang">—</div>

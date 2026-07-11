@@ -151,16 +151,33 @@ Format: `type(scope): description`
 
 ## Setup Awal GAS (Setelah Deploy)
 
+> Cara menjalankan: buka GAS Editor → pilih **file** di panel kiri → pilih **nama fungsi** di dropdown toolbar → klik **Run**.
+
 Urutan setup yang harus dijalankan **sekali** dari GAS Editor setelah deploy ke GAS:
 
-1. `setupBrandingLogosDefault()` — daftarkan Drive File ID semua logo
-2. `testInsertLogo()` — verifikasi logo terpasang (hapus sheet TEST_LOGO setelah selesai)
-3. `setupLaporanCabangSheet()` — terapkan header logo ke sheet Laporan Cabang
-4. `setupDatabaseStaffSheet()` — buat sheet Database Staff
-5. `setupInputStaffSheet()` — buat sheet Input Staff
-6. `setupDriverSheets()` — buat sheet Input Driver Airport + External
-7. `setupStaffSyncTrigger()` — pasang trigger auto-sync staff setiap 6 jam
-8. `setupDriverSyncTrigger()` — pasang trigger auto-sync driver setiap 6 jam
+| # | Fungsi | File | Keterangan |
+|---|--------|------|------------|
+| 1 | `setupBrandingLogosDefault()` | `brandingEngine.js` | Daftarkan Drive File ID semua logo |
+| 2 | `testInsertLogo()` | `brandingEngine.js` | Verifikasi logo terpasang (hapus sheet TEST_LOGO setelah selesai) |
+| 3 | `setupLaporanCabangSheet()` | `raosLaporanEngine.js` | Terapkan header logo ke sheet Laporan Cabang |
+| 4 | `setupDatabaseStaffSheet()` | `hrisSyncLayer.js` | Buat sheet Database Staff |
+| 5 | `setupInputStaffSheet()` | `hrisSyncLayer.js` | Buat sheet Input Staff |
+| 6 | `setupDriverSheets()` | `raosDriverLayer.js` | Buat sheet Input Driver Airport + External |
+| 7 | `setupStaffSyncTrigger()` | `hrisSyncLayer.js` | Trigger auto-sync staff setiap 6 jam |
+| 8 | `setupDriverSyncTrigger()` | `raosDriverLayer.js` | Trigger auto-sync driver setiap 6 jam |
+| 9 | `setupRaosSheets()` | `setupRaosSheets.js` | Buat semua sheet RAOS (Form Input Saldo PWA, Input Potongan 1/2, dll) |
+| 10 | `setupStaffAppSheets()` | `staffAppApi.js` | Buat sheet Absensi Staff + Antrian Bandara + kolom Validasi J-L (Staff PWA) |
+| 11 | `setupMonitoringSheets()` | `raosMonitoringEngine.js` | Buat sheet MONITORING_SALDO + MONITORING_POTONGAN |
+| 12 | `setupMonitoringTriggers()` | `raosMonitoringEngine.js` | Pasang trigger monitoring tiap 5 menit |
+
+### Property Wajib untuk Staff PWA (PropertiesService)
+
+| Property | Format | Keterangan |
+|----------|--------|------------|
+| `GEOFENCE_CABANG` | JSON `{"ID Rifim Airport Batam": [1.121, 104.119], ...}` | Koordinat geofence absensi per cabang. Tanpa ini absensi jalan tapi status "TIDAK DICEK" |
+| `ABSENSI_FOTO_FOLDER_ID` | Drive Folder ID | Auto-dibuat saat absensi pertama; bisa diisi manual |
+
+> **Reminder Redeploy:** setiap perubahan file `automation/apps-script/*.js` di GitHub → clasp push otomatis, tapi **Web App wajib redeploy manual**: Deploy → Manage deployments → ✏️ → Version: New version → Deploy.
 
 ---
 
