@@ -295,7 +295,10 @@ function _pindahDataPotonganByName(sheetName) {
 
     var price          = row[_PT_COL.PRICE - 1];           // B
     var loginId        = row[_PT_COL.LOGIN_ID - 1];        // C
-    var waktuOrder     = row[_PT_COL.WAKTU_ORDER - 1];     // D
+    // WAKTU_ORDER dari AIST: "11.07.2026 18:40" (string dd.MM.yyyy HH:mm tanpa detik)
+    // Konversi ke Date agar Sheets bisa baca sebagai tanggal & monitoring engine bisa parse
+    var waktuOrderRaw  = row[_PT_COL.WAKTU_ORDER - 1];    // D
+    var waktuOrder     = _parseAISTDate(waktuOrderRaw);    // → Date object jika bisa, raw jika tidak
     var offline        = row[_PT_COL.OFFLINE - 1];         // E (boolean)
     var kodeOpsional   = row[_PT_COL.KODE_OPSIONAL - 1];  // F
     var namaDriver     = row[_PT_COL.NAMA_DRIVER - 1];     // H
@@ -303,7 +306,7 @@ function _pindahDataPotonganByName(sheetName) {
     var hakDriver      = row[_PT_COL.HAK_DRIVER - 1];      // J
 
     var surchargeOffline = (offline === true) ? Math.round(Number(price) * 0.12) : 0;
-    var tipeWaktu        = _tipeWaktu(waktuOrder);
+    var tipeWaktu        = _tipeWaktu(waktuOrder); // _tipeWaktu() handle Date, number, dan string
 
     lastIdNum++;
     var newId = 'POT-' + ('0000' + lastIdNum).slice(-4);
@@ -402,12 +405,8 @@ function hapusPotonganBulanSebelumnya() {
   var rowsDeleted = 0;
   for (var i = data.length - 1; i >= 2; i--) { // Skip header (row 1) dan note (row 2)
     var waktu   = data[i][_DB_COL.TANGGAL - 1]; // Kolom B
-    var rowDate = null;
-    if (waktu instanceof Date) {
-      rowDate = waktu;
-    } else if (typeof waktu === 'string' && waktu.trim() !== '') {
-      rowDate = new Date(waktu);
-    }
+    var parsed  = _parseAISTDate(waktu);
+    var rowDate = (parsed instanceof Date && !isNaN(parsed.getTime())) ? parsed : null;
     if (rowDate && !isNaN(rowDate.getTime())) {
       if (rowDate.getMonth() === prevMonth && rowDate.getFullYear() === prevYear) {
         sheet.deleteRow(i + 1);
@@ -419,8 +418,33 @@ function hapusPotonganBulanSebelumnya() {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// 5. HELPER — Tipe Waktu
+// 5. HELPER — Date Parser & Tipe Waktu
 // ══════════════════════════════════════════════════════════════════
+
+/**
+ * Parse format tanggal dari AIST ke Date object.
+ * Handle semua format yang muncul di paste AIST:
+ *   "11.07.2026 18:40"       → dd.MM.yyyy HH:mm  (Input Potongan col D, tanpa detik)
+ *   "11.07.2026 21:40:26"    → dd.MM.yyyy HH:mm:ss (Form Input Saldo AIST col A, dengan detik)
+ *   "07/11/2026 18:40:00"    → MM/dd/yyyy (varian US, kalau ada)
+ * Jika raw sudah Date atau tidak bisa diparse → kembalikan raw.
+ * Dipanggil dari raosPotonganEngine.js dan raosMenuEngine.js (shared GAS scope).
+ */
+function _parseAISTDate(raw) {
+  if (!raw) return raw;
+  if (raw instanceof Date) return isNaN(raw.getTime()) ? raw : raw;
+  var s = String(raw).trim();
+  // dd.MM.yyyy HH:mm:ss atau dd.MM.yyyy HH:mm (separator titik)
+  var m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +(m[6] || 0));
+  // dd/MM/yyyy HH:mm:ss atau dd/MM/yyyy HH:mm (separator slash, format GAS)
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +(m[6] || 0));
+  // dd-MM-yyyy HH:mm:ss atau dd-MM-yyyy HH:mm (separator strip)
+  m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +(m[6] || 0));
+  return raw; // kembalikan original jika tidak ada yang match
+}
 
 /**
  * Hitung tipe waktu dari waktu order (sama dengan TIME() di spreadsheet).

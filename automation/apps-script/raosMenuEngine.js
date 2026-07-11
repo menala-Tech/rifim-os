@@ -181,8 +181,10 @@ function pindahTransaksiAISTKeDatabase() {
 
   for (var i = 0; i < data.length; i++) {
     // Patokan: Tanggal (kolom A) tidak kosong — pola Ops sistem final.gs
-    var tanggal = data[i][_AIST_FORM_COL.TANGGAL - 1]; // A
-    if (!tanggal || tanggal.toString().trim() === '') continue;
+    var tanggalRaw = data[i][_AIST_FORM_COL.TANGGAL - 1]; // A
+    if (!tanggalRaw || tanggalRaw.toString().trim() === '') continue;
+    // Tanggal AIST: "11.07.2026 21:40:26" (string dd.MM.yyyy HH:mm:ss) → Date object
+    var tanggal = _parseAISTDate(tanggalRaw);
 
     // SUM bisa berupa number (dari ops_AIST_RIFIM_OS.gs) atau string "45 000" (manual paste)
     var sumRaw        = data[i][_AIST_FORM_COL.SUM - 1];
@@ -263,7 +265,8 @@ function hapusTransaksiAISTBulanSebelumnya() {
   var rowsDeleted = 0;
   for (var i = data.length - 1; i >= 2; i--) {
     var tgl     = data[i][_AIST_DB_COL.TANGGAL - 1];
-    var rowDate = (tgl instanceof Date) ? tgl : (tgl ? new Date(tgl) : null);
+    var parsed  = _parseAISTDate(tgl);
+    var rowDate = (parsed instanceof Date && !isNaN(parsed.getTime())) ? parsed : null;
     if (rowDate && !isNaN(rowDate.getTime())) {
       if (rowDate.getMonth() === prevMonth && rowDate.getFullYear() === prevYear) {
         sheet.deleteRow(i + 1);
