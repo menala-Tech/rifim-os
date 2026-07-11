@@ -87,4 +87,40 @@ Format: `type(scope): description`
 
 ---
 
+## Logo & Branding Rules
+
+> Setiap kali user meminta logo perusahaan, Claude WAJIB menggunakan file dari:
+> **`C:\Users\ADMIN\Documents\RIFIM\rifim-os\branding\logo\`**
+> (atau path GitHub: `branding/logo/` di repo `menala-Tech/rifim-os`)
+
+### Mapping Logo Perusahaan
+
+| Perintah / Entitas | File Logo | Path Lokal |
+|--------------------|-----------|------------|
+| **PT. Menala Internasional Gemilang** | `logo-menala.png` | `branding/logo/logo-menala.png` |
+| **PT. RIFIM Internasional Gemilang** | `logo-rifim.png` | `branding/logo/logo-rifim.png` |
+| **CV. LailanKalilan Indonesia** | `logo-lailan.png` | `branding/logo/logo-lailan.png` |
+| **Maxim** | `logo-maxim.png` | `branding/logo/logo-maxim.png` |
+| **Semua Perusahaan / Rifim Group** | `logo-rifim-group.jpg` | `branding/logo/logo-rifim-group.jpg` |
+| **Icon App / PWA** | `icon-192.png` | `branding/icon/icon-192.png` |
+
+### Mapping Stempel Perusahaan
+
+| Entitas | File Stempel | Path Lokal |
+|---------|-------------|------------|
+| PT. Menala Internasional Gemilang | `stempel-menala.png` | `branding/logo/stempel-menala.png` |
+| PT. RIFIM Internasional Gemilang | `stempel-rifim.png` | `branding/logo/stempel-rifim.png` |
+| CV. LailanKalilan Indonesia | `stempel-lailan.png` | `branding/logo/stempel-lailan.png` |
+
+### Aturan Penggunaan Logo
+
+| # | Rule |
+|---|------|
+| 24 | Gunakan logo dari `branding/logo/` — jangan upload ulang atau hardcode base64 |
+| 25 | Referensi logo di HTML/GAS menggunakan path relatif dari root proyek |
+| 26 | Jangan ganti atau rename file logo tanpa update tabel mapping ini |
+| 27 | Jika ada logo baru, tambahkan ke `branding/logo/` dan update tabel di atas |
+
+---
+
 *Pelanggaran terhadap aturan ini harus didiskusikan sebelum implementasi.*

@@ -41,6 +41,19 @@ Monitor Koordinator PWA/
 Monitor Order PWA/
 Monitor Saldo PWA/
 
+# File logo/gambar di root (sudah dipindah ke branding/logo/)
+logo Menala.png
+logo PT.Rifim.png
+logo lailan.png
+Maxim.png
+Logo Rifim Group.jpg
+icon-192.png
+Icon.jpeg
+logo dashboard.jpeg
+stempel Menala.png
+stempel Rifim.png
+stempel lailankalilan.png
+
 # Build
 dist/
 build/

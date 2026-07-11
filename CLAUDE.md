@@ -7,6 +7,32 @@ Status: Active
 
 ---
 
+## Logo Perusahaan (WAJIB)
+
+Setiap kali user meminta logo perusahaan — dalam dokumen, template HTML, GAS, atau output apapun — Claude WAJIB langsung mengambil file dari folder lokal berikut **tanpa menunggu konfirmasi**:
+
+```
+C:\Users\ADMIN\Documents\RIFIM\rifim-os\branding\logo\
+```
+
+### Mapping Cepat Logo
+
+| Kata kunci / Perusahaan | File yang digunakan |
+|-------------------------|---------------------|
+| Menala / PT. Menala Internasional Gemilang | `branding/logo/logo-menala.png` |
+| Rifim / PT. RIFIM Internasional Gemilang | `branding/logo/logo-rifim.png` |
+| Lailan / CV. LailanKalilan Indonesia | `branding/logo/logo-lailan.png` |
+| Maxim | `branding/logo/logo-maxim.png` |
+| Rifim Group / Grup / Semua Perusahaan | `branding/logo/logo-rifim-group.jpg` |
+| Icon / PWA icon | `branding/icon/icon-192.png` |
+| Stempel Menala | `branding/logo/stempel-menala.png` |
+| Stempel Rifim | `branding/logo/stempel-rifim.png` |
+| Stempel Lailan | `branding/logo/stempel-lailan.png` |
+
+> Mapping lengkap + aturan stempel ada di `PROJECT_RULES.md` bagian **Logo & Branding Rules**.
+
+---
+
 ## Working Directory (WAJIB)
 
 **Semua file proyek HANYA boleh dibaca dan disimpan di:**
