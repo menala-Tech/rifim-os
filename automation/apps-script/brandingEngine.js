@@ -15,6 +15,16 @@
  *   ICON        → Icon App / PWA                      → branding/icon/icon-192.png
  */
 
+// ── Drive File ID logo (dari Google Drive RIFIM OS) ───────────────────────
+var _BRAND_DEFAULT_IDS = {
+  rifim      : '18-NTlBapUE0O1Q6Dlp-MEDYWRHGlx5Q8',  // logo-rifim.png
+  menala     : '1djlEyVUP7snT_LNd9ueA5tLjycQnQ-9F',   // logo-menala.png
+  lailan     : '17mfkZ8xA-TSzKqIRi9XEGT-LHobD9N_I',   // logo-lailan.png
+  maxim      : '1_aHRncn4AQbdRTCtNpw7xHiG4tyCfjgV',   // logo-maxim.png
+  rifimGroup : '1UnPiMQst1bTZu3euK2io1ns5JBETluSx',   // logo-rifim-group.jpg
+  icon       : '1R6gSt3BfwkxxgJKCSV7hP5SibE8bKn81',   // icon-192.png
+};
+
 // ── Kunci PropertiesService ────────────────────────────────────────────────
 var BRAND_KEY = {
   RIFIM       : 'brand_logo_rifim',
@@ -74,6 +84,15 @@ var BRAND_INFO = {
  *
  * @param {Object} params
  */
+/**
+ * Setup logo menggunakan Drive File ID default (sudah tersimpan di kode).
+ * Jalankan SEKALI dari GAS Editor setelah deploy.
+ * Tidak perlu input apapun — ID sudah tertanam di _BRAND_DEFAULT_IDS.
+ */
+function setupBrandingLogosDefault() {
+  setupBrandingLogos(_BRAND_DEFAULT_IDS);
+}
+
 function setupBrandingLogos(params) {
   if (!params) {
     SpreadsheetApp.getUi().alert(
