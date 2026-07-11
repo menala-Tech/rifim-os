@@ -58,6 +58,9 @@ function onOpen() {
         .addItem('Setup Trigger OnEdit Saldo AIST', 'setupTriggerSaldoAISTOnEdit')
         .addSeparator()
         .addItem('Test Tipe Waktu',                 'testTipeWaktu')
+        .addSeparator()
+        .addItem('🖼️ Setup Logo Perusahaan',        'setupBrandingLogosUI')
+        .addItem('🖼️ Test Insert Logo ke Sheet',    'testInsertLogo')
     )
 
     .addToUi();
@@ -92,6 +95,38 @@ function onOpen() {
     .addItem('PDF → Kirim WA Grup',       'pdfKirimKeWAGrup')
     .addItem('PDF → Kirim Email',         'pdfKirimViaEmail')
     .addToUi();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SETUP LOGO VIA UI (panggil dari menu)
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * Dialog panduan setup logo — minta admin input Drive File ID satu per satu.
+ * Dipanggil dari menu Setup → Setup Logo Perusahaan.
+ */
+function setupBrandingLogosUI() {
+  var ui = SpreadsheetApp.getUi();
+
+  ui.alert(
+    '🖼️ Setup Logo Perusahaan',
+    'Cara mendapatkan Drive File ID logo:\n\n' +
+    '1. Upload file logo ke Google Drive\n' +
+    '2. Klik kanan file → "Bagikan" → copy link\n' +
+    '3. Ambil ID dari URL:\n' +
+    '   drive.google.com/file/d/[FILE_ID]/view\n\n' +
+    'Setelah dapat File ID, jalankan fungsi ini\n' +
+    'dari GAS Editor:\n\n' +
+    'setupBrandingLogos({\n' +
+    '  rifim      : "ID_LOGO_RIFIM",\n' +
+    '  menala     : "ID_LOGO_MENALA",\n' +
+    '  lailan     : "ID_LOGO_LAILAN",\n' +
+    '  maxim      : "ID_LOGO_MAXIM",\n' +
+    '  rifimGroup : "ID_LOGO_GROUP",\n' +
+    '  icon       : "ID_ICON",\n' +
+    '})',
+    ui.ButtonSet.OK
+  );
 }
 
 // ══════════════════════════════════════════════════════════════════

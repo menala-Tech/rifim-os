@@ -20,8 +20,10 @@ var _LAPORAN_FOLDER_KEY     = 'laporan_pdf_folder_id';       // PropertiesServic
 var _LAPORAN_MAIN_FOLDER    = '19taBn0YXxjXTb-SxqFXGhwOPShZ4VlIt';
 var _LAPORAN_SUBFOLDER_NAME = 'LAPORAN CABANG PDF';
 
-var _LAPORAN_HEADER_ROW = 6;   // baris header kolom
-var _LAPORAN_DATA_ROW   = 7;   // baris awal data
+var _LAPORAN_HEADER_ROW = 7;   // baris header kolom
+var _LAPORAN_DATA_ROW   = 8;   // baris awal data
+var _LAPORAN_CABANG_ROW = 4;   // baris filter cabang (B4)
+var _LAPORAN_TGL_ROW    = 5;   // baris filter tanggal (B5)
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 1. SETUP
@@ -56,33 +58,58 @@ function setupLaporanCabangSheet() {
   if (!sheet) {
     sheet = ss.insertSheet(_LAPORAN_SHEET_NAME);
   } else {
+    sheet.getImages().forEach(function(i) { i.remove(); });
     sheet.clear();
-    var merges = sheet.getMergedRanges();
-    merges.forEach(function(m) { m.breakApart(); });
+    sheet.getMergedRanges().forEach(function(m) { try { m.breakApart(); } catch(e) {} });
   }
 
   // ── Lebar kolom ──────────────────────────────────────────────────────────
-  sheet.setColumnWidth(1, 50);   // A: No
-  sheet.setColumnWidth(2, 145);  // B: Login ID
-  sheet.setColumnWidth(3, 175);  // C: Nominal Tagihan
-  sheet.setColumnWidth(4, 235);  // D: Nama Driver
-  sheet.setColumnWidth(5, 175);  // E: Total Tagihan
+  sheet.setColumnWidth(1, 110);  // A: area logo
+  sheet.setColumnWidth(2, 130);  // B: Login ID
+  sheet.setColumnWidth(3, 160);  // C: Nominal Tagihan
+  sheet.setColumnWidth(4, 220);  // D: Nama Driver
+  sheet.setColumnWidth(5, 155);  // E: Total Tagihan
 
-  // ── Row 1-2: Title (merged, dark navy) ───────────────────────────────────
-  sheet.getRange('A1:D2').merge()
-    .setValue('INVOICE TAGIHAN INTERN CABANG')
-    .setFontSize(16).setFontWeight('bold')
-    .setFontColor('#FFFFFF').setBackground('#0D2A5E')
-    .setHorizontalAlignment('center').setVerticalAlignment('middle');
-  sheet.setRowHeight(1, 38);
+  // ── Row 1-2: Header dengan logo ───────────────────────────────────────────
+  // A1:A2 merge → area logo (warna latar, gambar di-overlay)
+  sheet.getRange('A1:A2').merge()
+    .setBackground('#0D2A5E');
+  sheet.setRowHeight(1, 55);
   sheet.setRowHeight(2, 38);
 
-  // ── Row 3: Dropdown Id Cabang ─────────────────────────────────────────────
-  sheet.getRange('A3').setValue('Cabang:')
-    .setFontWeight('bold').setVerticalAlignment('middle');
-  sheet.getRange('B3:C3').merge()
-    .setBackground('#FFE599')
-    .setHorizontalAlignment('left').setVerticalAlignment('middle');
+  // B1:E1 → nama perusahaan
+  sheet.getRange('B1:E1').merge()
+    .setValue('PT. RIFIM INTERNASIONAL GEMILANG')
+    .setBackground('#0D2A5E').setFontColor('#FFFFFF')
+    .setFontSize(13).setFontWeight('bold').setFontFamily('Arial')
+    .setHorizontalAlignment('left').setVerticalAlignment('middle')
+    .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+  sheet.getRange('B1').setFontWeight('bold');
+
+  // B2:E2 → judul dokumen + cabang-cabang
+  sheet.getRange('B2:E2').merge()
+    .setValue('INVOICE TAGIHAN INTERN CABANG   |   Batam · Jambi · Balikpapan · Manado · Pekanbaru')
+    .setBackground('#0D2A5E').setFontColor('#FFE599')
+    .setFontSize(9).setFontWeight('bold').setFontFamily('Arial')
+    .setHorizontalAlignment('left').setVerticalAlignment('middle')
+    .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+
+  // Sisipkan logo RIFIM di A1 (100×85px, offset 5,5)
+  insertLogoKeSheet(sheet, BRAND_KEY.RIFIM, 1, 1, 100, 85, 5, 5);
+
+  // ── Row 3: spacer ─────────────────────────────────────────────────────────
+  sheet.setRowHeight(3, 8);
+  sheet.getRange('A3:E3').setBackground('#FFFFFF');
+
+  // ── Row 4: Dropdown Id Cabang ─────────────────────────────────────────────
+  sheet.getRange('A4').setValue('Cabang :')
+    .setFontWeight('bold').setFontSize(10).setVerticalAlignment('middle')
+    .setHorizontalAlignment('right');
+  sheet.getRange('B4:D4').merge()
+    .setBackground('#FFF2CC').setBorder(true, true, true, true, false, false,
+      '#CCCCCC', SpreadsheetApp.BorderStyle.SOLID)
+    .setHorizontalAlignment('left').setVerticalAlignment('middle').setFontSize(10);
+  sheet.setRowHeight(4, 28);
 
   var _cabangList = [
     'ID Rifim Airport Batam',
@@ -93,47 +120,55 @@ function setupLaporanCabangSheet() {
     'ID Rifim Airport Manado',
     'ID Rifim Airport Pekanbaru',
   ];
-  var dropdownRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(_cabangList, true)
-    .setAllowInvalid(false)
-    .setHelpText('Pilih Id Cabang dari daftar')
-    .build();
-  sheet.getRange('B3').setDataValidation(dropdownRule);
-  sheet.setRowHeight(3, 30);
+  sheet.getRange('B4').setDataValidation(
+    SpreadsheetApp.newDataValidation()
+      .requireValueInList(_cabangList, true)
+      .setAllowInvalid(false)
+      .setHelpText('Pilih Id Cabang dari daftar')
+      .build()
+  );
 
-  // ── Row 4: Tanggal (date picker muncul otomatis) ──────────────────────────
-  sheet.getRange('A4').setValue('Tanggal:')
-    .setFontWeight('bold').setVerticalAlignment('middle');
-  sheet.getRange('B4')
+  // ── Row 5: Tanggal ────────────────────────────────────────────────────────
+  sheet.getRange('A5').setValue('Tanggal :')
+    .setFontWeight('bold').setFontSize(10).setVerticalAlignment('middle')
+    .setHorizontalAlignment('right');
+  sheet.getRange('B5')
     .setValue(new Date())
     .setNumberFormat('dd/MM/yyyy')
-    .setFontColor('#EA4335').setFontWeight('bold').setVerticalAlignment('middle');
-  var dateRule = SpreadsheetApp.newDataValidation()
-    .requireDate()
-    .setAllowInvalid(false)
-    .setHelpText('Pilih tanggal laporan')
-    .build();
-  sheet.getRange('B4').setDataValidation(dateRule);
-  sheet.setRowHeight(4, 28);
+    .setFontColor('#C0392B').setFontWeight('bold').setFontSize(10)
+    .setVerticalAlignment('middle')
+    .setBorder(true, true, true, true, false, false, '#CCCCCC', SpreadsheetApp.BorderStyle.SOLID)
+    .setBackground('#FFF2CC');
+  sheet.getRange('B5').setDataValidation(
+    SpreadsheetApp.newDataValidation()
+      .requireDate().setAllowInvalid(false)
+      .setHelpText('Pilih tanggal laporan').build()
+  );
+  sheet.setRowHeight(5, 28);
 
-  // ── Row 5: spacer ─────────────────────────────────────────────────────────
-  sheet.setRowHeight(5, 10);
+  // ── Row 6: spacer ─────────────────────────────────────────────────────────
+  sheet.setRowHeight(6, 8);
 
-  // ── Row 6: Header kolom (dark navy, white bold) ───────────────────────────
-  sheet.getRange(6, 1, 1, 5)
+  // ── Row 7: Header kolom tabel ─────────────────────────────────────────────
+  sheet.getRange(7, 1, 1, 5)
     .setValues([['No', 'Login ID', 'Nominal Tagihan (Net)', 'NAMA DRIVER', 'TOTAL TAGIHAN']])
     .setBackground('#0D2A5E').setFontColor('#FFFFFF').setFontWeight('bold')
-    .setHorizontalAlignment('center').setVerticalAlignment('middle');
-  sheet.setRowHeight(6, 36);
+    .setFontSize(10).setFontFamily('Arial')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle')
+    .setBorder(true, true, true, true, true, false,
+      '#1A4080', SpreadsheetApp.BorderStyle.SOLID);
+  sheet.setRowHeight(7, 34);
 
-  sheet.setFrozenRows(6);
+  sheet.setFrozenRows(7);
 
-  Logger.log('✅ Sheet ' + _LAPORAN_SHEET_NAME + ' berhasil di-setup.');
+  // Update konstanta baris (row 7 = header, row 8 = data mulai)
+  Logger.log('✅ Sheet ' + _LAPORAN_SHEET_NAME + ' berhasil di-setup dengan logo.');
   SpreadsheetApp.getUi().alert(
-    '✅ Sheet "' + _LAPORAN_SHEET_NAME + '" siap!\n\n' +
+    '✅ Sheet "' + _LAPORAN_SHEET_NAME + '" siap dengan logo!\n\n' +
     'Langkah selanjutnya:\n' +
-    '1. Isi nama Cabang di sel B3\n' +
-    '2. Klik PDF & WA → Generate Laporan Cabang');
+    '1. Pilih Cabang di sel B4\n' +
+    '2. Pilih Tanggal di sel B5\n' +
+    '3. Klik PDF & WA → Generate Laporan Cabang');
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -155,15 +190,15 @@ function generateLaporanCabang() {
     return;
   }
 
-  var cabang = sheet.getRange('B3').getValue().toString().trim();
+  var cabang = sheet.getRange('B' + _LAPORAN_CABANG_ROW).getValue().toString().trim();
   if (!cabang) {
     SpreadsheetApp.getUi().alert(
-      'Pilih Cabang di sel B3 (klik → pilih dari dropdown).\n\nContoh: ID Rifim Airport Pekanbaru');
+      'Pilih Cabang di sel B4 (klik → pilih dari dropdown).\n\nContoh: ID Rifim Airport Pekanbaru');
     return;
   }
 
-  // Baca tanggal filter dari B4
-  var tglRaw = sheet.getRange('B4').getValue();
+  // Baca tanggal filter dari B5
+  var tglRaw = sheet.getRange('B' + _LAPORAN_TGL_ROW).getValue();
   var filterDate = (tglRaw instanceof Date && !isNaN(tglRaw.getTime()))
                      ? tglRaw : new Date();
   var filterY = filterDate.getFullYear();
@@ -337,7 +372,7 @@ function pdfSimpanKeDrive() {
 function pdfKirimViaEmail() {
   var ss     = SpreadsheetApp.openById(RAOS_SS_ID);
   var sheet  = ss.getSheetByName(_LAPORAN_SHEET_NAME);
-  var cabang = sheet ? sheet.getRange('B3').getValue().toString().trim() : '';
+  var cabang = sheet ? sheet.getRange('B' + _LAPORAN_CABANG_ROW).getValue().toString().trim() : '';
 
   if (!cabang) {
     SpreadsheetApp.getUi().alert(
@@ -380,7 +415,7 @@ function pdfKirimViaEmail() {
 function pdfKirimKeWAGrup() {
   var ss     = SpreadsheetApp.openById(RAOS_SS_ID);
   var sheet  = ss.getSheetByName(_LAPORAN_SHEET_NAME);
-  var cabang = sheet ? sheet.getRange('B3').getValue().toString().trim() : '';
+  var cabang = sheet ? sheet.getRange('B' + _LAPORAN_CABANG_ROW).getValue().toString().trim() : '';
 
   if (!cabang) {
     SpreadsheetApp.getUi().alert(
