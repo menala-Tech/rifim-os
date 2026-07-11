@@ -23,7 +23,7 @@ var _BRAND_DEFAULT_IDS = {
   lailan     : '1WC0wBexm6zIjuoKF_KEb7Znpk3Bwdv6V',  // logo-lailan.png
   maxim      : '1OC2cFMTGhGSzfkRwtLYs_ZBlaHGBe6gh',  // logo-maxim.png
   rifimGroup : '1oX0JnQSRFlVfgoctTqJQ9cz30F-Oehw3',  // logo-rifim-group.jpg
-  icon       : '',                                     // icon-192.png (belum diupload)
+  icon       : '1GVCau2MeBXFt-yM7-B8_aSSGVp3VDS3U',  // icon-192.png
 };
 
 // ── Kunci PropertiesService ────────────────────────────────────────────────
