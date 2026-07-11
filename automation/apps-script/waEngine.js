@@ -69,6 +69,19 @@ function waSendToGroup(pesan) {
 }
 
 /**
+ * Kirim pesan WA ke target ARBITRARY (grup per-cabang, nomor spesifik, dll).
+ * Dipakai oleh monitoring engine yang mengirim ke banyak grup berbeda.
+ *
+ * @param {string} target - Group ID (format: 12036xxx@g.us) atau nomor (628xxx)
+ * @param {string} pesan  - Isi pesan
+ * @returns {object} Response Fonnte
+ */
+function waSendToTarget(target, pesan) {
+  if (!target) throw new Error('WA Engine: target tidak boleh kosong.');
+  return _fonntePost_(String(target), pesan);
+}
+
+/**
  * Kirim pesan WA ke banyak nomor sekaligus (batch).
  * Jeda 1 detik antar pesan untuk menghindari rate-limit Fonnte.
  *

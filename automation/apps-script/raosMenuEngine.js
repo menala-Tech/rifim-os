@@ -53,9 +53,32 @@ function onOpen() {
         .addItem('Setup Sheet Laporan Cabang',      'setupLaporanCabangSheet')
         .addItem('Setup Folder PDF Drive',          'setupLaporanFolder')
         .addSeparator()
+        .addItem('Setup Sheet Monitoring',          'setupMonitoringSheets')
+        .addItem('Setup Trigger Monitoring',        'setupMonitoringTriggers')
+        .addSeparator()
         .addItem('Test Tipe Waktu',                 'testTipeWaktu')
     )
 
+    .addToUi();
+
+  // ─────────────────────────────────────────────────────────────
+  // Menu 3: Monitoring (dashboard real-time)
+  // ─────────────────────────────────────────────────────────────
+  ui.createMenu('📊 Monitoring')
+    .addSubMenu(
+      ui.createMenu('💳 Monitoring Saldo')
+        .addItem('Refresh Dashboard Saldo',         'refreshMonitoringSaldo')
+        .addItem('Cek SLA Saldo (Kirim WA)',        'cekSLASaldo')
+        .addSeparator()
+        .addItem('Test WA Saldo (semua grup)',      'testMonitoringSaldoWA')
+    )
+    .addSubMenu(
+      ui.createMenu('📦 Monitoring Potongan')
+        .addItem('Refresh Dashboard Potongan',      'refreshMonitoringPotongan')
+        .addItem('Cek SLA Potongan (Kirim WA)',     'cekSLAPotongan')
+        .addSeparator()
+        .addItem('Test WA Potongan (semua grup)',   'testMonitoringPotonganWA')
+    )
     .addToUi();
 
   // ─────────────────────────────────────────────────────────────
