@@ -177,7 +177,11 @@ function generateLaporanCabang() {
 
   for (var i = 0; i < filtered.length; i++) {
     var r       = filtered[i];
-    var nominal = Number(r[6]) || 0;
+    // Nominal bisa number (dari DB) atau string "45 000" (jika manual paste)
+    var nominalRaw = r[6];
+    var nominal    = (typeof nominalRaw === 'number')
+                       ? nominalRaw
+                       : Number(String(nominalRaw).replace(/\s+/g, '').replace(/[^0-9.-]/g, '')) || 0;
     totalTagihan += nominal;
     rows.push([i + 1, r[2], nominal, r[4], '']); // No, Login ID, Nominal, Nama Driver, Total(kosong)
   }

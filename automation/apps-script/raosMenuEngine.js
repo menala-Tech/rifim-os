@@ -25,8 +25,15 @@ function onOpen() {
     )
 
     // ─ Saldo AIST ────────────────────────────────────────────────
+    // Item "Ambil Data AIST", "Cek Status", "Reset Lock" hanya aktif
+    // saat ops_AIST_RIFIM_OS.gs ditambahkan sementara ke project GAS.
+    // Tanpa script itu → GAS menampilkan error "function not found" (normal).
     .addSubMenu(
       ui.createMenu('💳 Saldo AIST')
+        .addItem('🤖 Ambil Data AIST',                'ambilDataAIST')    // temp: ops_AIST_RIFIM_OS.gs
+        .addItem('📋 Cek Status (siapa sudah ambil?)', 'cekStatusLock')    // temp: ops_AIST_RIFIM_OS.gs
+        .addItem('🔓 Reset Lock AIST',                'resetLockAIST')    // temp: ops_AIST_RIFIM_OS.gs
+        .addSeparator()
         .addItem('Pindahkan Transaksi AIST → Database AIST', 'pindahTransaksiAISTKeDatabase')
         .addSeparator()
         .addItem('Hapus Transaksi AIST Bulan Sebelumnya',    'hapusTransaksiAISTBulanSebelumnya')
@@ -154,7 +161,11 @@ function pindahTransaksiAISTKeDatabase() {
     var tanggal = data[i][_AIST_FORM_COL.TANGGAL - 1]; // A
     if (!tanggal || tanggal.toString().trim() === '') continue;
 
-    var sum           = data[i][_AIST_FORM_COL.SUM - 1];            // B (nominal AIST)
+    // SUM bisa berupa number (dari ops_AIST_RIFIM_OS.gs) atau string "45 000" (manual paste)
+    var sumRaw        = data[i][_AIST_FORM_COL.SUM - 1];
+    var sum           = (typeof sumRaw === 'number')
+                          ? sumRaw
+                          : Number(String(sumRaw).replace(/\s+/g, '').replace(/[^0-9.-]/g, '')) || sumRaw;
     var creditAccount = data[i][_AIST_FORM_COL.CREDIT_ACCOUNT - 1]; // C
     var loginId       = data[i][_AIST_FORM_COL.LOGIN_ID - 1];       // D
     var namaDriver    = data[i][_AIST_FORM_COL.NAMA_DRIVER - 1];    // F (auto)
