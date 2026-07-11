@@ -30,6 +30,12 @@ temp/
 *.tmp
 *.bak
 
+# Data PII — jangan commit ke git (nama, email, HP, gaji karyawan/driver)
+*_extracted/
+*_insert.sql
+*_supabase.sql
+*.gs
+
 # Build
 dist/
 build/
