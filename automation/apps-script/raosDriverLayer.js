@@ -454,7 +454,7 @@ function setupDriverSyncTrigger() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 6. HELPER Supabase internal
+// 7. HELPER Supabase internal
 // ══════════════════════════════════════════════════════════════════════════════
 
 function _sbUrl(table, params) {
