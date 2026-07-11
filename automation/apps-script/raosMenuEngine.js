@@ -1,20 +1,21 @@
 /**
  * RIFIM OS — Custom Menu Google Sheets
  *
- * Menu "RIFIM OS" muncul di toolbar saat spreadsheet dibuka.
- * onOpen() dipanggil otomatis oleh GAS saat spreadsheet dibuka.
+ * Dua menu di toolbar:
+ *   🚛 RIFIM OS  → operasi data (Potongan, Saldo AIST, Setup)
+ *   📄 PDF & WA  → generate laporan, export PDF, kirim WA/Email
  *
- * Sub-menu:
- *   📦 Potongan Order  → Pindahkan dari Input Potongan 1/2 → Database Potongan
- *   💳 Saldo AIST      → Pindahkan Transaksi AIST → Database AIST
- *   ⚙️  Setup           → Setup sheet, formula, trigger (admin saja)
+ * onOpen() dipanggil otomatis oleh GAS saat spreadsheet dibuka.
  */
 function onOpen() {
   var ui = SpreadsheetApp.getUi();
 
+  // ─────────────────────────────────────────────────────────────
+  // Menu 1: RIFIM OS (operasi data)
+  // ─────────────────────────────────────────────────────────────
   ui.createMenu('🚛 RIFIM OS')
 
-    // ─ Potongan Order ─────────────────────────────────────────────
+    // ─ Potongan Order ────────────────────────────────────────────
     .addSubMenu(
       ui.createMenu('📦 Potongan Order')
         .addItem('Pindahkan dari Input Potongan 1 → Database', 'pindahDataInputPotongan1')
@@ -23,7 +24,7 @@ function onOpen() {
         .addItem('Hapus Data Potongan Bulan Sebelumnya',       'hapusPotonganBulanSebelumnya')
     )
 
-    // ─ Saldo AIST ─────────────────────────────────────────────────
+    // ─ Saldo AIST ────────────────────────────────────────────────
     .addSubMenu(
       ui.createMenu('💳 Saldo AIST')
         .addItem('Pindahkan Transaksi AIST → Database AIST', 'pindahTransaksiAISTKeDatabase')
@@ -33,7 +34,7 @@ function onOpen() {
 
     .addSeparator()
 
-    // ─ Setup (admin) ───────────────────────────────────────────────
+    // ─ Setup (admin) ─────────────────────────────────────────────
     .addSubMenu(
       ui.createMenu('⚙️ Setup')
         .addItem('Setup Semua RAOS Sheets',         'setupRaosSheets')
@@ -42,9 +43,23 @@ function onOpen() {
         .addItem('Setup Formula Input Potongan',    'setupFormulasInputPotongan')
         .addItem('Setup Trigger OnEdit Potongan',   'setupTriggerPotonganOnEdit')
         .addSeparator()
+        .addItem('Setup Sheet Laporan Cabang',      'setupLaporanCabangSheet')
+        .addItem('Setup Folder PDF Drive',          'setupLaporanFolder')
+        .addSeparator()
         .addItem('Test Tipe Waktu',                 'testTipeWaktu')
     )
 
+    .addToUi();
+
+  // ─────────────────────────────────────────────────────────────
+  // Menu 2: PDF & WA (laporan dan distribusi)
+  // ─────────────────────────────────────────────────────────────
+  ui.createMenu('📄 PDF & WA')
+    .addItem('Generate Laporan Cabang',   'generateLaporanCabang')
+    .addSeparator()
+    .addItem('PDF → Simpan Drive',        'pdfSimpanKeDrive')
+    .addItem('PDF → Kirim WA Grup',       'pdfKirimKeWAGrup')
+    .addItem('PDF → Kirim Email',         'pdfKirimViaEmail')
     .addToUi();
 }
 
