@@ -1,0 +1,55 @@
+name: Deploy PWA Monitor ke Vercel
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/pwa/monitor-saldo/**'
+      - 'apps/pwa/monitor-order/**'
+      - 'apps/pwa/monitor-koordinator/**'
+
+jobs:
+  deploy-monitor-saldo:
+    name: Deploy Monitor Saldo
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: team_PpkAToo3Pg1CgnG0vefYMO52
+      VERCEL_PROJECT_ID: prj_Vg84iuBuw8Cj2iXZqqFZEsWwoOO2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install -g vercel
+      - name: Deploy ke Vercel
+        run: vercel deploy apps/pwa/monitor-saldo --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+
+  deploy-monitor-order:
+    name: Deploy Monitor Order
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: team_PpkAToo3Pg1CgnG0vefYMO52
+      VERCEL_PROJECT_ID: prj_aeqHuJBRFl2WovJySImM5YTAx26B
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install -g vercel
+      - name: Deploy ke Vercel
+        run: vercel deploy apps/pwa/monitor-order --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+
+  deploy-monitor-koordinator:
+    name: Deploy Monitor Koordinator
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: team_PpkAToo3Pg1CgnG0vefYMO52
+      VERCEL_PROJECT_ID: prj_qo8wftEaAHdJwlAQhAtnn1Dqo634
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install -g vercel
+      - name: Deploy ke Vercel
+        run: vercel deploy apps/pwa/monitor-koordinator --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
