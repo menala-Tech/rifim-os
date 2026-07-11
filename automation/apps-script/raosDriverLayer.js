@@ -18,6 +18,12 @@ var _DRV_INPUT_AIRPORT  = 'Input Driver Airport';
 var _DRV_INPUT_EXTERNAL = 'Input Driver External';
 var _DRV_DATA_START_ROW = 3;
 
+// Spreadsheet ID terpisah untuk Database Driver (bukan sheet di dalam RAOS_SS_ID)
+// Airport : https://docs.google.com/spreadsheets/d/1FEZxyHPx_GCQKw92hLSf6QxxkXgZn5R1sRswOYM_Tlc
+// External: https://docs.google.com/spreadsheets/d/1suoDC-RsWOgTHiLq4max6iIsWe39Ou-RMddRXl5DVJc
+var _DRV_AIRPORT_SS_ID  = '1FEZxyHPx_GCQKw92hLSf6QxxkXgZn5R1sRswOYM_Tlc';
+var _DRV_EXTERNAL_SS_ID = '1suoDC-RsWOgTHiLq4max6iIsWe39Ou-RMddRXl5DVJc';
+
 // Kolom Database Driver (1-based) — A=No, B=Login ID, C=Nama, D=ID Cabang
 var _DRV_COL = {
   NO        : 1, // A
@@ -122,14 +128,18 @@ function syncDriversDariSupabase() {
 }
 
 /**
- * Tulis data driver ke sheet (replace penuh, pertahankan header).
+ * Tulis data driver ke spreadsheet Database Driver (file terpisah).
+ * Airport  → _DRV_AIRPORT_SS_ID  (spreadsheet sendiri)
+ * External → _DRV_EXTERNAL_SS_ID (spreadsheet sendiri)
  * @private
  */
 function _tulisDriverKeSheet(sheetName, drivers) {
-  var ss    = SpreadsheetApp.openById(RAOS_SS_ID);
-  var sheet = ss.getSheetByName(sheetName);
+  var ssId  = (sheetName === _DRV_AIRPORT_SHEET) ? _DRV_AIRPORT_SS_ID : _DRV_EXTERNAL_SS_ID;
+  var ss    = SpreadsheetApp.openById(ssId);
+  // Coba cari sheet dengan nama yang sama; fallback ke sheet pertama
+  var sheet = ss.getSheetByName(sheetName) || ss.getSheets()[0];
   if (!sheet) {
-    Logger.log('⚠️ Sheet tidak ditemukan: ' + sheetName);
+    Logger.log('⚠️ Sheet tidak ditemukan di spreadsheet: ' + sheetName);
     return;
   }
 
@@ -234,6 +244,39 @@ function setupDriverSheets() {
   _setupInputDriverSheet(_DRV_INPUT_AIRPORT,  'airport');
   _setupInputDriverSheet(_DRV_INPUT_EXTERNAL, 'external');
   SpreadsheetApp.getUi().alert('✅ Sheet Input Driver Airport + External siap!');
+}
+
+/**
+ * Setup header di spreadsheet Database Driver Airport & External (file terpisah).
+ * Jalankan SEKALI jika spreadsheet belum punya header standar.
+ * Data yang sudah ada (baris 3+) TIDAK dihapus.
+ */
+function setupDatabaseDriverSheets() {
+  var headers = ['No', 'Login ID (ID Maxim)', 'Nama Driver', 'ID Cabang', 'Zone', 'Tipe Driver', 'Status'];
+
+  [[_DRV_AIRPORT_SS_ID, _DRV_AIRPORT_SHEET], [_DRV_EXTERNAL_SS_ID, _DRV_EXTERNAL_SHEET]]
+    .forEach(function(item) {
+      var ssId = item[0], label = item[1];
+      var ss    = SpreadsheetApp.openById(ssId);
+      var sheet = ss.getSheetByName(label) || ss.getSheets()[0];
+      // Baris 1: header (hanya jika belum ada / kosong)
+      var existing = sheet.getRange(1, 1).getValue().toString().trim();
+      if (!existing) {
+        sheet.getRange(1, 1, 1, headers.length)
+          .setValues([headers])
+          .setBackground('#1155CC').setFontColor('#FFFFFF')
+          .setFontWeight('bold').setHorizontalAlignment('center');
+        sheet.getRange('A2').setValue(
+          'SSoT driver — sync dari Supabase drivers. Jangan edit manual.'
+        ).setFontStyle('italic').setFontColor('#666666');
+        sheet.getRange(2, 1, 1, headers.length).merge();
+        sheet.setFrozenRows(2);
+        Logger.log('✅ Header ' + label + ' dibuat.');
+      } else {
+        Logger.log('ℹ️ Header ' + label + ' sudah ada, dilewati.');
+      }
+    });
+  try { SpreadsheetApp.getUi().alert('✅ Header Database Driver Airport + External siap.'); } catch(e) {}
 }
 
 function _setupInputDriverSheet(sheetName, zone) {
