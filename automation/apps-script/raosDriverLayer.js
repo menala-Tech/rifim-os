@@ -113,6 +113,7 @@ function syncDriversDariSupabase() {
     return;
   }
 
+  // zone di Supabase: 'airport' | 'non_airport'
   var airport  = allDrivers.filter(function(d) { return (d.zone || '').toLowerCase() === 'airport'; });
   var external = allDrivers.filter(function(d) { return (d.zone || '').toLowerCase() !== 'airport'; });
 
@@ -167,7 +168,7 @@ function _tulisDriverKeSheet(sheetName, drivers) {
       d.cabang      || '',
       d.zone        || '',
       d.driver_type || '',
-      d.status      || 'AKTIF',
+      d.is_active === false ? 'NONAKTIF' : 'AKTIF',
     ];
   });
 
@@ -387,10 +388,13 @@ function importDriversDariSheetKeSupabase() {
         var cabang    = row[3] ? row[3].toString().trim() : '';
         var zone      = row[4] ? row[4].toString().trim() : zoneName;
         var tipe      = row[5] ? row[5].toString().trim() : 'konvensional';
-        var status    = row[6] ? row[6].toString().trim() : 'AKTIF';
+        var statusRaw = row[6] ? row[6].toString().trim().toUpperCase() : 'AKTIF';
+        var isActive  = (statusRaw !== 'NONAKTIF' && statusRaw !== 'SUSPEND');
 
         if (!idMaxim || !nama) { totalSkip++; return; }
-        if (!zone || zone === 'ask') zone = zoneName; // normalisasi "ask" → zone default
+        // Normalisasi zone: 'ask'/kosong → pakai zoneName; 'external' → 'non_airport'
+        if (!zone || zone === 'ask') zone = zoneName;
+        if (zone === 'external') zone = 'non_airport';
 
         try {
           // Upsert: jika id_maxim sudah ada di Supabase → update, jika belum → insert
@@ -404,7 +408,7 @@ function importDriversDariSheetKeSupabase() {
               cabang     : cabang,
               zone       : zone,
               driver_type: tipe,
-              status     : status,
+              is_active  : isActive,
             }),
             muteHttpExceptions: true,
           });
