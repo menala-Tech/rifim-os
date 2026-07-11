@@ -128,19 +128,26 @@ function syncDriversDariSupabase() {
 }
 
 /**
- * Tulis data driver ke spreadsheet Database Driver (file terpisah).
- * Airport  → _DRV_AIRPORT_SS_ID  (spreadsheet sendiri)
- * External → _DRV_EXTERNAL_SS_ID (spreadsheet sendiri)
+ * Tulis data driver ke sheet di dalam RAOS_SS_ID (Smart Office Database).
+ * Sheet "Database Driver Airport" dan "Database Driver External" dibuat di spreadsheet utama.
  * @private
  */
 function _tulisDriverKeSheet(sheetName, drivers) {
-  var ssId  = (sheetName === _DRV_AIRPORT_SHEET) ? _DRV_AIRPORT_SS_ID : _DRV_EXTERNAL_SS_ID;
-  var ss    = SpreadsheetApp.openById(ssId);
-  // Coba cari sheet dengan nama yang sama; fallback ke sheet pertama
-  var sheet = ss.getSheetByName(sheetName) || ss.getSheets()[0];
+  var ss    = _getDB();
+  var sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
-    Logger.log('⚠️ Sheet tidak ditemukan di spreadsheet: ' + sheetName);
-    return;
+    // Buat sheet baru jika belum ada
+    sheet = ss.insertSheet(sheetName);
+    var headers = ['No', 'Login ID (ID Maxim)', 'Nama Driver', 'ID Cabang', 'Zone', 'Tipe Driver', 'Status'];
+    sheet.getRange(1, 1, 1, headers.length)
+      .setValues([headers])
+      .setBackground('#1155CC').setFontColor('#FFFFFF')
+      .setFontWeight('bold').setHorizontalAlignment('center');
+    sheet.getRange('A2').setValue('SSoT driver — sync dari Supabase. Jangan edit manual.')
+      .setFontStyle('italic').setFontColor('#666666');
+    sheet.getRange(2, 1, 1, headers.length).merge();
+    sheet.setFrozenRows(2);
+    Logger.log('✅ Sheet baru dibuat: ' + sheetName);
   }
 
   // Hapus data lama (baris 3 dst)
@@ -341,7 +348,96 @@ function _setupInputDriverSheet(sheetName, zone) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 5. TRIGGER — Auto sync tiap 6 jam
+// 5. IMPORT — Baca dari spreadsheet existing → Supabase (sekali/migrasi awal)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Import semua driver dari spreadsheet existing ke Supabase.
+ * Baca SEMUA tab di kedua file, skip tab yang namanya tidak dimulai dengan "ID ".
+ * Gunakan upsert (on_conflict=id_maxim) agar aman dijalankan ulang.
+ *
+ * Struktur kolom spreadsheet existing (baris 1 = header, data mulai baris 2):
+ *   A=No, B=ID Driver (id_maxim), C=Nama Driver, D=Cabang, E=Zone, F=Tipe, G=Status
+ *
+ * Jalankan SEKALI dari GAS Editor untuk migrasi data awal.
+ * Setelah itu, input baru melalui sheet "Input Driver" + prosesInputDriver().
+ */
+function importDriversDariSheetKeSupabase() {
+  var AIRPORT_SS_ID  = _DRV_AIRPORT_SS_ID;
+  var EXTERNAL_SS_ID = _DRV_EXTERNAL_SS_ID;
+
+  var totalBerhasil = 0, totalGagal = 0, totalSkip = 0;
+
+  [[AIRPORT_SS_ID, 'airport'], [EXTERNAL_SS_ID, 'external']].forEach(function(item) {
+    var ssId     = item[0];
+    var zoneName = item[1];
+    var ss       = SpreadsheetApp.openById(ssId);
+    var tabs     = ss.getSheets();
+
+    tabs.forEach(function(tab) {
+      var tabName = tab.getName();
+      var lastRow = tab.getLastRow();
+      if (lastRow < 2) return; // tab kosong
+
+      var data = tab.getRange(2, 1, lastRow - 1, 7).getValues();
+
+      data.forEach(function(row) {
+        var idMaxim   = row[1] ? row[1].toString().trim() : '';
+        var nama      = row[2] ? row[2].toString().trim() : '';
+        var cabang    = row[3] ? row[3].toString().trim() : '';
+        var zone      = row[4] ? row[4].toString().trim() : zoneName;
+        var tipe      = row[5] ? row[5].toString().trim() : 'konvensional';
+        var status    = row[6] ? row[6].toString().trim() : 'AKTIF';
+
+        if (!idMaxim || !nama) { totalSkip++; return; }
+        if (!zone || zone === 'ask') zone = zoneName; // normalisasi "ask" → zone default
+
+        try {
+          // Upsert: jika id_maxim sudah ada di Supabase → update, jika belum → insert
+          var url  = _sbUrl('drivers') + '?on_conflict=id_maxim';
+          var resp = UrlFetchApp.fetch(url, {
+            method : 'POST',
+            headers: _sbHeaders({ 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+            payload: JSON.stringify({
+              id_maxim   : idMaxim,
+              nama_driver: nama,
+              cabang     : cabang,
+              zone       : zone,
+              driver_type: tipe,
+              status     : status,
+            }),
+            muteHttpExceptions: true,
+          });
+          var code = resp.getResponseCode();
+          if (code === 200 || code === 201 || code === 204) {
+            totalBerhasil++;
+          } else {
+            Logger.log('⚠️ Gagal upsert ' + idMaxim + ': HTTP ' + code + ' — ' + resp.getContentText().substring(0, 100));
+            totalGagal++;
+          }
+        } catch(e) {
+          Logger.log('⚠️ Error ' + idMaxim + ': ' + e.message);
+          totalGagal++;
+        }
+      });
+
+      Logger.log('Tab ' + tabName + ' (' + zoneName + '): ' + data.length + ' baris diproses.');
+    });
+  });
+
+  var msg = '✅ Import Driver ke Supabase selesai!\n\n' +
+            'Berhasil : ' + totalBerhasil + '\n' +
+            'Gagal    : ' + totalGagal   + '\n' +
+            'Skip     : ' + totalSkip    + ' (baris kosong)';
+  Logger.log(msg);
+  try { SpreadsheetApp.getUi().alert(msg); } catch(e) {}
+
+  // Langsung sync ke sheet RIFIM OS setelah import
+  if (totalBerhasil > 0) syncDriversDariSupabase();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 6. TRIGGER — Auto sync tiap 6 jam
 // ══════════════════════════════════════════════════════════════════════════════
 
 function setupDriverSyncTrigger() {
