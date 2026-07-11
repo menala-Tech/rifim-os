@@ -128,7 +128,21 @@ function doGet(e) {
 
   if (action === 'staff_list') {
     try {
-      var staff = getEmployeesFromSheet();
+      var rawList = hrisGetEmployees({ status: 'AKTIF', limit: 200 });
+      var staff = rawList.map(function(r) {
+        return {
+          id:           r.employee_id   || '',
+          nama:         r.full_name     || '',
+          jabatan:      r.position      || '',
+          department:   r.department    || '',
+          cabang:       r.branch        || '',
+          email:        r.email         || '',
+          company_code: r.company_code  || '',
+          status:       r.status        || '',
+          salary_base:  r.salary_base   || '',
+          join_date:    r.join_date     || '',
+        };
+      });
       return ContentService
         .createTextOutput(JSON.stringify({ success: true, staff: staff }))
         .setMimeType(ContentService.MimeType.JSON);
