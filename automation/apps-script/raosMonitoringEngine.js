@@ -19,7 +19,8 @@
 
 // ── KONFIGURASI ───────────────────────────────────────────────────
 
-var _MON_SLA_SALDO_MENIT    = 30;  // menit tanpa Login ID → alert
+var _MON_SLA_SALDO_MENIT    = 30;  // menit tanpa Login ID di AIST form → alert
+var _MON_SLA_SALDO_PWA_MENIT = 5;  // menit belum dicentang "Sudah Diisi" di PWA form → alert
 var _MON_SLA_POTONGAN_MENIT = 60;  // menit tanpa input potongan → alert
 var _MON_JAM_MULAI          = 7;   // monitoring aktif mulai 07:00
 var _MON_JAM_SELESAI        = 23;  // monitoring aktif sampai 23:00
@@ -593,6 +594,125 @@ function _monPesanPotonganOnline(cabang, tz) {
     '─────────────────────\nPT Rifim Internasional Gemilang';
 }
 
+// ══════════════════════════════════════════════════════════════════
+// MONITORING SALDO PWA — Form Input Saldo PWA col G "Sudah Diisi"
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * Cek SLA saldo PWA — kirim WA ke grup per-cabang jika ada driver request
+ * di "Form Input Saldo PWA" yang belum dicentang "Sudah Diisi" (col G) > SLA menit.
+ *
+ * Format sheet Form Input Saldo PWA (1-based):
+ *   A=Timestamp, B=Cabang, C=Nama Staff, D=Nominal, E=ID Login Driver,
+ *   F=Nama Driver, G=Sudah Diisi (checkbox), H=Alert Terkirim, I=Alert Terakhir
+ *
+ * Data mulai baris 3 (row 1=header, row 2=note).
+ */
+function cekSLASaldoPWA() {
+  var ss    = SpreadsheetApp.openById(RAOS_SS_ID);
+  var shPWA = ss.getSheetByName('Form Input Saldo PWA');
+  if (!shPWA) return;
+
+  var tz  = ss.getSpreadsheetTimeZone();
+  var now = new Date();
+  if (!_monDalamJamOps(now, tz)) return;
+
+  var lastRow = shPWA.getLastRow();
+  if (lastRow < 3) return;
+
+  // Baca 9 kolom: A-I
+  var data = shPWA.getRange(3, 1, lastRow - 2, 9).getValues();
+  var telatPerCabang = {};
+
+  data.forEach(function(row, idx) {
+    var timestamp  = row[0]; // A
+    var cabangRaw  = row[1]; // B
+    var nominal    = row[3]; // D
+    var loginId    = row[4]; // E
+    var namaDriver = row[5]; // F
+    var sudahDiisi = row[6]; // G — checkbox TRUE/FALSE
+
+    if (!timestamp || sudahDiisi === true) return; // skip baris kosong atau sudah selesai
+
+    var tgl = _monParseTs(timestamp);
+    if (!tgl) return;
+
+    var selisihMenit = Math.floor((now - tgl) / 60000);
+    if (selisihMenit < _MON_SLA_SALDO_PWA_MENIT) return;
+
+    var cabang = _monCabangMatch(String(cabangRaw || '').trim(), _MON_SALDO_CABANG);
+    var kunci  = cabang || '_UNKNOWN_';
+
+    if (!telatPerCabang[kunci]) telatPerCabang[kunci] = { cabang: cabang || String(cabangRaw || 'Unknown'), items: [] };
+    telatPerCabang[kunci].items.push({
+      namaDriver   : String(namaDriver || loginId || '(unknown)'),
+      loginId      : String(loginId || ''),
+      nominal      : Number(nominal) || 0,
+      requestJam   : Utilities.formatDate(tgl, tz, 'HH:mm'),
+      selisihMenit : selisihMenit,
+      sheetRow     : idx + 3,
+    });
+  });
+
+  if (Object.keys(telatPerCabang).length === 0) return;
+
+  var props = PropertiesService.getScriptProperties();
+  var tsStr = Utilities.formatDate(now, tz, 'dd/MM/yyyy HH:mm:ss');
+
+  Object.keys(telatPerCabang).forEach(function(kunci) {
+    var group   = telatPerCabang[kunci];
+    var cabang  = group.cabang;
+    var groupId = kunci !== '_UNKNOWN_' ? _MON_WA_SALDO_GRUP[cabang] : null;
+
+    // Cek repeat — jangan kirim lebih sering dari SLA
+    var alertKey    = 'MON_PWA_ALERT_' + kunci;
+    var lastAlertTs = props.getProperty(alertKey);
+    if (lastAlertTs) {
+      var lad = _monParseTs(lastAlertTs);
+      if (lad && Math.floor((now - lad) / 60000) < _MON_SLA_SALDO_PWA_MENIT) return;
+    }
+
+    var pesan = _monPesanSaldoPWATelat(cabang, group.items, tz);
+    try {
+      if (groupId) {
+        waSendToTarget(groupId, pesan);
+      } else {
+        waSendToGroup(pesan);
+      }
+      props.setProperty(alertKey, tsStr);
+
+      // Tandai H (Alert Terkirim) = TRUE dan I (Alert Terakhir) = timestamp
+      group.items.forEach(function(item) {
+        shPWA.getRange(item.sheetRow, 8).setValue(true); // H: Alert Terkirim
+        shPWA.getRange(item.sheetRow, 9).setValue(tsStr); // I: Alert Terakhir
+      });
+
+      Logger.log('cekSLASaldoPWA: alert terkirim ke ' + (groupId || 'grup utama') + ' — ' + cabang);
+    } catch (err) {
+      Logger.log('cekSLASaldoPWA: gagal kirim WA (' + cabang + '): ' + err.message);
+    }
+  });
+}
+
+function _monPesanSaldoPWATelat(cabang, items, tz) {
+  var nama   = _monNamaSingkat(cabang);
+  var tglStr = Utilities.formatDate(new Date(), tz, 'd MMMM yyyy');
+  var detail = items.map(function(item) {
+    return '• ' + item.namaDriver + ' — Login ' + item.loginId +
+           ' — Rp ' + item.nominal.toLocaleString('id-ID') +
+           ' (request ' + item.requestJam + ', sudah ' + item.selisihMenit + ' menit)';
+  }).join('\n');
+
+  return '🔴 RIFIM - SALDO BELUM DIPROSES\n\n' +
+    'Cabang :\n' + nama + '\n\n' +
+    items.length + ' permintaan belum dicentang "Sudah Diisi" (>' + _MON_SLA_SALDO_PWA_MENIT + ' menit) :\n' +
+    detail + '\n\n' +
+    'Tanggal :\n' + tglStr + '\n\n' +
+    'Mohon segera diisi di AIST, lalu centang "Sudah Diisi" di sheet.\n\n' +
+    '─────────────────────\n' +
+    'PT Rifim Internasional Gemilang';
+}
+
 // ── TEST MANUAL ───────────────────────────────────────────────────
 
 /** Test: kirim pesan test ke semua grup saldo */
@@ -619,7 +739,7 @@ function testMonitoringPotonganWA() {
 
 function setupMonitoringTriggers() {
   var namaFungsi = [
-    'refreshMonitoringSaldo', 'cekSLASaldo',
+    'refreshMonitoringSaldo', 'cekSLASaldo', 'cekSLASaldoPWA',
     'refreshMonitoringPotongan', 'cekSLAPotongan',
   ];
 
@@ -630,16 +750,19 @@ function setupMonitoringTriggers() {
 
   ScriptApp.newTrigger('refreshMonitoringSaldo').timeBased().everyMinutes(5).create();
   ScriptApp.newTrigger('cekSLASaldo').timeBased().everyMinutes(5).create();
+  ScriptApp.newTrigger('cekSLASaldoPWA').timeBased().everyMinutes(5).create();
   ScriptApp.newTrigger('refreshMonitoringPotongan').timeBased().everyMinutes(5).create();
   ScriptApp.newTrigger('cekSLAPotongan').timeBased().everyMinutes(5).create();
 
   SpreadsheetApp.getUi().alert(
-    '✅ Trigger Monitoring terpasang:\n\n' +
+    '✅ Trigger Monitoring terpasang (5 trigger):\n\n' +
     '• refreshMonitoringSaldo    — tiap 5 menit\n' +
     '• cekSLASaldo               — tiap 5 menit\n' +
-    '  (alert ke grup saldo per-cabang jika Login ID belum diisi >' + _MON_SLA_SALDO_MENIT + ' mnt)\n\n' +
+    '  (alert AIST form jika Login ID belum diisi >' + _MON_SLA_SALDO_MENIT + ' mnt)\n\n' +
+    '• cekSLASaldoPWA            — tiap 5 menit\n' +
+    '  (alert PWA form jika "Sudah Diisi" belum dicentang >' + _MON_SLA_SALDO_PWA_MENIT + ' mnt)\n\n' +
     '• refreshMonitoringPotongan — tiap 5 menit\n' +
     '• cekSLAPotongan            — tiap 5 menit\n' +
-    '  (alert ke grup admin cabang jika tidak ada input >' + _MON_SLA_POTONGAN_MENIT + ' mnt)'
+    '  (alert grup admin jika tidak ada input potongan >' + _MON_SLA_POTONGAN_MENIT + ' mnt)'
   );
 }

@@ -77,19 +77,43 @@ function setupLaporanCabangSheet() {
   sheet.setRowHeight(1, 38);
   sheet.setRowHeight(2, 38);
 
-  // ── Row 3: Input Cabang ───────────────────────────────────────────────────
+  // ── Row 3: Dropdown Id Cabang ─────────────────────────────────────────────
   sheet.getRange('A3').setValue('Cabang:')
     .setFontWeight('bold').setVerticalAlignment('middle');
   sheet.getRange('B3:C3').merge()
-    .setBackground('#FFE599')  // kuning — area input manual
+    .setBackground('#FFE599')
     .setHorizontalAlignment('left').setVerticalAlignment('middle');
+
+  var _cabangList = [
+    'ID Rifim Airport Batam',
+    'ID Rifim Batam',
+    'ID Rifim Airport Jambi',
+    'ID Rifim Jambi Luar',
+    'ID Rifim Airport Balikpapan',
+    'ID Rifim Airport Manado',
+    'ID Rifim Airport Pekanbaru',
+  ];
+  var dropdownRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(_cabangList, true)
+    .setAllowInvalid(false)
+    .setHelpText('Pilih Id Cabang dari daftar')
+    .build();
+  sheet.getRange('B3').setDataValidation(dropdownRule);
   sheet.setRowHeight(3, 30);
 
-  // ── Row 4: Tanggal ────────────────────────────────────────────────────────
+  // ── Row 4: Tanggal (date picker muncul otomatis) ──────────────────────────
   sheet.getRange('A4').setValue('Tanggal:')
     .setFontWeight('bold').setVerticalAlignment('middle');
   sheet.getRange('B4')
+    .setValue(new Date())
+    .setNumberFormat('dd/MM/yyyy')
     .setFontColor('#EA4335').setFontWeight('bold').setVerticalAlignment('middle');
+  var dateRule = SpreadsheetApp.newDataValidation()
+    .requireDate()
+    .setAllowInvalid(false)
+    .setHelpText('Pilih tanggal laporan')
+    .build();
+  sheet.getRange('B4').setDataValidation(dateRule);
   sheet.setRowHeight(4, 28);
 
   // ── Row 5: spacer ─────────────────────────────────────────────────────────
@@ -134,9 +158,17 @@ function generateLaporanCabang() {
   var cabang = sheet.getRange('B3').getValue().toString().trim();
   if (!cabang) {
     SpreadsheetApp.getUi().alert(
-      'Isi nama Cabang di sel B3 terlebih dahulu.\n\nContoh: ID Rifim Airport Pekanbaru');
+      'Pilih Cabang di sel B3 (klik → pilih dari dropdown).\n\nContoh: ID Rifim Airport Pekanbaru');
     return;
   }
+
+  // Baca tanggal filter dari B4
+  var tglRaw = sheet.getRange('B4').getValue();
+  var filterDate = (tglRaw instanceof Date && !isNaN(tglRaw.getTime()))
+                     ? tglRaw : new Date();
+  var filterY = filterDate.getFullYear();
+  var filterM = filterDate.getMonth();
+  var filterD = filterDate.getDate();
 
   // Ambil Database AIST
   var sheetDB = ss.getSheetByName(_AIST_DB_NAME);
@@ -151,13 +183,19 @@ function generateLaporanCabang() {
   //                          4=Nama Driver, 5=Cabang, 6=Nominal AIST, 7=Status, 8=Created At
 
   var filtered = dbData.filter(function(row) {
-    return row[5] && row[5].toString().trim() === cabang;
+    if (!row[5] || row[5].toString().trim() !== cabang) return false;
+    // Filter by tanggal (B4)
+    var tgl = _parseAISTDate(row[1]);
+    if (!(tgl instanceof Date) || isNaN(tgl.getTime())) return false;
+    return tgl.getFullYear() === filterY && tgl.getMonth() === filterM && tgl.getDate() === filterD;
   });
+
+  var tglStr = Utilities.formatDate(filterDate, Session.getScriptTimeZone(), 'dd/MM/yyyy');
 
   if (filtered.length === 0) {
     SpreadsheetApp.getUi().alert(
-      'Tidak ada data untuk Cabang:\n"' + cabang + '"\n\n' +
-      'Pastikan nama Cabang sesuai dengan yang ada di Database AIST.');
+      'Tidak ada data untuk:\nCabang: "' + cabang + '"\nTanggal: ' + tglStr + '\n\n' +
+      'Coba ubah tanggal di B4 atau pastikan data sudah dipindahkan ke Database AIST.');
     return;
   }
 
@@ -167,9 +205,7 @@ function generateLaporanCabang() {
     sheet.getRange(_LAPORAN_DATA_ROW, 1, lastRow - _LAPORAN_DATA_ROW + 1, 5).clear();
   }
 
-  // Update tanggal di B4
-  sheet.getRange('B4').setValue(
-    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy'));
+  // B4 sudah diisi user, tidak perlu overwrite
 
   // Bangun baris data
   var totalTagihan = 0;
@@ -210,10 +246,11 @@ function generateLaporanCabang() {
 
   SpreadsheetApp.getUi().alert(
     '✅ Laporan berhasil dibuat!\n\n' +
-    'Cabang: ' + cabang + '\n' +
-    'Jumlah Driver: ' + rows.length + '\n' +
-    'Total Tagihan: Rp ' + totalTagihan.toLocaleString('id-ID') + '\n\n' +
-    'Selanjutnya: PDF & WA → PDF → Simpan Drive / Kirim WA / Kirim Email');
+    'Cabang  : ' + cabang + '\n' +
+    'Tanggal : ' + tglStr + '\n' +
+    'Driver  : ' + rows.length + ' orang\n' +
+    'Total   : Rp ' + totalTagihan.toLocaleString('id-ID') + '\n\n' +
+    'Selanjutnya: PDF & WA → Simpan Drive / Kirim WA / Kirim Email');
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

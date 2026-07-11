@@ -58,13 +58,16 @@ var _PT_SHEET_NAMES  = ['Input Potongan 1', 'Input Potongan 2'];
 var _DB_POTONGAN_NAME = 'Database Potongan';
 
 // ══════════════════════════════════════════════════════════════════
-// 1. SETUP FORMULA — jalankan SEKALI
+// 1. SETUP — jalankan SEKALI
 // ══════════════════════════════════════════════════════════════════
 
 /**
- * Inject ARRAYFORMULA ke kolom I (Potongan Kantor), J (Hak Driver), K (Status).
- * Formula diambil verbatim dari Formula.txt versi INPUT DOCK 2/3.
- * Data mulai baris 3 (bukan 2) karena baris 2 adalah note.
+ * Setup Input Potongan 1 & 2:
+ *   - Hapus ARRAYFORMULA lama di I/J/K (sekarang dihitung langsung oleh GAS script)
+ *   - Pasang checkbox validation di kolom E (Offline?)
+ *   - Recalculate I/J/K untuk data yang sudah ada di sheet
+ *
+ * Jalankan SEKALI dari menu Setup atau GAS Editor.
  */
 function setupFormulasInputPotongan() {
   var ss = SpreadsheetApp.openById(RAOS_SS_ID);
@@ -73,59 +76,140 @@ function setupFormulasInputPotongan() {
     var sheet = ss.getSheetByName(sName);
     if (!sheet) { Logger.log('⚠️  Sheet tidak ditemukan: ' + sName); return; }
 
-    // ── Formula Potongan Kantor (I3) ─────────────────────────────
-    // Port dari Formula.txt INPUT DOCK 2/3 — start row 3 (bukan 2)
-    var formulaI = '=ARRAYFORMULA(IF(B' + _PT_DATA_START_ROW + ':B="","",IFS(' +
-      'A' + _PT_DATA_START_ROW + ':A="ID Rifim Airport Balikpapan",25000,' +
+    var lastRow = Math.max(sheet.getLastRow(), _PT_DATA_START_ROW);
 
-      // Batam Airport: siang 07:00-18:30 + offline surcharge
-      'A' + _PT_DATA_START_ROW + ':A="ID Rifim Airport Batam",' +
-        'IF((MOD(D' + _PT_DATA_START_ROW + ':D,1)>=TIME(7,0,0))*(MOD(D' + _PT_DATA_START_ROW + ':D,1)<TIME(18,30,0)),' +
-          'IF(B' + _PT_DATA_START_ROW + ':B>=70000,30000,25000),' +
-          'IF(MOD(D' + _PT_DATA_START_ROW + ':D,1)>=TIME(18,30,0),25000,20000)' +
-        ')' +
-        '+IF(E' + _PT_DATA_START_ROW + ':E=TRUE,ROUND(B' + _PT_DATA_START_ROW + ':B*12%),0),' +
+    // 1. Bersihkan ARRAYFORMULA lama di I3, J3, K3
+    sheet.getRange(_PT_DATA_START_ROW, _PT_COL.POTONGAN_KANTOR).clearContent();
+    sheet.getRange(_PT_DATA_START_ROW, _PT_COL.HAK_DRIVER).clearContent();
+    sheet.getRange(_PT_DATA_START_ROW, _PT_COL.STATUS).clearContent();
 
-      // Manado: flat 25rb + offline
-      'A' + _PT_DATA_START_ROW + ':A="ID Rifim Airport Manado",' +
-        '25000+IF(E' + _PT_DATA_START_ROW + ':E=TRUE,ROUND(B' + _PT_DATA_START_ROW + ':B*12%),0),' +
+    // 2. Pasang checkbox validation ke kolom E (Offline?) — baris 3 sampai 1000
+    var checkRule = SpreadsheetApp.newDataValidation().requireCheckbox().build();
+    sheet.getRange(_PT_DATA_START_ROW, _PT_COL.OFFLINE, 1000, 1).setDataValidation(checkRule);
 
-      // Pekanbaru: kode 1/2/3 (tidak ada offline surcharge)
-      'A' + _PT_DATA_START_ROW + ':A="ID Rifim Airport Pekanbaru",' +
-        'IF(F' + _PT_DATA_START_ROW + ':F=1,35000,' +
-          'IF(F' + _PT_DATA_START_ROW + ':F=3,20000,' +
-            'IF(F' + _PT_DATA_START_ROW + ':F=2,35000+ROUND((G' + _PT_DATA_START_ROW + ':G-B' + _PT_DATA_START_ROW + ':B)*12%),0)' +
-          ')' +
-        '),' +
+    // 3. Recalculate I/J/K untuk data yang sudah ada
+    if (lastRow >= _PT_DATA_START_ROW) {
+      var numRows = lastRow - _PT_DATA_START_ROW + 1;
+      var data    = sheet.getRange(_PT_DATA_START_ROW, 1, numRows, _PT_COL.NAMA_DRIVER).getValues();
+      for (var i = 0; i < data.length; i++) {
+        var idCabang = data[i][_PT_COL.ID_CABANG - 1];
+        var price    = data[i][_PT_COL.PRICE - 1];
+        if (!idCabang || !price) continue;
+        _updatePotonganRow(sheet, _PT_DATA_START_ROW + i);
+      }
+    }
 
-      // Jambi Airport: threshold 70rb + kode P/C + offline
-      'A' + _PT_DATA_START_ROW + ':A="ID Rifim Airport Jambi",' +
-        'IF(B' + _PT_DATA_START_ROW + ':B<70000,25000,' +
-          'IF(LOWER(F' + _PT_DATA_START_ROW + ':F)="p",35000,25000)' +
-        ')' +
-        '+IF(E' + _PT_DATA_START_ROW + ':E=TRUE,ROUND(B' + _PT_DATA_START_ROW + ':B*12%),0),' +
-
-      // Default (External / Makassar / tidak dikenal): 0
-      'TRUE,0' +
-    ')))';
-
-    // ── Formula Hak Driver (J3) ──────────────────────────────────
-    var formulaJ = '=ARRAYFORMULA(IF(B' + _PT_DATA_START_ROW + ':B="",' +
-      '"",B' + _PT_DATA_START_ROW + ':B-I' + _PT_DATA_START_ROW + ':I))';
-
-    // ── Formula Status (K3) ──────────────────────────────────────
-    var formulaK = '=ARRAYFORMULA(IF(B' + _PT_DATA_START_ROW + ':B="","","DONE"))';
-
-    // Inject ke cell header kolom (baris _PT_DATA_START_ROW = awal data)
-    sheet.getRange(_PT_DATA_START_ROW, _PT_COL.POTONGAN_KANTOR).setFormula(formulaI);
-    sheet.getRange(_PT_DATA_START_ROW, _PT_COL.HAK_DRIVER).setFormula(formulaJ);
-    sheet.getRange(_PT_DATA_START_ROW, _PT_COL.STATUS).setFormula(formulaK);
-
-    Logger.log('✅ ARRAYFORMULA diterapkan ke ' + sName + ' (I3, J3, K3)');
+    Logger.log('✅ Setup selesai: ' + sName);
+    Logger.log('   - Kolom E (Offline?): checkbox terpasang (baris 3–1002)');
+    Logger.log('   - Kolom I/J/K: kalkulasi via GAS script (bukan ARRAYFORMULA)');
   });
 
   Logger.log('');
-  Logger.log('Formula siap. Kolom I/J/K akan auto-hitung saat admin paste data di B/C/D/E/F/G.');
+  Logger.log('Potongan Kantor (I) + Hak Driver (J) dihitung otomatis oleh onEditInputPotongan()');
+  Logger.log('saat admin paste B/C/D atau centang/hapus centang Offline (E).');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 1b. KALKULASI POTONGAN KANTOR — sesuai Batch 4 config per cabang
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * Hitung Potongan Kantor sesuai aturan per cabang (port dari Batch 4 / Formula.txt).
+ *
+ * Aturan:
+ *   Balikpapan : flat 25.000
+ *   Batam      : SIANG (07:00–18:29) → 30rb jika price≥70rb, else 25rb
+ *                MALAM (18:30–23:59) → 25rb
+ *                DINI  (00:00–06:59) → 20rb
+ *                + offline surcharge ROUND(price × 12%) jika offline
+ *   Manado     : flat 25.000 + offline surcharge jika offline
+ *   Pekanbaru  : kode 1 → 35rb | kode 3 → 20rb
+ *                kode 2 → 35rb + ROUND((pembanding - price) × 12%)
+ *   Jambi      : price < 70rb → 25rb
+ *                price ≥ 70rb + kode "p" → 35rb | kode lain → 25rb
+ *                + offline surcharge jika offline
+ *   Lainnya    : 0 (External / non-airport)
+ *
+ * @param {string} idCabang
+ * @param {number} price
+ * @param {Date}   waktuOrder   — harus Date object (sudah dikonversi dari AIST string)
+ * @param {boolean} offline
+ * @param {*}      kodeOpsional — number (Pekanbaru) atau string "p" (Jambi)
+ * @param {number} pembandingPKU — khusus Pekanbaru kode 2
+ * @returns {number} Potongan Kantor (sudah termasuk surcharge jika offline)
+ */
+function _hitungPotonganKantor(idCabang, price, waktuOrder, offline, kodeOpsional, pembandingPKU) {
+  price = Number(price) || 0;
+  if (!price) return 0;
+
+  idCabang = String(idCabang || '').trim();
+  var potongan = 0;
+
+  if (idCabang === 'ID Rifim Airport Balikpapan') {
+    potongan = 25000;
+
+  } else if (idCabang === 'ID Rifim Airport Batam') {
+    var jam = -1, menit = 0;
+    if (waktuOrder instanceof Date && !isNaN(waktuOrder.getTime())) {
+      jam   = waktuOrder.getHours();
+      menit = waktuOrder.getMinutes();
+    }
+    var totalMenit = jam * 60 + menit;
+    if (jam < 0 || (totalMenit >= 7 * 60 && totalMenit < 18 * 60 + 30)) {
+      // SIANG (default jika jam tidak diketahui)
+      potongan = (price >= 70000) ? 30000 : 25000;
+    } else if (totalMenit >= 18 * 60 + 30) {
+      // MALAM
+      potongan = 25000;
+    } else {
+      // DINI (00:00–06:59)
+      potongan = 20000;
+    }
+    if (offline === true) potongan += Math.round(price * 0.12);
+
+  } else if (idCabang === 'ID Rifim Airport Manado') {
+    potongan = 25000;
+    if (offline === true) potongan += Math.round(price * 0.12);
+
+  } else if (idCabang === 'ID Rifim Airport Pekanbaru') {
+    var kode = Number(kodeOpsional);
+    if      (kode === 1) potongan = 35000;
+    else if (kode === 3) potongan = 20000;
+    else if (kode === 2) potongan = 35000 + Math.round((Number(pembandingPKU) - price) * 0.12);
+    else                 potongan = 0;
+
+  } else if (idCabang === 'ID Rifim Airport Jambi') {
+    potongan = (price < 70000) ? 25000
+             : (String(kodeOpsional).toLowerCase() === 'p' ? 35000 : 25000);
+    if (offline === true) potongan += Math.round(price * 0.12);
+  }
+  // ID Rifim Batam / ID Rifim Jambi Luar (External) → 0
+
+  return potongan;
+}
+
+/**
+ * Baca nilai baris tertentu di Input Potongan, hitung I/J/K, dan tulis balik ke sheet.
+ * Dipanggil dari onEditInputPotongan() dan setupFormulasInputPotongan().
+ */
+function _updatePotonganRow(sheet, row) {
+  var idCabang      = sheet.getRange(row, _PT_COL.ID_CABANG).getValue();
+  var price         = sheet.getRange(row, _PT_COL.PRICE).getValue();
+  var waktuOrder    = sheet.getRange(row, _PT_COL.WAKTU_ORDER).getValue();
+  var offline       = sheet.getRange(row, _PT_COL.OFFLINE).getValue();
+  var kodeOpsional  = sheet.getRange(row, _PT_COL.KODE_OPSIONAL).getValue();
+  var pembandingPKU = sheet.getRange(row, _PT_COL.PEMBANDING_PKU).getValue();
+
+  if (!price || !idCabang || idCabang === 'TIDAK DITEMUKAN') return;
+
+  var potonganKantor = _hitungPotonganKantor(
+    idCabang, price, waktuOrder, offline, kodeOpsional, pembandingPKU
+  );
+  var hakDriver = Number(price) - potonganKantor;
+
+  sheet.getRange(row, _PT_COL.POTONGAN_KANTOR).setValue(potonganKantor);
+  sheet.getRange(row, _PT_COL.HAK_DRIVER).setValue(hakDriver);
+  sheet.getRange(row, _PT_COL.STATUS).setValue('DONE');
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -133,15 +217,18 @@ function setupFormulasInputPotongan() {
 // ══════════════════════════════════════════════════════════════════
 
 /**
- * OnEdit handler — auto-fill A (Id Cabang) dan H (Nama Driver) dari C (Login ID).
- * Juga auto-konversi D (Waktu Order) dari string AIST "dd.MM.yyyy HH:mm" ke Date object
- * agar ARRAYFORMULA MOD(D,1) bisa hitung tipe waktu Batam dengan benar.
+ * OnEdit handler — dipanggil oleh trigger tiap kali ada edit di spreadsheet.
  *
- * Install via setupTriggerPotonganOnEdit().
+ * Skenario yang di-handle:
+ *   A) Admin paste B/C/D (atau hanya C) → range mencakup col C (Login ID)
+ *      - Auto-fill A (Id Cabang) + H (Nama Driver) dari Login ID
+ *      - Auto-konversi D (Waktu Order) dari string AIST "dd.MM.yyyy HH:mm" ke Date object
+ *      - Hitung I (Potongan Kantor) + J (Hak Driver) + K (Status) via _hitungPotonganKantor()
  *
- * Mendukung paste multi-baris sekaligus (B3:D10) maupun edit satu sel.
- * Trigger aktif jika range yang diedit MENCAKUP kolom C (Login ID) — bukan hanya
- * dimulai dari C, karena paste B/C/D bersama memulai range dari kolom B.
+ *   B) Admin centang/hapus centang E (Offline?) — col 5 saja
+ *      - Recalculate I/J/K saja (A dan H sudah terisi sebelumnya)
+ *
+ * Mendukung paste multi-baris (B3:D10). Install via setupTriggerPotonganOnEdit().
  */
 function onEditInputPotongan(e) {
   if (!e || !e.range) return;
@@ -153,18 +240,30 @@ function onEditInputPotongan(e) {
   var endCol   = startCol + e.range.getNumColumns() - 1;
   var endRow   = startRow + e.range.getNumRows() - 1;
 
-  // Trigger hanya jika editan mencakup kolom C (Login ID)
-  if (startCol > _PT_COL.LOGIN_ID || endCol < _PT_COL.LOGIN_ID) return;
+  // Skenario A: paste/edit mencakup col C (Login ID) — start ≤ C ≤ end
+  var termasukLoginId = (startCol <= _PT_COL.LOGIN_ID && endCol >= _PT_COL.LOGIN_ID);
+  // Skenario B: toggle col E (Offline?) saja
+  var isOfflineToggle = (startCol === _PT_COL.OFFLINE && endCol === _PT_COL.OFFLINE);
+
+  if (!termasukLoginId && !isOfflineToggle) return;
 
   var firstDataRow = Math.max(startRow, _PT_DATA_START_ROW);
   if (firstDataRow > endRow) return;
 
   for (var row = firstDataRow; row <= endRow; row++) {
-    var loginId = sheet.getRange(row, _PT_COL.LOGIN_ID).getValue();
-    if (!loginId || loginId.toString().trim() === '') {
-      sheet.getRange(row, _PT_COL.ID_CABANG).clearContent();
-      sheet.getRange(row, _PT_COL.NAMA_DRIVER).clearContent();
-    } else {
+
+    if (termasukLoginId) {
+      var loginId = sheet.getRange(row, _PT_COL.LOGIN_ID).getValue();
+      if (!loginId || loginId.toString().trim() === '') {
+        sheet.getRange(row, _PT_COL.ID_CABANG).clearContent();
+        sheet.getRange(row, _PT_COL.NAMA_DRIVER).clearContent();
+        sheet.getRange(row, _PT_COL.POTONGAN_KANTOR).clearContent();
+        sheet.getRange(row, _PT_COL.HAK_DRIVER).clearContent();
+        sheet.getRange(row, _PT_COL.STATUS).clearContent();
+        continue;
+      }
+
+      // Fill A (Id Cabang) + H (Nama Driver) dari lookup Database Driver
       var driver = _cariDriverByLoginId(loginId.toString().trim());
       if (driver) {
         sheet.getRange(row, _PT_COL.ID_CABANG).setValue(driver.idCabang);
@@ -173,19 +272,21 @@ function onEditInputPotongan(e) {
         sheet.getRange(row, _PT_COL.ID_CABANG).setValue('TIDAK DITEMUKAN');
         sheet.getRange(row, _PT_COL.NAMA_DRIVER).setValue('TIDAK DITEMUKAN');
       }
-    }
 
-    // Konversi Waktu Order (D) dari string AIST "11.07.2026 18:40" ke Date object.
-    // Diperlukan agar ARRAYFORMULA kolom I bisa pakai MOD(D,1) untuk cek waktu Batam.
-    // Google Sheets tidak auto-detect format dd.MM.yyyy (format Eropa).
-    var dCell = sheet.getRange(row, _PT_COL.WAKTU_ORDER);
-    var dRaw  = dCell.getValue();
-    if (typeof dRaw === 'string' && dRaw.trim()) {
-      var dParsed = _parseAISTDate(dRaw);
-      if (dParsed instanceof Date && !isNaN(dParsed.getTime())) {
-        dCell.setValue(dParsed);
+      // Konversi D (Waktu Order) dari string AIST "11.07.2026 18:40" → Date object
+      // Agar _hitungPotonganKantor() bisa baca jam untuk Batam SIANG/MALAM/DINI
+      var dCell = sheet.getRange(row, _PT_COL.WAKTU_ORDER);
+      var dRaw  = dCell.getValue();
+      if (typeof dRaw === 'string' && dRaw.trim()) {
+        var dParsed = _parseAISTDate(dRaw);
+        if (dParsed instanceof Date && !isNaN(dParsed.getTime())) {
+          dCell.setValue(dParsed);
+        }
       }
     }
+
+    // Hitung Potongan Kantor, Hak Driver, Status (skenario A dan B)
+    _updatePotonganRow(sheet, row);
   }
 }
 
@@ -322,14 +423,20 @@ function _pindahDataPotonganByName(sheetName) {
     var price          = row[_PT_COL.PRICE - 1];           // B
     var loginId        = row[_PT_COL.LOGIN_ID - 1];        // C
     // WAKTU_ORDER dari AIST: "11.07.2026 18:40" (string dd.MM.yyyy HH:mm tanpa detik)
-    // Konversi ke Date agar Sheets bisa baca sebagai tanggal & monitoring engine bisa parse
     var waktuOrderRaw  = row[_PT_COL.WAKTU_ORDER - 1];    // D
-    var waktuOrder     = _parseAISTDate(waktuOrderRaw);    // → Date object jika bisa, raw jika tidak
-    var offline        = row[_PT_COL.OFFLINE - 1];         // E (boolean)
+    var waktuOrder     = _parseAISTDate(waktuOrderRaw);    // → Date object jika bisa
+    var offline        = row[_PT_COL.OFFLINE - 1];         // E (boolean checkbox)
     var kodeOpsional   = row[_PT_COL.KODE_OPSIONAL - 1];  // F
+    var pembandingPKU  = row[_PT_COL.PEMBANDING_PKU - 1]; // G
     var namaDriver     = row[_PT_COL.NAMA_DRIVER - 1];     // H
-    var potonganKantor = row[_PT_COL.POTONGAN_KANTOR - 1]; // I
-    var hakDriver      = row[_PT_COL.HAK_DRIVER - 1];      // J
+    var potonganKantor = row[_PT_COL.POTONGAN_KANTOR - 1]; // I (diisi oleh onEditInputPotongan)
+    var hakDriver      = row[_PT_COL.HAK_DRIVER - 1];      // J (diisi oleh onEditInputPotongan)
+
+    // Fallback: hitung ulang jika onEdit belum sempat mengisi I/J
+    if (!potonganKantor || potonganKantor === '') {
+      potonganKantor = _hitungPotonganKantor(idCabang, price, waktuOrder, offline, kodeOpsional, pembandingPKU);
+      hakDriver = Number(price) - potonganKantor;
+    }
 
     var surchargeOffline = (offline === true) ? Math.round(Number(price) * 0.12) : 0;
     var tipeWaktu        = _tipeWaktu(waktuOrder); // _tipeWaktu() handle Date, number, dan string

@@ -55,6 +55,7 @@ function onOpen() {
         .addSeparator()
         .addItem('Setup Sheet Monitoring',          'setupMonitoringSheets')
         .addItem('Setup Trigger Monitoring',        'setupMonitoringTriggers')
+        .addItem('Setup Trigger OnEdit Saldo AIST', 'setupTriggerSaldoAISTOnEdit')
         .addSeparator()
         .addItem('Test Tipe Waktu',                 'testTipeWaktu')
     )
@@ -275,4 +276,118 @@ function hapusTransaksiAISTBulanSebelumnya() {
     }
   }
   SpreadsheetApp.getUi().alert('Selesai: ' + rowsDeleted + ' baris bulan lalu dihapus dari ' + _AIST_DB_NAME + '.');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// FORM INPUT SALDO AIST — AUTO-FILL saat Login ID (col D) diisi
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * OnEdit handler untuk "Form Input Saldo AIST".
+ * Ketika admin mengisi kolom D (Login ID), auto-fill:
+ *   F (Nama Driver)     — lookup dari Database Driver Airport/External
+ *   G (Cabang)          — lookup dari Database Driver
+ *   E (Nominal Tagihan) — lookup dari Form Input Saldo PWA (request driver belum diproses)
+ *
+ * Install via setupTriggerSaldoAISTOnEdit().
+ */
+function onEditFormInputSaldoAIST(e) {
+  if (!e || !e.range) return;
+  var sheet = e.range.getSheet();
+  if (sheet.getName() !== _AIST_FORM_NAME) return;
+
+  var startRow = e.range.getRow();
+  var startCol = e.range.getColumn();
+  var endCol   = startCol + e.range.getNumColumns() - 1;
+  var endRow   = startRow + e.range.getNumRows() - 1;
+
+  // Trigger hanya jika editan mencakup col D (Login ID)
+  if (startCol > _AIST_FORM_COL.LOGIN_ID || endCol < _AIST_FORM_COL.LOGIN_ID) return;
+
+  var firstDataRow = Math.max(startRow, _AIST_DATA_START_ROW);
+  if (firstDataRow > endRow) return;
+
+  var ss = SpreadsheetApp.openById(RAOS_SS_ID);
+
+  for (var row = firstDataRow; row <= endRow; row++) {
+    var loginId = sheet.getRange(row, _AIST_FORM_COL.LOGIN_ID).getValue();
+    if (!loginId || String(loginId).trim() === '') {
+      sheet.getRange(row, _AIST_FORM_COL.NAMA_DRIVER).clearContent();
+      sheet.getRange(row, _AIST_FORM_COL.CABANG).clearContent();
+      sheet.getRange(row, _AIST_FORM_COL.NOMINAL_TAGIHAN).clearContent();
+      continue;
+    }
+
+    var loginIdStr = String(loginId).trim();
+
+    // Auto-fill F (Nama Driver) + G (Cabang) dari Database Driver
+    var driver = _cariDriverByLoginId(loginIdStr);
+    if (driver) {
+      sheet.getRange(row, _AIST_FORM_COL.NAMA_DRIVER).setValue(driver.nama);
+      sheet.getRange(row, _AIST_FORM_COL.CABANG).setValue(driver.idCabang);
+    }
+
+    // Auto-fill E (Nominal Tagihan) dari Form Input Saldo PWA (request belum diproses)
+    var nominalPWA = _cariNominalPWAByLoginId(ss, loginIdStr);
+    if (nominalPWA !== null) {
+      sheet.getRange(row, _AIST_FORM_COL.NOMINAL_TAGIHAN).setValue(nominalPWA);
+    }
+  }
+}
+
+/**
+ * Cari nominal tagihan dari Form Input Saldo PWA berdasarkan Login ID driver.
+ * Ambil baris pertama yang Login ID-nya cocok dan belum dicentang "Sudah Diisi" (col G).
+ *
+ * @param {Spreadsheet} ss
+ * @param {string}      loginId
+ * @returns {number|null}
+ */
+function _cariNominalPWAByLoginId(ss, loginId) {
+  var shPWA = ss.getSheetByName('Form Input Saldo PWA');
+  if (!shPWA || shPWA.getLastRow() < 3) return null;
+
+  // A=Timestamp(0), B=Cabang(1), C=NamaStaff(2), D=Nominal(3), E=IDLoginDriver(4),
+  // F=NamaDriver(5), G=SudahDiisi(6)
+  var data = shPWA.getRange(3, 1, shPWA.getLastRow() - 2, 7).getValues();
+  for (var i = 0; i < data.length; i++) {
+    var rowLoginId  = String(data[i][4]).trim();
+    var sudahDiisi  = data[i][6];
+    if (rowLoginId === loginId && sudahDiisi !== true) {
+      return Number(data[i][3]) || null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Pasang onEdit trigger untuk auto-fill Form Input Saldo AIST.
+ * Jalankan SEKALI dari GAS Editor atau menu Setup.
+ */
+function setupTriggerSaldoAISTOnEdit() {
+  var ss       = SpreadsheetApp.openById(RAOS_SS_ID);
+  var triggers = ScriptApp.getUserTriggers(ss);
+
+  triggers.forEach(function(t) {
+    if (t.getHandlerFunction() === 'onEditFormInputSaldoAIST') {
+      ScriptApp.deleteTrigger(t);
+      Logger.log('🗑️  Trigger lama dihapus: onEditFormInputSaldoAIST');
+    }
+  });
+
+  ScriptApp.newTrigger('onEditFormInputSaldoAIST')
+    .forSpreadsheet(ss)
+    .onEdit()
+    .create();
+
+  Logger.log('✅ Trigger onEditFormInputSaldoAIST terpasang.');
+  Logger.log('   Aktif di: ' + _AIST_FORM_NAME);
+  Logger.log('   Fungsi: Auto-fill col E (Nominal), F (Nama Driver), G (Cabang) saat Login ID (D) diisi.');
+  SpreadsheetApp.getUi().alert(
+    '✅ Trigger OnEdit Saldo AIST terpasang!\n\n' +
+    'Saat admin isi kolom D (Login ID) di "Form Input Saldo AIST",\n' +
+    'otomatis terisi:\n' +
+    '  E (Nominal Tagihan) — dari PWA request driver\n' +
+    '  F (Nama Driver)     — dari Database Driver\n' +
+    '  G (Cabang)          — dari Database Driver');
 }
