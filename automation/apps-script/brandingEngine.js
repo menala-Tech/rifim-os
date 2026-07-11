@@ -129,7 +129,19 @@ function _getLogoBlob(brandKey) {
   if (!fileId) throw new Error(
     'Logo "' + brandKey + '" belum di-setup.\n' +
     'Jalankan: RIFIM OS → Setup → Setup Logo Perusahaan');
-  return DriveApp.getFileById(fileId).getBlob();
+
+  // Pakai Drive thumbnail URL dengan lebar max 400px
+  // agar blob selalu < 2MB dan < 1 juta pixel (batas GAS insertImage)
+  var thumbUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w400';
+  var token    = ScriptApp.getOAuthToken();
+  var resp     = UrlFetchApp.fetch(thumbUrl, {
+    headers           : { Authorization: 'Bearer ' + token },
+    muteHttpExceptions: true,
+  });
+  if (resp.getResponseCode() !== 200) {
+    throw new Error('Gagal ambil logo dari Drive (HTTP ' + resp.getResponseCode() + ').');
+  }
+  return resp.getBlob().setContentType('image/png');
 }
 
 /**
