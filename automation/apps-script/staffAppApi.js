@@ -39,7 +39,7 @@ var _SA_QUEUE_SHEET   = 'Antrian Bandara';
 var _SA_STAFF_SHEET   = 'Database Staff';
 var _SA_DATA_START    = 3; // row 1 = header, row 2 = note
 
-// Radius geofence absensi (meter)
+// Radius geofence absensi default (meter) — bisa dioverride per cabang di GEOFENCE_CABANG
 var _SA_GEOFENCE_RADIUS_M = 300;
 
 // ══════════════════════════════════════════════════════════════════
@@ -319,16 +319,48 @@ function staffSaldoValidasi(params) {
 
 /**
  * Koordinat cabang untuk geofence — dari PropertiesService.
- * Format property GEOFENCE_CABANG: JSON {"ID Rifim Airport Batam": [1.121, 104.119], ...}
- * Setup: setupGeofenceCabang() atau isi manual di Project Properties.
+ * Format property GEOFENCE_CABANG (JSON):
+ *   {"ID Rifim Airport Batam": {"lat": 1.1229, "lng": 104.1139, "radius": 1000}, ...}
+ * Nilai null = cabang belum punya koordinat (absensi jalan, status "TIDAK DICEK").
+ * Setup: jalankan setupGeofenceCabang() SEKALI dari GAS Editor.
+ * @returns {{lat: number, lng: number, radius: number}|null}
  */
 function _saGetGeofence(cabang) {
   var raw = PropertiesService.getScriptProperties().getProperty('GEOFENCE_CABANG');
   if (!raw) return null;
   try {
-    var map = JSON.parse(raw);
-    return map[cabang] || null;
+    var g = JSON.parse(raw)[cabang];
+    if (!g) return null;
+    // Dukung format lama [lat, lng] dan format baru {lat, lng, radius}
+    if (Array.isArray(g)) return { lat: g[0], lng: g[1], radius: _SA_GEOFENCE_RADIUS_M };
+    return { lat: g.lat, lng: g.lng, radius: g.radius || _SA_GEOFENCE_RADIUS_M };
   } catch (e) { return null; }
+}
+
+/**
+ * Simpan koordinat geofence semua cabang ke PropertiesService.
+ * Jalankan SEKALI dari GAS Editor (file: staffAppApi.js).
+ * Koordinat bandara = data publik, aman disimpan di kode.
+ * Cabang bernilai null belum punya koordinat counter — absensi tetap jalan
+ * dengan status "TIDAK DICEK" sampai koordinatnya diisi.
+ */
+function setupGeofenceCabang() {
+  var geofence = {
+    'ID Rifim Airport Batam':      { lat: 1.1229474611566184,  lng: 104.11399999608159, radius: 1000 },
+    'ID Rifim Airport Jambi':      { lat: -1.6315198788190148, lng: 103.6438881064391,  radius: 1000 },
+    'ID Rifim Airport Balikpapan': { lat: -1.2613140099073543, lng: 116.89823585376726, radius: 1000 },
+    'ID Rifim Airport Manado':     { lat: 1.5432943843910787,  lng: 124.92259315566997, radius: 1000 },
+    'ID Rifim Airport Pekanbaru':  { lat: 0.46502090112651967, lng: 101.44852194619506, radius: 1000 },
+    'ID Rifim Batam':      null, // TODO: belum ada koordinat counter
+    'ID Rifim Jambi Luar': null, // TODO: belum ada koordinat counter
+  };
+  PropertiesService.getScriptProperties()
+    .setProperty('GEOFENCE_CABANG', JSON.stringify(geofence));
+
+  var terisi = Object.keys(geofence).filter(function(k) { return geofence[k]; });
+  Logger.log('✅ GEOFENCE_CABANG tersimpan.');
+  Logger.log('   Terisi (' + terisi.length + '): ' + terisi.join(', '));
+  Logger.log('   Belum ada koordinat: ID Rifim Batam, ID Rifim Jambi Luar');
 }
 
 /** Haversine — jarak antar 2 koordinat dalam meter. */
@@ -383,8 +415,8 @@ function staffAbsensi(params) {
   var koordinat = _saGetGeofence(cabang);
   var jarak = null, dalamArea = 'TIDAK DICEK';
   if (koordinat) {
-    jarak = _saJarakMeter(lat, lng, koordinat[0], koordinat[1]);
-    dalamArea = jarak <= _SA_GEOFENCE_RADIUS_M ? 'YA' : 'TIDAK';
+    jarak = _saJarakMeter(lat, lng, koordinat.lat, koordinat.lng);
+    dalamArea = jarak <= koordinat.radius ? 'YA' : 'TIDAK';
   }
 
   // Simpan foto ke Drive (opsional)

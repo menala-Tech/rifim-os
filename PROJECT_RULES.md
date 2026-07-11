@@ -174,7 +174,7 @@ Urutan setup yang harus dijalankan **sekali** dari GAS Editor setelah deploy ke 
 
 | Property | Format | Keterangan |
 |----------|--------|------------|
-| `GEOFENCE_CABANG` | JSON `{"ID Rifim Airport Batam": [1.121, 104.119], ...}` | Koordinat geofence absensi per cabang. Tanpa ini absensi jalan tapi status "TIDAK DICEK" |
+| `GEOFENCE_CABANG` | JSON `{"ID Rifim Airport Batam": {"lat": 1.1229, "lng": 104.1139, "radius": 1000}, ...}` | Isi via `setupGeofenceCabang()` di `staffAppApi.js`. Cabang null = absensi jalan tapi status "TIDAK DICEK" |
 | `ABSENSI_FOTO_FOLDER_ID` | Drive Folder ID | Auto-dibuat saat absensi pertama; bisa diisi manual |
 
 > **Reminder Redeploy:** setiap perubahan file `automation/apps-script/*.js` di GitHub → clasp push otomatis, tapi **Web App wajib redeploy manual**: Deploy → Manage deployments → ✏️ → Version: New version → Deploy.
