@@ -202,21 +202,45 @@ function _cariDriverByLoginId(loginId) {
 // ══════════════════════════════════════════════════════════════════
 
 /**
+ * Wrapper public — dipanggil dari MENU (bukan tombol di sheet).
+ * Eksplisit pilih Input Potongan 1.
+ */
+function pindahDataInputPotongan1() {
+  _pindahDataPotonganByName('Input Potongan 1');
+}
+
+/**
+ * Wrapper public — dipanggil dari MENU (bukan tombol di sheet).
+ * Eksplisit pilih Input Potongan 2.
+ */
+function pindahDataInputPotongan2() {
+  _pindahDataPotonganByName('Input Potongan 2');
+}
+
+/**
  * Port dari kode.gs pindahData() — Batch 4 Potongan Order.
- * Pindah baris dari sheet aktif (Input Potongan 1 atau 2) ke Database Potongan.
- *
- * Perbedaan dari original Batch:
- *   - Sumber: Input Potongan 1/2, data mulai row 3 (bukan row 2)
- *   - Tujuan: sheet "Database Potongan" (bukan "MASTER DATA ALL")
- *   - Kolom tambahan di Database: Tipe Waktu, Surcharge Offline, Total Potongan, Created At
- *   - Cooldown: 60 detik (sama dengan original)
- *
- * Assign fungsi ini ke tombol "Pindahkan ke Database" di sheet Input Potongan 1 & 2.
+ * Dipanggil dari tombol di sheet (pakai active sheet) atau dari menu via wrapper di atas.
+ * Untuk tombol di sheet: assign ke pindahDataKeDatabasePotongan().
  */
 function pindahDataKeDatabasePotongan() {
+  var ss        = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetName = ss.getActiveSheet().getName();
+  if (_PT_SHEET_NAMES.indexOf(sheetName) === -1) {
+    SpreadsheetApp.getUi().alert(
+      'Harap jalankan dari sheet "Input Potongan 1" atau "Input Potongan 2".');
+    return;
+  }
+  _pindahDataPotonganByName(sheetName);
+}
+
+/**
+ * Core logic pindah data potongan.
+ * @param {string} sheetName - 'Input Potongan 1' atau 'Input Potongan 2'
+ */
+function _pindahDataPotonganByName(sheetName) {
   // ── Cooldown 60 detik (cegah double-klik) ─────────────────────
-  var cache      = CacheService.getScriptCache();
-  var cacheKey   = 'cooldown_pindahPotongan';
+  var cache    = CacheService.getScriptCache();
+  var cacheKey = 'cooldown_pindahPotongan_' + sheetName.replace(/\s/g, '_');
   if (cache.get(cacheKey) != null) {
     SpreadsheetApp.getUi().alert(
       'Mohon tunggu sekitar 60 detik sebelum memindahkan data kembali\nuntuk mencegah double input.');
@@ -224,14 +248,10 @@ function pindahDataKeDatabasePotongan() {
   }
   cache.put(cacheKey, 'true', 60);
 
-  var ss         = SpreadsheetApp.getActiveSpreadsheet();
-  var sheetInput = ss.getActiveSheet();
-  var sheetName  = sheetInput.getName();
-
-  // ── Validasi sheet aktif ───────────────────────────────────────
-  if (_PT_SHEET_NAMES.indexOf(sheetName) === -1) {
-    SpreadsheetApp.getUi().alert(
-      'Harap jalankan tombol ini dari sheet "Input Potongan 1" atau "Input Potongan 2".');
+  var ss         = SpreadsheetApp.openById(RAOS_SS_ID);
+  var sheetInput = ss.getSheetByName(sheetName);
+  if (!sheetInput) {
+    SpreadsheetApp.getUi().alert('Sheet "' + sheetName + '" tidak ditemukan.');
     cache.remove(cacheKey);
     return;
   }

@@ -1,0 +1,224 @@
+/**
+ * RIFIM OS — Custom Menu Google Sheets
+ *
+ * Menu "RIFIM OS" muncul di toolbar saat spreadsheet dibuka.
+ * onOpen() dipanggil otomatis oleh GAS saat spreadsheet dibuka.
+ *
+ * Sub-menu:
+ *   📦 Potongan Order  → Pindahkan dari Input Potongan 1/2 → Database Potongan
+ *   💳 Saldo AIST      → Pindahkan Transaksi AIST → Database AIST
+ *   ⚙️  Setup           → Setup sheet, formula, trigger (admin saja)
+ */
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+
+  ui.createMenu('🚛 RIFIM OS')
+
+    // ─ Potongan Order ─────────────────────────────────────────────
+    .addSubMenu(
+      ui.createMenu('📦 Potongan Order')
+        .addItem('Pindahkan dari Input Potongan 1 → Database', 'pindahDataInputPotongan1')
+        .addItem('Pindahkan dari Input Potongan 2 → Database', 'pindahDataInputPotongan2')
+        .addSeparator()
+        .addItem('Hapus Data Potongan Bulan Sebelumnya',       'hapusPotonganBulanSebelumnya')
+    )
+
+    // ─ Saldo AIST ─────────────────────────────────────────────────
+    .addSubMenu(
+      ui.createMenu('💳 Saldo AIST')
+        .addItem('Pindahkan Transaksi AIST → Database AIST', 'pindahTransaksiAISTKeDatabase')
+        .addSeparator()
+        .addItem('Hapus Transaksi AIST Bulan Sebelumnya',    'hapusTransaksiAISTBulanSebelumnya')
+    )
+
+    .addSeparator()
+
+    // ─ Setup (admin) ───────────────────────────────────────────────
+    .addSubMenu(
+      ui.createMenu('⚙️ Setup')
+        .addItem('Setup Semua RAOS Sheets',         'setupRaosSheets')
+        .addItem('Verify RAOS Sheets',              'verifyRaosSheets')
+        .addSeparator()
+        .addItem('Setup Formula Input Potongan',    'setupFormulasInputPotongan')
+        .addItem('Setup Trigger OnEdit Potongan',   'setupTriggerPotonganOnEdit')
+        .addSeparator()
+        .addItem('Test Tipe Waktu',                 'testTipeWaktu')
+    )
+
+    .addToUi();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PINDAH TRANSAKSI AIST → DATABASE AIST
+// ══════════════════════════════════════════════════════════════════
+
+var _AIST_FORM_NAME = 'Form Input Saldo AIST';
+var _AIST_DB_NAME   = 'Database AIST';
+
+// Kolom Form Input Saldo AIST (1-based)
+var _AIST_FORM_COL = {
+  TANGGAL         : 1,  // A — paste dari AIST
+  SUM             : 2,  // B — paste dari AIST (nominal AIST)
+  CREDIT_ACCOUNT  : 3,  // C — paste dari AIST
+  LOGIN_ID        : 4,  // D — paste dari AIST
+  NOMINAL_TAGIHAN : 5,  // E — auto dari DB (nominal PWA)
+  NAMA_DRIVER     : 6,  // F — auto dari DB Driver
+  CABANG          : 7,  // G — auto dari DB Driver
+  STATUS          : 8,  // H — auto status
+};
+
+// Kolom Database AIST (1-based)
+var _AIST_DB_COL = {
+  ID              : 1,  // A
+  TANGGAL         : 2,  // B
+  LOGIN_ID        : 3,  // C
+  CREDIT_ACCOUNT  : 4,  // D
+  NAMA_DRIVER     : 5,  // E
+  CABANG          : 6,  // F
+  NOMINAL_AIST    : 7,  // G — SUM dari AIST (yang tertulis di Credit Account)
+  STATUS_MATCH    : 8,  // H — TRANSFERRED / MATCH / SELISIH dll
+  CREATED_AT      : 9,  // I
+};
+
+var _AIST_DATA_START_ROW = 3; // baris 1=header, 2=note, 3+=data
+
+/**
+ * Pindahkan transaksi dari "Form Input Saldo AIST" ke "Database AIST".
+ * Patokan baris valid: kolom D (Login ID) tidak kosong.
+ * Setelah pindah, baris manual di form dikosongkan (A-D), auto-fill ikut hilang.
+ */
+function pindahTransaksiAISTKeDatabase() {
+  // ── Cooldown 60 detik ─────────────────────────────────────────
+  var cache    = CacheService.getScriptCache();
+  var cacheKey = 'cooldown_pindahAIST';
+  if (cache.get(cacheKey) != null) {
+    SpreadsheetApp.getUi().alert(
+      'Mohon tunggu sekitar 60 detik sebelum memindahkan transaksi kembali\nuntuk mencegah double input.');
+    return;
+  }
+  cache.put(cacheKey, 'true', 60);
+
+  var ss       = SpreadsheetApp.openById(RAOS_SS_ID);
+  var sheetForm = ss.getSheetByName(_AIST_FORM_NAME);
+  var sheetDB   = ss.getSheetByName(_AIST_DB_NAME);
+
+  if (!sheetForm) {
+    SpreadsheetApp.getUi().alert('Sheet "' + _AIST_FORM_NAME + '" tidak ditemukan.');
+    cache.remove(cacheKey);
+    return;
+  }
+  if (!sheetDB) {
+    SpreadsheetApp.getUi().alert('Sheet "' + _AIST_DB_NAME + '" tidak ditemukan. Jalankan setupRaosSheets() dulu.');
+    cache.remove(cacheKey);
+    return;
+  }
+
+  var lastRow = sheetForm.getLastRow();
+  if (lastRow < _AIST_DATA_START_ROW) {
+    SpreadsheetApp.getUi().alert('Tidak ada data di "' + _AIST_FORM_NAME + '".');
+    cache.remove(cacheKey);
+    return;
+  }
+
+  // ── Ambil semua data form ──────────────────────────────────────
+  var numRows = lastRow - _AIST_DATA_START_ROW + 1;
+  var data    = sheetForm.getRange(_AIST_DATA_START_ROW, 1, numRows, 8).getValues();
+
+  // ── Hitung ID terakhir di Database AIST ───────────────────────
+  var lastIdNum = 0;
+  var dbLastRow = sheetDB.getLastRow();
+  if (dbLastRow >= _AIST_DATA_START_ROW) {
+    var lastIdVal = sheetDB.getRange(dbLastRow, _AIST_DB_COL.ID).getValue().toString();
+    var idMatch = lastIdVal.match(/(\d+)$/);
+    if (idMatch) lastIdNum = parseInt(idMatch[1]);
+  }
+
+  var toAppend  = [];
+  var timestamp = new Date();
+  var rowsToClear = []; // indeks baris yang akan dikosongkan
+
+  for (var i = 0; i < data.length; i++) {
+    var loginId = data[i][_AIST_FORM_COL.LOGIN_ID - 1]; // D
+    if (!loginId || loginId.toString().trim() === '') continue;
+
+    var tanggal        = data[i][_AIST_FORM_COL.TANGGAL - 1];         // A
+    var sum            = data[i][_AIST_FORM_COL.SUM - 1];             // B (nominal AIST)
+    var creditAccount  = data[i][_AIST_FORM_COL.CREDIT_ACCOUNT - 1];  // C
+    var namaDriver     = data[i][_AIST_FORM_COL.NAMA_DRIVER - 1];     // F (auto)
+    var cabang         = data[i][_AIST_FORM_COL.CABANG - 1];          // G (auto)
+    var status         = data[i][_AIST_FORM_COL.STATUS - 1];          // H (auto)
+
+    lastIdNum++;
+    var newId = 'AIST-' + ('0000' + lastIdNum).slice(-4);
+
+    toAppend.push([
+      newId,                                    // A: ID
+      tanggal,                                  // B: Tanggal
+      loginId.toString().trim(),                // C: Login ID
+      creditAccount,                            // D: Credit Account
+      namaDriver,                               // E: Nama Driver
+      cabang,                                   // F: Cabang
+      sum,                                      // G: Nominal AIST (SUM dari AIST)
+      status || 'TRANSFERRED',                  // H: Status Match
+      timestamp,                                // I: Created At
+    ]);
+
+    rowsToClear.push(i);
+  }
+
+  if (toAppend.length === 0) {
+    SpreadsheetApp.getUi().alert('Data kosong. Pastikan kolom Login ID (D) terisi.');
+    cache.remove(cacheKey);
+    return;
+  }
+
+  // ── Append ke Database AIST ───────────────────────────────────
+  sheetDB.getRange(dbLastRow + 1, 1, toAppend.length, toAppend[0].length).setValues(toAppend);
+
+  // ── Bersihkan kolom manual di form (A, B, C, D) ──────────────
+  // Kolom E-H adalah auto-fill (formula/GAS) — ikut kosong saat A-D dikosongkan
+  var manualCols = [
+    _AIST_FORM_COL.TANGGAL,
+    _AIST_FORM_COL.SUM,
+    _AIST_FORM_COL.CREDIT_ACCOUNT,
+    _AIST_FORM_COL.LOGIN_ID,
+  ];
+
+  rowsToClear.forEach(function(i) {
+    var actualRow = i + _AIST_DATA_START_ROW;
+    manualCols.forEach(function(col) {
+      sheetForm.getRange(actualRow, col).clearContent();
+    });
+  });
+
+  SpreadsheetApp.getUi().alert(
+    '✅ Berhasil memindahkan ' + toAppend.length + ' transaksi ke "' + _AIST_DB_NAME + '"!');
+}
+
+/**
+ * Hapus transaksi AIST di Database AIST yang tanggalnya bulan lalu.
+ */
+function hapusTransaksiAISTBulanSebelumnya() {
+  var ss    = SpreadsheetApp.openById(RAOS_SS_ID);
+  var sheet = ss.getSheetByName(_AIST_DB_NAME);
+  if (!sheet) { SpreadsheetApp.getUi().alert('Sheet "' + _AIST_DB_NAME + '" tidak ditemukan.'); return; }
+
+  var data         = sheet.getDataRange().getValues();
+  var now          = new Date();
+  var prevMonth    = now.getMonth() - 1;
+  var prevYear     = now.getFullYear();
+  if (prevMonth < 0) { prevMonth = 11; prevYear--; }
+
+  var rowsDeleted = 0;
+  for (var i = data.length - 1; i >= 2; i--) {
+    var tgl     = data[i][_AIST_DB_COL.TANGGAL - 1];
+    var rowDate = (tgl instanceof Date) ? tgl : (tgl ? new Date(tgl) : null);
+    if (rowDate && !isNaN(rowDate.getTime())) {
+      if (rowDate.getMonth() === prevMonth && rowDate.getFullYear() === prevYear) {
+        sheet.deleteRow(i + 1);
+        rowsDeleted++;
+      }
+    }
+  }
+  SpreadsheetApp.getUi().alert('Selesai: ' + rowsDeleted + ' baris bulan lalu dihapus dari ' + _AIST_DB_NAME + '.');
+}
