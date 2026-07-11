@@ -84,11 +84,11 @@ var _AIST_DATA_START_ROW = 3; // baris 1=header, 2=note, 3+=data
 
 /**
  * Pindahkan transaksi dari "Form Input Saldo AIST" ke "Database AIST".
- * Patokan baris valid: kolom D (Login ID) tidak kosong.
- * Setelah pindah, baris manual di form dikosongkan (A-D), auto-fill ikut hilang.
+ * Patokan baris valid: kolom A (Tanggal) tidak kosong — mengikuti pola Ops sistem final.gs.
+ * Cooldown di-set SETELAH berhasil (bukan sebelum proses).
  */
 function pindahTransaksiAISTKeDatabase() {
-  // ── Cooldown 60 detik ─────────────────────────────────────────
+  // ── Guard cooldown (cek dulu, SET setelah berhasil) ───────────
   var cache    = CacheService.getScriptCache();
   var cacheKey = 'cooldown_pindahAIST';
   if (cache.get(cacheKey) != null) {
@@ -96,27 +96,23 @@ function pindahTransaksiAISTKeDatabase() {
       'Mohon tunggu sekitar 60 detik sebelum memindahkan transaksi kembali\nuntuk mencegah double input.');
     return;
   }
-  cache.put(cacheKey, 'true', 60);
 
-  var ss       = SpreadsheetApp.openById(RAOS_SS_ID);
+  var ss        = SpreadsheetApp.openById(RAOS_SS_ID);
   var sheetForm = ss.getSheetByName(_AIST_FORM_NAME);
   var sheetDB   = ss.getSheetByName(_AIST_DB_NAME);
 
   if (!sheetForm) {
     SpreadsheetApp.getUi().alert('Sheet "' + _AIST_FORM_NAME + '" tidak ditemukan.');
-    cache.remove(cacheKey);
     return;
   }
   if (!sheetDB) {
     SpreadsheetApp.getUi().alert('Sheet "' + _AIST_DB_NAME + '" tidak ditemukan. Jalankan setupRaosSheets() dulu.');
-    cache.remove(cacheKey);
     return;
   }
 
   var lastRow = sheetForm.getLastRow();
   if (lastRow < _AIST_DATA_START_ROW) {
     SpreadsheetApp.getUi().alert('Tidak ada data di "' + _AIST_FORM_NAME + '".');
-    cache.remove(cacheKey);
     return;
   }
 
@@ -129,51 +125,55 @@ function pindahTransaksiAISTKeDatabase() {
   var dbLastRow = sheetDB.getLastRow();
   if (dbLastRow >= _AIST_DATA_START_ROW) {
     var lastIdVal = sheetDB.getRange(dbLastRow, _AIST_DB_COL.ID).getValue().toString();
-    var idMatch = lastIdVal.match(/(\d+)$/);
+    var idMatch   = lastIdVal.match(/(\d+)$/);
     if (idMatch) lastIdNum = parseInt(idMatch[1]);
   }
 
-  var toAppend  = [];
-  var timestamp = new Date();
-  var rowsToClear = []; // indeks baris yang akan dikosongkan
+  var toAppend   = [];
+  var tsStr      = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
+  var adminEmail = Session.getActiveUser().getEmail();
+  var rowsToClear = [];
 
   for (var i = 0; i < data.length; i++) {
-    var loginId = data[i][_AIST_FORM_COL.LOGIN_ID - 1]; // D
-    if (!loginId || loginId.toString().trim() === '') continue;
+    // Patokan: Tanggal (kolom A) tidak kosong — pola Ops sistem final.gs
+    var tanggal = data[i][_AIST_FORM_COL.TANGGAL - 1]; // A
+    if (!tanggal || tanggal.toString().trim() === '') continue;
 
-    var tanggal        = data[i][_AIST_FORM_COL.TANGGAL - 1];         // A
-    var sum            = data[i][_AIST_FORM_COL.SUM - 1];             // B (nominal AIST)
-    var creditAccount  = data[i][_AIST_FORM_COL.CREDIT_ACCOUNT - 1];  // C
-    var namaDriver     = data[i][_AIST_FORM_COL.NAMA_DRIVER - 1];     // F (auto)
-    var cabang         = data[i][_AIST_FORM_COL.CABANG - 1];          // G (auto)
-    var status         = data[i][_AIST_FORM_COL.STATUS - 1];          // H (auto)
+    var sum           = data[i][_AIST_FORM_COL.SUM - 1];            // B (nominal AIST)
+    var creditAccount = data[i][_AIST_FORM_COL.CREDIT_ACCOUNT - 1]; // C
+    var loginId       = data[i][_AIST_FORM_COL.LOGIN_ID - 1];       // D
+    var namaDriver    = data[i][_AIST_FORM_COL.NAMA_DRIVER - 1];    // F (auto)
+    var cabang        = data[i][_AIST_FORM_COL.CABANG - 1];         // G (auto)
+    var status        = data[i][_AIST_FORM_COL.STATUS - 1];         // H (auto)
 
     lastIdNum++;
     var newId = 'AIST-' + ('0000' + lastIdNum).slice(-4);
 
     toAppend.push([
-      newId,                                    // A: ID
-      tanggal,                                  // B: Tanggal
-      loginId.toString().trim(),                // C: Login ID
-      creditAccount,                            // D: Credit Account
-      namaDriver,                               // E: Nama Driver
-      cabang,                                   // F: Cabang
-      sum,                                      // G: Nominal AIST (SUM dari AIST)
-      status || 'TRANSFERRED',                  // H: Status Match
-      timestamp,                                // I: Created At
+      newId,                             // A: ID
+      tanggal,                           // B: Tanggal
+      loginId ? loginId.toString().trim() : '', // C: Login ID
+      creditAccount,                     // D: Credit Account
+      namaDriver,                        // E: Nama Driver
+      cabang,                            // F: Cabang
+      sum,                               // G: Nominal AIST (SUM dari AIST)
+      status || 'TRANSFERRED',           // H: Status Match
+      tsStr,                             // I: Created At
     ]);
 
     rowsToClear.push(i);
   }
 
   if (toAppend.length === 0) {
-    SpreadsheetApp.getUi().alert('Data kosong. Pastikan kolom Login ID (D) terisi.');
-    cache.remove(cacheKey);
+    SpreadsheetApp.getUi().alert('Data kosong. Pastikan kolom Tanggal (A) terisi.');
     return;
   }
 
   // ── Append ke Database AIST ───────────────────────────────────
   sheetDB.getRange(dbLastRow + 1, 1, toAppend.length, toAppend[0].length).setValues(toAppend);
+
+  // ── Cooldown SETELAH berhasil — pola Ops sistem final.gs ──────
+  cache.put(cacheKey, 'true', 60);
 
   // ── Bersihkan kolom manual di form (A, B, C, D) ──────────────
   // Kolom E-H adalah auto-fill (formula/GAS) — ikut kosong saat A-D dikosongkan
@@ -192,7 +192,9 @@ function pindahTransaksiAISTKeDatabase() {
   });
 
   SpreadsheetApp.getUi().alert(
-    '✅ Berhasil memindahkan ' + toAppend.length + ' transaksi ke "' + _AIST_DB_NAME + '"!');
+    '✅ BERHASIL!\n\nBaris: ' + toAppend.length +
+    '\nWaktu: ' + tsStr +
+    '\nAdmin: ' + adminEmail);
 }
 
 /**

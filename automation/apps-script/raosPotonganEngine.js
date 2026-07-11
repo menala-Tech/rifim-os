@@ -238,7 +238,7 @@ function pindahDataKeDatabasePotongan() {
  * @param {string} sheetName - 'Input Potongan 1' atau 'Input Potongan 2'
  */
 function _pindahDataPotonganByName(sheetName) {
-  // ── Cooldown 60 detik (cegah double-klik) ─────────────────────
+  // ── Guard cooldown (cek dulu, SET setelah berhasil) ───────────
   var cache    = CacheService.getScriptCache();
   var cacheKey = 'cooldown_pindahPotongan_' + sheetName.replace(/\s/g, '_');
   if (cache.get(cacheKey) != null) {
@@ -246,20 +246,17 @@ function _pindahDataPotonganByName(sheetName) {
       'Mohon tunggu sekitar 60 detik sebelum memindahkan data kembali\nuntuk mencegah double input.');
     return;
   }
-  cache.put(cacheKey, 'true', 60);
 
   var ss         = SpreadsheetApp.openById(RAOS_SS_ID);
   var sheetInput = ss.getSheetByName(sheetName);
   if (!sheetInput) {
     SpreadsheetApp.getUi().alert('Sheet "' + sheetName + '" tidak ditemukan.');
-    cache.remove(cacheKey);
     return;
   }
 
   var sheetDB = ss.getSheetByName(_DB_POTONGAN_NAME);
   if (!sheetDB) {
     SpreadsheetApp.getUi().alert('Sheet "' + _DB_POTONGAN_NAME + '" tidak ditemukan. Jalankan setupRaosSheets() dulu.');
-    cache.remove(cacheKey);
     return;
   }
 
@@ -267,7 +264,6 @@ function _pindahDataPotonganByName(sheetName) {
   var lastRow   = sheetInput.getLastRow();
   if (lastRow < _PT_DATA_START_ROW) {
     SpreadsheetApp.getUi().alert('Data kosong.');
-    cache.remove(cacheKey);
     return;
   }
 
@@ -277,9 +273,10 @@ function _pindahDataPotonganByName(sheetName) {
   var formulas   = rangeInput.getFormulas();
 
   // ── Bangun baris untuk Database Potongan ──────────────────────
-  var toAppend  = [];
-  var timestamp = new Date();
-  var lastIdRow = sheetDB.getLastRow();
+  var toAppend   = [];
+  var tsStr      = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
+  var adminEmail = Session.getActiveUser().getEmail();
+  var lastIdRow  = sheetDB.getLastRow();
 
   // Hitung ID terakhir di Database Potongan untuk generate ID baru
   var lastIdNum = 0;
@@ -326,14 +323,13 @@ function _pindahDataPotonganByName(sheetName) {
       surchargeOffline,  // L: Surcharge Offline (price × 12% jika offline)
       potonganKantor,    // M: Total Potongan (sudah termasuk surcharge)
       'DONE',            // N: Status
-      timestamp,         // O: Created At
+      tsStr,             // O: Created At
     ]);
   }
 
   if (toAppend.length === 0) {
     SpreadsheetApp.getUi().alert(
       'Data kosong. Pastikan kolom Id Cabang terisi sebelum memindahkan data.');
-    cache.remove(cacheKey);
     return;
   }
 
@@ -342,6 +338,9 @@ function _pindahDataPotonganByName(sheetName) {
   sheetDB.getRange(
     dbLastRow + 1, 1, toAppend.length, toAppend[0].length
   ).setValues(toAppend);
+
+  // ── Cooldown SETELAH berhasil — pola Ops sistem final.gs ──────
+  cache.put(cacheKey, 'true', 60);
 
   // ── Bersihkan Input Potongan (hanya sel manual, bukan formula) ─
   // Port dari kode.gs: hanya hapus sel yang tidak punya rumus
@@ -372,7 +371,10 @@ function _pindahDataPotonganByName(sheetName) {
   }
 
   SpreadsheetApp.getUi().alert(
-    '✅ Berhasil memindahkan ' + toAppend.length + ' baris ke "' + _DB_POTONGAN_NAME + '"!');
+    '✅ BERHASIL!\n\nBaris: ' + toAppend.length +
+    '\nSheet: ' + sheetName +
+    '\nWaktu: ' + tsStr +
+    '\nAdmin: ' + adminEmail);
 }
 
 // ══════════════════════════════════════════════════════════════════
