@@ -8,6 +8,26 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Staff PWA v1 (Sprint 3A)
+- `apps/pwa/staff-app/` — PWA baru untuk staff lapangan (login ID Staff + PIN)
+  - Input top-up saldo driver → sheet `Form Input Saldo PWA` (auto-lookup nama driver)
+  - Riwayat pengisian bulan berjalan + total nominal
+  - Antrian bandara: tambah driver, panggil, jemput, selesai (WAITING→CALLED→PICKED→DONE)
+  - Absensi MASUK/PULANG: GPS geofence + foto selfie (kompres canvas 640px → Drive)
+  - [Koordinator] Monitoring saldo cabang harian + validasi/tolak per entry
+- `automation/apps-script/staffAppApi.js` — backend API Staff PWA
+  - `staffLogin` — auth dari sheet Database Staff (ID + PIN + status AKTIF)
+  - `staffSaldoSubmit/Riwayat/Monitor/Validasi` — alur saldo dengan validation layer Koordinator
+  - `staffAbsensi/Status` — geofence Haversine 300m, koordinat cabang di PropertiesService `GEOFENCE_CABANG`
+  - `queueList/Add/Update` — antrian bandara (pengganti RADMS yang tidak bisa diakses)
+  - `setupStaffAppSheets()` — buat sheet Absensi Staff + Antrian Bandara + kolom Validasi J-L
+- `automation/apps-script/webApp.js` — routing `routeStaffApp()` di doPost
+
+### Context — RADMS Lama
+- RADMS (radms-driver / radms-dashboard) tidak pernah dipakai production dan akun lama
+  (GitHub + Vercel + Google) sudah tidak bisa diakses → di-rebuild ke Staff PWA (antrian)
+  dan Driver PWA (menyusul). Tidak ada data yang perlu diselamatkan.
+
 ### In Progress — HRIS Sprint 2
 - [x] Export rekap karyawan CSV (filter sesuai tampilan aktif)
 - [x] Filter absensi per departemen + kolom nama karyawan di tabel absensi

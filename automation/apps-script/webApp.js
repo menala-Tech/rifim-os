@@ -33,6 +33,14 @@ function doPost(e) {
       return _json(_handleHrisPost(input));
     }
 
+    // Staff App PWA actions (staffLogin, staffSaldoSubmit, queueAdd, dll.)
+    if (input.action) {
+      var staffAppResult = routeStaffApp(input.action, input);
+      if (staffAppResult !== null && input.action !== 'log_activity') {
+        return _json(staffAppResult);
+      }
+    }
+
     // Log activity dari Portal / Smart Office (fire-and-forget dari frontend)
     if (input.action === 'log_activity') {
       const by = input.performed_by || {};
