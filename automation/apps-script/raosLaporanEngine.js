@@ -335,32 +335,12 @@ function pdfKirimViaEmail() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Upload PDF ke Drive (public link) lalu kirim link ke WA Grup via API.
- * Provider-agnostic: gunakan Script Properties untuk konfigurasi API.
+ * Upload PDF ke Drive (public link) lalu kirim ke WA Grup via waEngine.js.
  *
- * Script Properties yang dibutuhkan:
- *   WA_API_URL  — endpoint API (mis. https://api.fonnte.com/send)
- *   WA_API_KEY  — token/key dari provider
- *   WA_GROUP_ID — nomor/ID grup WA tujuan
+ * Prasyarat: jalankan setupWaEngine(token, groupId) sekali dari GAS Editor.
+ * Token & group ID tersimpan di PropertiesService (FONNTE_TOKEN, WA_GROUP_ID).
  */
 function pdfKirimKeWAGrup() {
-  var props  = PropertiesService.getScriptProperties();
-  var waUrl  = props.getProperty('WA_API_URL')  || '';
-  var waKey  = props.getProperty('WA_API_KEY')  || '';
-  var waTo   = props.getProperty('WA_GROUP_ID') || '';
-
-  if (!waUrl || !waKey || !waTo) {
-    SpreadsheetApp.getUi().alert(
-      '⚠️ Konfigurasi WA belum lengkap.\n\n' +
-      'Set di GAS Editor → Project Settings → Script Properties:\n' +
-      '• WA_API_URL  = endpoint API WA\n' +
-      '  (mis. https://api.fonnte.com/send)\n' +
-      '• WA_API_KEY  = token/key dari provider WA\n' +
-      '• WA_GROUP_ID = nomor grup WA tujuan\n\n' +
-      'Hubungi admin untuk mendapatkan konfigurasi WA API.');
-    return;
-  }
-
   var ss     = SpreadsheetApp.openById(RAOS_SS_ID);
   var sheet  = ss.getSheetByName(_LAPORAN_SHEET_NAME);
   var cabang = sheet ? sheet.getRange('B3').getValue().toString().trim() : '';
@@ -372,10 +352,9 @@ function pdfKirimKeWAGrup() {
   }
 
   try {
-    // Simpan PDF ke Drive dan buat link publik
-    var blob = _getLaporanBlob();
-
-    var folderId = props.getProperty(_LAPORAN_FOLDER_KEY);
+    // Upload PDF ke Drive → buat link publik agar bisa dibuka dari WA
+    var blob     = _getLaporanBlob();
+    var folderId = PropertiesService.getScriptProperties().getProperty(_LAPORAN_FOLDER_KEY);
     var folder   = folderId ? DriveApp.getFolderById(folderId) : DriveApp.getRootFolder();
     var file     = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -388,27 +367,19 @@ function pdfKirimKeWAGrup() {
       '📅 ' + tanggal + '\n\n' +
       '🔗 ' + fileUrl;
 
-    var apiResp = UrlFetchApp.fetch(waUrl, {
-      method: 'post',
-      headers: { 'Authorization': waKey },
-      payload: { target: waTo, message: message },
-      muteHttpExceptions: true,
-    });
+    // Kirim via waEngine.js — routing ke FONNTE_TOKEN + WA_GROUP_ID
+    waSendToGroup(message);
 
-    var result = {};
-    try { result = JSON.parse(apiResp.getContentText()); } catch (e) {}
+    SpreadsheetApp.getUi().alert(
+      '✅ Pesan WA terkirim ke grup!\n\n' +
+      '📄 ' + file.getName() + '\n🔗 ' + fileUrl);
 
-    if (result.status === true || apiResp.getResponseCode() === 200) {
-      SpreadsheetApp.getUi().alert(
-        '✅ Pesan WA terkirim ke grup!\n\n' +
-        '📄 ' + file.getName() + '\n🔗 ' + fileUrl);
-    } else {
-      SpreadsheetApp.getUi().alert(
-        '⚠️ WA API response: ' + apiResp.getResponseCode() + '\n' +
-        apiResp.getContentText() + '\n\n' +
-        '🔗 Link PDF (tersimpan): ' + fileUrl);
-    }
   } catch (err) {
-    SpreadsheetApp.getUi().alert('❌ Gagal kirim WA:\n' + err.message);
+    // Error dari waSendToGroup() sudah include pesan "FONNTE_TOKEN belum di-setup"
+    SpreadsheetApp.getUi().alert(
+      '❌ Gagal kirim WA:\n' + err.message +
+      (err.message.indexOf('FONNTE_TOKEN') !== -1
+        ? '\n\nJalankan dari GAS Editor:\nsetupWaEngine("TOKEN", "GROUPID")'
+        : ''));
   }
 }
