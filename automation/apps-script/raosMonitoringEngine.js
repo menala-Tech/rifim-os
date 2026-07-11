@@ -81,20 +81,30 @@ function _monFormatSelisih(menit) {
   return jam + ' jam' + (sisa > 0 ? ' ' + sisa + ' mnt' : '');
 }
 
-/** Parse "dd/MM/yyyy HH:mm:ss" (format CREATED_AT RIFIM OS) atau Date langsung */
+/**
+ * Parse berbagai format timestamp yang muncul di RIFIM OS → Date.
+ * Format yang di-handle (urutan prioritas):
+ *   dd/MM/yyyy HH:mm:ss  — CREATED_AT dari GAS (Utilities.formatDate)
+ *   dd-MM-yyyy HH:mm:ss  — format batch lama
+ *   dd.MM.yyyy HH:mm:ss  — AIST paste dengan detik (Form Input Saldo AIST col A)
+ *   dd.MM.yyyy HH:mm     — AIST paste tanpa detik (Input Potongan col D = "11.07.2026 18:40")
+ *   dd/MM/yyyy HH:mm     — varian tanpa detik
+ *   dd-MM-yyyy HH:mm     — varian tanpa detik
+ *   Date object          — langsung dikembalikan
+ */
 function _monParseTs(raw) {
   if (!raw) return null;
   if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw;
   var s = String(raw).trim();
-  // dd/MM/yyyy HH:mm:ss
-  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
+
+  // Dengan detik: sep = / - .
+  var m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
   if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +m[6]);
-  // dd-MM-yyyy HH:mm:ss (format alternatif dari beberapa batch)
-  m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
-  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +m[6]);
-  // dd.MM.yyyy H:mm:ss (format AIST dari ops_AIST)
-  m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
-  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +m[6]);
+
+  // Tanpa detik: sep = / - .  (contoh: "11.07.2026 18:40")
+  m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})\s+(\d{1,2}):(\d{2})$/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], 0);
+
   var fallback = new Date(s);
   return isNaN(fallback.getTime()) ? null : fallback;
 }
@@ -203,7 +213,11 @@ function refreshMonitoringSaldo() {
       if (!tgl) return;
 
       var loginId   = row[3]; // D
-      var nominal   = Number(row[1]) || 0; // B = SUM (nominal dari AIST)
+      // SUM bisa berupa string "195 000" (paste langsung dari AIST) atau number
+      var sumRaw  = row[1];
+      var nominal = (typeof sumRaw === 'number')
+                      ? sumRaw
+                      : Number(String(sumRaw).replace(/\s+/g, '').replace(/[^0-9.-]/g, '')) || 0;
       var cabangRaw = String(row[6] || '').trim(); // G
       var cabang    = _monCabangMatch(cabangRaw, _MON_SALDO_CABANG);
 
@@ -301,7 +315,10 @@ function cekSLASaldo() {
     var selisihMenit = Math.floor((now - tgl) / 60000);
     if (selisihMenit < _MON_SLA_SALDO_MENIT) return;
 
-    var nominal   = Number(row[1]) || 0;
+    var sumRaw2   = row[1];
+    var nominal   = (typeof sumRaw2 === 'number')
+                      ? sumRaw2
+                      : Number(String(sumRaw2).replace(/\s+/g, '').replace(/[^0-9.-]/g, '')) || 0;
     var creditAcc = String(row[2] || '').trim();
     var cabangRaw = String(row[6] || '').trim();
     var cabang    = _monCabangMatch(cabangRaw, _MON_SALDO_CABANG);
