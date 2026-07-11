@@ -15,6 +15,32 @@ function onOpen() {
   // ─────────────────────────────────────────────────────────────
   ui.createMenu('🚛 RIFIM OS')
 
+    // ─ HRIS Staff ────────────────────────────────────────────────
+    .addSubMenu(
+      ui.createMenu('👤 HRIS — Staff')
+        .addItem('Proses Input Staff → Supabase',    'prosesInputStaff')
+        .addSeparator()
+        .addItem('Sync Staff dari Supabase → Sheet', 'syncStaffKeDatabaseStaff')
+        .addSeparator()
+        .addItem('Setup Sheet Input Staff',          'setupInputStaffSheet')
+        .addItem('Setup Sheet Database Staff',       'setupDatabaseStaffSheet')
+        .addItem('Setup Trigger Auto-Sync Staff',    'setupStaffSyncTrigger')
+    )
+
+    // ─ RAOS Driver ───────────────────────────────────────────────
+    .addSubMenu(
+      ui.createMenu('🚗 RAOS — Driver')
+        .addItem('Proses Input Driver Airport',      'prosesInputDriverAirport')
+        .addItem('Proses Input Driver External',     'prosesInputDriverExternal')
+        .addSeparator()
+        .addItem('Sync Driver Airport + External',   'syncDriversDariSupabase')
+        .addSeparator()
+        .addItem('Setup Sheet Input Driver',         'setupDriverSheets')
+        .addItem('Setup Trigger Auto-Sync Driver',   'setupDriverSyncTrigger')
+    )
+
+    .addSeparator()
+
     // ─ Potongan Order ────────────────────────────────────────────
     .addSubMenu(
       ui.createMenu('📦 Potongan Order')
