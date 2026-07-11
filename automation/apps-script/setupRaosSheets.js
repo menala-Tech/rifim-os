@@ -125,12 +125,13 @@ var RAOS_SHEETS = [
 
   {
     name: 'Form Input Saldo AIST',
-    note: 'KUNING = paste manual dari web AIST. Kolom lain otomatis dari Database & rumus.',
+    note: 'KUNING A-C = paste dari web AIST (Tanggal dd.MM.yyyy, SUM "195 000", Credit Account). D (Login ID) = isi manual admin. Kolom E-H otomatis.',
     cols: [
-      // Kolom A-D: KUNING — admin paste dari web AIST
+      // Kolom A-C: KUNING — paste dari web AIST
       {h:'Tanggal',         c:_Y},
       {h:'SUM',             c:_Y},
       {h:'Credit Account',  c:_Y},
+      // Kolom D: KUNING — isi manual oleh admin (Login ID driver, bukan dari AIST paste)
       {h:'Login ID',        c:_Y},
       // Kolom E-G: hijau — auto dari Database Driver (VLOOKUP Login ID)
       {h:'Nominal Tagihan', c:_G},
@@ -164,7 +165,7 @@ var RAOS_SHEETS = [
 
   {
     name: 'Input Potongan 1',
-    note: 'KUNING = admin paste 3 kolom dari web AIST (Price, Login ID, Waktu Order). Lain otomatis dari DB + CONFIG_FEE.',
+    note: 'Paste B/C/D sekaligus dari AIST: B=Price (104600), C=Login ID (204753205), D=Waktu Order ("11.07.2026 18:40"). OnEdit auto-isi A & H + konversi D ke Date.',
     cols: [
       // Kolom A: hijau — auto dari Login ID (lookup DB Driver → Id Cabang)
       {h:'Id Cabang',       c:_G},
@@ -190,7 +191,7 @@ var RAOS_SHEETS = [
 
   {
     name: 'Input Potongan 2',
-    note: 'Paralel dengan Input Potongan 1 — multi-admin tanpa conflict. Struktur identik.',
+    note: 'Paralel dengan Input Potongan 1 — multi-admin tanpa conflict. Paste B/C/D dari AIST, A & H auto-isi, D auto-konversi ke Date. Struktur identik.',
     cols: [
       {h:'Id Cabang',       c:_G},
       {h:'Price',           c:_Y},

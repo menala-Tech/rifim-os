@@ -134,32 +134,58 @@ function setupFormulasInputPotongan() {
 
 /**
  * OnEdit handler — auto-fill A (Id Cabang) dan H (Nama Driver) dari C (Login ID).
+ * Juga auto-konversi D (Waktu Order) dari string AIST "dd.MM.yyyy HH:mm" ke Date object
+ * agar ARRAYFORMULA MOD(D,1) bisa hitung tipe waktu Batam dengan benar.
+ *
  * Install via setupTriggerPotonganOnEdit().
+ *
+ * Mendukung paste multi-baris sekaligus (B3:D10) maupun edit satu sel.
+ * Trigger aktif jika range yang diedit MENCAKUP kolom C (Login ID) — bukan hanya
+ * dimulai dari C, karena paste B/C/D bersama memulai range dari kolom B.
  */
 function onEditInputPotongan(e) {
   if (!e || !e.range) return;
   var sheet = e.range.getSheet();
   if (_PT_SHEET_NAMES.indexOf(sheet.getName()) === -1) return;
-  var row = e.range.getRow();
-  var col = e.range.getColumn();
-  if (row < _PT_DATA_START_ROW) return;
-  // Hanya trigger saat Login ID (C) diubah
-  if (col !== _PT_COL.LOGIN_ID) return;
 
-  var loginId = sheet.getRange(row, _PT_COL.LOGIN_ID).getValue();
-  if (!loginId) {
-    sheet.getRange(row, _PT_COL.ID_CABANG).clearContent();
-    sheet.getRange(row, _PT_COL.NAMA_DRIVER).clearContent();
-    return;
-  }
+  var startRow = e.range.getRow();
+  var startCol = e.range.getColumn();
+  var endCol   = startCol + e.range.getNumColumns() - 1;
+  var endRow   = startRow + e.range.getNumRows() - 1;
 
-  var driver = _cariDriverByLoginId(loginId.toString().trim());
-  if (driver) {
-    sheet.getRange(row, _PT_COL.ID_CABANG).setValue(driver.idCabang);
-    sheet.getRange(row, _PT_COL.NAMA_DRIVER).setValue(driver.nama);
-  } else {
-    sheet.getRange(row, _PT_COL.ID_CABANG).setValue('TIDAK DITEMUKAN');
-    sheet.getRange(row, _PT_COL.NAMA_DRIVER).setValue('TIDAK DITEMUKAN');
+  // Trigger hanya jika editan mencakup kolom C (Login ID)
+  if (startCol > _PT_COL.LOGIN_ID || endCol < _PT_COL.LOGIN_ID) return;
+
+  var firstDataRow = Math.max(startRow, _PT_DATA_START_ROW);
+  if (firstDataRow > endRow) return;
+
+  for (var row = firstDataRow; row <= endRow; row++) {
+    var loginId = sheet.getRange(row, _PT_COL.LOGIN_ID).getValue();
+    if (!loginId || loginId.toString().trim() === '') {
+      sheet.getRange(row, _PT_COL.ID_CABANG).clearContent();
+      sheet.getRange(row, _PT_COL.NAMA_DRIVER).clearContent();
+    } else {
+      var driver = _cariDriverByLoginId(loginId.toString().trim());
+      if (driver) {
+        sheet.getRange(row, _PT_COL.ID_CABANG).setValue(driver.idCabang);
+        sheet.getRange(row, _PT_COL.NAMA_DRIVER).setValue(driver.nama);
+      } else {
+        sheet.getRange(row, _PT_COL.ID_CABANG).setValue('TIDAK DITEMUKAN');
+        sheet.getRange(row, _PT_COL.NAMA_DRIVER).setValue('TIDAK DITEMUKAN');
+      }
+    }
+
+    // Konversi Waktu Order (D) dari string AIST "11.07.2026 18:40" ke Date object.
+    // Diperlukan agar ARRAYFORMULA kolom I bisa pakai MOD(D,1) untuk cek waktu Batam.
+    // Google Sheets tidak auto-detect format dd.MM.yyyy (format Eropa).
+    var dCell = sheet.getRange(row, _PT_COL.WAKTU_ORDER);
+    var dRaw  = dCell.getValue();
+    if (typeof dRaw === 'string' && dRaw.trim()) {
+      var dParsed = _parseAISTDate(dRaw);
+      if (dParsed instanceof Date && !isNaN(dParsed.getTime())) {
+        dCell.setValue(dParsed);
+      }
+    }
   }
 }
 
