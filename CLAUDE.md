@@ -7,6 +7,21 @@ Status: Active
 
 ---
 
+## Working Directory (WAJIB)
+
+**Semua file proyek HANYA boleh dibaca dan disimpan di:**
+
+```
+C:\Users\ADMIN\Documents\RIFIM\rifim-os
+```
+
+- Jangan buat file di luar folder ini
+- Jangan simpan script, data, atau output ke path lain (Desktop, Downloads, temp sistem, dll.)
+- File temporary → gunakan folder `temp/` di dalam proyek ini
+- File data/analisa → simpan di subfolder yang sesuai di dalam proyek ini
+
+---
+
 ## Role
 
 Kamu adalah Lead Software Engineer untuk proyek RIFIM OS.

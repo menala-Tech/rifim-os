@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>RIFIM Saldo Monitor</title>
+<link rel="icon" href="icon-512.png">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#C62828">
+<style>
+  :root {
+    --navy: #0f172a;
+    --navy2: #1e293b;
+    --red: #C62828;
+    --gold: #d4af37;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --grey: #64748b;
+    --text: #f1f5f9;
+    --text2: #94a3b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--navy);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    min-height: 100vh;
+  }
+  body { padding-bottom: 28px; }
+
+  header {
+    background: linear-gradient(135deg, var(--red), #7a1414);
+    padding: 18px 16px 14px;
+    text-align: center;
+    position: sticky; top: 0; z-index: 10;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  header h1 { font-size: 16px; letter-spacing: 1px; font-weight: 800; }
+  header .logo { width: 48px; height: 48px; border-radius: 10px; margin-bottom: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+  header .sub { font-size: 10.5px; opacity: 0.9; margin-top: 3px; letter-spacing: 0.5px; }
+
+  .widget { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 14px 14px 4px; }
+  .widget-card { background: var(--navy2); border-radius: 10px; padding: 12px 10px; text-align: center; }
+  .widget-card.full { grid-column: 1 / -1; }
+  .widget-card .label { font-size: 9.5px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+  .widget-card .value { font-size: 17px; font-weight: 700; margin-top: 4px; color: var(--gold); }
+
+  .update-row { text-align: center; font-size: 11px; color: var(--text2); padding: 4px 14px 10px; }
+  .cabang-list { padding: 4px 14px; display: flex; flex-direction: column; gap: 10px; }
+
+  .card {
+    background: var(--navy2); border-radius: 12px; padding: 13px 15px;
+    border-left: 5px solid var(--grey);
+    display: flex; justify-content: space-between; align-items: center;
+    transition: border-color 0.3s ease;
+  }
+  .card.online  { border-left-color: var(--green); }
+  .card.warning { border-left-color: var(--yellow); }
+  .card.offline { border-left-color: var(--red); }
+
+  .left { display: flex; align-items: flex-start; gap: 10px; }
+  .dot { font-size: 18px; line-height: 1.3; }
+  .nama { font-size: 14px; font-weight: 700; }
+  .meta { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .admin { font-size: 10px; color: var(--text2); margin-top: 3px; }
+
+  .right { text-align: right; flex-shrink: 0; padding-left: 10px; }
+  .order { font-size: 19px; font-weight: 800; color: var(--gold); }
+  .order-label { font-size: 9.5px; color: var(--text2); margin-top: -2px; }
+  .omzet { font-size: 10px; color: var(--text2); margin-top: 3px; }
+
+  .loading, .error { text-align: center; padding: 36px 16px; color: var(--text2); font-size: 13px; }
+  .error { color: var(--red); }
+
+  .footer { text-align: center; font-size: 10.5px; color: var(--text2); padding: 18px 14px 4px; }
+  .refresh-dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green); margin-right: 5px;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.25 } }
+</style>
+</head>
+<body>
+
+<header>
+  <img class="logo" src="icon-512.png" alt="RIFIM">
+  <h1>RIFIM SALDO MONITOR</h1>
+  <div class="sub">PT RIFIM INTERNATIONAL GEMILANG</div>
+</header>
+
+<div id="widget" class="widget"></div>
+<div id="updateInfo" class="update-row">Memuat...</div>
+<div id="cabangList" class="cabang-list">
+  <div class="loading">⏳ Memuat data monitoring...</div>
+</div>
+<div class="footer"><span class="refresh-dot"></span>Auto-refresh tiap 20 detik</div>
+
+<script>
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbzqpltYmow61r3x6FTjdFjFpgDR6ekIjqpp6dMxK8uwNOorDMvJDHwyg_fpZTVudomm/exec?format=json';
+
+function statusClass(emoji) {
+  emoji = String(emoji || '');
+  if (emoji.indexOf('🟢') > -1) return 'online';
+  if (emoji.indexOf('🟡') > -1) return 'warning';
+  if (emoji.indexOf('🔴') > -1) return 'offline';
+  return '';
+}
+
+function rupiah(n) {
+  return 'Rp ' + (Number(n) || 0).toLocaleString('id-ID');
+}
+
+function namaSingkat(cabang) {
+  return String(cabang || '').replace(/^id rifim airport /i, '').replace(/^id rifim /i, '').trim() || cabang;
+}
+
+function renderWidget(data) {
+  var items = [
+    ['Cabang Aman', data.cabangAman],
+    ['Total Hari Ini', data.totalHariIni],
+    ['Sudah Diisi', data.totalSudahDiisi],
+    ['Belum Diisi', data.totalBelumDiisi],
+    ['Total Nominal', data.totalNominal]
+  ];
+  document.getElementById('widget').innerHTML = items.map(function(item, i) {
+    var full = (i === items.length - 1 && items.length % 2 === 1) ? ' full' : '';
+    return '<div class="widget-card' + full + '"><div class="label">' + item[0] + '</div><div class="value">' + item[1] + '</div></div>';
+  }).join('');
+  document.getElementById('updateInfo').textContent = 'Update terakhir: ' + (data.updateTerakhir || '—');
+}
+
+function renderCabang(list) {
+  var el = document.getElementById('cabangList');
+  if (!list || !list.length) { el.innerHTML = '<div class="loading">Belum ada data cabang</div>'; return; }
+  el.innerHTML = list.map(function(c) {
+    var cls = statusClass(c.status);
+    return '<div class="card ' + cls + '">' +
+      '<div class="left"><span class="dot">' + (c.status || '⚪') + '</span>' +
+      '<div><div class="nama">' + namaSingkat(c.cabang) + '</div>' +
+      '<div class="meta">Last Request ' + (c.lastRequest || '—') + ' · Pending ' + (c.pendingTertua || '—') + '</div>' +
+      '<div class="admin">Admin: ' + (c.adminTerakhir || '—') + '</div></div></div>' +
+      '<div class="right"><div class="order">' + (c.belumDiisi || 0) + '</div>' +
+      '<div class="order-label">belum diisi</div>' +
+      '<div class="omzet">' + (c.totalHariIni || 0) + ' total · ' + (c.nominalHariIni || 'Rp 0') + '</div></div></div>';
+  }).join('');
+}
+
+function muatData() {
+  fetch(GAS_URL + '&t=' + Date.now())
+    .then(function(r) { return r.json(); })
+    .then(function(data) { renderWidget(data); renderCabang(data.cabang); })
+    .catch(function(err) {
+      document.getElementById('cabangList').innerHTML = '<div class="error">⚠️ Gagal memuat data — ' + err.message + '</div>';
+    });
+}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(function(){});
+
+muatData();
+setInterval(muatData, 20000);
+</script>
+</body>
+</html>

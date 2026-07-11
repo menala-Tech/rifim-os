@@ -1,0 +1,14 @@
+{
+  "name": "RIFIM Saldo Monitor",
+  "short_name": "Saldo Monitor",
+  "description": "Monitoring Pengisian Saldo RIFIM - Owner View",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#C62828",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon-512.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

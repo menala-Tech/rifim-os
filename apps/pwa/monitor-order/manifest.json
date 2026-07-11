@@ -1,0 +1,12 @@
+{
+  "name": "RIFIM Live Monitor",
+  "short_name": "RIFIM Monitor",
+  "description": "Dashboard monitoring real-time potongan order RIFIM per cabang",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#C62828",
+  "icons": [
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

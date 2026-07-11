@@ -36,6 +36,11 @@ temp/
 *_supabase.sql
 *.gs
 
+# Folder PWA lama di root (sudah dipindah ke apps/pwa/)
+Monitor Koordinator PWA/
+Monitor Order PWA/
+Monitor Saldo PWA/
+
 # Build
 dist/
 build/
