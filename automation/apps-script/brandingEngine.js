@@ -18,12 +18,12 @@
 // ── Drive File ID logo (diisi setelah upload ke Google Drive) ─────────────
 // Jalankan setupBrandingLogosDefault() dari GAS Editor setelah ID diisi.
 var _BRAND_DEFAULT_IDS = {
-  rifim      : '',  // logo-rifim.png       — PT. RIFIM Internasional Gemilang
-  menala     : '',  // logo-menala.png      — PT. Menala Internasional Gemilang
-  lailan     : '',  // logo-lailan.png      — CV. LailanKalilan Indonesia
-  maxim      : '',  // logo-maxim.png       — Maxim
-  rifimGroup : '',  // logo-rifim-group.jpg — Semua Perusahaan
-  icon       : '',  // icon-192.png         — Icon App/PWA
+  rifim      : '1ylC1QAjPRT4OiRsCh1BfbrNNZI9JRpTE',  // logo-rifim.png
+  menala     : '1mN9jmuWej2PjdlxqzmU90LsDhz1N1mVf',  // logo-menala.png
+  lailan     : '1WC0wBexm6zIjuoKF_KEb7Znpk3Bwdv6V',  // logo-lailan.png
+  maxim      : '1OC2cFMTGhGSzfkRwtLYs_ZBlaHGBe6gh',  // logo-maxim.png
+  rifimGroup : '1oX0JnQSRFlVfgoctTqJQ9cz30F-Oehw3',  // logo-rifim-group.jpg
+  icon       : '',                                     // icon-192.png (belum diupload)
 };
 
 // ── Kunci PropertiesService ────────────────────────────────────────────────
