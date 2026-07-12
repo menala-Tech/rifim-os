@@ -274,73 +274,86 @@ function staffLookupDriver(params) {
 /**
  * Submit pengajuan top-up saldo driver → append ke Form Input Saldo PWA.
  * Nama Driver auto-lookup dari _cariDriverByLoginId() (raosPotonganEngine.js).
+ *
+ * REFACTOR (gasUtils):
+ *   - _gasValidate()  : cek nominal integer, loginId numerik, field wajib
+ *   - _gasWithLock()  : ScriptLock 10 detik — cegah double-entry konkuren
+ *   - _gasNow()       : ISO UTC timestamp di kolom A
+ *   - _gasLogError()  : catat ke system_log kalau lempar exception
  */
 function staffSaldoSubmit(params) {
-  var cabang    = String(params.cabang || '').trim();
-  var namaStaff = String(params.namaStaff || '').trim();
-  var staffId   = String(params.staffId || '').trim();
-  var nominal   = Number(params.nominal) || 0;
-  var loginId   = String(params.loginId || '').trim();
+  // ── 1. VALIDASI ──────────────────────────────────────────────────
+  var errs = _gasValidate(params, {
+    cabang    : { required: true,  type: 'string',  maxLen: 100 },
+    namaStaff : { required: true,  type: 'string',  maxLen: 100 },
+    staffId   : { required: true,  type: 'string' },
+    nominal   : { required: true,  type: 'integer', min: 1000, max: 10000000 },
+    loginId   : { required: true,  type: 'string',  regex: /^\d{5,20}$/ },
+  });
+  if (errs.length) return { ok: false, error: errs.join('; ') };
 
-  if (!cabang || !namaStaff || !loginId) return { ok: false, error: 'Data tidak lengkap.' };
-  if (nominal < 1000) return { ok: false, error: 'Nominal minimal Rp 1.000.' };
+  var cabang    = String(params.cabang).trim();
+  var namaStaff = String(params.namaStaff).trim();
+  var staffId   = String(params.staffId).trim();
+  var nominal   = Math.round(Number(params.nominal)); // enforce integer
+  var loginId   = String(params.loginId).trim();
 
-  // Geofence dicek ulang SERVER-SIDE di titik submit (aturan sistem lama) —
-  // jangan percaya cuma karena frontend lolos di awal. Staff bebas absensi
-  // dikecualikan (boleh isi saldo dari mana saja).
+  // ── 2. GEOFENCE (server-side re-check, aturan sistem lama) ───────
   if (!_saIsBebasAbsensi(staffId)) {
     var geo = _saCekGeofence(cabang, params.lat, params.lng);
     if (geo.configured && !geo.ok) {
       return {
         ok: false,
-        error: 'Anda di luar lokasi ' + cabang + ' (jarak ' + geo.jarak +
-               'm, maksimal ' + geo.radius + 'm). Saldo hanya bisa diisi dari lokasi cabang.'
+        error: 'Di luar lokasi ' + cabang + ' (jarak ' + geo.jarak +
+               'm, maks ' + geo.radius + 'm). Saldo hanya bisa diisi dari lokasi cabang.',
       };
     }
   }
 
-  var driver = _cariDriverByLoginId(loginId);
+  var driver     = _cariDriverByLoginId(loginId);
   var namaDriver = driver ? driver.nama : 'TIDAK DITEMUKAN';
 
-  var ss = SpreadsheetApp.openById(RAOS_SS_ID);
-  var sh = ss.getSheetByName(_SA_SALDO_SHEET);
-  if (!sh) return { ok: false, error: 'Sheet ' + _SA_SALDO_SHEET + ' tidak ditemukan.' };
+  // ── 3. WRITE DENGAN LOCK ──────────────────────────────────────────
+  try {
+    return _gasWithLock(function() {
+      var ss  = SpreadsheetApp.openById(RAOS_SS_ID);
+      var sh  = ss.getSheetByName(_SA_SALDO_SHEET);
+      if (!sh) return { ok: false, error: 'Sheet ' + _SA_SALDO_SHEET + ' tidak ditemukan.' };
 
-  var tz  = ss.getSpreadsheetTimeZone();
-  var now = new Date();
+      var now    = new Date();
+      var tsISO  = now.toISOString(); // ← ISO UTC, bukan 'dd/MM/yyyy HH:mm:ss'
+      var cutoff = new Date(now.getTime() - 5 * 60 * 1000);
 
-  // IDEMPOTENCY (aturan sistem lama): submission persis sama (cabang+staff+
-  // nominal+loginId) dalam 5 menit terakhir → anggap duplikat dari retry/
-  // double-tap, balas ok TANPA tulis ulang. Scan dari bawah, berhenti begitu
-  // timestamp lebih tua dari 5 menit.
-  var lastRow = sh.getLastRow();
-  if (lastRow >= _SA_DATA_START) {
-    var cutoff = new Date(now.getTime() - 5 * 60 * 1000);
-    var rows = sh.getRange(_SA_DATA_START, 1, lastRow - _SA_DATA_START + 1, 5).getValues();
-    for (var i = rows.length - 1; i >= 0; i--) {
-      var ts = _monParseTs(rows[i][0]);
-      if (!ts || ts < cutoff) break;
-      if (String(rows[i][1]).trim() === cabang &&
-          String(rows[i][2]).trim().toLowerCase() === namaStaff.toLowerCase() &&
-          Number(rows[i][3]) === nominal &&
-          String(rows[i][4]).trim() === loginId) {
-        return { ok: true, namaDriver: namaDriver, driverDitemukan: !!driver, duplikat: true };
+      // IDEMPOTENCY: submission identik dalam 5 menit → skip tulis
+      var lastRow = sh.getLastRow();
+      if (lastRow >= _SA_DATA_START) {
+        var rows = sh.getRange(_SA_DATA_START, 1, lastRow - _SA_DATA_START + 1, 5).getValues();
+        for (var i = rows.length - 1; i >= 0; i--) {
+          var ts = _monParseTs(rows[i][0]);
+          if (!ts || ts < cutoff) break;
+          if (String(rows[i][1]).trim() === cabang &&
+              String(rows[i][2]).trim().toLowerCase() === namaStaff.toLowerCase() &&
+              Number(rows[i][3]) === nominal &&
+              String(rows[i][4]).trim() === loginId) {
+            return { ok: true, namaDriver: namaDriver, driverDitemukan: !!driver, duplikat: true };
+          }
+        }
       }
+
+      sh.appendRow([
+        tsISO, cabang, namaStaff, nominal, loginId, namaDriver,
+        false, false, '', 'PENDING', '', '',
+      ]);
+      return { ok: true, namaDriver: namaDriver, driverDitemukan: !!driver, timestamp: tsISO };
+    });
+  } catch (err) {
+    _gasLogError('Staff PWA', 'staffSaldoSubmit', err,
+      { cabang: cabang, namaStaff: namaStaff, nominal: nominal, loginId: loginId });
+    if (String(err.message).indexOf('Could not obtain lock') !== -1) {
+      return { ok: false, error: 'Server sedang sibuk, coba lagi dalam beberapa detik.' };
     }
+    return { ok: false, error: 'Gagal menyimpan: ' + err.message };
   }
-
-  var tsStr = Utilities.formatDate(now, tz, 'dd/MM/yyyy HH:mm:ss');
-  sh.appendRow([
-    tsStr, cabang, namaStaff, nominal, loginId, namaDriver,
-    false, false, '', 'PENDING', '', ''
-  ]);
-
-  return {
-    ok: true,
-    namaDriver: namaDriver,
-    driverDitemukan: !!driver,
-    timestamp: tsStr,
-  };
 }
 
 /**
@@ -448,26 +461,35 @@ function staffSaldoMonitor(params) {
 /**
  * Validasi / tolak entry saldo — Koordinator only.
  * @param params { row, keputusan: 'VALID'|'TOLAK', validator }
+ *
+ * REFACTOR: _gasValidate + _gasWithLock + ISO timestamp + _gasLogError
  */
 function staffSaldoValidasi(params) {
-  var row       = Number(params.row) || 0;
-  var keputusan = String(params.keputusan || '').trim().toUpperCase();
-  var validator = String(params.validator || '').trim();
+  var errs = _gasValidate(params, {
+    row       : { required: true, type: 'integer', min: _SA_DATA_START },
+    keputusan : { required: true, enum: ['VALID', 'TOLAK'] },
+    validator : { required: true, type: 'string', maxLen: 100 },
+  });
+  if (errs.length) return { ok: false, error: errs.join('; ') };
 
-  if (row < _SA_DATA_START) return { ok: false, error: 'Baris tidak valid.' };
-  if (keputusan !== 'VALID' && keputusan !== 'TOLAK') {
-    return { ok: false, error: 'Keputusan harus VALID atau TOLAK.' };
+  var row       = Math.round(Number(params.row));
+  var keputusan = String(params.keputusan).trim().toUpperCase();
+  var validator = String(params.validator).trim();
+
+  try {
+    return _gasWithLock(function() {
+      var ss = SpreadsheetApp.openById(RAOS_SS_ID);
+      var sh = ss.getSheetByName(_SA_SALDO_SHEET);
+      if (!sh) return { ok: false, error: 'Sheet tidak ditemukan.' };
+
+      sh.getRange(row, _SA_SALDO_COL.VALIDASI, 1, 3)
+        .setValues([[keputusan, validator, _gasNow()]]); // ← ISO UTC
+      return { ok: true, keputusan: keputusan };
+    });
+  } catch (err) {
+    _gasLogError('Staff PWA', 'staffSaldoValidasi', err, { row: row, keputusan: keputusan });
+    return { ok: false, error: 'Gagal menyimpan validasi: ' + err.message };
   }
-
-  var ss = SpreadsheetApp.openById(RAOS_SS_ID);
-  var sh = ss.getSheetByName(_SA_SALDO_SHEET);
-  if (!sh) return { ok: false, error: 'Sheet tidak ditemukan.' };
-
-  var tz    = ss.getSpreadsheetTimeZone();
-  var tsStr = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm:ss');
-
-  sh.getRange(row, _SA_SALDO_COL.VALIDASI, 1, 3).setValues([[keputusan, validator, tsStr]]);
-  return { ok: true, keputusan: keputusan };
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -552,17 +574,27 @@ function _saJarakMeter(lat1, lng1, lat2, lng2) {
 /**
  * Absensi check-in / check-out.
  * @param params { staffId, nama, cabang, tipe: 'MASUK'|'PULANG', lat, lng, fotoBase64? }
+ *
+ * REFACTOR: _gasValidate + _gasWithLock + ISO UTC timestamp + _gasLogError
+ * - Timestamp (col A) → ISO UTC  (dulu: 'dd/MM/yyyy HH:mm:ss')
+ * - Tanggal (col B)   → 'yyyy-MM-dd' tetap (date-only display, bukan timestamp)
+ * - Race condition pada append sekarang dilindungi ScriptLock
+ * - Validasi tipe enum sebelum masuk ke logika utama
  */
 function staffAbsensi(params) {
-  var staffId = String(params.staffId || '').trim();
-  var nama    = String(params.nama || '').trim();
+  // ── 1. VALIDASI ──────────────────────────────────────────────────
+  var errs = _gasValidate(params, {
+    staffId : { required: true, type: 'string' },
+    tipe    : { required: true, enum: ['MASUK', 'PULANG'] },
+  });
+  if (errs.length) return { ok: false, error: errs.join('; ') };
+
+  var staffId = String(params.staffId).trim();
+  var nama    = String(params.nama   || '').trim();
   var cabang  = String(params.cabang || '').trim();
-  var tipe    = String(params.tipe || '').trim().toUpperCase();
+  var tipe    = String(params.tipe).trim().toUpperCase();
   var lat     = Number(params.lat);
   var lng     = Number(params.lng);
-
-  if (!staffId || !tipe) return { ok: false, error: 'Data tidak lengkap.' };
-  if (tipe !== 'MASUK' && tipe !== 'PULANG') return { ok: false, error: 'Tipe absensi tidak valid.' };
 
   // Staff dikecualikan — tidak perlu absen sama sekali
   if (_saIsBebasAbsensi(staffId)) {
@@ -570,74 +602,88 @@ function staffAbsensi(params) {
              pesan: 'Akun ini dikecualikan dari absensi.' };
   }
 
-  var ss = SpreadsheetApp.openById(RAOS_SS_ID);
-  var sh = ss.getSheetByName(_SA_ABSENSI_SHEET);
-  if (!sh) return { ok: false, error: 'Sheet Absensi Staff belum di-setup.' };
-
-  var tz    = ss.getSpreadsheetTimeZone();
-  var now   = new Date();
-  var today = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
-
-  // Cegah dobel absen tipe sama di hari sama + cek sudah MASUK (untuk PULANG)
-  var sudahMasukHariIni = false;
-  var lastRow = sh.getLastRow();
-  if (lastRow >= _SA_DATA_START) {
-    var existing = sh.getRange(_SA_DATA_START, 1, lastRow - _SA_DATA_START + 1, 6).getValues();
-    for (var i = 0; i < existing.length; i++) {
-      if (String(existing[i][2]).trim() !== staffId || String(existing[i][1]) !== today) continue;
-      var tipeRow = String(existing[i][5]).trim().toUpperCase();
-      if (tipeRow === tipe) return { ok: false, error: 'Sudah absen ' + tipe + ' hari ini.' };
-      if (tipeRow === 'MASUK') sudahMasukHariIni = true;
-    }
-  }
-  // Aturan sistem lama: absen PULANG hanya boleh setelah absen MASUK
-  if (tipe === 'PULANG' && !sudahMasukHariIni) {
-    return { ok: false, error: 'Belum absen MASUK hari ini.' };
-  }
-
-  // Geofence — GPS kosong tidak memblokir (dicatat "TIDAK DICEK"), tapi
-  // absen MASUK di LUAR area (GPS aktif + jarak > radius) DIBLOKIR server
-  // (aturan sistem lama). PULANG tetap dicatat walau di luar area.
-  var geo = _saCekGeofence(cabang, lat, lng);
-  var jarak = geo.configured ? geo.jarak : null;
+  // ── 2. GEOFENCE (sebelum lock — tidak perlu sheet access) ────────
+  var geo       = _saCekGeofence(cabang, lat, lng);
+  var jarak     = geo.configured ? geo.jarak : null;
   var dalamArea = geo.configured ? (geo.ok ? 'YA' : 'TIDAK') : 'TIDAK DICEK';
   if (tipe === 'MASUK' && geo.configured && !geo.ok) {
     return {
       ok: false,
-      error: 'Anda di luar lokasi ' + cabang + ' (jarak ' + geo.jarak +
-             'm, maksimal ' + geo.radius + 'm). Absen masuk hanya bisa dari lokasi cabang.'
+      error: 'Di luar lokasi ' + cabang + ' (jarak ' + geo.jarak +
+             'm, maks ' + geo.radius + 'm). Absen masuk hanya bisa dari lokasi cabang.',
     };
   }
 
-  // Simpan foto ke Drive (opsional)
+  // ── 3. FOTO (sebelum lock — operasi Drive tidak butuh lock sheet) ─
   var fotoUrl = '';
   if (params.fotoBase64) {
     try {
-      var blob = Utilities.newBlob(
+      var now0  = new Date();
+      var tz0   = SpreadsheetApp.openById(RAOS_SS_ID).getSpreadsheetTimeZone();
+      var blob  = Utilities.newBlob(
         Utilities.base64Decode(String(params.fotoBase64).replace(/^data:image\/\w+;base64,/, '')),
         'image/jpeg',
-        'absen_' + staffId + '_' + Utilities.formatDate(now, tz, 'yyyyMMdd_HHmmss') + '.jpg'
+        'absen_' + staffId + '_' + Utilities.formatDate(now0, tz0, 'yyyyMMdd_HHmmss') + '.jpg'
       );
-      var folder = _saGetAbsensiFolder(cabang, now, tz);
-      fotoUrl = folder.createFile(blob).getUrl();
-    } catch (e) {
-      Logger.log('staffAbsensi: gagal simpan foto — ' + e.message);
+      fotoUrl = _saGetAbsensiFolder(cabang, now0, tz0).createFile(blob).getUrl();
+    } catch (fotoErr) {
+      _gasLogWarn('Staff PWA', 'staffAbsensi:foto', fotoErr.message, { staffId: staffId });
     }
   }
 
-  var latStr = (!isNaN(lat) && lat !== 0) ? lat : '';
-  var lngStr = (!isNaN(lng) && lng !== 0) ? lng : '';
-  sh.appendRow([
-    Utilities.formatDate(now, tz, 'dd/MM/yyyy HH:mm:ss'),
-    today, staffId, nama, cabang, tipe, latStr, lngStr,
-    jarak === null ? '' : jarak, dalamArea, fotoUrl
-  ]);
+  // ── 4. WRITE DENGAN LOCK ──────────────────────────────────────────
+  try {
+    return _gasWithLock(function() {
+      var ss  = SpreadsheetApp.openById(RAOS_SS_ID);
+      var sh  = ss.getSheetByName(_SA_ABSENSI_SHEET);
+      if (!sh) return { ok: false, error: 'Sheet Absensi Staff belum di-setup.' };
 
-  return {
-    ok: true, tipe: tipe,
-    jam: Utilities.formatDate(now, tz, 'HH:mm'),
-    jarak: jarak, dalamArea: dalamArea,
-  };
+      var now   = new Date();
+      var tz    = ss.getSpreadsheetTimeZone();
+      var today = Utilities.formatDate(now, tz, 'yyyy-MM-dd'); // date-only, aman
+
+      // Cegah dobel absen + cek MASUK ada (untuk PULANG)
+      var sudahMasukHariIni = false;
+      var lastRow = sh.getLastRow();
+      if (lastRow >= _SA_DATA_START) {
+        var rows = sh.getRange(_SA_DATA_START, 1, lastRow - _SA_DATA_START + 1, 6).getValues();
+        for (var i = 0; i < rows.length; i++) {
+          if (String(rows[i][2]).trim() !== staffId) continue;
+          // Bandingkan via Timestamp (col A) — robust terhadap Date object di col B
+          var tglRow = _monParseTs(rows[i][0]);
+          if (!tglRow || Utilities.formatDate(tglRow, tz, 'yyyy-MM-dd') !== today) continue;
+          var tipeRow = String(rows[i][5]).trim().toUpperCase();
+          if (tipeRow === tipe) return { ok: false, error: 'Sudah absen ' + tipe + ' hari ini.' };
+          if (tipeRow === 'MASUK') sudahMasukHariIni = true;
+        }
+      }
+      if (tipe === 'PULANG' && !sudahMasukHariIni) {
+        return { ok: false, error: 'Belum absen MASUK hari ini.' };
+      }
+
+      var latStr = (!isNaN(lat) && lat !== 0) ? lat : '';
+      var lngStr = (!isNaN(lng) && lng !== 0) ? lng : '';
+      var tsISO  = now.toISOString(); // ← ISO UTC (dulu 'dd/MM/yyyy HH:mm:ss')
+
+      sh.appendRow([
+        tsISO, today, staffId, nama, cabang, tipe,
+        latStr, lngStr, jarak === null ? '' : jarak, dalamArea, fotoUrl,
+      ]);
+
+      return {
+        ok: true, tipe: tipe,
+        jam: Utilities.formatDate(now, tz, 'HH:mm'),
+        jarak: jarak, dalamArea: dalamArea,
+      };
+    });
+  } catch (err) {
+    _gasLogError('Staff PWA', 'staffAbsensi', err,
+      { staffId: staffId, tipe: tipe, cabang: cabang });
+    if (String(err.message).indexOf('Could not obtain lock') !== -1) {
+      return { ok: false, error: 'Server sedang sibuk, coba lagi dalam beberapa detik.' };
+    }
+    return { ok: false, error: 'Gagal menyimpan absensi: ' + err.message };
+  }
 }
 
 /**
@@ -785,14 +831,20 @@ function queueList(params) {
       if (status === 'DONE') { selesaiHariIni++; return; }
       if (status === 'CANCEL') return;
 
+      // col G (masuk) & H (dipanggil) kini berisi ISO UTC — format ke HH:mm untuk display
+      var fmtJam = function(raw) {
+        if (!raw || raw === '') return '';
+        var parsed = _monParseTs(raw); // handle ISO & legacy string
+        return parsed ? Utilities.formatDate(parsed, tz, 'HH:mm') : String(raw).substring(11, 16);
+      };
       antrian.push({
         row       : idx + _SA_DATA_START,
         id        : String(row[0]),
         loginId   : String(row[3]),
         namaDriver: String(row[4]),
         status    : status,
-        masuk     : String(row[6]),
-        dipanggil : String(row[7]),
+        masuk     : fmtJam(row[6]),
+        dipanggil : fmtJam(row[7]),
       });
     });
   }
@@ -803,72 +855,118 @@ function queueList(params) {
 /**
  * Tambah driver ke antrian. Nama driver auto-lookup.
  * @param params { cabang, loginId, staffNama }
+ *
+ * REFACTOR: _gasValidate + _gasWithLock + _gasUuid + ISO timestamp + _gasLogError
+ * - ID antrian: dari 'Q-yyMMdd-HHmmss' (tidak unik saat concurrent) → UUID v4
+ * - Timestamp masuk_antrian (col G): simpan ISO UTC, bukan 'HH:mm' saja
+ * - Race condition dobel antri kini terlindungi ScriptLock
  */
 function queueAdd(params) {
-  var cabang  = String(params.cabang || '').trim();
-  var loginId = String(params.loginId || '').trim();
+  // ── 1. VALIDASI ──────────────────────────────────────────────────
+  var errs = _gasValidate(params, {
+    cabang   : { required: true, type: 'string', maxLen: 100 },
+    loginId  : { required: true, type: 'string', regex: /^\d{5,20}$/ },
+    staffNama: { required: false, type: 'string', maxLen: 100 },
+  });
+  if (errs.length) return { ok: false, error: errs.join('; ') };
+
+  var cabang  = String(params.cabang).trim();
+  var loginId = String(params.loginId).trim();
   var staff   = String(params.staffNama || '').trim();
-  if (!cabang || !loginId) return { ok: false, error: 'Cabang dan ID Driver wajib.' };
 
   var driver = _cariDriverByLoginId(loginId);
   if (!driver) return { ok: false, error: 'Driver tidak ditemukan di database.' };
 
-  var ss = SpreadsheetApp.openById(RAOS_SS_ID);
-  var sh = ss.getSheetByName(_SA_QUEUE_SHEET);
-  if (!sh) return { ok: false, error: 'Sheet Antrian Bandara belum di-setup.' };
+  // ── 2. WRITE DENGAN LOCK ──────────────────────────────────────────
+  try {
+    return _gasWithLock(function() {
+      var ss  = SpreadsheetApp.openById(RAOS_SS_ID);
+      var sh  = ss.getSheetByName(_SA_QUEUE_SHEET);
+      if (!sh) return { ok: false, error: 'Sheet Antrian Bandara belum di-setup.' };
 
-  var tz    = ss.getSpreadsheetTimeZone();
-  var now   = new Date();
-  var today = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+      var now   = new Date();
+      var tz    = ss.getSpreadsheetTimeZone();
+      var today = Utilities.formatDate(now, tz, 'yyyy-MM-dd'); // date-only untuk filter
 
-  // Cegah driver dobel antri
-  var lastRow = sh.getLastRow();
-  if (lastRow >= _SA_DATA_START) {
-    var data = sh.getRange(_SA_DATA_START, 1, lastRow - _SA_DATA_START + 1, 6).getValues();
-    for (var i = 0; i < data.length; i++) {
-      if (String(data[i][1]) === today &&
-          String(data[i][3]).trim() === loginId) {
-        var st = String(data[i][5]).trim().toUpperCase();
-        if (st === 'WAITING' || st === 'CALLED' || st === 'PICKED') {
-          return { ok: false, error: driver.nama + ' sudah dalam antrian (' + st + ').' };
+      // Cegah driver dobel antri (cek dalam lock supaya tidak ada window)
+      var lastRow = sh.getLastRow();
+      if (lastRow >= _SA_DATA_START) {
+        var data = sh.getRange(_SA_DATA_START, 1, lastRow - _SA_DATA_START + 1, 6).getValues();
+        for (var i = 0; i < data.length; i++) {
+          if (String(data[i][1]) === today && String(data[i][3]).trim() === loginId) {
+            var st = String(data[i][5]).trim().toUpperCase();
+            if (st === 'WAITING' || st === 'CALLED' || st === 'PICKED') {
+              return { ok: false, error: driver.nama + ' sudah dalam antrian (' + st + ').' };
+            }
+          }
         }
       }
+
+      var qId    = _gasUuid();          // ← UUID v4 (dulu 'Q-yyMMdd-HHmmss')
+      var tsISO  = now.toISOString();   // ← ISO UTC untuk masuk_antrian
+
+      sh.appendRow([
+        qId, today, cabang, loginId, driver.nama,
+        'WAITING', tsISO, '', '', staff,   // col G = ISO UTC, bukan 'HH:mm'
+      ]);
+
+      // Kembalikan jam display (HH:mm) ke frontend, bukan ISO
+      var jamDisplay = Utilities.formatDate(now, tz, 'HH:mm');
+      return { ok: true, id: qId, namaDriver: driver.nama, masuk: jamDisplay };
+    });
+  } catch (err) {
+    _gasLogError('Staff PWA', 'queueAdd', err, { cabang: cabang, loginId: loginId });
+    if (String(err.message).indexOf('Could not obtain lock') !== -1) {
+      return { ok: false, error: 'Server sedang sibuk, coba lagi dalam beberapa detik.' };
     }
+    return { ok: false, error: 'Gagal menambah antrian: ' + err.message };
   }
-
-  var qId = 'Q-' + Utilities.formatDate(now, tz, 'yyMMdd-HHmmss');
-  sh.appendRow([
-    qId, today, cabang, loginId, driver.nama,
-    'WAITING', Utilities.formatDate(now, tz, 'HH:mm'), '', '', staff
-  ]);
-
-  return { ok: true, id: qId, namaDriver: driver.nama };
 }
 
 /**
  * Update status antrian.
  * @param params { row, status: 'CALLED'|'PICKED'|'DONE'|'CANCEL' }
+ *
+ * REFACTOR: _gasValidate + _gasWithLock + ISO timestamp + _gasLogError
+ * - col H (dipanggil) & col I (selesai): simpan ISO UTC, bukan 'HH:mm'
+ * - Lock cegah 2 koordinator klik bersamaan
  */
 function queueUpdate(params) {
-  var row    = Number(params.row) || 0;
-  var status = String(params.status || '').trim().toUpperCase();
-  var valid  = ['CALLED', 'PICKED', 'DONE', 'CANCEL'];
+  // ── 1. VALIDASI ──────────────────────────────────────────────────
+  var errs = _gasValidate(params, {
+    row    : { required: true, type: 'integer', min: _SA_DATA_START },
+    status : { required: true, enum: ['CALLED', 'PICKED', 'DONE', 'CANCEL'] },
+  });
+  if (errs.length) return { ok: false, error: errs.join('; ') };
 
-  if (row < _SA_DATA_START) return { ok: false, error: 'Baris tidak valid.' };
-  if (valid.indexOf(status) === -1) return { ok: false, error: 'Status tidak valid.' };
+  var row    = Math.round(Number(params.row));
+  var status = String(params.status).trim().toUpperCase();
 
-  var ss = SpreadsheetApp.openById(RAOS_SS_ID);
-  var sh = ss.getSheetByName(_SA_QUEUE_SHEET);
-  if (!sh) return { ok: false, error: 'Sheet tidak ditemukan.' };
+  // ── 2. WRITE DENGAN LOCK ──────────────────────────────────────────
+  try {
+    return _gasWithLock(function() {
+      var ss = SpreadsheetApp.openById(RAOS_SS_ID);
+      var sh = ss.getSheetByName(_SA_QUEUE_SHEET);
+      if (!sh) return { ok: false, error: 'Sheet tidak ditemukan.' };
 
-  var tz  = ss.getSpreadsheetTimeZone();
-  var jam = Utilities.formatDate(new Date(), tz, 'HH:mm');
+      var now    = new Date();
+      var tz     = ss.getSpreadsheetTimeZone();
+      var tsISO  = now.toISOString(); // ← ISO UTC
 
-  sh.getRange(row, 6).setValue(status);
-  if (status === 'CALLED') sh.getRange(row, 8).setValue(jam);
-  if (status === 'DONE' || status === 'CANCEL') sh.getRange(row, 9).setValue(jam);
+      sh.getRange(row, 6).setValue(status);
+      if (status === 'CALLED') sh.getRange(row, 8).setValue(tsISO); // col H
+      if (status === 'DONE' || status === 'CANCEL') sh.getRange(row, 9).setValue(tsISO); // col I
 
-  return { ok: true, status: status, jam: jam };
+      var jamDisplay = Utilities.formatDate(now, tz, 'HH:mm');
+      return { ok: true, status: status, jam: jamDisplay };
+    });
+  } catch (err) {
+    _gasLogError('Staff PWA', 'queueUpdate', err, { row: row, status: status });
+    if (String(err.message).indexOf('Could not obtain lock') !== -1) {
+      return { ok: false, error: 'Server sedang sibuk, coba lagi dalam beberapa detik.' };
+    }
+    return { ok: false, error: 'Gagal update status: ' + err.message };
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════

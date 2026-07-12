@@ -25,50 +25,75 @@
  * }
  */
 function doPost(e) {
+  var input;
   try {
-    const input = JSON.parse(e.postData.contents);
+    input = JSON.parse(e.postData.contents);
+  } catch (parseErr) {
+    // Payload tidak bisa di-parse — log dan tolak
+    _gasLogError('doPost', 'parse', parseErr,
+      { raw: (e.postData && e.postData.contents || '').substring(0, 500) });
+    return _json({ success: false, message: 'Payload JSON tidak valid.' });
+  }
 
-    // HRIS actions diidentifikasi dengan field hrisAction
+  try {
+    // ── HRIS actions ───────────────────────────────────────────────
     if (input.hrisAction) {
       return _json(_handleHrisPost(input));
     }
 
-    // Staff App PWA actions (staffLogin, staffSaldoSubmit, queueAdd, dll.)
-    if (input.action) {
-      var staffAppResult = routeStaffApp(input.action, input);
-      if (staffAppResult !== null && input.action !== 'log_activity') {
-        return _json(staffAppResult);
-      }
+    // ── Staff App PWA actions (staffLogin, staffSaldoSubmit, dll.) ─
+    if (input.action && input.action !== 'log_activity') {
+      var staffResult = routeStaffApp(input.action, input);
+      if (staffResult !== null) return _json(staffResult);
     }
 
-    // Log activity dari Portal / Smart Office (fire-and-forget dari frontend)
+    // ── Log activity (fire-and-forget dari Portal / Smart Office) ──
     if (input.action === 'log_activity') {
-      const by = input.performed_by || {};
+      var by0 = input.performed_by || {};
       logActivity(input.module, input.action_type, input.target_id || '',
-        input.target_name || '', by.name || '', by.email || '', input.detail || '');
+        input.target_name || '', by0.name || '', by0.email || '', input.detail || '');
       return _json({ success: true });
     }
 
-    // Default: Smart Office document generation
-    const result = generateDocument(input);
-    if (result && result.success) {
-      const by = input.performed_by || {};
+    // ── Default: Smart Office document generation ──────────────────
+    // Validasi field attachment: harus integer (nomor lampiran), bukan teks bebas
+    if (input.attachment !== undefined && input.attachment !== '-') {
+      var attNum = Number(input.attachment);
+      if (isNaN(attNum) || !Number.isInteger(attNum)) {
+        _gasLogWarn('Smart Office', 'generateDocument',
+          'attachment bukan integer: ' + String(input.attachment),
+          { documentType: input.documentType, subject: input.subject });
+        // Koreksi: paksa ke integer atau default 0
+        input.attachment = Number.isInteger(attNum) ? attNum : 0;
+      } else {
+        input.attachment = attNum; // enforce number type
+      }
+    }
+
+    var docResult = generateDocument(input);
+    if (docResult && docResult.success) {
+      var by = input.performed_by || {};
       logActivity('Smart Office', 'BUAT DOKUMEN',
-        result.documentNumber || '', input.subject || '',
+        docResult.documentNumber || '', input.subject || '',
         by.name || '', by.email || '',
         'Tipe: ' + (input.documentType || '') + ' · ' + (input.company_code || ''));
       notifDocumentCreated({
-        documentNumber: result.documentNumber || '',
-        documentType:   DOCUMENT_TYPES[input.documentType] ? DOCUMENT_TYPES[input.documentType].label : (input.documentType || ''),
-        subject:        input.subject || '',
-        gdocUrl:        result.gdocUrl || '',
-        pdfUrl:         result.pdfUrl  || '',
+        documentNumber: docResult.documentNumber || '',
+        documentType:   DOCUMENT_TYPES[input.documentType]
+                          ? DOCUMENT_TYPES[input.documentType].label
+                          : (input.documentType || ''),
+        subject:        input.subject  || '',
+        gdocUrl:        docResult.gdocUrl || '',
+        pdfUrl:         docResult.pdfUrl  || '',
         createdBy:      by.name || by.email || '',
       });
     }
-    return _json(result);
+    return _json(docResult);
 
   } catch (err) {
+    // Catat ke system_log — bukan hanya console.warn
+    _gasLogError('doPost', input.action || input.hrisAction || 'unknown', err,
+      { action: input.action, hrisAction: input.hrisAction, documentType: input.documentType });
     return _json({ success: false, message: 'Server error: ' + err.message });
   }
 }
@@ -116,11 +141,16 @@ function _handleHrisPost(input) {
 
 /**
  * Panggil sync ke spreadsheet setelah write ke Supabase.
- * Jika sync gagal, operasi utama tetap berhasil.
+ * Jika sync gagal, operasi utama tetap berhasil — tapi dicatat ke system_log.
  * @private
  */
 function _syncAfterHrisWrite(result) {
-  try { syncHrisEmployeesToSheet(); } catch (e) { console.warn('Sync sheet gagal:', e.message); }
+  try {
+    syncHrisEmployeesToSheet();
+  } catch (syncErr) {
+    // Dulu hanya console.warn — sekarang juga log ke system_log
+    _gasLogError('HRIS', '_syncAfterHrisWrite', syncErr, null);
+  }
   return result;
 }
 
