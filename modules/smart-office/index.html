@@ -1234,7 +1234,8 @@
       const data = await res.json();
       if (data.success && data.staff) {
         _staffList = data.staff;
-        _onSignerTitleChange(); // auto-fill nama penanda tangan saat data HRIS siap
+        _onSignerTitleChange();   // auto-fill nama penanda tangan
+        _wireStaffAutocomplete(); // wire autocomplete jika form sudah terbuka
       }
     } catch(_) {}
   }
