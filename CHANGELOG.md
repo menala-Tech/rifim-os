@@ -19,6 +19,14 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/).
   - Anti double-entry — operasi tulis tanpa retry + timeout 30s; koneksi putus → arahkan cek riwayat
   - Ganti PIN mandiri
   - Retry 3x hanya untuk operasi baca (atasi limit kuota GAS Gmail biasa)
+- Aturan bisnis dari Main.gs + Absensi.gs lama diadopsi:
+  - GPS gagal TIDAK memblokir (fix bug Number('')=0 → koordinat Teluk Guinea)
+  - Nominal per cabang: default [45000,95000]; Balikpapan & Pekanbaru + [145000,195000]
+  - Geofence dicek ulang server-side di titik submit saldo
+  - Idempotency 5 menit — submission identik → skip tulis (anti double-entry server)
+  - Absen PULANG wajib sudah MASUK; absen MASUK di luar area diblokir server
+  - Staff bebas absensi & geofence via property `STAFF_BEBAS_ABSENSI` (setupStaffBebasAbsensi())
+- Login page: matikan autofill browser (autocomplete off + readonly-sampai-fokus)
 - `staffAppApi.js` endpoint baru: `staffLookupDriver`, `staffGantiPin`, `staffCekStatus`
 - PIN override tersimpan di PropertiesService `STAFF_PIN_<ID>` — sync-safe (tidak
   tertimpa sync Supabase → Database Staff tiap 6 jam)

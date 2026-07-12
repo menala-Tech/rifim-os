@@ -147,34 +147,79 @@ function staffLogin(params) {
     }
 
     var jabatan = String(row[2] || '').trim().toUpperCase();
+    var cabang  = String(row[4] || row[3] || '').trim();
     return {
       ok: true,
       staff: {
         id      : String(row[0]).trim(),
         nama    : String(row[1]).trim(),
         jabatan : jabatan,
-        cabang  : String(row[4] || row[3] || '').trim(),
+        cabang  : cabang,
         role    : jabatan.indexOf('KOORDINATOR') > -1 ? 'KOORDINATOR' : 'STAFF',
+        bebasAbsensi: _saIsBebasAbsensi(String(row[0]).trim()),
       },
-      nominalOptions: _saNominalOptions(),
+      nominalOptions: _saNominalOptions(cabang),
     };
   }
   return { ok: false, error: 'ID Staff tidak ditemukan.' };
 }
 
 /**
- * Pilihan nominal preset untuk form isi saldo.
- * Override via property SALDO_NOMINAL_OPTIONS (JSON array), contoh: [50000,100000].
+ * Pilihan nominal preset untuk form isi saldo — PER CABANG (aturan dari
+ * sistem isi-saldo lama): default 2 pilihan, Balikpapan & Pekanbaru 4 pilihan.
+ * Override via property SALDO_NOMINAL_OPTIONS:
+ *   - JSON array  → berlaku semua cabang: [45000,95000]
+ *   - JSON object → per cabang: {"DEFAULT":[45000,95000],"ID Rifim Airport Pekanbaru":[45000,95000,145000,195000]}
  */
-function _saNominalOptions() {
+var _SA_NOMINAL_DEFAULT  = [45000, 95000];
+var _SA_NOMINAL_EXTENDED = [45000, 95000, 145000, 195000];
+var _SA_CABANG_NOMINAL_EXTENDED = ['ID Rifim Airport Balikpapan', 'ID Rifim Airport Pekanbaru'];
+
+function _saNominalOptions(cabang) {
   var raw = PropertiesService.getScriptProperties().getProperty('SALDO_NOMINAL_OPTIONS');
   if (raw) {
     try {
-      var arr = JSON.parse(raw);
-      if (Array.isArray(arr) && arr.length) return arr;
+      var v = JSON.parse(raw);
+      if (Array.isArray(v) && v.length) return v;
+      if (v && typeof v === 'object') {
+        if (Array.isArray(v[cabang]) && v[cabang].length) return v[cabang];
+        if (Array.isArray(v.DEFAULT) && v.DEFAULT.length) return v.DEFAULT;
+      }
     } catch (e) {}
   }
-  return [50000, 100000, 150000, 200000, 300000, 500000];
+  return _SA_CABANG_NOMINAL_EXTENDED.indexOf(String(cabang || '').trim()) > -1
+    ? _SA_NOMINAL_EXTENDED : _SA_NOMINAL_DEFAULT;
+}
+
+/**
+ * Staff yang dikecualikan TOTAL dari absensi DAN geofence isi saldo
+ * (pengganti ABSEN_STAFF_DIKECUALIKAN di sistem lama — Gusril & Hadityawarman).
+ * Diisi via property STAFF_BEBAS_ABSENSI: JSON array ID Staff,
+ * contoh: ["RIF0001","RIF0005"]. Setup: setupStaffBebasAbsensi().
+ */
+function _saIsBebasAbsensi(staffId) {
+  var raw = PropertiesService.getScriptProperties().getProperty('STAFF_BEBAS_ABSENSI');
+  if (!raw) return false;
+  try {
+    var arr = JSON.parse(raw);
+    return Array.isArray(arr) && arr.some(function(id) {
+      return String(id).trim().toUpperCase() === String(staffId).trim().toUpperCase();
+    });
+  } catch (e) { return false; }
+}
+
+/**
+ * Simpan daftar staff bebas absensi + geofence ke PropertiesService.
+ * EDIT daftar ID di bawah sesuai kebutuhan, lalu jalankan SEKALI dari
+ * GAS Editor (file: staffAppApi.js).
+ */
+function setupStaffBebasAbsensi() {
+  var bebasAbsensi = [
+    // 'RIF0001', // contoh: isi ID Staff akun admin/owner
+  ];
+  PropertiesService.getScriptProperties()
+    .setProperty('STAFF_BEBAS_ABSENSI', JSON.stringify(bebasAbsensi));
+  Logger.log('✅ STAFF_BEBAS_ABSENSI tersimpan: ' + JSON.stringify(bebasAbsensi));
 }
 
 /**
@@ -233,11 +278,26 @@ function staffLookupDriver(params) {
 function staffSaldoSubmit(params) {
   var cabang    = String(params.cabang || '').trim();
   var namaStaff = String(params.namaStaff || '').trim();
+  var staffId   = String(params.staffId || '').trim();
   var nominal   = Number(params.nominal) || 0;
   var loginId   = String(params.loginId || '').trim();
 
   if (!cabang || !namaStaff || !loginId) return { ok: false, error: 'Data tidak lengkap.' };
   if (nominal < 1000) return { ok: false, error: 'Nominal minimal Rp 1.000.' };
+
+  // Geofence dicek ulang SERVER-SIDE di titik submit (aturan sistem lama) —
+  // jangan percaya cuma karena frontend lolos di awal. Staff bebas absensi
+  // dikecualikan (boleh isi saldo dari mana saja).
+  if (!_saIsBebasAbsensi(staffId)) {
+    var geo = _saCekGeofence(cabang, params.lat, params.lng);
+    if (geo.configured && !geo.ok) {
+      return {
+        ok: false,
+        error: 'Anda di luar lokasi ' + cabang + ' (jarak ' + geo.jarak +
+               'm, maksimal ' + geo.radius + 'm). Saldo hanya bisa diisi dari lokasi cabang.'
+      };
+    }
+  }
 
   var driver = _cariDriverByLoginId(loginId);
   var namaDriver = driver ? driver.nama : 'TIDAK DITEMUKAN';
@@ -246,9 +306,30 @@ function staffSaldoSubmit(params) {
   var sh = ss.getSheetByName(_SA_SALDO_SHEET);
   if (!sh) return { ok: false, error: 'Sheet ' + _SA_SALDO_SHEET + ' tidak ditemukan.' };
 
-  var tz    = ss.getSpreadsheetTimeZone();
-  var tsStr = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm:ss');
+  var tz  = ss.getSpreadsheetTimeZone();
+  var now = new Date();
 
+  // IDEMPOTENCY (aturan sistem lama): submission persis sama (cabang+staff+
+  // nominal+loginId) dalam 5 menit terakhir → anggap duplikat dari retry/
+  // double-tap, balas ok TANPA tulis ulang. Scan dari bawah, berhenti begitu
+  // timestamp lebih tua dari 5 menit.
+  var lastRow = sh.getLastRow();
+  if (lastRow >= _SA_DATA_START) {
+    var cutoff = new Date(now.getTime() - 5 * 60 * 1000);
+    var rows = sh.getRange(_SA_DATA_START, 1, lastRow - _SA_DATA_START + 1, 5).getValues();
+    for (var i = rows.length - 1; i >= 0; i--) {
+      var ts = _monParseTs(rows[i][0]);
+      if (!ts || ts < cutoff) break;
+      if (String(rows[i][1]).trim() === cabang &&
+          String(rows[i][2]).trim().toLowerCase() === namaStaff.toLowerCase() &&
+          Number(rows[i][3]) === nominal &&
+          String(rows[i][4]).trim() === loginId) {
+        return { ok: true, namaDriver: namaDriver, driverDitemukan: !!driver, duplikat: true };
+      }
+    }
+  }
+
+  var tsStr = Utilities.formatDate(now, tz, 'dd/MM/yyyy HH:mm:ss');
   sh.appendRow([
     tsStr, cabang, namaStaff, nominal, loginId, namaDriver,
     false, false, '', 'PENDING', '', ''
@@ -439,6 +520,24 @@ function setupGeofenceCabang() {
   Logger.log('   Belum ada koordinat: ID Rifim Batam, ID Rifim Jambi Luar');
 }
 
+/**
+ * Cek geofence terpusat — aturan dari sistem isi-saldo lama:
+ * - Cabang tanpa koordinat → ok:true, configured:false (tidak diblokir)
+ * - GPS tidak tersedia (lat/lng kosong, NaN, atau 0,0) → ok:true,
+ *   configured:false. PENTING: Number('')=0 → koordinat (0,0) = Teluk Guinea,
+ *   jarak 11.000+ km — dulu bikin staff terblokir padahal cuma GPS mati.
+ * - GPS ada + koordinat cabang ada → hitung jarak vs radius.
+ */
+function _saCekGeofence(cabang, lat, lng) {
+  var titik = _saGetGeofence(cabang);
+  if (!titik) return { ok: true, jarak: null, radius: null, configured: false };
+  if (!lat || !lng || isNaN(lat) || isNaN(lng) || (Number(lat) === 0 && Number(lng) === 0)) {
+    return { ok: true, jarak: null, radius: titik.radius, configured: false };
+  }
+  var jarak = _saJarakMeter(Number(lat), Number(lng), titik.lat, titik.lng);
+  return { ok: jarak <= titik.radius, jarak: jarak, radius: titik.radius, configured: true };
+}
+
 /** Haversine — jarak antar 2 koordinat dalam meter. */
 function _saJarakMeter(lat1, lng1, lat2, lng2) {
   var R = 6371000;
@@ -464,7 +563,12 @@ function staffAbsensi(params) {
 
   if (!staffId || !tipe) return { ok: false, error: 'Data tidak lengkap.' };
   if (tipe !== 'MASUK' && tipe !== 'PULANG') return { ok: false, error: 'Tipe absensi tidak valid.' };
-  if (isNaN(lat) || isNaN(lng)) return { ok: false, error: 'Lokasi GPS wajib aktif.' };
+
+  // Staff dikecualikan — tidak perlu absen sama sekali
+  if (_saIsBebasAbsensi(staffId)) {
+    return { ok: true, tipe: tipe, jam: '—', dalamArea: 'DIKECUALIKAN',
+             pesan: 'Akun ini dikecualikan dari absensi.' };
+  }
 
   var ss = SpreadsheetApp.openById(RAOS_SS_ID);
   var sh = ss.getSheetByName(_SA_ABSENSI_SHEET);
@@ -474,25 +578,35 @@ function staffAbsensi(params) {
   var now   = new Date();
   var today = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
 
-  // Cegah dobel absen tipe sama di hari sama
+  // Cegah dobel absen tipe sama di hari sama + cek sudah MASUK (untuk PULANG)
+  var sudahMasukHariIni = false;
   var lastRow = sh.getLastRow();
   if (lastRow >= _SA_DATA_START) {
     var existing = sh.getRange(_SA_DATA_START, 1, lastRow - _SA_DATA_START + 1, 6).getValues();
     for (var i = 0; i < existing.length; i++) {
-      if (String(existing[i][2]).trim() === staffId &&
-          String(existing[i][1]) === today &&
-          String(existing[i][5]).trim().toUpperCase() === tipe) {
-        return { ok: false, error: 'Sudah absen ' + tipe + ' hari ini.' };
-      }
+      if (String(existing[i][2]).trim() !== staffId || String(existing[i][1]) !== today) continue;
+      var tipeRow = String(existing[i][5]).trim().toUpperCase();
+      if (tipeRow === tipe) return { ok: false, error: 'Sudah absen ' + tipe + ' hari ini.' };
+      if (tipeRow === 'MASUK') sudahMasukHariIni = true;
     }
   }
+  // Aturan sistem lama: absen PULANG hanya boleh setelah absen MASUK
+  if (tipe === 'PULANG' && !sudahMasukHariIni) {
+    return { ok: false, error: 'Belum absen MASUK hari ini.' };
+  }
 
-  // Geofence
-  var koordinat = _saGetGeofence(cabang);
-  var jarak = null, dalamArea = 'TIDAK DICEK';
-  if (koordinat) {
-    jarak = _saJarakMeter(lat, lng, koordinat.lat, koordinat.lng);
-    dalamArea = jarak <= koordinat.radius ? 'YA' : 'TIDAK';
+  // Geofence — GPS kosong tidak memblokir (dicatat "TIDAK DICEK"), tapi
+  // absen MASUK di LUAR area (GPS aktif + jarak > radius) DIBLOKIR server
+  // (aturan sistem lama). PULANG tetap dicatat walau di luar area.
+  var geo = _saCekGeofence(cabang, lat, lng);
+  var jarak = geo.configured ? geo.jarak : null;
+  var dalamArea = geo.configured ? (geo.ok ? 'YA' : 'TIDAK') : 'TIDAK DICEK';
+  if (tipe === 'MASUK' && geo.configured && !geo.ok) {
+    return {
+      ok: false,
+      error: 'Anda di luar lokasi ' + cabang + ' (jarak ' + geo.jarak +
+             'm, maksimal ' + geo.radius + 'm). Absen masuk hanya bisa dari lokasi cabang.'
+    };
   }
 
   // Simpan foto ke Drive (opsional)
@@ -511,9 +625,11 @@ function staffAbsensi(params) {
     }
   }
 
+  var latStr = (!isNaN(lat) && lat !== 0) ? lat : '';
+  var lngStr = (!isNaN(lng) && lng !== 0) ? lng : '';
   sh.appendRow([
     Utilities.formatDate(now, tz, 'dd/MM/yyyy HH:mm:ss'),
-    today, staffId, nama, cabang, tipe, lat, lng,
+    today, staffId, nama, cabang, tipe, latStr, lngStr,
     jarak === null ? '' : jarak, dalamArea, fotoUrl
   ]);
 
@@ -575,27 +691,22 @@ function staffAbsensiStatus(params) {
  * @returns { ok, masuk, pulang, geofence: {configured, ok, jarak, radius} }
  */
 function staffCekStatus(params) {
+  var staffId = String(params.staffId || '').trim();
+
+  // Staff dikecualikan (admin/owner) — bebas absensi & geofence total
+  if (_saIsBebasAbsensi(staffId)) {
+    return {
+      ok: true, masuk: '—', pulang: null,
+      geofence: { configured: false, ok: true, jarak: null, radius: null },
+      bebasAbsensi: true,
+    };
+  }
+
   var status = staffAbsensiStatus(params);
   if (!status.ok) return status;
 
-  var cabang = String(params.cabang || '').trim();
-  var lat = Number(params.lat);
-  var lng = Number(params.lng);
-
-  var koordinat = _saGetGeofence(cabang);
-  var geofence = { configured: false, ok: true, jarak: null, radius: null };
-  if (koordinat) {
-    geofence.configured = true;
-    geofence.radius = koordinat.radius;
-    if (!isNaN(lat) && !isNaN(lng)) {
-      geofence.jarak = _saJarakMeter(lat, lng, koordinat.lat, koordinat.lng);
-      geofence.ok = geofence.jarak <= koordinat.radius;
-    } else {
-      geofence.ok = false; // geofence dikonfigurasi tapi GPS tidak ada → di luar
-    }
-  }
-
-  status.geofence = geofence;
+  status.geofence = _saCekGeofence(String(params.cabang || '').trim(), params.lat, params.lng);
+  status.bebasAbsensi = false;
   return status;
 }
 

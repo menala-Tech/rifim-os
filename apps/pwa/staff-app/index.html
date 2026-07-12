@@ -179,14 +179,24 @@
     <div class="tag">PT RIFIM INTERNASIONAL GEMILANG</div>
   </div>
   <div class="card">
+    <!-- autocomplete=off + name acak + readonly-sampai-fokus: cegah browser
+         auto-isi ID & PIN akun yang pernah tersimpan (Chrome abaikan
+         autocomplete=off untuk field password biasa) -->
+    <form autocomplete="off" onsubmit="return false">
     <div class="field">
       <label>ID Staff</label>
-      <input type="text" id="inStaffId" placeholder="RIF0001" autocapitalize="characters" autocomplete="username">
+      <input type="text" id="inStaffId" name="rifim_sid_x" placeholder="RIF0001"
+             autocapitalize="characters" autocomplete="off" readonly
+             onfocus="this.removeAttribute('readonly')">
     </div>
     <div class="field">
       <label>PIN</label>
-      <input type="password" id="inPin" class="pin-input" inputmode="numeric" maxlength="6" placeholder="••••" autocomplete="current-password">
+      <input type="password" id="inPin" name="rifim_pin_x" class="pin-input"
+             inputmode="numeric" maxlength="6" placeholder="••••"
+             autocomplete="new-password" readonly
+             onfocus="this.removeAttribute('readonly')">
     </div>
+    </form>
     <button class="btn" id="btnLogin" onclick="doLogin()">Masuk</button>
     <div class="err" id="loginErr"></div>
   </div>
@@ -472,7 +482,9 @@ function cekStatusFlow() {
       return;
     }
     statusAbsen = res;
-    if (!res.masuk) {
+    if (res.bebasAbsensi) {
+      initApp(); // akun dikecualikan — langsung masuk tanpa gate absen
+    } else if (!res.masuk) {
       renderAbsenMasukGate();
     } else {
       initApp();
@@ -593,7 +605,7 @@ function switchView(name) {
 // ── SALDO: nominal preset + geofence blocking ──────────────────────
 function renderNominalGrid() {
   var opts = (session.nominalOptions && session.nominalOptions.length)
-    ? session.nominalOptions : [50000, 100000, 150000, 200000, 300000, 500000];
+    ? session.nominalOptions : [45000, 95000];
   document.getElementById('nominalGrid').innerHTML = opts.map(function(n) {
     return '<div class="nominal-btn" onclick="pilihNominal(' + n + ', this)">Rp' + Number(n).toLocaleString('id-ID') + '</div>';
   }).join('');
@@ -688,13 +700,19 @@ function kirimSaldo() {
     if (!lanjut) { btn.disabled = false; btn.textContent = 'Kirim Pengajuan'; return; }
   }
 
-  btn.textContent = 'Mengirim…';
-  // Operasi TULIS: 1x percobaan, tanpa retry (hindari double entry)
-  apiWrite('staffSaldoSubmit', {
-    cabang: session.staff.cabang,
-    namaStaff: session.staff.nama,
-    nominal: selectedNominal,
-    loginId: loginId,
+  btn.textContent = 'Mengecek lokasi…';
+  // Operasi TULIS: 1x percobaan, tanpa retry (hindari double entry).
+  // GPS ikut dikirim — geofence dicek ulang server-side di titik submit.
+  ambilLokasi().then(function(loc) {
+    btn.textContent = 'Mengirim…';
+    return apiWrite('staffSaldoSubmit', {
+      cabang: session.staff.cabang,
+      namaStaff: session.staff.nama,
+      staffId: session.staff.id,
+      nominal: selectedNominal,
+      loginId: loginId,
+      lat: loc.lat, lng: loc.lng,
+    });
   }).then(function(res) {
     if (!res.ok) { toast('Gagal: ' + (res.error || 'Coba lagi')); return; }
     toast('✅ ' + rupiah(selectedNominal) + ' · ' + (res.namaDriver || driverName));
@@ -800,8 +818,14 @@ function updQueue(row, status) {
 
 // ── ABSENSI ────────────────────────────────────────────────────────
 function renderAbsenInfo() {
-  var g = (statusAbsen && statusAbsen.geofence) || { configured: false };
   var el = document.getElementById('absenInfo');
+  if (statusAbsen && statusAbsen.bebasAbsensi) {
+    el.innerHTML = '<div class="ok-box">Akun ini dikecualikan dari absensi &amp; geofence.</div>';
+    var btnP = document.getElementById('btnAbsenPulang');
+    if (btnP) { btnP.disabled = true; btnP.textContent = 'Absensi Tidak Berlaku'; }
+    return;
+  }
+  var g = (statusAbsen && statusAbsen.geofence) || { configured: false };
   if (g.configured && g.jarak != null) {
     el.innerHTML = g.ok
       ? '<div class="ok-box">✓ Di lokasi cabang (jarak ' + g.jarak + 'm)</div>'
