@@ -10,6 +10,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added — Staff PWA v1 (Sprint 3A)
 - `apps/pwa/staff-app/` — PWA baru untuk staff lapangan (login ID Staff + PIN)
+  - Live: https://rifim-staff.vercel.app (Vercel project `rifim-staff`)
   - Input top-up saldo driver → sheet `Form Input Saldo PWA` (auto-lookup nama driver)
   - Riwayat pengisian bulan berjalan + total nominal
   - Antrian bandara: tambah driver, panggil, jemput, selesai (WAITING→CALLED→PICKED→DONE)
