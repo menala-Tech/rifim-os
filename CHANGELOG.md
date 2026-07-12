@@ -8,6 +8,21 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — Staff PWA v2: tema terang + UX PWA lama (Sprint 3A)
+- Tampilan diganti tema terang (putih + merah RIFIM) mengikuti PWA isi-saldo lama
+- 8 fungsi diadopsi dari PWA isi-saldo lama:
+  - Nominal preset grid (bukan ketik bebas) — opsi dari server, override via property `SALDO_NOMINAL_OPTIONS`
+  - Auto-lookup nama driver saat ID diketik (debounce 500ms + cache 24 jam) — Kirim baru aktif setelah nama terkonfirmasi
+  - Wajib Absen Masuk (foto via kamera live belakang) sebelum akses menu
+  - Geofence blocking — Isi Saldo & Absen Masuk terkunci kalau di luar area cabang
+  - Cek duplikat — konfirmasi kalau ID sama sudah diisi hari ini
+  - Anti double-entry — operasi tulis tanpa retry + timeout 30s; koneksi putus → arahkan cek riwayat
+  - Ganti PIN mandiri
+  - Retry 3x hanya untuk operasi baca (atasi limit kuota GAS Gmail biasa)
+- `staffAppApi.js` endpoint baru: `staffLookupDriver`, `staffGantiPin`, `staffCekStatus`
+- PIN override tersimpan di PropertiesService `STAFF_PIN_<ID>` — sync-safe (tidak
+  tertimpa sync Supabase → Database Staff tiap 6 jam)
+
 ### Added — Staff PWA v1 (Sprint 3A)
 - `apps/pwa/staff-app/` — PWA baru untuk staff lapangan (login ID Staff + PIN)
   - Live: https://rifim-staff.vercel.app (Vercel project `rifim-staff`)

@@ -4,6 +4,9 @@
  *
  * Endpoint (via doPost webApp.js → routing action):
  *   staffLogin          — login ID Staff + PIN (dari Database Staff sheet)
+ *   staffLookupDriver   — auto-lookup nama driver by ID Login (untuk form saldo)
+ *   staffGantiPin       — ganti PIN mandiri (override di PropertiesService, sync-safe)
+ *   staffCekStatus      — status absen hari ini + cek geofence (lat/lng)
  *   staffSaldoSubmit    — input top-up saldo driver → Form Input Saldo PWA
  *   staffSaldoRiwayat   — riwayat pengisian bulan berjalan per staff (+ target)
  *   staffSaldoMonitor   — [Koordinator] monitoring saldo per cabang hari ini
@@ -102,10 +105,22 @@ function setupStaffAppSheets() {
 // ══════════════════════════════════════════════════════════════════
 
 /**
+ * PIN efektif staff = override PropertiesService (hasil Ganti PIN mandiri)
+ * kalau ada, kalau tidak pakai PIN dari sheet Database Staff.
+ * Override disimpan di property STAFF_PIN_<ID> — TIDAK ikut tertimpa saat
+ * sync Supabase → Database Staff tiap 6 jam (rule 37 PROJECT_RULES.md).
+ */
+function _saPinEfektif(staffId, pinSheet) {
+  var override = PropertiesService.getScriptProperties()
+    .getProperty('STAFF_PIN_' + staffId);
+  return override !== null ? override : String(pinSheet || '').trim();
+}
+
+/**
  * Login staff dengan ID Staff + PIN.
  * Sumber: sheet Database Staff (kolom: A=ID Staff, B=Nama, C=Jabatan,
  * D=ID Cabang, E=Nama Cabang, F=Gaji, G=No WA, H=Email, I=Pin, J=Status).
- * @returns {object} { ok, staff: {id, nama, jabatan, cabang, role} }
+ * @returns {object} { ok, staff: {id, nama, jabatan, cabang, role}, nominalOptions }
  */
 function staffLogin(params) {
   var staffId = String(params.staffId || '').trim().toUpperCase();
@@ -127,7 +142,7 @@ function staffLogin(params) {
     if (String(row[9]).trim().toUpperCase() !== 'AKTIF') {
       return { ok: false, error: 'Akun tidak aktif. Hubungi admin.' };
     }
-    if (String(row[8]).trim() !== pin) {
+    if (_saPinEfektif(staffId, row[8]) !== pin) {
       return { ok: false, error: 'PIN salah.' };
     }
 
@@ -140,10 +155,71 @@ function staffLogin(params) {
         jabatan : jabatan,
         cabang  : String(row[4] || row[3] || '').trim(),
         role    : jabatan.indexOf('KOORDINATOR') > -1 ? 'KOORDINATOR' : 'STAFF',
-      }
+      },
+      nominalOptions: _saNominalOptions(),
     };
   }
   return { ok: false, error: 'ID Staff tidak ditemukan.' };
+}
+
+/**
+ * Pilihan nominal preset untuk form isi saldo.
+ * Override via property SALDO_NOMINAL_OPTIONS (JSON array), contoh: [50000,100000].
+ */
+function _saNominalOptions() {
+  var raw = PropertiesService.getScriptProperties().getProperty('SALDO_NOMINAL_OPTIONS');
+  if (raw) {
+    try {
+      var arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length) return arr;
+    } catch (e) {}
+  }
+  return [50000, 100000, 150000, 200000, 300000, 500000];
+}
+
+/**
+ * Ganti PIN mandiri. Verifikasi PIN lama, simpan PIN baru sebagai override
+ * di PropertiesService (sync-safe — tidak tertimpa sync Supabase).
+ * @param params { staffId, pinLama, pinBaru }
+ */
+function staffGantiPin(params) {
+  var staffId = String(params.staffId || '').trim().toUpperCase();
+  var pinLama = String(params.pinLama || '').trim();
+  var pinBaru = String(params.pinBaru || '').trim();
+
+  if (!staffId || !pinLama || !pinBaru) return { ok: false, error: 'Data tidak lengkap.' };
+  if (pinBaru.length < 4) return { ok: false, error: 'PIN baru minimal 4 digit.' };
+  if (!/^\d+$/.test(pinBaru)) return { ok: false, error: 'PIN baru harus angka.' };
+
+  var ss = SpreadsheetApp.openById(RAOS_SS_ID);
+  var sh = ss.getSheetByName(_SA_STAFF_SHEET);
+  if (!sh) return { ok: false, error: 'Database Staff belum tersedia.' };
+
+  var lastRow = sh.getLastRow();
+  if (lastRow < _SA_DATA_START) return { ok: false, error: 'Database Staff kosong.' };
+
+  var data = sh.getRange(_SA_DATA_START, 1, lastRow - _SA_DATA_START + 1, 10).getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (String(data[i][0]).trim().toUpperCase() !== staffId) continue;
+    if (_saPinEfektif(staffId, data[i][8]) !== pinLama) {
+      return { ok: false, error: 'PIN lama salah.' };
+    }
+    PropertiesService.getScriptProperties().setProperty('STAFF_PIN_' + staffId, pinBaru);
+    return { ok: true };
+  }
+  return { ok: false, error: 'ID Staff tidak ditemukan.' };
+}
+
+/**
+ * Auto-lookup nama driver by ID Login Maxim — untuk form isi saldo
+ * (nama muncul otomatis, tombol Kirim baru aktif setelah terkonfirmasi).
+ * @param params { loginId }
+ */
+function staffLookupDriver(params) {
+  var loginId = String(params.loginId || '').trim();
+  if (!loginId) return { ok: false, error: 'ID Login wajib.' };
+  var driver = _cariDriverByLoginId(loginId);
+  return { ok: true, ditemukan: !!driver, nama: driver ? driver.nama : null };
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -491,6 +567,38 @@ function staffAbsensiStatus(params) {
   return { ok: true, masuk: masuk, pulang: pulang };
 }
 
+/**
+ * Status lengkap setelah login: absen hari ini + cek geofence posisi staff.
+ * Dipakai frontend untuk menentukan layar (Absen Masuk dulu vs Menu) dan
+ * mengunci fitur Isi Saldo kalau di luar area cabang.
+ * @param params { staffId, cabang, lat?, lng? }
+ * @returns { ok, masuk, pulang, geofence: {configured, ok, jarak, radius} }
+ */
+function staffCekStatus(params) {
+  var status = staffAbsensiStatus(params);
+  if (!status.ok) return status;
+
+  var cabang = String(params.cabang || '').trim();
+  var lat = Number(params.lat);
+  var lng = Number(params.lng);
+
+  var koordinat = _saGetGeofence(cabang);
+  var geofence = { configured: false, ok: true, jarak: null, radius: null };
+  if (koordinat) {
+    geofence.configured = true;
+    geofence.radius = koordinat.radius;
+    if (!isNaN(lat) && !isNaN(lng)) {
+      geofence.jarak = _saJarakMeter(lat, lng, koordinat.lat, koordinat.lng);
+      geofence.ok = geofence.jarak <= koordinat.radius;
+    } else {
+      geofence.ok = false; // geofence dikonfigurasi tapi GPS tidak ada → di luar
+    }
+  }
+
+  status.geofence = geofence;
+  return status;
+}
+
 // ══════════════════════════════════════════════════════════════════
 // ANTRIAN BANDARA
 // ══════════════════════════════════════════════════════════════════
@@ -618,6 +726,9 @@ function queueUpdate(params) {
 function routeStaffApp(action, params) {
   switch (action) {
     case 'staffLogin':         return staffLogin(params);
+    case 'staffLookupDriver':  return staffLookupDriver(params);
+    case 'staffGantiPin':      return staffGantiPin(params);
+    case 'staffCekStatus':     return staffCekStatus(params);
     case 'staffSaldoSubmit':   return staffSaldoSubmit(params);
     case 'staffSaldoRiwayat':  return staffSaldoRiwayat(params);
     case 'staffSaldoMonitor':  return staffSaldoMonitor(params);

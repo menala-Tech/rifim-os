@@ -4,7 +4,7 @@
   "description": "Aplikasi Staff PT RIFIM Internasional Gemilang — saldo, absensi, antrian bandara",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0f172a",
+  "background_color": "#f4f4f5",
   "theme_color": "#C62828",
   "orientation": "portrait",
   "icons": [

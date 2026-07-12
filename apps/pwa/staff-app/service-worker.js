@@ -2,8 +2,8 @@
  * RIFIM Staff PWA — Service Worker
  * Cache shell app saja; data API selalu network (real-time).
  */
-var CACHE_NAME = 'rifim-staff-v2';
-var SHELL = ['./index.html', './manifest.json', './icon-512.png', './logo-rifim.png', './bg-maxim.jpg'];
+var CACHE_NAME = 'rifim-staff-v3';
+var SHELL = ['./index.html', './manifest.json', './icon-512.png', './logo-rifim.png'];
 
 self.addEventListener('install', function(e) {
   e.waitUntil(
