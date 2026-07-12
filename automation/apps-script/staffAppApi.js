@@ -165,6 +165,53 @@ function staffLogin(params) {
 }
 
 /**
+ * DEBUG: Jalankan dari GAS Editor untuk isolasi error staffLogin.
+ * Pilih "debugStaffLogin" di dropdown fungsi → klik Jalankan → baca Log eksekusi.
+ */
+function debugStaffLogin() {
+  var log = [];
+  try {
+    log.push('1. RAOS_SS_ID = ' + RAOS_SS_ID + ' (type=' + typeof RAOS_SS_ID + ')');
+    var ss = SpreadsheetApp.openById(RAOS_SS_ID);
+    log.push('2. openById OK');
+
+    var sh = ss.getSheetByName(_SA_STAFF_SHEET);
+    log.push('3. getSheetByName("' + _SA_STAFF_SHEET + '") = ' + (sh ? 'FOUND' : 'NULL'));
+    if (!sh) { Logger.log(log.join('\n')); return; }
+
+    var lastRow = sh.getLastRow();
+    log.push('4. lastRow=' + lastRow + ' (type=' + typeof lastRow + ')');
+    log.push('5. _SA_DATA_START=' + _SA_DATA_START + ' (type=' + typeof _SA_DATA_START + ')');
+
+    if (lastRow < _SA_DATA_START) { log.push('Sheet kosong — tidak ada data'); Logger.log(log.join('\n')); return; }
+
+    var numRows = lastRow - _SA_DATA_START + 1;
+    log.push('6. numRows=' + numRows + ', getRange(' + _SA_DATA_START + ', 1, ' + numRows + ', 10)');
+    var data = sh.getRange(_SA_DATA_START, 1, numRows, 10).getValues();
+    log.push('7. getRange+getValues OK, baris=' + data.length);
+
+    var row0 = data[0];
+    log.push('8. row[0]=' + row0[0] + ', row[8]=' + row0[8] + ', row[9]=' + row0[9]);
+
+    var pin = _saPinEfektif(String(row0[0]).trim(), row0[8]);
+    log.push('9. _saPinEfektif OK');
+
+    var bebas = _saIsBebasAbsensi(String(row0[0]).trim());
+    log.push('10. _saIsBebasAbsensi OK, result=' + bebas);
+
+    var cabang = String(row0[4] || row0[3] || '').trim();
+    var opts = _saNominalOptions(cabang);
+    log.push('11. _saNominalOptions OK, opts=' + JSON.stringify(opts));
+
+    log.push('=== SEMUA LANGKAH SUKSES ===');
+  } catch (e) {
+    log.push('!!! ERROR: ' + e.message);
+    log.push('Stack: ' + (e.stack || 'tidak ada'));
+  }
+  Logger.log(log.join('\n'));
+}
+
+/**
  * Pilihan nominal preset untuk form isi saldo — PER CABANG (aturan dari
  * sistem isi-saldo lama): default 2 pilihan, Balikpapan & Pekanbaru 4 pilihan.
  * Override via property SALDO_NOMINAL_OPTIONS:

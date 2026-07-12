@@ -94,7 +94,7 @@ function doPost(e) {
     // Catat ke system_log — bukan hanya console.warn
     _gasLogError('doPost', input.action || input.hrisAction || 'unknown', err,
       { action: input.action, hrisAction: input.hrisAction, documentType: input.documentType });
-    return _json({ success: false, message: 'Server error: ' + err.message });
+    return _json({ ok: false, error: err.message });
   }
 }
 
