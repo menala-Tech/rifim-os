@@ -455,10 +455,20 @@ function cekStatusFlow() {
     });
   }).then(function(res) {
     if (!res.ok) {
+      // res.error ada = error bisnis dari staffCekStatus (mis. ID tidak valid).
+      // res.error kosong/format asing = kemungkinan Web App GAS belum
+      // redeploy (endpoint belum dikenal) — beri pesan yang membedakan.
+      var kenal = typeof res.error === 'string' && res.error;
       document.getElementById('gateView').innerHTML =
-        '<div class="card center-msg"><div class="value" style="color:#dc2626">Sesi Tidak Valid</div>' +
-        '<div class="hint">' + (res.error || 'Login ulang dengan PIN terbaru.') + '</div></div>' +
-        '<button class="btn" onclick="doLogout()">🔄 Keluar &amp; Login Ulang</button>';
+        '<div class="card center-msg"><div class="value" style="color:#dc2626">' +
+        (kenal ? 'Sesi Tidak Valid' : 'Server Belum Siap') + '</div>' +
+        '<div class="hint">' + (kenal ? res.error :
+          'Backend belum mengenali versi aplikasi ini. Hubungi admin (GAS Web App perlu redeploy), lalu coba lagi.') +
+        '</div></div>' +
+        (kenal
+          ? '<button class="btn" onclick="doLogout()">🔄 Keluar &amp; Login Ulang</button>'
+          : '<button class="btn" onclick="cekStatusFlow()">Coba Lagi</button>' +
+            '<div class="link-row"><a href="javascript:void(0)" class="danger" onclick="doLogout()">Keluar</a></div>');
       return;
     }
     statusAbsen = res;
