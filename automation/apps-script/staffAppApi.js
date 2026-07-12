@@ -618,7 +618,7 @@ function staffAbsensi(params) {
         'image/jpeg',
         'absen_' + staffId + '_' + Utilities.formatDate(now, tz, 'yyyyMMdd_HHmmss') + '.jpg'
       );
-      var folder = _saGetAbsensiFolder();
+      var folder = _saGetAbsensiFolder(cabang, now, tz);
       fotoUrl = folder.createFile(blob).getUrl();
     } catch (e) {
       Logger.log('staffAbsensi: gagal simpan foto — ' + e.message);
@@ -640,12 +640,54 @@ function staffAbsensi(params) {
   };
 }
 
-/** Folder Drive untuk foto absensi — buat jika belum ada. */
-function _saGetAbsensiFolder() {
-  var props    = PropertiesService.getScriptProperties();
+/**
+ * Simpan Folder ID utama Drive "Rifim OS" ke PropertiesService.
+ * Jalankan SEKALI dari GAS Editor (file: staffAppApi.js).
+ * Struktur foto absensi: Rifim OS → PWA → Foto Absensi → [Bulan] → [Cabang]
+ * (subfolder bulan & cabang dibuat OTOMATIS saat foto pertama masuk).
+ */
+function setupAbsensiFolder() {
+  PropertiesService.getScriptProperties()
+    .setProperty('RIFIM_OS_FOLDER_ID', '19taBn0YXxjXTb-SxqFXGhwOPShZ4VlIt');
+  Logger.log('✅ RIFIM_OS_FOLDER_ID tersimpan. Struktur: Rifim OS → PWA → Foto Absensi → [Bulan] → [Cabang]');
+}
+
+/** Ambil subfolder bernama `nama` di dalam `parent` — buat kalau belum ada. */
+function _saGetOrCreateSub(parent, nama) {
+  var it = parent.getFoldersByName(nama);
+  return it.hasNext() ? it.next() : parent.createFolder(nama);
+}
+
+var _SA_BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+/**
+ * Folder Drive tujuan foto absensi, bertingkat per bulan per cabang:
+ *   Rifim OS / PWA / Foto Absensi / 2026-07 Juli / ID Rifim Airport Batam /
+ * Fallback: kalau RIFIM_OS_FOLDER_ID belum di-setup, pakai flat folder lama
+ * (ABSENSI_FOTO_FOLDER_ID) supaya absensi tidak pernah gagal karena folder.
+ */
+function _saGetAbsensiFolder(cabang, now, tz) {
+  var props  = PropertiesService.getScriptProperties();
+  var rootId = props.getProperty('RIFIM_OS_FOLDER_ID');
+
+  if (rootId) {
+    try {
+      var root  = DriveApp.getFolderById(rootId);
+      var bulan = Utilities.formatDate(now, tz, 'yyyy-MM') + ' ' + _SA_BULAN_ID[now.getMonth()];
+      var fPwa  = _saGetOrCreateSub(root, 'PWA');
+      var fFoto = _saGetOrCreateSub(fPwa, 'Foto Absensi');
+      var fBln  = _saGetOrCreateSub(fFoto, bulan);
+      return _saGetOrCreateSub(fBln, String(cabang || 'Tanpa Cabang').trim());
+    } catch (e) {
+      Logger.log('_saGetAbsensiFolder: gagal akses struktur bertingkat — ' + e.message);
+    }
+  }
+
+  // Fallback flat folder lama
   var folderId = props.getProperty('ABSENSI_FOTO_FOLDER_ID');
   if (folderId) {
-    try { return DriveApp.getFolderById(folderId); } catch (e) {}
+    try { return DriveApp.getFolderById(folderId); } catch (e2) {}
   }
   var folder = DriveApp.createFolder('RIFIM OS - Foto Absensi');
   props.setProperty('ABSENSI_FOTO_FOLDER_ID', folder.getId());

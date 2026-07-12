@@ -168,6 +168,7 @@ Urutan setup yang harus dijalankan **sekali** dari GAS Editor setelah deploy ke 
 | 9 | `setupRaosSheets()` | `setupRaosSheets.js` | Buat semua sheet RAOS (Form Input Saldo PWA, Input Potongan 1/2, dll) |
 | 10 | `setupStaffAppSheets()` | `staffAppApi.js` | Buat sheet Absensi Staff + Antrian Bandara + kolom Validasi J-L (Staff PWA) |
 | 10b | `setupStaffBebasAbsensi()` | `staffAppApi.js` | Daftar ID staff bebas absensi & geofence (edit daftar di fungsi dulu) |
+| 10c | `setupAbsensiFolder()` | `staffAppApi.js` | Folder ID utama Drive "Rifim OS" — foto absensi tersimpan bertingkat PWA/Foto Absensi/[Bulan]/[Cabang] |
 | 11 | `setupMonitoringSheets()` | `raosMonitoringEngine.js` | Buat sheet MONITORING_SALDO + MONITORING_POTONGAN |
 | 12 | `setupMonitoringTriggers()` | `raosMonitoringEngine.js` | Pasang trigger monitoring tiap 5 menit |
 
@@ -176,7 +177,8 @@ Urutan setup yang harus dijalankan **sekali** dari GAS Editor setelah deploy ke 
 | Property | Format | Keterangan |
 |----------|--------|------------|
 | `GEOFENCE_CABANG` | JSON `{"ID Rifim Airport Batam": {"lat": 1.1229, "lng": 104.1139, "radius": 1000}, ...}` | Isi via `setupGeofenceCabang()` di `staffAppApi.js`. Cabang null = absensi jalan tapi status "TIDAK DICEK" |
-| `ABSENSI_FOTO_FOLDER_ID` | Drive Folder ID | Auto-dibuat saat absensi pertama; bisa diisi manual |
+| `RIFIM_OS_FOLDER_ID` | Drive Folder ID | Folder utama "Rifim OS" di Drive. Isi via `setupAbsensiFolder()`. Foto absensi → subfolder `PWA/Foto Absensi/[yyyy-MM Bulan]/[Cabang]` (dibuat otomatis) |
+| `ABSENSI_FOTO_FOLDER_ID` | Drive Folder ID | Fallback flat folder lama — hanya dipakai kalau `RIFIM_OS_FOLDER_ID` belum di-setup |
 | `SALDO_NOMINAL_OPTIONS` | JSON array `[45000,95000]` atau object `{"DEFAULT":[...],"ID Rifim Airport Pekanbaru":[...]}` | Opsional. Preset nominal per cabang. Default: 45rb/95rb; Balikpapan & Pekanbaru + 145rb/195rb |
 | `STAFF_BEBAS_ABSENSI` | JSON array `["RIF0001"]` | ID staff yang bebas absensi & geofence total (admin/owner). Isi via `setupStaffBebasAbsensi()` |
 | `STAFF_PIN_<ID>` | string PIN | Auto-dibuat saat staff Ganti PIN mandiri. Override PIN sheet — sync-safe. Hapus property = kembali ke PIN sheet |

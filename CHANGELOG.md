@@ -27,6 +27,8 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/).
   - Absen PULANG wajib sudah MASUK; absen MASUK di luar area diblokir server
   - Staff bebas absensi & geofence via property `STAFF_BEBAS_ABSENSI` (setupStaffBebasAbsensi())
 - Login page: matikan autofill browser (autocomplete off + readonly-sampai-fokus)
+- Foto absensi tersimpan bertingkat di Drive: Rifim OS → PWA → Foto Absensi →
+  [yyyy-MM Bulan] → [Cabang] (subfolder dibuat otomatis; setup: setupAbsensiFolder())
 - `staffAppApi.js` endpoint baru: `staffLookupDriver`, `staffGantiPin`, `staffCekStatus`
 - PIN override tersimpan di PropertiesService `STAFF_PIN_<ID>` — sync-safe (tidak
   tertimpa sync Supabase → Database Staff tiap 6 jam)
