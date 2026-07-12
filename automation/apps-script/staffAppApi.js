@@ -714,9 +714,12 @@ function staffAbsensiStatus(params) {
   if (lastRow >= _SA_DATA_START) {
     var data = sh.getRange(_SA_DATA_START, 1, lastRow - _SA_DATA_START + 1, 6).getValues();
     data.forEach(function(row) {
-      if (String(row[2]).trim() !== staffId || String(row[1]) !== today) return;
-      var tgl  = _monParseTs(row[0]);
-      var jam  = tgl ? Utilities.formatDate(tgl, tz, 'HH:mm') : '—';
+      if (String(row[2]).trim() !== staffId) return;
+      // row[1] (Tanggal col B) bisa jadi Date object kalau Sheets auto-parse ISO string.
+      // Gunakan Timestamp (col A) via _monParseTs untuk derive tanggal — lebih robust.
+      var tgl = _monParseTs(row[0]);
+      if (!tgl || Utilities.formatDate(tgl, tz, 'yyyy-MM-dd') !== today) return;
+      var jam  = Utilities.formatDate(tgl, tz, 'HH:mm');
       var tipe = String(row[5]).trim().toUpperCase();
       if (tipe === 'MASUK')  masuk  = jam;
       if (tipe === 'PULANG') pulang = jam;

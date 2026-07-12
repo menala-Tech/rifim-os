@@ -104,6 +104,18 @@
   }
   .nominal-btn.selected { border-color: var(--red); background: #fef2f2; color: var(--red); }
 
+  /* ── HOME MENU CARDS ───────────────────── */
+  .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .menu-card {
+    background: var(--card); border-radius: 14px; padding: 20px 12px;
+    text-align: center; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    border: 2px solid transparent; transition: border-color 0.15s;
+    user-select: none;
+  }
+  .menu-card:active { border-color: var(--red); background: #fef2f2; }
+  .menu-card .menu-ic { font-size: 32px; margin-bottom: 8px; }
+  .menu-card .menu-label { font-size: 13px; font-weight: 700; color: var(--text); }
+
   /* ── TABS ───────────────────────────────── */
   nav {
     display: flex; position: fixed; bottom: 0; left: 0; right: 0;
@@ -220,8 +232,39 @@
   </header>
 
   <main>
+    <!-- ── HOME ── -->
+    <div class="view show" id="view-home">
+      <div class="card" id="homeStatusCard" style="margin-bottom:14px">
+        <div class="label">STATUS ABSENSI HARI INI</div>
+        <div id="homeAbsenStatus" style="margin-top:6px">Memuat…</div>
+      </div>
+      <h3 class="section">Menu</h3>
+      <div class="menu-grid" id="homeMenuGrid">
+        <div class="menu-card" onclick="switchView('saldo')">
+          <div class="menu-ic">💰</div>
+          <div class="menu-label">Isi Saldo</div>
+        </div>
+        <div class="menu-card" onclick="switchView('antrian')">
+          <div class="menu-ic">🚖</div>
+          <div class="menu-label">Antrian</div>
+        </div>
+        <div class="menu-card" onclick="switchView('absen')">
+          <div class="menu-ic">📍</div>
+          <div class="menu-label">Absensi</div>
+        </div>
+        <div class="menu-card" id="homeMonitor" style="display:none" onclick="switchView('monitor')">
+          <div class="menu-ic">✅</div>
+          <div class="menu-label">Validasi</div>
+        </div>
+        <div class="menu-card" onclick="renderGantiPin()">
+          <div class="menu-ic">🔑</div>
+          <div class="menu-label">Ganti PIN</div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── SALDO ── -->
-    <div class="view show" id="view-saldo">
+    <div class="view" id="view-saldo">
       <div id="saldoGeofenceBox"></div>
       <h3 class="section">Input Top-Up Saldo Driver</h3>
       <div class="card" id="saldoFormCard">
@@ -288,7 +331,8 @@
   </main>
 
   <nav id="navBar">
-    <button class="active" data-view="saldo" onclick="switchView('saldo')"><span class="ic">💰</span>Saldo</button>
+    <button class="active" data-view="home" onclick="switchView('home')"><span class="ic">🏠</span>Home</button>
+    <button data-view="saldo" onclick="switchView('saldo')"><span class="ic">💰</span>Saldo</button>
     <button data-view="antrian" onclick="switchView('antrian')"><span class="ic">🚖</span>Antrian</button>
     <button data-view="absen" onclick="switchView('absen')"><span class="ic">📍</span>Absensi</button>
     <button data-view="monitor" id="navMonitor" style="display:none" onclick="switchView('monitor')"><span class="ic">✅</span>Validasi</button>
@@ -564,11 +608,13 @@ function prosesAbsenMasuk() {
       renderAbsenMasukGate();
       return;
     }
-    // Sukses ATAU "sudah absen" → lanjut. Respons aneh → cek ulang status asli
-    // ke server, jangan nyangkut (baris mungkin sudah tertulis).
-    cekStatusFlow();
+    // Sukses atau "sudah absen" — update status lokal langsung, tidak re-query
+    // server (hindari race condition: sheet write baru selesai tapi read belum reflect).
+    if (!statusAbsen) statusAbsen = {};
+    statusAbsen.masuk = (res && res.jam) || '✓';
+    initApp();
   }).catch(function() {
-    // Koneksi putus — data mungkin sudah masuk. Cek status asli, bukan retry buta.
+    // Koneksi putus — data mungkin sudah masuk. Re-query untuk cek status asli.
     cekStatusFlow();
   });
 }
@@ -579,15 +625,36 @@ function initApp() {
   var s = session.staff;
   document.getElementById('hdrNama').textContent = s.nama;
   document.getElementById('hdrCabang').textContent = s.jabatan + ' · ' + s.cabang;
-  if (s.role === 'KOORDINATOR') document.getElementById('navMonitor').style.display = '';
-
+  if (s.role === 'KOORDINATOR') {
+    document.getElementById('navMonitor').style.display = '';
+    var hm = document.getElementById('homeMonitor');
+    if (hm) hm.style.display = '';
+  }
+  renderHome();
   renderNominalGrid();
   renderGeofenceBox();
   renderAbsenInfo();
-  muatRiwayat();
-  muatAntrian();
-  muatAbsenStatus();
-  if (s.role === 'KOORDINATOR') muatMonitor();
+  switchView('home');
+}
+
+function renderHome() {
+  var statusEl = document.getElementById('homeAbsenStatus');
+  if (!statusEl) return;
+  if (!statusAbsen) {
+    statusEl.innerHTML = '<span class="hint">—</span>';
+    return;
+  }
+  if (statusAbsen.bebasAbsensi) {
+    statusEl.innerHTML = '<div class="ok-box" style="margin-bottom:0">Akun ini dikecualikan dari absensi</div>';
+    return;
+  }
+  var masuk  = statusAbsen.masuk  || null;
+  var pulang = statusAbsen.pulang || null;
+  var html = '<div style="display:flex;gap:16px">' +
+    '<div><div class="label">MASUK</div><div class="value" style="color:var(--green);margin-bottom:0">' + (masuk || '—') + '</div></div>' +
+    '<div><div class="label">PULANG</div><div class="value" style="color:var(--text2);margin-bottom:0">' + (pulang || '—') + '</div></div>' +
+    '</div>';
+  statusEl.innerHTML = html;
 }
 
 function switchView(name) {
@@ -596,10 +663,11 @@ function switchView(name) {
   document.querySelectorAll('nav button').forEach(function(b) {
     b.classList.toggle('active', b.dataset.view === name);
   });
+  if (name === 'home')    { muatAbsenStatus(); renderHome(); }
   if (name === 'antrian') muatAntrian();
   if (name === 'monitor') muatMonitor();
-  if (name === 'saldo') muatRiwayat();
-  if (name === 'absen') muatAbsenStatus();
+  if (name === 'saldo')   muatRiwayat();
+  if (name === 'absen')   muatAbsenStatus();
 }
 
 // ── SALDO: nominal preset + geofence blocking ──────────────────────
@@ -837,10 +905,12 @@ function muatAbsenStatus() {
   apiRead('staffAbsensiStatus', { staffId: session.staff.id })
     .then(function(res) {
       if (!res.ok) return;
+      if (statusAbsen) { statusAbsen.masuk = res.masuk; statusAbsen.pulang = res.pulang; }
       document.getElementById('absMasuk').textContent = res.masuk || '—';
       document.getElementById('absPulang').textContent = res.pulang || '—';
       var btn = document.getElementById('btnAbsenPulang');
       if (res.pulang) { btn.disabled = true; btn.textContent = '✓ Sudah Absen Pulang'; }
+      renderHome();
     });
 }
 
