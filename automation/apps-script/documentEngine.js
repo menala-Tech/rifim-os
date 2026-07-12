@@ -85,21 +85,6 @@ function generateDocument(input) {
 }
 
 /**
- * TEST: Jalankan dari GAS Editor untuk trigger re-authorization scope documents.
- * Pilih "testDocumentScope" di dropdown → Jalankan → Izinkan saat diminta.
- * Setelah berhasil (muncul nama dokumen di log), coba Generate Dokumen di Smart Office.
- */
-function testDocumentScope() {
-  var ss     = SpreadsheetApp.openById(SPREADSHEET_ID);
-  var config = getCompanyConfig();
-  var tplId  = config.gdoc_template_pkwt || '';
-  if (!tplId) { Logger.log('GAGAL: gdoc_template_pkwt tidak ditemukan di company_config'); return; }
-  Logger.log('Template ID: ' + tplId);
-  var doc = DocumentApp.openById(tplId);
-  Logger.log('OK: ' + doc.getName());
-}
-
-/**
  * @private
  */
 function _validateInput(input) {
