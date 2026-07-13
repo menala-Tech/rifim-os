@@ -15,6 +15,34 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/).
 - `CLAUDE.md` — seksi **Integration Rules (MUTLAK, BACA PERTAMA)** v1.1: tabel 4 aturan
   + mapping ke utilitas kanonik `gasUtils.js`
 
+### Added — Sprint 3A: Saldo Engine + Fee Engine (2026-07-13)
+
+**`automation/apps-script/saldoEngine.js`** (baru)
+- Sheet baru: `Saldo Driver` (running balance per driver bulan ini) + `Rekap Saldo Cabang` (target harian per cabang)
+- `setupSaldoSheets()` + `setupSaldoTriggers()` — setup idempoten + onEdit + rekap 00:00 WIB
+- `onEditSaldoAIST()` — auto-fill Nama Driver + Cabang saat admin isi Login ID di Form Input Saldo AIST
+- `saldoProcessAIST()` — match PWA vs AIST: MATCH/SELISIH/HANYA_AIST → Database AIST → Saldo Driver. Semua baca di luar lock, semua tulis dalam satu `_gasWithLock` (Rule 41c)
+- `saldoDailyRekap()` — trigger 00:00 WIB, agregasi kemarin → Rekap Saldo Cabang (target dari Batch 8)
+- Endpoint: `saldoGetDriverBalance` (Driver PWA) + `saldoGetRekapCabang` (RAOS UI)
+- Router: `routeSaldoEngine(action, params)` — null-return pattern (sama dengan `routeStaffApp`)
+
+**`automation/apps-script/feeEngine.js`** (baru)
+- Sheet baru: `CONFIG_FEE_KANTOR` (referensi config fee per cabang), `Rekap Fee Harian`, `Rekap Fee Bulanan`, `DB Driver Kinerja`
+- `setupFeeSheets()` + `feeSeedConfigKantor()` + `setupFeeRekapTrigger()` — setup + isi config + trigger 01:00 WIB
+- `feeGenerateRekap()` — agregasi Database Potongan → Rekap Fee Harian + Bulanan per cabang (mode harian atau `full`)
+- `feeUpdateKinerjaDriver()` — agregasi Database Potongan → DB Driver Kinerja per driver per hari
+- Endpoint: `feeGetRekapHarian` + `feeGetRekapBulanan` + `feeGetKinerjaDriver`
+- Router: `routeFeeEngine(action, params)` — null-return pattern
+- Catatan: raosPotonganEngine.js tetap jadi SSoT kalkulasi per-order — Fee Engine hanya AGGREGATION layer
+
+**`automation/apps-script/webApp.js`** (update)
+- Routing ditambah: `routeSaldoEngine` + `routeFeeEngine` setelah `routeStaffApp` di `doPost`
+
+**`PROJECT_RULES.md`** (update)
+- Tambah baris 14-17 di tabel Setup Awal GAS: `setupSaldoSheets`, `setupSaldoTriggers`, `setupFeeSheets`, `feeSeedConfigKantor`, `setupFeeRekapTrigger`
+
+---
+
 ### Fixed — Pre-Sprint 3A compliance (2026-07-13)
 - `setupDatabase.js` — sample row `DOC-2026-001` attachment diganti integer `1` (sebelumnya string `"1 (Satu) Berkas Proposal"` — violation Rule 42a)
 - `setupDatabase.js` — tambah `patchSampleDocAttachment()`: patch baris lama di sheet `documents` yang masih tersimpan sebagai string attachment → integer `1`. Jalankan SEKALI dari GAS Editor.

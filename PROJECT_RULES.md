@@ -226,6 +226,11 @@ Urutan setup yang harus dijalankan **sekali** dari GAS Editor setelah deploy ke 
 | 11 | `setupMonitoringSheets()` | `raosMonitoringEngine.js` | Buat sheet MONITORING_SALDO + MONITORING_POTONGAN |
 | 12 | `setupMonitoringTriggers()` | `raosMonitoringEngine.js` | Pasang trigger monitoring tiap 5 menit |
 | 13 | `setupTriggerExpiringContracts()` | `notificationEngine.js` | Trigger harian jam 08:00 WIB — cek kontrak berakhir ≤30 hari → email + WA HRD |
+| 14 | `setupSaldoSheets()` | `saldoEngine.js` | Buat sheet Saldo Driver + Rekap Saldo Cabang |
+| 15 | `setupSaldoTriggers()` | `saldoEngine.js` | Trigger onEdit AIST auto-fill + rekap harian 00:00 WIB |
+| 16 | `setupFeeSheets()` | `feeEngine.js` | Buat sheet CONFIG_FEE_KANTOR, Rekap Fee Harian, Rekap Fee Bulanan, DB Driver Kinerja |
+| 16b | `feeSeedConfigKantor()` | `feeEngine.js` | Isi CONFIG_FEE_KANTOR dari config aktual Batch 4 (jalankan setelah setupFeeSheets) |
+| 17 | `setupFeeRekapTrigger()` | `feeEngine.js` | Trigger harian 01:00 WIB — feeGenerateRekap + feeUpdateKinerjaDriver |
 
 ### Property Wajib untuk Staff PWA (PropertiesService)
 

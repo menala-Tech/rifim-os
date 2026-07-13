@@ -45,6 +45,14 @@ function doPost(e) {
     if (input.action && input.action !== 'log_activity') {
       var staffResult = routeStaffApp(input.action, input);
       if (staffResult !== null) return _json(staffResult);
+
+      // ── Saldo Engine (saldoGetDriverBalance, saldoGetRekapCabang) ──
+      var saldoResult = routeSaldoEngine(input.action, input);
+      if (saldoResult !== null) return _json(saldoResult);
+
+      // ── Fee Engine (feeGetRekapHarian, feeGetRekapBulanan, dll.) ──
+      var feeResult = routeFeeEngine(input.action, input);
+      if (feeResult !== null) return _json(feeResult);
     }
 
     // ── Log activity (fire-and-forget dari Portal / Smart Office) ──
