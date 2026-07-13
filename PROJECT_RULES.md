@@ -149,6 +149,60 @@ Format: `type(scope): description`
 
 ---
 
+## Integration Rules — SSoT Data Contract (MUTLAK)
+
+> Empat aturan ini berlaku untuk SEMUA kode yang menyentuh data: PWA frontend
+> (payload), Modul Backend, dan Google Apps Script. Utilitas kanonik ada di
+> `automation/apps-script/gasUtils.js` — JANGAN implementasi sendiri.
+
+### Rule 40 — Timestamp ISO UTC
+
+| # | Rule |
+|---|------|
+| 40a | Semua kolom timestamp storage (Timestamp, created_at, updated_at, masuk_antrian, dll.) WAJIB format ISO 8601 UTC: `YYYY-MM-DDTHH:mm:ss.sssZ` — di GAS via `_gasNow()` |
+| 40b | Waktu display (jam antrian, alert UI) boleh format lokal via `_gasTimeDisplay()` / `Utilities.formatDate()` — tapi TIDAK boleh jadi satu-satunya timestamp yang tersimpan |
+| 40c | Kolom date-only (Tanggal absensi) format `yyyy-MM-dd` via `_gasToday(ss)` |
+| 40d | Parsing di PWA: selalu `new Date(isoString)` — jangan parse string `dd/MM/yyyy` manual |
+
+### Rule 41 — Race Condition Protection
+
+| # | Rule |
+|---|------|
+| 41a | Semua operasi TULIS yang bisa konkuren (appendRow, setValue dari PWA/webhook) WAJIB dibungkus `_gasWithLock(fn)` — `LockService.getScriptLock()` + `waitLock(10000)` |
+| 41b | `releaseLock()` WAJIB di blok `finally` (sudah built-in di `_gasWithLock`) |
+| 41c | Operasi read-modify-write (numbering, increment saldo) WAJIB satu lock utuh — dilarang baca di luar lock lalu tulis di dalam lock |
+| 41d | Pengecualian: fungsi setup* satu-kali admin & trigger tunggal terjadwal (backup harian) tidak wajib lock |
+
+### Rule 42 — Validasi Tipe Data & Enum
+
+| # | Rule |
+|---|------|
+| 42a | Kolom `attachment` (documents) WAJIB integer — frontend kirim `parseInt(...) \|\| 0`, backend sanitasi via `_docSanitizeAttachment()`, display dokumen via `_formatAttachmentDisplay()` |
+| 42b | Status Antrian Bandara WAJIB uppercase enum: `WAITING`, `CALLED`, `PICKED`, `DONE`, `CANCEL` — validasi via `_gasValidate({enum:[...]})` |
+| 42c | Semua endpoint webApp WAJIB `_gasValidate()` di baris pertama sebelum logika apapun |
+| 42d | ID baris baru WAJIB UUID v4 via `_gasUuid()` — dilarang pola timestamp (`Q-yyMMdd-HHmmss`) |
+| 42e | Enum lain: keputusan validasi = `VALID`/`TOLAK`; tipe absensi = `MASUK`/`PULANG` — selalu uppercase |
+
+### Rule 43 — Error Handling & System Log
+
+| # | Rule |
+|---|------|
+| 43a | Semua blok `catch` di GAS WAJIB memanggil `_gasLogError(source, action, err, payload)` → sheet `system_log` |
+| 43b | Endpoint webApp mengembalikan `{ok:false, error:'...'}` — jangan telan error tanpa jejak |
+| 43c | Kegagalan non-fatal (foto gagal upload) → `_gasLogWarn()` — jangan crash operasi utama |
+| 43d | Pengecualian recursion: catch di dalam `logActivity()`/`_gasLog()` sendiri pakai `console.error()` agar tidak infinite loop |
+
+### Kontrak Payload PWA → GAS
+
+| # | Rule |
+|---|------|
+| 44 | Payload PWA WAJIB kirim tipe final (integer sudah integer, enum sudah uppercase) — jangan andalkan sanitasi backend sebagai jalur utama |
+| 45 | Backend tetap sanitasi ulang (defense in depth) — sanitasi bukan pengganti validasi frontend |
+| 46 | Operasi TULIS dari PWA: tanpa auto-retry + timeout 30s (anti double-entry); operasi BACA: boleh retry 3x |
+| 47 | Perubahan kontrak payload (nama field, tipe, enum) WAJIB update ketiga sisi sekaligus dalam satu commit: PWA + webApp routing + engine |
+
+---
+
 ## Setup Awal GAS (Setelah Deploy)
 
 > Cara menjalankan: buka GAS Editor → pilih **file** di panel kiri → pilih **nama fungsi** di dropdown toolbar → klik **Run**.

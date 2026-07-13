@@ -65,7 +65,7 @@ function buildPlaceholderData(userInput, config, docNumber) {
 
     // ── Konten dokumen ───────────────────────────────────────
     SUBJECT:     userInput.subject    || '',
-    ATTACHMENT:  userInput.attachment || '-',
+    ATTACHMENT:  _formatAttachmentDisplay(userInput.attachment),
     BODY:        '',
 
     // ── Status ───────────────────────────────────────────────
@@ -86,6 +86,29 @@ function buildPlaceholderData(userInput, config, docNumber) {
   }
 
   return data;
+}
+
+
+/**
+ * Format nilai attachment (integer dari payload PWA) menjadi teks display
+ * untuk placeholder {{ATTACHMENT}} di dokumen.
+ *   0 / kosong / non-angka → '-'
+ *   1                      → '1 (Satu) Berkas'
+ *   n                      → 'n Berkas'
+ * Kontrak payload: frontend WAJIB kirim attachment sebagai integer
+ * (Rule 40-47 PROJECT_RULES.md). String angka lama tetap diterima.
+ * @private
+ */
+function _formatAttachmentDisplay(raw) {
+  var n = Math.round(Number(raw));
+  if (isNaN(n) || n <= 0) return '-';
+  var terbilang = {
+    1: 'Satu', 2: 'Dua', 3: 'Tiga', 4: 'Empat', 5: 'Lima',
+    6: 'Enam', 7: 'Tujuh', 8: 'Delapan', 9: 'Sembilan', 10: 'Sepuluh',
+  };
+  return terbilang[n]
+    ? n + ' (' + terbilang[n] + ') Berkas'
+    : n + ' Berkas';
 }
 
 

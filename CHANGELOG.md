@@ -8,6 +8,19 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Integration Rules SSoT (2026-07-13)
+- `PROJECT_RULES.md` — seksi baru **Integration Rules — SSoT Data Contract** (Rule 40–47):
+  timestamp ISO UTC, ScriptLock 10s, validasi tipe/enum, error logging ke system_log,
+  kontrak payload PWA→GAS (frontend kirim tipe final, backend sanitasi defense-in-depth)
+- `CLAUDE.md` — seksi **Integration Rules (MUTLAK, BACA PERTAMA)** v1.1: tabel 4 aturan
+  + mapping ke utilitas kanonik `gasUtils.js`
+
+### Fixed — Konsistensi payload attachment (Fix #18)
+- `modules/smart-office/index.html` — field Lampiran jadi `<input type="number">`,
+  payload kirim `parseInt(...) || 0` (integer, bukan teks bebas `"1 (Satu) Berkas"`)
+- `automation/apps-script/placeholderEngine.js` — `_formatAttachmentDisplay()`:
+  integer → teks display dokumen (`1 (Satu) Berkas`, `2 (Dua) Berkas`, 0 → `-`)
+
 ### Changed — Staff PWA v2: tema terang + UX PWA lama (Sprint 3A)
 - Tampilan diganti tema terang (putih + merah RIFIM) mengikuti PWA isi-saldo lama
 - 8 fungsi diadopsi dari PWA isi-saldo lama:

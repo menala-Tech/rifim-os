@@ -2,8 +2,30 @@
 
 > RIFIM OS — Claude Code Operating Manual
 
-Version: 1.0
+Version: 1.1
 Status: Active
+
+---
+
+## Integration Rules — SSoT Data Contract (MUTLAK, BACA PERTAMA)
+
+Empat aturan ini WAJIB diterapkan pada SETIAP kode yang menyentuh data
+(PWA payload, Modul Backend, GAS). Detail lengkap: `PROJECT_RULES.md`
+seksi **Integration Rules** (Rule 40–47). Utilitas kanonik:
+`automation/apps-script/gasUtils.js` — jangan implementasi ulang.
+
+| # | Aturan | Implementasi |
+|---|--------|--------------|
+| 1 | **Timestamp ISO UTC** — semua kolom storage `YYYY-MM-DDTHH:mm:ss.sssZ` | `_gasNow()`; date-only `_gasToday(ss)`; display lokal `_gasTimeDisplay(ss)` (bukan pengganti storage) |
+| 2 | **Race Condition** — semua write konkuren dalam ScriptLock 10 detik | `_gasWithLock(fn)` — waitLock(10000) + releaseLock di finally; read-modify-write = satu lock utuh |
+| 3 | **Validasi Tipe & Enum** — `attachment` integer; status Antrian Bandara uppercase enum `WAITING/CALLED/PICKED/DONE/CANCEL`; ID baru = UUID v4 | `_gasValidate()` di baris pertama endpoint; `_gasUuid()`; frontend kirim tipe final (`parseInt \|\| 0`) |
+| 4 | **Error Logging** — semua catch → sheet `system_log` | `_gasLogError()` / `_gasLogWarn()`; return `{ok:false, error}`; kecuali di dalam logger sendiri → `console.error()` |
+
+**Aturan kontrak payload:** perubahan nama field / tipe / enum WAJIB update
+tiga sisi sekaligus (PWA + webApp + engine) dalam satu commit.
+
+**Reminder redeploy:** perubahan `automation/apps-script/*.js` → push GitHub
+(clasp auto) → **Web App wajib redeploy manual** di GAS Editor.
 
 ---
 

@@ -775,8 +775,8 @@
               <input type="text" id="subject" placeholder="Penawaran Kerjasama...">
             </div>
             <div class="field">
-              <label>Lampiran</label>
-              <input type="text" id="attachment" placeholder="1 (Satu) Berkas — kosongkan jika tidak ada">
+              <label>Jumlah Lampiran (berkas)</label>
+              <input type="number" id="attachment" min="0" step="1" placeholder="0 = tidak ada lampiran">
             </div>
           </div>
 
@@ -1447,7 +1447,7 @@
       documentType:  currentCode,
       company_code:  _activeCompany ? _activeCompany.code : 'RIFIM',
       subject,
-      attachment:    document.getElementById('attachment').value.trim() || '-',
+      attachment:    parseInt(document.getElementById('attachment').value, 10) || 0,
       documentDate:  document.getElementById('docDate').value,
       directorName:  document.getElementById('signerName').value.trim(),
       directorTitle: document.getElementById('signerTitle').value.trim(),
