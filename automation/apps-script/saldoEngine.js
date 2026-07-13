@@ -67,6 +67,50 @@ var _SD_TARGET = {
 // SETUP
 // ══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Patch SEKALI: tambah kolom "SUM AIST" di posisi 8 pada sheet Database AIST.
+ * Jalankan dari GAS Editor jika sheet Database AIST sudah ada tapi belum punya kolom SUM AIST.
+ * Aman dijalankan berulang (idempoten — cek header dulu sebelum insert).
+ */
+function patchDatabaseAISTAddSumColumn() {
+  var ss = SpreadsheetApp.openById(RAOS_SS_ID);
+  var sh = ss.getSheetByName(_SD_AIST_DB);
+  if (!sh) { Logger.log('Sheet Database AIST tidak ditemukan.'); return; }
+
+  var lastCol   = sh.getLastColumn();
+  var headers   = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  var colNames  = headers.map(function(h) { return String(h).trim(); });
+
+  // Sudah ada → skip
+  if (colNames.indexOf('SUM AIST') !== -1) {
+    Logger.log('✅ Kolom SUM AIST sudah ada di kolom ' + (colNames.indexOf('SUM AIST') + 1) + '. Tidak perlu patch.');
+    return;
+  }
+
+  // Cek apakah Nominal Tagihan ada di col 7 (sebagai anchor posisi insert)
+  var ntIdx = colNames.indexOf('Nominal Tagihan');
+  var insertAt = (ntIdx !== -1) ? (ntIdx + 2) : 8; // insert setelah Nominal Tagihan
+
+  sh.insertColumnBefore(insertAt);
+  var hCell = sh.getRange(1, insertAt);
+  hCell.setValue('SUM AIST')
+       .setBackground('#FBBC04')  // kuning — data dari AIST (bukan kalkulasi)
+       .setFontColor('#000000')
+       .setFontWeight('bold')
+       .setFontSize(11)
+       .setHorizontalAlignment('center');
+  sh.setColumnWidth(insertAt, 160);
+
+  // Pastikan note row 2 masih merged
+  try {
+    sh.getRange(2, 1, 1, sh.getLastColumn()).merge()
+      .setValue('ℹ️  Hasil proses Form Input Saldo AIST. Status: MATCH/SELISIH/HANYA_AIST. Jangan edit manual.')
+      .setFontStyle('italic').setFontColor('#888888').setFontSize(10);
+  } catch (e) { /* ignore merge error jika sudah ada data */ }
+
+  Logger.log('✅ Patch selesai: kolom SUM AIST ditambah di posisi ' + insertAt + '. Total kolom: ' + sh.getLastColumn());
+}
+
 function setupSaldoSheets() {
   var ss = SpreadsheetApp.openById(RAOS_SS_ID);
   _sdSetupSaldoDriver(ss);
