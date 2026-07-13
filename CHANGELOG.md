@@ -15,6 +15,20 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/).
 - `CLAUDE.md` — seksi **Integration Rules (MUTLAK, BACA PERTAMA)** v1.1: tabel 4 aturan
   + mapping ke utilitas kanonik `gasUtils.js`
 
+### Added — Sprint 3A: Driver PWA (2026-07-13)
+
+**`apps/pwa/driver-app/`** (baru)
+- `index.html` — PWA driver: login dengan Login ID Maxim → saldo bulan ini + kinerja harian
+- `manifest.json` + `service-worker.js` — PWA installable + offline shell
+- Auth: `staffLookupDriver` (verifikasi driver ada di Database Driver)
+- Data saldo: `saldoGetDriverBalance` → Rekap Saldo bulan ini (nominal + jumlah pengisian)
+- Data kinerja: `feeGetKinerjaDriver` → tabel order per hari + hak driver (bulan berjalan)
+- Session disimpan di `localStorage` (auto-login saat buka ulang)
+- Responsive, mobile-first, tema putih + merah RIFIM
+- Deploy target: Vercel project baru `rifim-driver` (lihat langkah deploy di bawah)
+
+---
+
 ### Added — Sprint 3A: Saldo Engine + Fee Engine (2026-07-13)
 
 **`automation/apps-script/saldoEngine.js`** (baru)

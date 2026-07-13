@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#CC0000">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>RIFIM Driver App</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red:   #CC0000;
+      --red2:  #A00000;
+      --teal:  #46BDC6;
+      --green: #34A853;
+      --blue:  #4285F4;
+      --bg:    #F5F5F5;
+      --white: #FFFFFF;
+      --gray:  #757575;
+      --light: #EEEEEE;
+      --text:  #212121;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* ── LOGIN ── */
+    #loginScreen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 32px 24px;
+      background: var(--white);
+    }
+    .login-logo {
+      width: 80px;
+      height: 80px;
+      background: var(--red);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+    .login-logo span { font-size: 40px; }
+    .login-title { font-size: 22px; font-weight: 700; color: var(--red); margin-bottom: 4px; }
+    .login-sub   { font-size: 14px; color: var(--gray); margin-bottom: 36px; }
+
+    .form-group { width: 100%; margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--gray); margin-bottom: 6px; }
+    .form-group input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1.5px solid var(--light);
+      border-radius: 10px;
+      font-size: 16px;
+      outline: none;
+      transition: border-color .2s;
+      background: var(--white);
+    }
+    .form-group input:focus { border-color: var(--red); }
+
+    .btn {
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-primary { background: var(--red); color: var(--white); }
+    .btn-primary:hover { opacity: .9; }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-outline {
+      background: transparent;
+      color: var(--red);
+      border: 1.5px solid var(--red);
+      padding: 10px;
+      font-size: 14px;
+    }
+
+    .error-msg {
+      background: #FFF0F0;
+      color: var(--red);
+      border: 1px solid #FFCCCC;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 14px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    /* ── MAIN ── */
+    #mainScreen { display: none; }
+
+    .top-bar {
+      background: var(--red);
+      color: var(--white);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .top-bar-title { font-size: 16px; font-weight: 700; }
+    .top-bar-sub   { font-size: 12px; opacity: .8; margin-top: 2px; }
+    .btn-logout {
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.3);
+      color: var(--white);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .main-content { padding: 16px; }
+
+    /* ── INFO DRIVER ── */
+    .driver-card {
+      background: var(--white);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .driver-avatar {
+      width: 48px; height: 48px;
+      background: var(--red);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--white);
+      font-size: 20px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .driver-nama  { font-size: 16px; font-weight: 700; }
+    .driver-meta  { font-size: 13px; color: var(--gray); margin-top: 2px; }
+
+    /* ── SALDO CARD ── */
+    .saldo-card {
+      background: linear-gradient(135deg, var(--teal), #2EA9B3);
+      color: var(--white);
+      border-radius: 16px;
+      padding: 24px 20px;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 12px rgba(70,189,198,.3);
+    }
+    .saldo-label   { font-size: 13px; opacity: .85; margin-bottom: 6px; }
+    .saldo-nominal { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; }
+    .saldo-meta    { font-size: 12px; opacity: .8; margin-top: 6px; }
+    .saldo-footer  {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,.3);
+    }
+    .saldo-count   { text-align: center; }
+    .saldo-count-val  { font-size: 22px; font-weight: 700; }
+    .saldo-count-lbl  { font-size: 11px; opacity: .8; }
+    .saldo-updated { font-size: 11px; opacity: .7; text-align: right; }
+
+    /* ── KINERJA ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      margin-top: 8px;
+    }
+    .section-title { font-size: 15px; font-weight: 700; }
+    .btn-refresh {
+      background: var(--light);
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 13px;
+      color: var(--gray);
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .kinerja-empty {
+      background: var(--white);
+      border-radius: 12px;
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--gray);
+      font-size: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+
+    .kinerja-list { display: flex; flex-direction: column; gap: 8px; }
+    .kinerja-row {
+      background: var(--white);
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .kinerja-tgl   { font-size: 13px; color: var(--gray); }
+    .kinerja-order { font-size: 16px; font-weight: 700; }
+    .kinerja-order span { font-size: 11px; font-weight: 400; color: var(--gray); }
+    .kinerja-hak   { font-size: 14px; font-weight: 600; color: var(--green); text-align: right; }
+    .kinerja-hak span { display: block; font-size: 11px; font-weight: 400; color: var(--gray); }
+
+    .badge-bulan {
+      background: var(--red);
+      color: var(--white);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+
+    /* ── LOADING ── */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(255,255,255,.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 4px solid var(--light);
+      border-top-color: var(--red);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-overlay p { font-size: 14px; color: var(--gray); }
+    .loading-overlay.hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="loginScreen">
+  <div class="login-logo"><span>🚗</span></div>
+  <div class="login-title">RIFIM Driver App</div>
+  <div class="login-sub">Lihat saldo & kinerja order Anda</div>
+
+  <div id="loginError" class="error-msg"></div>
+
+  <div class="form-group">
+    <label for="inputLoginId">Login ID Maxim</label>
+    <input type="text" id="inputLoginId" placeholder="Contoh: 204753205"
+           autocomplete="off" inputmode="numeric">
+  </div>
+
+  <button class="btn btn-primary" id="btnLogin" onclick="doLogin()">Masuk</button>
+</div>
+
+<!-- ── MAIN ── -->
+<div id="mainScreen">
+  <div class="top-bar">
+    <div>
+      <div class="top-bar-title">RIFIM Driver App</div>
+      <div class="top-bar-sub" id="topBarSub">—</div>
+    </div>
+    <button class="btn-logout" onclick="doLogout()">Keluar</button>
+  </div>
+
+  <div class="main-content">
+    <!-- Info Driver -->
+    <div class="driver-card">
+      <div class="driver-avatar" id="driverInitial">?</div>
+      <div>
+        <div class="driver-nama" id="driverNama">—</div>
+        <div class="driver-meta" id="driverMeta">—</div>
+      </div>
+    </div>
+
+    <!-- Saldo Bulan Ini -->
+    <div class="saldo-card">
+      <div class="saldo-label">Saldo Bulan Ini</div>
+      <div class="saldo-nominal" id="saldoNominal">Rp —</div>
+      <div class="saldo-meta" id="saldoMeta">Memuat data...</div>
+      <div class="saldo-footer">
+        <div class="saldo-count">
+          <div class="saldo-count-val" id="saldoCount">—</div>
+          <div class="saldo-count-lbl">Pengisian</div>
+        </div>
+        <div class="saldo-updated" id="saldoUpdated">—</div>
+      </div>
+    </div>
+
+    <!-- Kinerja Harian -->
+    <div class="section-header">
+      <div>
+        <div class="section-title">Kinerja Harian</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge-bulan" id="badgeBulan">—</span>
+        <button class="btn-refresh" onclick="loadData()">↻ Refresh</button>
+      </div>
+    </div>
+    <div id="kinerjaContainer">
+      <div class="kinerja-empty">Memuat kinerja...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── LOADING ── -->
+<div class="loading-overlay hidden" id="loadingOverlay">
+  <div class="spinner"></div>
+  <p id="loadingText">Memuat...</p>
+</div>
+
+<script>
+  'use strict';
+
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbx9_RVyi_58XIeSH-fvrg7CpsUJUpOP5Mim0Q5IDiBiQI7d--WboYhgt7MF6JQl32dW/exec';
+  var STORAGE_KEY = 'rifim_driver_session';
+  var session = null;
+
+  // ── Init ──────────────────────────────────────────────────────────────
+  (function init() {
+    var saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        session = JSON.parse(saved);
+        if (session && session.loginId) { showMain(); loadData(); return; }
+      } catch (e) {}
+    }
+    showLogin();
+  })();
+
+  // ── Auth ──────────────────────────────────────────────────────────────
+  function doLogin() {
+    var loginId = document.getElementById('inputLoginId').value.trim();
+    if (!loginId) { showError('Masukkan Login ID Maxim Anda.'); return; }
+
+    var btn = document.getElementById('btnLogin');
+    btn.disabled = true; btn.textContent = 'Memverifikasi...';
+    hideError();
+    showLoading('Memverifikasi Login ID...');
+
+    callGAS({ action: 'staffLookupDriver', loginId: loginId })
+      .then(function(res) {
+        if (!res.ok || !res.nama) {
+          showError('Login ID tidak ditemukan. Pastikan Login ID Maxim Anda benar.');
+          return;
+        }
+        session = { loginId: loginId, nama: res.nama, cabang: res.idCabang || '' };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+        showMain();
+        loadData();
+      })
+      .catch(function(err) {
+        showError('Koneksi gagal. Coba lagi dalam beberapa saat.');
+      })
+      .finally(function() {
+        btn.disabled = false; btn.textContent = 'Masuk';
+        hideLoading();
+      });
+  }
+
+  function doLogout() {
+    localStorage.removeItem(STORAGE_KEY);
+    session = null;
+    document.getElementById('inputLoginId').value = '';
+    showLogin();
+  }
+
+  // ── Load Data ─────────────────────────────────────────────────────────
+  function loadData() {
+    if (!session) return;
+    showLoading('Memuat data saldo...');
+
+    Promise.all([
+      callGAS({ action: 'saldoGetDriverBalance', loginId: session.loginId }),
+      callGAS({ action: 'feeGetKinerjaDriver',   loginId: session.loginId })
+    ])
+    .then(function(results) {
+      renderSaldo(results[0]);
+      renderKinerja(results[1]);
+    })
+    .catch(function() {
+      showError('Gagal memuat data. Tap Refresh untuk coba lagi.');
+    })
+    .finally(hideLoading);
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────
+  function renderSaldo(res) {
+    var nominal = (res && res.nominal) ? res.nominal : 0;
+    var count   = (res && res.count)   ? res.count   : 0;
+    var upd     = (res && res.updatedAt) ? res.updatedAt : null;
+
+    document.getElementById('saldoNominal').textContent = formatRp(nominal);
+    document.getElementById('saldoCount').textContent   = count + 'x';
+    document.getElementById('saldoMeta').textContent    = nominal > 0
+      ? 'Total top-up yang terverifikasi bulan ini'
+      : 'Belum ada saldo terverifikasi bulan ini';
+    document.getElementById('saldoUpdated').textContent = upd
+      ? 'Update: ' + formatTgl(upd)
+      : '';
+  }
+
+  function renderKinerja(res) {
+    var now  = new Date();
+    var bln  = now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+    document.getElementById('badgeBulan').textContent = bln;
+
+    var container = document.getElementById('kinerjaContainer');
+    var data = (res && res.ok && res.data) ? res.data : [];
+
+    // Filter bulan ini & urutkan descending
+    var thnBln = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    var bulanIni = data.filter(function(d) {
+      return String(d.tanggal || '').startsWith(thnBln);
+    }).sort(function(a, b) { return b.tanggal > a.tanggal ? 1 : -1; });
+
+    if (!bulanIni.length) {
+      container.innerHTML = '<div class="kinerja-empty">Belum ada data kinerja bulan ini.<br>Data akan muncul setelah order diproses.</div>';
+      return;
+    }
+
+    var html = '<div class="kinerja-list">';
+    bulanIni.forEach(function(row) {
+      html += '<div class="kinerja-row">' +
+        '<div>' +
+          '<div class="kinerja-tgl">' + formatTglShort(row.tanggal) + '</div>' +
+          '<div class="kinerja-order">' + (row.jumlahOrder || 0) +
+            ' <span>order</span></div>' +
+        '</div>' +
+        '<div class="kinerja-hak">' + formatRp(row.totalHakDriver || 0) +
+          '<span>Hak Driver</span></div>' +
+      '</div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  // ── UI Helpers ────────────────────────────────────────────────────────
+  function showMain() {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainScreen').style.display  = 'block';
+    if (session) {
+      var initial = (session.nama || '?').charAt(0).toUpperCase();
+      document.getElementById('driverInitial').textContent = initial;
+      document.getElementById('driverNama').textContent    = session.nama || '—';
+      document.getElementById('driverMeta').textContent    = 'ID: ' + session.loginId +
+        (session.cabang ? ' · ' + session.cabang : '');
+      document.getElementById('topBarSub').textContent     = session.cabang || '';
+    }
+  }
+
+  function showLogin() {
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('mainScreen').style.display  = 'none';
+  }
+
+  function showLoading(txt) {
+    document.getElementById('loadingText').textContent = txt || 'Memuat...';
+    document.getElementById('loadingOverlay').classList.remove('hidden');
+  }
+
+  function hideLoading() {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+  }
+
+  function showError(msg) {
+    var el = document.getElementById('loginError');
+    el.textContent = msg; el.style.display = 'block';
+  }
+
+  function hideError() {
+    document.getElementById('loginError').style.display = 'none';
+  }
+
+  // ── Format ────────────────────────────────────────────────────────────
+  function formatRp(n) {
+    return 'Rp ' + Number(n || 0).toLocaleString('id-ID');
+  }
+
+  function formatTgl(iso) {
+    try {
+      return new Date(iso).toLocaleString('id-ID', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta'
+      });
+    } catch (e) { return String(iso).substring(0, 10); }
+  }
+
+  function formatTglShort(str) {
+    try {
+      return new Date(str).toLocaleDateString('id-ID', {
+        weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Jakarta'
+      });
+    } catch (e) { return str; }
+  }
+
+  // ── GAS Fetch ─────────────────────────────────────────────────────────
+  function callGAS(payload) {
+    return fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  // ── Enter key di login ─────────────────────────────────────────────────
+  document.getElementById('inputLoginId').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
+
+  // ── Service Worker ─────────────────────────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js').catch(function() {});
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "RIFIM Driver App",
+  "short_name": "Driver App",
+  "description": "Cek saldo dan kinerja order harian driver RIFIM",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#CC0000",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "../../branding/icon/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "../../branding/icon/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
