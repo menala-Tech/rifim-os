@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1a1a2e">
+<title>RIFIM OS — RAOS</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+/* ─── RESET & BASE ─── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --primary:#1a1a2e;
+  --raos:#E8731A;
+  --raos-dim:rgba(232,115,26,0.12);
+  --accent:#e94560;
+  --bg:#f0f2f5;
+  --card:#fff;
+  --border:#e0e0e0;
+  --text:#1f2328;
+  --muted:#6e7681;
+  --success:#1a7f37;
+  --success-bg:#d1fae5;
+  --warning:#9a6700;
+  --warning-bg:#fef3c7;
+  --danger:#cf222e;
+  --danger-bg:#fee2e2;
+  --info:#0969da;
+  --info-bg:#dbeafe;
+  --font:'Segoe UI',system-ui,sans-serif;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
+button{cursor:pointer;font-family:var(--font)}
+input,select,textarea{font-family:var(--font)}
+
+/* ─── AUTH GATE ─── */
+#auth-gate{
+  position:fixed;inset:0;background:var(--primary);
+  display:flex;align-items:center;justify-content:center;z-index:9999;
+}
+.auth-box{
+  background:#fff;border-radius:16px;padding:40px;width:360px;
+  box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;
+}
+.auth-logo{
+  width:48px;height:48px;background:var(--raos);border-radius:10px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:800;color:#fff;margin-bottom:16px;letter-spacing:-1px;
+}
+.auth-box h1{font-size:22px;font-weight:700;margin-bottom:4px;color:var(--primary)}
+.auth-box p{color:var(--muted);font-size:13px;margin-bottom:24px}
+.auth-field{
+  width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:8px;
+  font-size:14px;margin-bottom:12px;background:#fff;outline:none;transition:border-color .15s;
+}
+.auth-field:focus{border-color:var(--raos);box-shadow:0 0 0 3px rgba(232,115,26,.15)}
+.auth-btn{
+  width:100%;padding:12px;background:var(--raos);color:#fff;
+  border:none;border-radius:8px;font-size:14px;font-weight:700;letter-spacing:.3px;
+  transition:background .15s;
+}
+.auth-btn:hover{background:#c85e10}
+#auth-error{color:var(--danger);font-size:13px;margin-top:8px;display:none;text-align:left}
+.auth-back{
+  display:block;margin-top:16px;font-size:12px;color:var(--muted);
+  text-decoration:none;
+}
+.auth-back:hover{color:var(--primary)}
+
+/* ─── APP SHELL ─── */
+#app{display:none;flex-direction:column;min-height:100vh}
+
+/* ─── HEADER ─── */
+header{
+  background:var(--primary);color:#fff;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;height:54px;position:sticky;top:0;z-index:200;
+  box-shadow:0 2px 8px rgba(0,0,0,.3);
+}
+.hdr-left{display:flex;align-items:center;gap:10px}
+.hdr-back{
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);
+  color:#fff;padding:5px 10px;border-radius:6px;font-size:12px;
+  cursor:pointer;text-decoration:none;transition:background .15s;
+}
+.hdr-back:hover{background:rgba(255,255,255,.2)}
+.hdr-logo{font-size:16px;font-weight:700;letter-spacing:.5px}
+.hdr-module{
+  background:var(--raos);color:#fff;font-size:10px;font-weight:700;
+  padding:2px 8px;border-radius:4px;letter-spacing:.8px;
+}
+.hdr-right{display:flex;align-items:center;gap:8px}
+#cabang-badge{
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);
+  color:#fff;font-size:11px;padding:3px 9px;border-radius:5px;font-weight:600;
+}
+#user-badge{font-size:11px;opacity:.75}
+.btn-logout{
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);
+  color:#fff;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;
+  transition:background .15s;
+}
+.btn-logout:hover{background:rgba(255,255,255,.2)}
+
+/* ─── NAV TABS ─── */
+nav{
+  background:#fff;border-bottom:1px solid var(--border);
+  display:flex;padding:0 20px;overflow-x:auto;
+  position:sticky;top:54px;z-index:100;
+  box-shadow:0 1px 4px rgba(0,0,0,.04);
+}
+nav::-webkit-scrollbar{display:none}
+nav button{
+  padding:12px 18px;border:none;background:none;color:var(--muted);
+  font-size:13px;font-weight:500;border-bottom:3px solid transparent;
+  margin-bottom:-1px;white-space:nowrap;transition:all .15s;cursor:pointer;
+}
+nav button:hover{color:var(--primary)}
+nav button.active{color:var(--raos);border-bottom-color:var(--raos);font-weight:700}
+
+/* ─── MAIN ─── */
+main{flex:1;padding:20px;max-width:1400px;width:100%;margin:0 auto}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ─── REFRESH BAR ─── */
+.refresh-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:16px;flex-wrap:wrap;gap:8px;
+}
+.refresh-bar h2{font-size:16px;font-weight:700;color:var(--primary)}
+.refresh-info{font-size:11px;color:var(--muted)}
+
+/* ─── STATS ROW ─── */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{
+  background:var(--card);border-radius:10px;border:1px solid var(--border);
+  padding:16px;position:relative;overflow:hidden;
+}
+.stat-card::before{
+  content:'';position:absolute;top:0;left:0;width:4px;height:100%;
+  background:var(--raos);
+}
+.stat-num{font-size:28px;font-weight:800;color:var(--primary);line-height:1;font-variant-numeric:tabular-nums}
+.stat-label{font-size:11px;color:var(--muted);margin-top:5px;font-weight:500}
+.stat-sub{font-size:10px;color:var(--muted);margin-top:2px}
+.stat-card.green::before{background:var(--success)}
+.stat-card.amber::before{background:var(--raos)}
+.stat-card.blue::before{background:var(--info)}
+.stat-card.red::before{background:var(--danger)}
+
+/* ─── SECTION ─── */
+.section{margin-bottom:20px}
+.section-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:12px;flex-wrap:wrap;gap:8px;
+}
+.section-head h3{font-size:14px;font-weight:700;color:var(--primary)}
+
+/* ─── CARD ─── */
+.card{
+  background:var(--card);border-radius:10px;border:1px solid var(--border);
+  box-shadow:0 1px 3px rgba(0,0,0,.05);overflow:hidden;
+}
+.card-header{
+  padding:14px 18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;
+}
+.card-header h3{font-size:14px;font-weight:700}
+.card-body{padding:18px}
+
+/* ─── CABANG SELECTOR ─── */
+.cabang-tabs{
+  display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;
+}
+.cabang-tab{
+  padding:6px 14px;border-radius:20px;border:1px solid var(--border);
+  background:var(--bg);color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;
+  transition:all .15s;white-space:nowrap;
+}
+.cabang-tab.active,.cabang-tab:hover{
+  background:var(--raos);border-color:var(--raos);color:#fff;font-weight:700;
+}
+
+/* ─── QUEUE ─── */
+.queue-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.queue-card{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:14px;border-left:4px solid var(--border);
+  transition:box-shadow .15s;
+}
+.queue-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.queue-card.WAITING {border-left-color:#94a3b8}
+.queue-card.CALLED  {border-left-color:var(--raos)}
+.queue-card.PICKED  {border-left-color:var(--info)}
+.queue-card.DONE    {border-left-color:var(--success)}
+.queue-card.CANCEL  {border-left-color:#d1d5db;opacity:.6}
+
+.queue-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.queue-num{font-size:11px;font-weight:700;color:var(--muted)}
+.queue-name{font-size:15px;font-weight:700;color:var(--primary);margin-bottom:2px}
+.queue-id{font-size:11px;color:var(--muted)}
+.queue-time{font-size:11px;color:var(--muted);margin-top:6px}
+.queue-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+
+/* ─── STATUS BADGE ─── */
+.badge{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;
+  letter-spacing:.04em;
+}
+.badge.WAITING{background:#f1f5f9;color:#64748b}
+.badge.CALLED {background:var(--raos-dim);color:var(--raos)}
+.badge.PICKED {background:var(--info-bg);color:var(--info)}
+.badge.DONE   {background:var(--success-bg);color:var(--success)}
+.badge.CANCEL {background:#f1f5f9;color:#9ca3af}
+.badge.AKTIF  {background:var(--success-bg);color:var(--success)}
+.badge.NONAKTIF{background:#f1f5f9;color:var(--muted)}
+.badge.AIRPORT{background:var(--info-bg);color:var(--info)}
+.badge.EXTERNAL{background:var(--warning-bg);color:var(--warning)}
+
+/* ─── TOOLBAR ─── */
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.toolbar-input{
+  padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;
+  background:#fff;outline:none;transition:border-color .15s;
+}
+.toolbar-input:focus{border-color:var(--raos)}
+.toolbar-search{flex:1;min-width:180px}
+.toolbar-select{min-width:130px}
+
+/* ─── BUTTONS ─── */
+.btn{
+  padding:7px 14px;border-radius:7px;border:none;font-size:12px;font-weight:700;
+  cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px;
+  white-space:nowrap;
+}
+.btn-primary{background:var(--raos);color:#fff}
+.btn-primary:hover{background:#c85e10}
+.btn-success{background:var(--success);color:#fff}
+.btn-success:hover{background:#166534}
+.btn-info{background:var(--info);color:#fff}
+.btn-info:hover{background:#0756b6}
+.btn-ghost{background:#fff;border:1px solid var(--border);color:var(--text)}
+.btn-ghost:hover{background:var(--bg)}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-danger:hover{background:#9d1b1b}
+.btn-sm{padding:4px 9px;font-size:11px;border-radius:5px}
+
+/* ─── TABLE ─── */
+.table-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{
+  background:var(--bg);padding:9px 12px;text-align:left;font-size:11px;font-weight:700;
+  color:var(--muted);letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(232,115,26,.03)}
+.td-num{font-variant-numeric:tabular-nums;text-align:right}
+.td-id{font-family:monospace;font-size:11px;color:var(--muted)}
+.td-name{font-weight:600}
+
+/* ─── SALDO TABLE ─── */
+.pct-bar{
+  display:flex;align-items:center;gap:8px;
+}
+.pct-fill{
+  height:6px;border-radius:3px;background:var(--border);flex:1;max-width:80px;overflow:hidden;
+}
+.pct-fill-inner{height:100%;border-radius:3px;background:var(--success);transition:width .3s}
+.pct-fill-inner.warn{background:var(--raos)}
+.pct-fill-inner.danger{background:var(--danger)}
+.pct-label{font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:36px;text-align:right}
+
+/* ─── EMPTY STATE ─── */
+.empty{
+  text-align:center;padding:48px 20px;color:var(--muted);
+}
+.empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
+.empty p{font-size:13px}
+
+/* ─── LOADING ─── */
+.loading{
+  text-align:center;padding:32px;color:var(--muted);font-size:13px;
+}
+.spinner{
+  width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--raos);
+  border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ─── MODAL ─── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;
+  display:none;align-items:center;justify-content:center;padding:16px;
+}
+.modal-overlay.open{display:flex}
+.modal{
+  background:#fff;border-radius:14px;width:100%;max-width:480px;
+  box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;
+}
+.modal-header{
+  padding:18px 20px 14px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.modal-header h3{font-size:16px;font-weight:700}
+.modal-close{background:none;border:none;font-size:18px;color:var(--muted);cursor:pointer;line-height:1}
+.modal-body{padding:20px;max-height:60vh;overflow-y:auto}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+
+/* ─── FORM ─── */
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:12px;font-weight:600;margin-bottom:5px;color:var(--primary)}
+.form-control{
+  width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;
+  font-size:13px;background:#fff;outline:none;transition:border-color .15s;
+}
+.form-control:focus{border-color:var(--raos)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-hint{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* ─── TOAST ─── */
+#toast{
+  position:fixed;bottom:20px;right:20px;z-index:9999;
+  padding:12px 18px;border-radius:8px;font-size:13px;font-weight:600;
+  color:#fff;background:#1f2328;
+  box-shadow:0 4px 16px rgba(0,0,0,.3);
+  opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;
+}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.success{background:var(--success)}
+#toast.error{background:var(--danger)}
+#toast.info{background:var(--info)}
+
+/* ─── DASHBOARD GRID ─── */
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.cabang-summary{
+  background:var(--card);border-radius:10px;border:1px solid var(--border);
+  padding:16px;border-top:3px solid var(--raos);
+}
+.cabang-summary h4{font-size:14px;font-weight:700;margin-bottom:10px;color:var(--primary)}
+.cs-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0}
+.cs-row span:first-child{color:var(--muted)}
+.cs-row span:last-child{font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:640px){
+  main{padding:12px}
+  .stats-row{grid-template-columns:1fr 1fr}
+  .queue-grid{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr}
+  .hdr-right .btn-logout{display:none}
+  #user-badge{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ─── AUTH GATE ─── -->
+<div id="auth-gate">
+  <div class="auth-box">
+    <div class="auth-logo">ROS</div>
+    <h1>RIFIM OS — RAOS</h1>
+    <p>Login dengan ID Staff + PIN untuk mengakses modul operasional.</p>
+    <input class="auth-field" id="auth-id" type="text" placeholder="ID Staff (cth: RIF0001)"
+      autocomplete="off" autocorrect="off" spellcheck="false">
+    <input class="auth-field" id="auth-pin" type="password" placeholder="PIN"
+      autocomplete="off" maxlength="10">
+    <button class="auth-btn" onclick="doLogin()">Masuk ke RAOS</button>
+    <div id="auth-error"></div>
+    <a class="auth-back" href="/">← Kembali ke Portal</a>
+  </div>
+</div>
+
+<!-- ─── APP ─── -->
+<div id="app">
+  <!-- Header -->
+  <header>
+    <div class="hdr-left">
+      <a class="hdr-back" href="/">← Portal</a>
+      <span class="hdr-logo">RIFIM OS</span>
+      <span class="hdr-module">RAOS</span>
+    </div>
+    <div class="hdr-right">
+      <span id="cabang-badge"></span>
+      <span id="user-badge"></span>
+      <button class="btn-logout" onclick="doLogout()">Logout</button>
+    </div>
+  </header>
+
+  <!-- Nav Tabs -->
+  <nav>
+    <button class="active" onclick="switchTab('dashboard',this)">Dashboard</button>
+    <button onclick="switchTab('antrian',this)">Antrian</button>
+    <button onclick="switchTab('driver',this)">Driver</button>
+    <button onclick="switchTab('saldo',this)">Saldo</button>
+    <button onclick="switchTab('kinerja',this)">Kinerja</button>
+  </nav>
+
+  <!-- Main Content -->
+  <main>
+
+    <!-- ═══ TAB: DASHBOARD ═══ -->
+    <div id="tab-dashboard" class="tab-panel active">
+      <div class="refresh-bar">
+        <h2>Dashboard Operasional</h2>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="refresh-info" id="dash-last-update">–</span>
+          <button class="btn btn-ghost btn-sm" onclick="loadDashboard()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- Stats row -->
+      <div class="stats-row" id="dash-stats">
+        <div class="stat-card">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Per-cabang summaries -->
+      <div class="section">
+        <div class="section-head"><h3>Ringkasan per Cabang</h3></div>
+        <div class="dash-grid" id="dash-cabang"></div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB: ANTRIAN ═══ -->
+    <div id="tab-antrian" class="tab-panel">
+      <div class="refresh-bar">
+        <h2>Antrian Bandara</h2>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="refresh-info" id="queue-last-update">–</span>
+          <button class="btn btn-ghost btn-sm" onclick="loadQueue()">↻ Refresh</button>
+          <button class="btn btn-primary" onclick="openAddQueue()">+ Tambah Driver</button>
+        </div>
+      </div>
+
+      <!-- Cabang selector -->
+      <div class="cabang-tabs" id="cabang-tabs-antrian"></div>
+
+      <!-- Status filter chips -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;" id="status-filters">
+        <button class="cabang-tab active" onclick="filterQueue('ALL',this)">Semua</button>
+        <button class="cabang-tab" onclick="filterQueue('WAITING',this)">Menunggu</button>
+        <button class="cabang-tab" onclick="filterQueue('CALLED',this)">Dipanggil</button>
+        <button class="cabang-tab" onclick="filterQueue('PICKED',this)">Sedang Order</button>
+        <button class="cabang-tab" onclick="filterQueue('DONE',this)">Selesai</button>
+      </div>
+
+      <div id="queue-container">
+        <div class="loading"><div class="spinner"></div><div>Memuat antrian...</div></div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB: DRIVER ═══ -->
+    <div id="tab-driver" class="tab-panel">
+      <div class="refresh-bar">
+        <h2>Database Driver</h2>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="refresh-info" id="driver-last-update">–</span>
+          <button class="btn btn-ghost btn-sm" onclick="loadDrivers()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <input class="toolbar-input toolbar-search" id="driver-search" type="text"
+          placeholder="Cari nama atau Login ID..." oninput="renderDrivers()">
+        <select class="toolbar-input toolbar-select" id="driver-filter-cabang" onchange="renderDrivers()">
+          <option value="">Semua Cabang</option>
+        </select>
+        <select class="toolbar-input toolbar-select" id="driver-filter-zone" onchange="renderDrivers()">
+          <option value="">Semua Zone</option>
+          <option value="airport">Airport</option>
+          <option value="non_airport">External</option>
+        </select>
+        <select class="toolbar-input toolbar-select" id="driver-filter-tipe" onchange="renderDrivers()">
+          <option value="">Semua Tipe</option>
+          <option value="konvensional">Konvensional</option>
+          <option value="online">Online/ASK</option>
+        </select>
+        <select class="toolbar-input toolbar-select" id="driver-filter-status" onchange="renderDrivers()">
+          <option value="">Semua Status</option>
+          <option value="AKTIF">Aktif</option>
+          <option value="NONAKTIF">Non-aktif</option>
+        </select>
+      </div>
+
+      <div id="driver-count" style="font-size:12px;color:var(--muted);margin-bottom:10px;"></div>
+
+      <div id="driver-container">
+        <div class="loading"><div class="spinner"></div><div>Memuat data driver...</div></div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB: SALDO ═══ -->
+    <div id="tab-saldo" class="tab-panel">
+      <div class="refresh-bar">
+        <h2>Rekap Saldo Cabang</h2>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="refresh-info" id="saldo-last-update">–</span>
+          <button class="btn btn-ghost btn-sm" onclick="loadSaldo()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div id="saldo-container">
+        <div class="loading"><div class="spinner"></div><div>Memuat data saldo...</div></div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB: KINERJA ═══ -->
+    <div id="tab-kinerja" class="tab-panel">
+      <div class="refresh-bar">
+        <h2>Kinerja & Fee</h2>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="date" class="toolbar-input" id="kinerja-date" onchange="loadKinerja()"
+            style="padding:5px 10px;font-size:12px;">
+          <button class="btn btn-ghost btn-sm" onclick="loadKinerja()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- Rekap Fee Harian per Cabang -->
+      <div class="section">
+        <div class="section-head"><h3>Rekap Fee Harian per Cabang</h3></div>
+        <div id="fee-harian-container">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Kinerja per Driver -->
+      <div class="section">
+        <div class="section-head">
+          <h3>Kinerja Driver</h3>
+          <div style="display:flex;gap:6px;">
+            <div class="cabang-tabs" id="cabang-tabs-kinerja" style="margin:0;flex-wrap:nowrap;overflow-x:auto;"></div>
+          </div>
+        </div>
+        <div id="kinerja-driver-container">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ─── MODAL: TAMBAH ANTRIAN ─── -->
+<div class="modal-overlay" id="modal-add-queue">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Tambah Driver ke Antrian</h3>
+      <button class="modal-close" onclick="closeModal('modal-add-queue')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Login ID Maxim <span style="color:var(--danger)">*</span></label>
+        <input class="form-control" id="q-login-id" type="text" placeholder="cth: 1234567"
+          oninput="onLoginIdInput(this.value)">
+        <div class="form-hint" id="q-driver-hint">Masukkan Login ID untuk auto-cari nama driver.</div>
+      </div>
+      <div class="form-group">
+        <label>Nama Driver <span style="color:var(--danger)">*</span></label>
+        <input class="form-control" id="q-nama" type="text" placeholder="Nama driver">
+      </div>
+      <div class="form-group">
+        <label>Cabang <span style="color:var(--danger)">*</span></label>
+        <select class="form-control" id="q-cabang">
+          <option value="">-- Pilih Cabang --</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-queue')">Batal</button>
+      <button class="btn btn-primary" onclick="submitAddQueue()">Tambah ke Antrian</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── TOAST ─── -->
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// CONFIG
+// ══════════════════════════════════════════════════════
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbx9_RVyi_58XIeSH-fvrg7CpsUJUpOP5Mim0Q5IDiBiQI7d--WboYhgt7MF6JQl32dW/exec';
+const SESSION_KEY = 'rifim_raos_auth';
+const QUEUE_REFRESH_MS = 30000; // 30 detik
+
+// State
+let _session = null;
+let _queueData = [];
+let _driverData = [];
+let _saldoData = [];
+let _activeCabang = '';
+let _activeQueueFilter = 'ALL';
+let _activeKinerjaCabang = '';
+let _queueTimer = null;
+let _driverLookupCache = {};
+
+// CABANG LIST (dari saldoEngine.js _SD_TARGET)
+const CABANG_LIST = [
+  'ID Rifim Airport Batam',
+  'ID Rifim Batam',
+  'ID Rifim Airport Jambi',
+  'ID Rifim Jambi Luar',
+  'ID Rifim Airport Balikpapan',
+  'ID Rifim Airport Manado',
+  'ID Rifim Airport Pekanbaru',
+];
+const CABANG_SHORT = {
+  'ID Rifim Airport Batam':      'Batam Airport',
+  'ID Rifim Batam':              'Batam Luar',
+  'ID Rifim Airport Jambi':      'Jambi Airport',
+  'ID Rifim Jambi Luar':         'Jambi Luar',
+  'ID Rifim Airport Balikpapan': 'Balikpapan',
+  'ID Rifim Airport Manado':     'Manado',
+  'ID Rifim Airport Pekanbaru':  'Pekanbaru',
+};
+
+// ══════════════════════════════════════════════════════
+// API
+// ══════════════════════════════════════════════════════
+async function api(payload, timeoutMs = 30000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal,
+    });
+    return await res.json();
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('Koneksi timeout. Coba lagi.');
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════════════════
+function initApp() {
+  const saved = sessionStorage.getItem(SESSION_KEY);
+  if (saved) {
+    try {
+      _session = JSON.parse(saved);
+      applySession();
+      return;
+    } catch(e) {}
+  }
+  document.getElementById('auth-gate').style.display = 'flex';
+  document.getElementById('auth-id').addEventListener('keydown', e => e.key==='Enter' && document.getElementById('auth-pin').focus());
+  document.getElementById('auth-pin').addEventListener('keydown', e => e.key==='Enter' && doLogin());
+}
+
+async function doLogin() {
+  const staffId = document.getElementById('auth-id').value.trim().toUpperCase();
+  const pin     = document.getElementById('auth-pin').value.trim();
+  const errEl   = document.getElementById('auth-error');
+  const btn     = document.querySelector('.auth-btn');
+  errEl.style.display = 'none';
+  if (!staffId || !pin) { showErr(errEl, 'Isi ID Staff dan PIN.'); return; }
+  btn.textContent = 'Memverifikasi...'; btn.disabled = true;
+  try {
+    const res = await api({ action: 'staffLogin', staffId, pin });
+    if (!res.ok) { showErr(errEl, res.error || 'Login gagal.'); return; }
+    _session = res.staff;
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(_session));
+    applySession();
+  } catch(e) {
+    showErr(errEl, e.message || 'Koneksi gagal.');
+  } finally {
+    btn.textContent = 'Masuk ke RAOS'; btn.disabled = false;
+  }
+}
+function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
+
+function applySession() {
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('user-badge').textContent = _session.nama + ' · ' + (_session.role || _session.jabatan);
+  const cabang = _session.cabang || '';
+  document.getElementById('cabang-badge').textContent = CABANG_SHORT[cabang] || cabang || 'Semua Cabang';
+  _activeCabang = cabang || CABANG_LIST[0];
+
+  // Populate cabang selectors
+  buildCabangTabs('cabang-tabs-antrian', loadQueue);
+  buildCabangTabs('cabang-tabs-kinerja', loadKinerja);
+  buildCabangSelect('q-cabang');
+  buildCabangSelect('driver-filter-cabang', true);
+
+  // Set today as default kinerja date
+  document.getElementById('kinerja-date').value = todayISO();
+
+  loadDashboard();
+}
+
+function doLogout() {
+  sessionStorage.removeItem(SESSION_KEY);
+  _session = null;
+  if (_queueTimer) clearInterval(_queueTimer);
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('auth-gate').style.display = 'flex';
+  document.getElementById('auth-id').value = '';
+  document.getElementById('auth-pin').value = '';
+}
+
+// ══════════════════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════════════════
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (_queueTimer) { clearInterval(_queueTimer); _queueTimer = null; }
+  if (name === 'antrian') { loadQueue(); startQueueAutoRefresh(); }
+  else if (name === 'driver') loadDrivers();
+  else if (name === 'saldo') loadSaldo();
+  else if (name === 'kinerja') loadKinerja();
+  else if (name === 'dashboard') loadDashboard();
+}
+
+function startQueueAutoRefresh() {
+  _queueTimer = setInterval(loadQueue, QUEUE_REFRESH_MS);
+}
+
+// ══════════════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════════════
+async function loadDashboard() {
+  document.getElementById('dash-stats').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  document.getElementById('dash-cabang').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const [qRes, sRes] = await Promise.all([
+      api({ action: 'queueList', cabang: '' }),
+      api({ action: 'saldoGetRekapCabang' }),
+    ]);
+    const qAll = (qRes && qRes.ok && qRes.data) ? qRes.data : [];
+    const sAll = (sRes && sRes.ok && sRes.data) ? sRes.data : [];
+
+    const today = qAll.filter(q => q.tanggal === todayISO());
+    const waiting = today.filter(q => q.status === 'WAITING').length;
+    const called  = today.filter(q => q.status === 'CALLED').length;
+    const picked  = today.filter(q => q.status === 'PICKED').length;
+    const done    = today.filter(q => q.status === 'DONE').length;
+
+    document.getElementById('dash-stats').innerHTML = `
+      <div class="stat-card">
+        <div class="stat-num">${waiting}</div>
+        <div class="stat-label">Menunggu</div>
+        <div class="stat-sub">Antrian aktif</div>
+      </div>
+      <div class="stat-card amber">
+        <div class="stat-num">${called}</div>
+        <div class="stat-label">Dipanggil</div>
+        <div class="stat-sub">Menuju penumpang</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-num">${picked}</div>
+        <div class="stat-label">Sedang Order</div>
+        <div class="stat-sub">Dalam perjalanan</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-num">${done}</div>
+        <div class="stat-label">Selesai Hari Ini</div>
+        <div class="stat-sub">Total tercatat</div>
+      </div>
+    `;
+
+    // Per-cabang summary
+    const html = CABANG_LIST.map(cab => {
+      const qCab  = today.filter(q => q.cabang === cab);
+      const saldo = sAll.find(s => s.cabang === cab) || {};
+      const pct   = saldo.persen || 0;
+      return `
+        <div class="cabang-summary">
+          <h4>${CABANG_SHORT[cab] || cab}</h4>
+          <div class="cs-row"><span>Antrian aktif</span><span>${qCab.filter(q=>q.status==='WAITING').length + qCab.filter(q=>q.status==='CALLED').length + qCab.filter(q=>q.status==='PICKED').length}</span></div>
+          <div class="cs-row"><span>Selesai hari ini</span><span>${qCab.filter(q=>q.status==='DONE').length}</span></div>
+          <div class="cs-row"><span>Saldo hari ini</span><span>${saldo.total_nominal ? 'Rp ' + fmtNum(saldo.total_nominal) : '—'}</span></div>
+          <div class="cs-row"><span>Target saldo</span><span style="color:${pct>=80?'var(--success)':pct>=50?'var(--raos)':'var(--danger)'}">${pct ? pct+'%' : '—'}</span></div>
+        </div>
+      `;
+    }).join('');
+    document.getElementById('dash-cabang').innerHTML = html || '<div class="empty"><p>Data belum tersedia.</p></div>';
+    document.getElementById('dash-last-update').textContent = 'Update: ' + fmtTime(new Date());
+  } catch(e) {
+    document.getElementById('dash-stats').innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><p>${e.message}</p></div>`;
+    document.getElementById('dash-cabang').innerHTML = '';
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// ANTRIAN
+// ══════════════════════════════════════════════════════
+async function loadQueue() {
+  document.getElementById('queue-container').innerHTML =
+    '<div class="loading"><div class="spinner"></div><div>Memuat antrian...</div></div>';
+  try {
+    const res = await api({ action: 'queueList', cabang: _activeCabang, tanggal: todayISO() });
+    if (!res.ok) throw new Error(res.error || 'Gagal memuat antrian.');
+    _queueData = res.data || [];
+    renderQueue();
+    document.getElementById('queue-last-update').textContent = 'Update: ' + fmtTime(new Date());
+  } catch(e) {
+    document.getElementById('queue-container').innerHTML =
+      `<div class="empty"><div class="empty-icon">⚠️</div><p>${e.message}</p></div>`;
+  }
+}
+
+function filterQueue(status, btn) {
+  _activeQueueFilter = status;
+  document.querySelectorAll('#status-filters .cabang-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderQueue();
+}
+
+function renderQueue() {
+  let data = _queueData.filter(q => q.cabang === _activeCabang || !_activeCabang);
+  if (_activeQueueFilter !== 'ALL') data = data.filter(q => q.status === _activeQueueFilter);
+  // Sort: WAITING & CALLED first by masukAntrian, then PICKED, then DONE
+  const ORDER = { WAITING:0, CALLED:1, PICKED:2, DONE:3, CANCEL:4 };
+  data.sort((a,b) => {
+    const os = (ORDER[a.status]||0) - (ORDER[b.status]||0);
+    return os !== 0 ? os : (a.masukAntrian||'').localeCompare(b.masukAntrian||'');
+  });
+
+  if (!data.length) {
+    document.getElementById('queue-container').innerHTML =
+      '<div class="empty"><div class="empty-icon">🚕</div><p>Tidak ada data antrian untuk filter ini.</p></div>';
+    return;
+  }
+
+  const isKoord = _session && (_session.role === 'KOORDINATOR' || (_session.jabatan||'').includes('DIREKTUR'));
+  const html = `<div class="queue-grid">${data.map(q => queueCardHtml(q, isKoord)).join('')}</div>`;
+  document.getElementById('queue-container').innerHTML = html;
+}
+
+function queueCardHtml(q, isKoord) {
+  const elapsed = q.masukAntrian ? minsAgo(q.masukAntrian) : '';
+  const actions = [];
+  if (q.status === 'WAITING')  actions.push(`<button class="btn btn-primary btn-sm" onclick="updateQueue('${q.id}','CALLED')">📢 Panggil</button>`);
+  if (q.status === 'CALLED')   actions.push(`<button class="btn btn-info btn-sm" onclick="updateQueue('${q.id}','PICKED')">🚗 Jemput</button>`);
+  if (q.status === 'PICKED')   actions.push(`<button class="btn btn-success btn-sm" onclick="updateQueue('${q.id}','DONE')">✅ Selesai</button>`);
+  if (isKoord && (q.status === 'WAITING' || q.status === 'CALLED'))
+    actions.push(`<button class="btn btn-ghost btn-sm" onclick="updateQueue('${q.id}','CANCEL')" style="color:var(--muted)">✕</button>`);
+
+  return `
+    <div class="queue-card ${q.status}" id="qc-${q.id}">
+      <div class="queue-header">
+        <span class="queue-num">#${q.noAntrian || '—'}</span>
+        <span class="badge ${q.status}">${statusLabel(q.status)}</span>
+      </div>
+      <div class="queue-name">${esc(q.namaDriver)}</div>
+      <div class="queue-id">${esc(q.loginId || q.id_driver || '—')}</div>
+      <div class="queue-time">${elapsed ? 'Masuk ' + elapsed : '—'}</div>
+      ${actions.length ? `<div class="queue-actions">${actions.join('')}</div>` : ''}
+    </div>
+  `;
+}
+
+async function updateQueue(id, status) {
+  try {
+    const res = await api({
+      action: 'queueUpdate',
+      id,
+      status,
+      olehStaff: _session ? _session.nama : 'System',
+    });
+    if (!res.ok) throw new Error(res.error || 'Gagal update status.');
+    toast('Status antrian diperbarui: ' + statusLabel(status), 'success');
+    loadQueue();
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+}
+
+function openAddQueue() {
+  document.getElementById('q-login-id').value = '';
+  document.getElementById('q-nama').value = '';
+  document.getElementById('q-cabang').value = _activeCabang || '';
+  document.getElementById('q-driver-hint').textContent = 'Masukkan Login ID untuk auto-cari nama driver.';
+  document.getElementById('modal-add-queue').classList.add('open');
+  setTimeout(() => document.getElementById('q-login-id').focus(), 50);
+}
+
+let _lookupDebounce;
+function onLoginIdInput(val) {
+  clearTimeout(_lookupDebounce);
+  if (!val.trim()) return;
+  _lookupDebounce = setTimeout(() => lookupDriver(val.trim()), 500);
+}
+
+async function lookupDriver(loginId) {
+  if (_driverLookupCache[loginId]) {
+    const d = _driverLookupCache[loginId];
+    document.getElementById('q-nama').value = d.nama || '';
+    document.getElementById('q-driver-hint').textContent = '✓ ' + (d.nama || 'Ditemukan');
+    return;
+  }
+  document.getElementById('q-driver-hint').textContent = 'Mencari...';
+  try {
+    const res = await api({ action: 'staffLookupDriver', loginId });
+    if (res.ok && res.driver) {
+      _driverLookupCache[loginId] = res.driver;
+      document.getElementById('q-nama').value = res.driver.nama || '';
+      document.getElementById('q-driver-hint').textContent = '✓ Driver ditemukan: ' + res.driver.cabang;
+    } else {
+      document.getElementById('q-driver-hint').textContent = 'Driver tidak ditemukan. Isi nama manual.';
+    }
+  } catch(e) {
+    document.getElementById('q-driver-hint').textContent = 'Gagal lookup. Isi nama manual.';
+  }
+}
+
+async function submitAddQueue() {
+  const loginId = document.getElementById('q-login-id').value.trim();
+  const nama    = document.getElementById('q-nama').value.trim();
+  const cabang  = document.getElementById('q-cabang').value;
+  if (!loginId || !nama || !cabang) { toast('Lengkapi semua field.', 'error'); return; }
+  try {
+    const res = await api({
+      action: 'queueAdd',
+      loginId,
+      namaDriver: nama,
+      cabang,
+      olehStaff: _session ? _session.nama : 'Admin',
+    });
+    if (!res.ok) throw new Error(res.error || 'Gagal tambah antrian.');
+    toast('Driver ' + nama + ' ditambahkan ke antrian.', 'success');
+    closeModal('modal-add-queue');
+    loadQueue();
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// DRIVER
+// ══════════════════════════════════════════════════════
+async function loadDrivers() {
+  document.getElementById('driver-container').innerHTML =
+    '<div class="loading"><div class="spinner"></div><div>Memuat database driver...</div></div>';
+  try {
+    const res = await api({ action: 'raosGetDriverList' });
+    if (!res.ok) throw new Error(res.error || 'Gagal memuat driver.');
+    _driverData = res.data || [];
+    renderDrivers();
+    document.getElementById('driver-last-update').textContent = 'Update: ' + fmtTime(new Date());
+  } catch(e) {
+    document.getElementById('driver-container').innerHTML =
+      `<div class="empty"><div class="empty-icon">⚠️</div><p>${e.message}</p></div>`;
+  }
+}
+
+function renderDrivers() {
+  const q      = (document.getElementById('driver-search').value || '').toLowerCase();
+  const cabang = document.getElementById('driver-filter-cabang').value;
+  const zone   = document.getElementById('driver-filter-zone').value;
+  const tipe   = document.getElementById('driver-filter-tipe').value;
+  const status = document.getElementById('driver-filter-status').value;
+
+  let data = _driverData.filter(d => {
+    if (q && !(d.nama_driver||'').toLowerCase().includes(q) && !(d.id_maxim||'').toLowerCase().includes(q)) return false;
+    if (cabang && d.cabang !== cabang) return false;
+    if (zone && d.zone !== zone) return false;
+    if (tipe && d.driver_type !== tipe) return false;
+    if (status && (d.status||'').toUpperCase() !== status) return false;
+    return true;
+  });
+
+  document.getElementById('driver-count').textContent =
+    `Menampilkan ${data.length} dari ${_driverData.length} driver`;
+
+  if (!data.length) {
+    document.getElementById('driver-container').innerHTML =
+      '<div class="empty"><div class="empty-icon">🔍</div><p>Tidak ada driver yang cocok.</p></div>';
+    return;
+  }
+
+  const rows = data.map(d => `
+    <tr>
+      <td class="td-id">${esc(d.id_maxim||'—')}</td>
+      <td class="td-name">${esc(d.nama_driver||'—')}</td>
+      <td>${esc(d.cabang||'—')}</td>
+      <td><span class="badge ${(d.zone||'').toUpperCase()}">${d.zone==='airport'?'Airport':'External'}</span></td>
+      <td>${esc(d.driver_type||'—')}</td>
+      <td><span class="badge ${(d.status||'AKTIF').toUpperCase()}">${esc(d.status||'AKTIF')}</span></td>
+    </tr>
+  `).join('');
+
+  document.getElementById('driver-container').innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Login ID</th>
+            <th>Nama Driver</th>
+            <th>Cabang</th>
+            <th>Zone</th>
+            <th>Tipe</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════════════
+// SALDO
+// ══════════════════════════════════════════════════════
+async function loadSaldo() {
+  document.getElementById('saldo-container').innerHTML =
+    '<div class="loading"><div class="spinner"></div><div>Memuat data saldo...</div></div>';
+  try {
+    const res = await api({ action: 'saldoGetRekapCabang' });
+    if (!res.ok) throw new Error(res.error || 'Gagal memuat saldo.');
+    _saldoData = res.data || [];
+    renderSaldo();
+    document.getElementById('saldo-last-update').textContent = 'Update: ' + fmtTime(new Date());
+  } catch(e) {
+    document.getElementById('saldo-container').innerHTML =
+      `<div class="empty"><div class="empty-icon">⚠️</div><p>${e.message}</p></div>`;
+  }
+}
+
+function renderSaldo() {
+  if (!_saldoData.length) {
+    document.getElementById('saldo-container').innerHTML =
+      '<div class="empty"><div class="empty-icon">📊</div><p>Belum ada data saldo hari ini.</p></div>';
+    return;
+  }
+  const rows = _saldoData.map(s => {
+    const pct = parseFloat(s.persen) || 0;
+    const cls = pct >= 80 ? '' : pct >= 50 ? 'warn' : 'danger';
+    const color = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--raos)' : 'var(--danger)';
+    return `
+      <tr>
+        <td class="td-name">${esc(CABANG_SHORT[s.cabang] || s.cabang || '—')}</td>
+        <td class="td-num">Rp ${fmtNum(s.total_nominal || 0)}</td>
+        <td class="td-num">${s.total_pengisian || 0}</td>
+        <td class="td-num">Rp ${fmtNum(s.target || 0)}</td>
+        <td>
+          <div class="pct-bar">
+            <div class="pct-fill"><div class="pct-fill-inner ${cls}" style="width:${Math.min(pct,100)}%"></div></div>
+            <span class="pct-label" style="color:${color}">${pct.toFixed(0)}%</span>
+          </div>
+        </td>
+        <td><span class="badge ${pct>=80?'AKTIF':pct>=50?'CALLED':'CANCEL'}">${s.status || (pct>=80?'ON TRACK':'BEHIND')}</span></td>
+        <td style="font-size:11px;color:var(--muted)">${s.tanggal || '—'}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const total = _saldoData.reduce((a,s) => a + (s.total_nominal||0), 0);
+  document.getElementById('saldo-container').innerHTML = `
+    <div class="stats-row" style="margin-bottom:16px;">
+      <div class="stat-card green">
+        <div class="stat-num">Rp ${fmtNum(total)}</div>
+        <div class="stat-label">Total Saldo Semua Cabang Hari Ini</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Cabang</th>
+            <th style="text-align:right">Total Nominal</th>
+            <th style="text-align:right">Jumlah Pengisian</th>
+            <th style="text-align:right">Target</th>
+            <th>Progress</th>
+            <th>Status</th>
+            <th>Tanggal</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════════════
+// KINERJA
+// ══════════════════════════════════════════════════════
+async function loadKinerja() {
+  const tanggal = document.getElementById('kinerja-date').value || todayISO();
+  document.getElementById('fee-harian-container').innerHTML =
+    '<div class="loading"><div class="spinner"></div></div>';
+  document.getElementById('kinerja-driver-container').innerHTML =
+    '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const [fRes, kRes] = await Promise.all([
+      api({ action: 'feeGetRekapHarian', tanggal }),
+      api({ action: 'feeGetKinerjaDriver', tanggal }),
+    ]);
+
+    // Fee Harian per Cabang
+    const fData = (fRes && fRes.ok && fRes.data) ? fRes.data : [];
+    if (!fData.length) {
+      document.getElementById('fee-harian-container').innerHTML =
+        '<div class="empty"><div class="empty-icon">📈</div><p>Belum ada data fee untuk tanggal ini.</p></div>';
+    } else {
+      const fRows = fData.map(f => `
+        <tr>
+          <td class="td-name">${esc(CABANG_SHORT[f.cabang]||f.cabang||'—')}</td>
+          <td class="td-num">${f.jumlah_order||0}</td>
+          <td class="td-num">Rp ${fmtNum(f.total_fee||0)}</td>
+          <td class="td-num">Rp ${fmtNum(f.total_hak_driver||0)}</td>
+          <td class="td-num" style="color:var(--success);font-weight:700">Rp ${fmtNum(f.total_revenue||0)}</td>
+        </tr>
+      `).join('');
+      const totOrder = fData.reduce((a,f)=>a+(f.jumlah_order||0),0);
+      const totFee   = fData.reduce((a,f)=>a+(f.total_revenue||0),0);
+      document.getElementById('fee-harian-container').innerHTML = `
+        <div class="stats-row" style="margin-bottom:14px;">
+          <div class="stat-card"><div class="stat-num">${totOrder}</div><div class="stat-label">Total Order</div></div>
+          <div class="stat-card green"><div class="stat-num">Rp ${fmtNum(totFee)}</div><div class="stat-label">Total Revenue</div></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Cabang</th><th style="text-align:right">Jumlah Order</th><th style="text-align:right">Fee Kantor</th><th style="text-align:right">Hak Driver</th><th style="text-align:right">Revenue</th></tr></thead>
+            <tbody>${fRows}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // Kinerja per Driver
+    const kData = (kRes && kRes.ok && kRes.data) ? kRes.data : [];
+    if (!kData.length) {
+      document.getElementById('kinerja-driver-container').innerHTML =
+        '<div class="empty"><div class="empty-icon">🏎️</div><p>Belum ada data kinerja driver untuk tanggal ini.</p></div>';
+    } else {
+      // Populate cabang filter tabs for kinerja
+      const cabangInData = [...new Set(kData.map(k=>k.cabang).filter(Boolean))];
+      if (!_activeKinerjaCabang && cabangInData.length) _activeKinerjaCabang = cabangInData[0];
+      const tabsHtml = ['Semua',...cabangInData].map((cab,i) => {
+        const isAll = cab === 'Semua';
+        const active = (!_activeKinerjaCabang && isAll) || (cab === _activeKinerjaCabang) ? 'active' : '';
+        return `<button class="cabang-tab ${active}" onclick="_setKinerjaCabang(this,'${isAll?'':cab}',${JSON.stringify(kData)})">${CABANG_SHORT[cab]||cab}</button>`;
+      }).join('');
+      document.getElementById('cabang-tabs-kinerja').innerHTML = tabsHtml;
+      renderKinerjaDriver(kData, _activeKinerjaCabang);
+    }
+  } catch(e) {
+    const errHtml = `<div class="empty"><div class="empty-icon">⚠️</div><p>${e.message}</p></div>`;
+    document.getElementById('fee-harian-container').innerHTML = errHtml;
+    document.getElementById('kinerja-driver-container').innerHTML = errHtml;
+  }
+}
+
+function _setKinerjaCabang(btn, cabang, data) {
+  _activeKinerjaCabang = cabang;
+  document.querySelectorAll('#cabang-tabs-kinerja .cabang-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderKinerjaDriver(data, cabang);
+}
+
+function renderKinerjaDriver(data, cabang) {
+  const filtered = cabang ? data.filter(k => k.cabang === cabang) : data;
+  filtered.sort((a,b) => (b.jumlah_order||0) - (a.jumlah_order||0));
+  const rows = filtered.map(k => `
+    <tr>
+      <td class="td-id">${esc(k.login_id||'—')}</td>
+      <td class="td-name">${esc(k.nama_driver||'—')}</td>
+      <td>${esc(CABANG_SHORT[k.cabang]||k.cabang||'—')}</td>
+      <td class="td-num">${k.jumlah_order||0}</td>
+      <td class="td-num">Rp ${fmtNum(k.total_fee||0)}</td>
+      <td class="td-num">Rp ${fmtNum(k.total_hak_driver||0)}</td>
+    </tr>
+  `).join('');
+  document.getElementById('kinerja-driver-container').innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Login ID</th><th>Nama Driver</th><th>Cabang</th><th style="text-align:right">Order</th><th style="text-align:right">Fee Kantor</th><th style="text-align:right">Hak Driver</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════
+function buildCabangTabs(containerId, onChangeFn) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = CABANG_LIST.map((cab, i) => `
+    <button class="cabang-tab ${i===0?'active':''}" onclick="_setCabang(this,'${cab}','${onChangeFn.name}')">
+      ${CABANG_SHORT[cab]||cab}
+    </button>
+  `).join('');
+}
+
+function _setCabang(btn, cabang, fnName) {
+  _activeCabang = cabang;
+  document.querySelectorAll(`#${btn.closest('.cabang-tabs').id} .cabang-tab`)
+    .forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (fnName === 'loadQueue') loadQueue();
+}
+
+function buildCabangSelect(selectId, addAll = false) {
+  const el = document.getElementById(selectId);
+  if (!el) return;
+  const opts = addAll ? '<option value="">Semua Cabang</option>' : '<option value="">-- Pilih Cabang --</option>';
+  el.innerHTML = opts + CABANG_LIST.map(c =>
+    `<option value="${c}">${CABANG_SHORT[c]||c}</option>`
+  ).join('');
+}
+
+function statusLabel(s) {
+  return { WAITING:'Menunggu', CALLED:'Dipanggil', PICKED:'Sedang Order', DONE:'Selesai', CANCEL:'Batal' }[s] || s;
+}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtNum(n) {
+  return Number(n||0).toLocaleString('id-ID');
+}
+function fmtTime(d) {
+  return d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function todayISO() {
+  return new Date().toISOString().slice(0,10);
+}
+function minsAgo(isoStr) {
+  if (!isoStr) return '';
+  const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 60000);
+  if (diff < 1) return 'baru saja';
+  return diff + ' mnt lalu';
+}
+function toast(msg, type = 'info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = '', 3000);
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// ── INIT
+document.addEventListener('DOMContentLoaded', initApp);
+</script>
+</body>
+</html>

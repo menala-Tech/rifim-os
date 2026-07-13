@@ -53,6 +53,10 @@ function doPost(e) {
       // ── Fee Engine (feeGetRekapHarian, feeGetRekapBulanan, dll.) ──
       var feeResult = routeFeeEngine(input.action, input);
       if (feeResult !== null) return _json(feeResult);
+
+      // ── RAOS Driver Layer (raosGetDriverList, raosAddDriver, raosUpdateDriver) ──
+      var raosResult = routeRaosDriverLayer(input.action, input);
+      if (raosResult !== null) return _json(raosResult);
     }
 
     // ── Log activity (fire-and-forget dari Portal / Smart Office) ──
