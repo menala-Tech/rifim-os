@@ -2,7 +2,7 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-07-11 (Sprint 2 selesai + 12 Batch Analisa + Supabase populated)
+> Last updated: 2026-07-13 (Sprint 3A RAOS selesai + 4 Dokumen Arsitektur dianalisa)
 
 ---
 
@@ -57,11 +57,46 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 
 ---
 
+## Batch Arsitektur — Analisis Selesai (2026-07-13)
+
+> 4 dokumen arsitektur + gambar dari user telah dianalisa mendalam sebelum Sprint 3B dimulai.
+
+| Dokumen | Fokus | Temuan Kunci |
+|---------|-------|--------------|
+| V2 — Arsitektur Sistem | Layer teknis, RCP Model | 8 roles, RIFIM Core Platform (12 services), integrasi eksternal |
+| V3 — UI/UX Mockup | Layout visual sistem | RIFIM Chat di header, queue format A001, AI sebagai kontak |
+| V4 — Arsitektur Definitif | RCP 4-level + 9 cabang | +Makassar (CGK) +HO, Analytics sebagai Platform Service, 4 dashboard |
+| Framework — Documentation | 8-level doc structure | RIFIM Enterprise Handbook (SSOT), Level 6 AI Knowledge Base |
+
+### Keputusan Arsitektur dari Batch Ini
+
+| Area | Keputusan |
+|------|-----------|
+| **Cabang** | 9 lokasi: 7 existing + Makassar (Sultan Hasanuddin) + Soekarno-Hatta (CGK) + Head Office |
+| **Auth** | RCP 4-level: Role → Cabang → Permission → Data Scope → HAK AKSES AKTIF |
+| **Login flow** | Verifikasi Akun → Ambil Role → Ambil Cabang → Ambil Permission → Bangun Menu |
+| **Dashboard** | 4 varian: Direktur / Koordinator / Staff / Driver |
+| **Analytics** | Platform Service (bukan modul), bagian dari RIFIM Core Platform |
+| **AI Assistant** | Muncul sebagai kontak di RIFIM Chat (bukan halaman terpisah) |
+| **RAOS Queue** | Format tiket: A001 Andi / A002 Budi (nomor urut + nama, per cabang per hari) |
+| **Dokumentasi** | 8-level structure: Executive → Architecture → Business Module → User Guide → SOP → AI Knowledge → Dev → Ops |
+
+### Implikasi untuk Kode Existing
+
+| File | Perlu Update |
+|------|-------------|
+| `modules/raos/index.html` | Tambah 2 cabang (Makassar, CGK), queue auto-numbering A001 format |
+| `automation/apps-script/authEngine.js` | Return 4-level RCP: role + cabang + permission[] + data_scope |
+| `automation/apps-script/staffAppApi.js` | Bangun Menu berdasarkan Permission (bukan hanya role) |
+| `docs/` | Buat struktur 8-level per Framework doc |
+
+---
+
 ## Current Phase
 
 **Sprint 3A — RAOS Module + Finance UI + Dashboard** 
 
-Status: 🟡 Siap Dimulai
+Status: 🟡 In Progress (RAOS selesai, Finance + Dashboard berikutnya)
 
 ### Infrastruktur Data (Selesai)
 
@@ -181,15 +216,33 @@ RADMS (Batch 7) sudah production:
 - [ ] Test PKWT generation end-to-end
 - [ ] Setup GAS trigger `notifCheckExpiringContracts()`
 
-### Sprint 3A — Modul Baru (Siap Dimulai)
-- [ ] **RAOS** — saldoEngine, feeEngine (Order+Daily+Iuran), dashboard per cabang
+### Sprint 3A — Modul Baru
+- [x] **RAOS UI** — 5-tab (Dashboard, Antrian, Driver, Saldo, Kinerja) — PR #3 merged
+- [x] `routeRaosDriverLayer()` — routing raosGetDriverList/raosAddDriver/raosUpdateDriver
+- [ ] RAOS UI patch: queue auto-numbering A001, tambah cabang Makassar + CGK
 - [ ] **Finance UI** — cash flow viewer, tagihan tracker, rekap harian/bulanan
-- [ ] **Executive Dashboard** — agregasi KPI, revenue, operasional
+- [ ] **Executive Dashboard** — agregasi KPI, revenue, operasional (4 varian: Direktur/Koordinator/Staff/Driver)
 - [ ] **RLS drivers** — enable Row Level Security + policy untuk GAS service key
 
-### Sprint 3B+ (Backlog)
-- [ ] **CRM** — airport, vendor, partner, client
-- [ ] **AI Assistant** — document generator, SOP, business analysis
+### Sprint 3B — RCP Auth + Chat (Backlog)
+- [ ] **Auth RCP upgrade** — authEngine return 4-level (role + cabang + permission[] + data_scope)
+- [ ] **Menu Builder** — bangun menu dinamis berdasarkan permission (bukan hardcoded)
+- [ ] **RIFIM Chat** — Supabase Realtime, kontak list, grup, broadcast, AI sebagai kontak
+- [ ] **AI Module** — Claude API (claude-sonnet-5), knowledge base, analisis data, prediksi antrian
+
+### Sprint 4 (Backlog)
+- [ ] **Analytics Platform** — Trend Omzet, Peak Hour, Performa Cabang/Driver/Staff
+- [ ] **GPS Monitoring** — Driver tracking (OpenStreetMap), geofence bandara
+- [ ] **Dashboard Driver** — Check-in, antrian sendiri, riwayat order, profil
+- [ ] **Dashboard Staff** — Absensi, shift, laporan harian sendiri
+- [ ] **Knowledge Center** — SOP, FAQ, Tutorial (Level 5 Framework)
+- [ ] **AI Knowledge Base** — KNOWLEDGE_BASE.md, VECTOR_INDEX.md (Level 6 Framework)
+
+### Sprint 5 (Backlog)
+- [ ] **Payment Gateway** — Midtrans / Xendit integrasi
+- [ ] **2FA & Security** — Session management, audit trail
+- [ ] **Documentation** — 8-level structure per Framework doc (Level 1-8)
+- [ ] **Makassar + CGK cabang** — onboarding operasional
 
 ### Sinkronisasi Antar Modul (Kesimpulan 12 Batch)
 - Finance = aggregator 4 sumber otomatis: Potongan Order + Saldo Fee + ASK Syafiq + FEE External
