@@ -165,6 +165,35 @@ drivers (external) →    sheet "Database Driver External"
 
 ---
 
+## Google Apps Script — Project Registry
+
+Daftar GAS project yang terhubung ke RIFIM OS. Gunakan Script ID ini saat `clasp push` ke project tertentu.
+
+| Nama Project | Script ID | Lokasi Lokal | File Utama |
+|---|---|---|---|
+| RIFIM OS (Main) | `1IK8-2anrxahce1X1MG7Bi3aGe6e-_4e3obanTRprT6brYSdla9rEYOxp` | `automation/apps-script/` | `raosMonitoringEngine.js` dll |
+| Pengisian Saldo | `1_V2BOS56ac1v0mzte2rfl3at4wmc31foeKoLddZ6SeYRhSc_B2icbcUz` | `C:\Users\ADMIN\Documents\RIFIM\RIFIM\ADM Surat\isi saldo` | `MonitoringSaldo.js` |
+
+### Cara Push ke GAS Project Tertentu
+
+```bash
+# Push RIFIM OS Main
+cd automation/apps-script && clasp push
+
+# Push Pengisian Saldo (pull dulu ke temp folder, edit, push)
+mkdir -p /tmp/pengisian-saldo
+cd /tmp/pengisian-saldo
+echo '{"scriptId":"1_V2BOS56ac1v0mzte2rfl3at4wmc31foeKoLddZ6SeYRhSc_B2icbcUz","rootDir":"."}' > .clasp.json
+clasp pull
+# ... edit ...
+clasp push
+```
+
+> `.clasprc.json` (OAuth token) harus ada di `~/.clasprc.json` sebelum bisa push.
+> Token didapat dari `clasp login` di komputer lokal, lalu paste isinya ke remote session.
+
+---
+
 ## Google Apps Script Rules
 
 Pisahkan menjadi:
