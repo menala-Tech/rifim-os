@@ -474,6 +474,53 @@ function _sbHeaders(extra) {
   return h;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// ROUTER — dipanggil dari webApp.js
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Router untuk endpoint RAOS Driver dari doPost webApp.js.
+ * Pola null-return: kembalikan null jika action tidak ditangani di sini.
+ * @param {string} action
+ * @param {object} params
+ * @returns {object|null}
+ */
+function routeRaosDriverLayer(action, params) {
+  try {
+    if (action === 'raosGetDriverList') {
+      var opts = {};
+      if (params.zone)   opts.zone   = params.zone;
+      if (params.cabang) opts.cabang = params.cabang;
+      if (params.status) opts.status = params.status;
+      if (params.limit)  opts.limit  = parseInt(params.limit) || 2000;
+      var drivers = raosGetDrivers(opts);
+      return { ok: true, data: drivers, total: drivers.length };
+    }
+    if (action === 'raosAddDriver') {
+      _gasValidate(params, { id_maxim: 'string', nama_driver: 'string', cabang: 'string' });
+      return raosAddDriver(params);
+    }
+    if (action === 'raosUpdateDriver') {
+      if (!params.loginId) return { ok: false, error: 'loginId wajib diisi.' };
+      var updates = {};
+      if (params.status)      updates.status      = params.status;
+      if (params.nama_driver) updates.nama_driver = params.nama_driver;
+      if (params.cabang)      updates.cabang      = params.cabang;
+      if (params.zone)        updates.zone        = params.zone;
+      if (params.driver_type) updates.driver_type = params.driver_type;
+      return raosUpdateDriver(params.loginId, updates);
+    }
+    return null; // action tidak ditangani di sini
+  } catch (e) {
+    _gasLogError('raosDriverLayer', action, e, params);
+    return { ok: false, error: e.message };
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SUPABASE HELPERS
+// ══════════════════════════════════════════════════════════════════════════════
+
 function _sbGet(url) {
   var resp = UrlFetchApp.fetch(url, { headers: _sbHeaders(), muteHttpExceptions: true });
   if (resp.getResponseCode() !== 200) throw new Error('Supabase GET gagal: ' + resp.getContentText());
