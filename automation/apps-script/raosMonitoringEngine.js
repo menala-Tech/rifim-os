@@ -19,6 +19,24 @@
 
 // ── KONFIGURASI ───────────────────────────────────────────────────
 
+/**
+ * Retry wrapper untuk Google service calls yang kadang kena transient server error.
+ * Exponential backoff: 2s → 4s → gagal.
+ */
+function _gasWithRetry(fn, maxAttempts) {
+  var attempts = maxAttempts || 3;
+  for (var i = 0; i < attempts; i++) {
+    try {
+      return fn();
+    } catch (e) {
+      if (i === attempts - 1) throw e;
+      var delayMs = Math.pow(2, i + 1) * 1000; // 2000ms, 4000ms
+      Logger.log('[Retry ' + (i + 1) + '/' + attempts + '] ' + e.message + ' — tunggu ' + (delayMs / 1000) + 's');
+      Utilities.sleep(delayMs);
+    }
+  }
+}
+
 var _MON_SLA_SALDO_MENIT    = 30;  // menit tanpa Login ID di AIST form → alert
 var _MON_SLA_SALDO_PWA_MENIT = 5;  // menit belum dicentang "Sudah Diisi" di PWA form → alert
 var _MON_SLA_POTONGAN_MENIT = 60;  // menit tanpa input potongan → alert
@@ -183,7 +201,7 @@ function setupMonitoringSheets() {
  * Dipanggil otomatis tiap 5 menit oleh trigger.
  */
 function refreshMonitoringSaldo() {
-  var ss     = SpreadsheetApp.openById(RAOS_SS_ID);
+  var ss     = _gasWithRetry(function() { return SpreadsheetApp.openById(RAOS_SS_ID); });
   var shForm = ss.getSheetByName('Form Input Saldo AIST');
   var shMon  = ss.getSheetByName(_MON_SHEET_SALDO);
   if (!shForm || !shMon) {
@@ -289,7 +307,7 @@ function refreshMonitoringSaldo() {
  * Repeat tiap SLA menit selama belum diisi.
  */
 function cekSLASaldo() {
-  var ss     = SpreadsheetApp.openById(RAOS_SS_ID);
+  var ss     = _gasWithRetry(function() { return SpreadsheetApp.openById(RAOS_SS_ID); });
   var shForm = ss.getSheetByName('Form Input Saldo AIST');
   if (!shForm) return;
 
@@ -395,7 +413,7 @@ function _monPesanSaldoTelat(cabang, list, tz) {
  * (Referensi _DB_COL dari raosPotonganEngine.js — file di-load dalam scope GAS yang sama)
  */
 function refreshMonitoringPotongan() {
-  var ss    = SpreadsheetApp.openById(RAOS_SS_ID);
+  var ss    = _gasWithRetry(function() { return SpreadsheetApp.openById(RAOS_SS_ID); });
   var shDB  = ss.getSheetByName('Database Potongan');
   var shMon = ss.getSheetByName(_MON_SHEET_POTONGAN);
   if (!shDB || !shMon) {
@@ -485,7 +503,7 @@ function refreshMonitoringPotongan() {
  * Pola state change + repeat tiap SLA menit (dari Monitoring.gs).
  */
 function cekSLAPotongan() {
-  var ss   = SpreadsheetApp.openById(RAOS_SS_ID);
+  var ss   = _gasWithRetry(function() { return SpreadsheetApp.openById(RAOS_SS_ID); });
   var shDB = ss.getSheetByName('Database Potongan');
   if (!shDB) return;
 
@@ -609,7 +627,7 @@ function _monPesanPotonganOnline(cabang, tz) {
  * Data mulai baris 3 (row 1=header, row 2=note).
  */
 function cekSLASaldoPWA() {
-  var ss    = SpreadsheetApp.openById(RAOS_SS_ID);
+  var ss    = _gasWithRetry(function() { return SpreadsheetApp.openById(RAOS_SS_ID); });
   var shPWA = ss.getSheetByName('Form Input Saldo PWA');
   if (!shPWA) return;
 
