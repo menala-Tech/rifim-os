@@ -31,12 +31,16 @@ var _SD_PWA_F      = 'Form Input Saldo PWA';
 var _SD_DATA_START = 3;  // row 1=header, row 2=note keterangan
 
 // ── Kolom Form Input Saldo AIST (1-based) ─────────────────────────────────
+// A=Tanggal B=SUM C=Credit Account D=Login ID (kuning, paste/isi manual)
+// E=Nominal Tagihan F=Nama Driver G=Cabang H=STATUS (hijau/teal, auto)
 var _FA_C = { TANGGAL:1, SUM:2, CREDIT_ACCOUNT:3, LOGIN_ID:4,
-              NAMA_DRIVER:5, CABANG:6, STATUS:7 };
+              NOMINAL_TAGIHAN:5, NAMA_DRIVER:6, CABANG:7, STATUS:8 };
 
 // ── Kolom Database AIST (1-based) ─────────────────────────────────────────
+// 10 kolom: ID Tanggal LoginID CreditAccount NamaDriver Cabang NominalTagihan SumAIST StatusMatch CreatedAt
+// Jika sheet masih kosong dan perlu tambah kolom SUM AIST: resetSingleRaosSheet('Database AIST')
 var _DA_C = { ID:1, TANGGAL:2, LOGIN_ID:3, CREDIT_ACCOUNT:4, NAMA_DRIVER:5,
-              CABANG:6, NOMINAL_PWA:7, SUM_AIST:8, STATUS_MATCH:9, CREATED_AT:10 };
+              CABANG:6, NOMINAL_TAGIHAN:7, SUM_AIST:8, STATUS_MATCH:9, CREATED_AT:10 };
 
 // ── Kolom Form Input Saldo PWA (dari staffAppApi.js) (1-based) ────────────
 var _FP_C = { TIMESTAMP:1, CABANG:2, NAMA_STAFF:3, NOMINAL:4, LOGIN_ID:5, NAMA_DRIVER:6 };
@@ -142,6 +146,7 @@ function onEditSaldoAIST(e) {
 
   var loginId = sheet.getRange(row, _FA_C.LOGIN_ID).getValue();
   if (!loginId || String(loginId).trim() === '') {
+    sheet.getRange(row, _FA_C.NOMINAL_TAGIHAN).clearContent();
     sheet.getRange(row, _FA_C.NAMA_DRIVER).clearContent();
     sheet.getRange(row, _FA_C.CABANG).clearContent();
     return;
@@ -149,9 +154,12 @@ function onEditSaldoAIST(e) {
 
   var driver = _cariDriverByLoginId(String(loginId).trim());
   if (driver) {
+    // Nominal Tagihan (E) dikosongkan — akan diisi oleh saldoProcessAIST() saat matching
+    sheet.getRange(row, _FA_C.NOMINAL_TAGIHAN).clearContent();
     sheet.getRange(row, _FA_C.NAMA_DRIVER).setValue(driver.nama);
     sheet.getRange(row, _FA_C.CABANG).setValue(driver.idCabang);
   } else {
+    sheet.getRange(row, _FA_C.NOMINAL_TAGIHAN).clearContent();
     sheet.getRange(row, _FA_C.NAMA_DRIVER).setValue('TIDAK DITEMUKAN');
     sheet.getRange(row, _FA_C.CABANG).setValue('TIDAK DITEMUKAN');
   }
@@ -207,8 +215,8 @@ function saldoProcessAIST() {
       var sumAIST       = Number(rowData[_FA_C.SUM - 1]) || 0;
       var creditAccount = rowData[_FA_C.CREDIT_ACCOUNT - 1];
       var loginId       = String(rowData[_FA_C.LOGIN_ID - 1] || '').trim();
-      var namaDriver    = rowData[_FA_C.NAMA_DRIVER - 1];
-      var cabang        = rowData[_FA_C.CABANG - 1];
+      var namaDriver    = rowData[_FA_C.NAMA_DRIVER - 1];   // col F (6), auto-fill by onEditSaldoAIST
+      var cabang        = rowData[_FA_C.CABANG - 1];        // col G (7)
 
       if (!loginId || !sumAIST) continue;
 
@@ -227,15 +235,15 @@ function saldoProcessAIST() {
         tanggal,        // B: Tanggal
         loginId,        // C: Login ID
         creditAccount,  // D: Credit Account
-        namaDriver,     // E: Nama Driver
-        cabang,         // F: Cabang
-        nominalPWA,     // G: Nominal PWA (yang diinput staff)
-        sumAIST,        // H: SUM AIST (yang tercatat di Maxim)
-        statusMatch,    // I: Status Match
+        namaDriver,     // E: Nama Driver (dari col F Form Input AIST — sudah di-auto-fill onEdit)
+        cabang,         // F: Cabang (dari col G Form Input AIST)
+        nominalPWA,     // G: Nominal Tagihan (nominal yg diinput staff di PWA; 0 jika HANYA_AIST)
+        sumAIST,        // H: SUM AIST (jumlah yang tercatat di Maxim AIST — col B Form Input AIST)
+        statusMatch,    // I: Status Match (MATCH/SELISIH/HANYA_AIST)
         tsISO,          // J: Created At (ISO UTC — Rule 40a)
       ]);
 
-      statusUpdates.push({ rowNum: _SD_DATA_START + i, status: statusMatch });
+      statusUpdates.push({ rowNum: _SD_DATA_START + i, nominalPWA: nominalPWA, status: statusMatch });
 
       // Update balance untuk MATCH dan SELISIH (transaksi terjadi — pakai SUM dari AIST)
       if (statusMatch === 'MATCH' || statusMatch === 'SELISIH') {
@@ -256,8 +264,9 @@ function saldoProcessAIST() {
       shDbAIST.getRange(lastDB + 1, 1, toAppendDB.length, toAppendDB[0].length)
               .setValues(toAppendDB);
 
-      // 2. Update status di Form Input Saldo AIST
+      // 2. Update Nominal Tagihan (E) + STATUS (H) di Form Input Saldo AIST
       statusUpdates.forEach(function(u) {
+        if (u.nominalPWA) shAIST.getRange(u.rowNum, _FA_C.NOMINAL_TAGIHAN).setValue(u.nominalPWA);
         shAIST.getRange(u.rowNum, _FA_C.STATUS).setValue(u.status);
       });
 

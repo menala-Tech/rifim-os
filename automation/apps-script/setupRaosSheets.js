@@ -152,8 +152,9 @@ var RAOS_SHEETS = [
       {h:'Credit Account',  c:_Y},
       {h:'Nama Driver',     c:_G},
       {h:'Cabang',          c:_G},
-      {h:'Nominal Tagihan', c:_G},
-      {h:'Status Match',    c:_T},  // MATCH / SELISIH / HANYA_PWA / HANYA_AIST
+      {h:'Nominal Tagihan', c:_G},   // Nominal dari Form Input Saldo PWA (yang diinput staff)
+      {h:'SUM AIST',        c:_Y},   // Jumlah yang tercatat di Maxim AIST (dari Form Input AIST col B)
+      {h:'Status Match',    c:_T},   // MATCH / SELISIH / HANYA_AIST
       {h:'Created At',      c:_T},
     ]
   },
