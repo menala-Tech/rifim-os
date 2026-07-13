@@ -62,35 +62,46 @@ function setupEmployeesSheet() {
 /**
  * Sinkronisasi semua karyawan dari Supabase ke sheet employees.
  * Dipanggil otomatis setelah add/update/resign karyawan.
+ *
+ * FIX #7 — dibungkus try/catch agar error sync tidak crash operasi HRIS utama.
+ *           Error dicatat ke system_log via _gasLogError().
+ *
  * @returns {{ synced: number }}
  */
 function syncHrisEmployeesToSheet() {
-  var employees = hrisGetEmployees({ limit: 1000 });
-  var ss        = _getDB();
-  var sheet     = ss.getSheetByName(EMPLOYEES_SHEET_NAME);
-  if (!sheet) {
-    setupEmployeesSheet();
-    sheet = ss.getSheetByName(EMPLOYEES_SHEET_NAME);
-  }
+  try {
+    var employees = hrisGetEmployees({ limit: 1000 });
+    var ss        = _getDB();
+    var sheet     = ss.getSheetByName(EMPLOYEES_SHEET_NAME);
+    if (!sheet) {
+      setupEmployeesSheet();
+      sheet = ss.getSheetByName(EMPLOYEES_SHEET_NAME);
+    }
 
-  // Hapus data lama (baris 2 dst), biarkan header
-  var lastRow = sheet.getLastRow();
-  if (lastRow > 1) {
-    sheet.getRange(2, 1, lastRow - 1, EMPLOYEES_HEADERS.length).clearContent();
-  }
+    // Hapus data lama (baris 2 dst), biarkan header
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, EMPLOYEES_HEADERS.length).clearContent();
+    }
 
-  if (!employees || employees.length === 0) return { synced: 0 };
+    if (!employees || employees.length === 0) return { synced: 0 };
 
-  var rows = employees.map(function(emp) {
-    return EMPLOYEES_HEADERS.map(function(col) {
-      var val = emp[col];
-      return (val === null || val === undefined) ? '' : String(val);
+    var rows = employees.map(function(emp) {
+      return EMPLOYEES_HEADERS.map(function(col) {
+        var val = emp[col];
+        return (val === null || val === undefined) ? '' : String(val);
+      });
     });
-  });
 
-  sheet.getRange(2, 1, rows.length, EMPLOYEES_HEADERS.length).setValues(rows);
-  Logger.log('Sync selesai: ' + rows.length + ' karyawan.');
-  return { synced: rows.length };
+    sheet.getRange(2, 1, rows.length, EMPLOYEES_HEADERS.length).setValues(rows);
+    Logger.log('Sync selesai: ' + rows.length + ' karyawan.');
+    return { synced: rows.length };
+
+  } catch (syncErr) {
+    // FIX #7 — log ke system_log; jangan re-throw agar operasi HRIS utama tetap sukses
+    _gasLogError('HRIS', 'syncHrisEmployeesToSheet', syncErr, null);
+    return { synced: 0, error: syncErr.message };
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -365,6 +376,12 @@ function setupActivityLogSheet() {
 
 /**
  * Catat satu baris aktivitas. Gagal diam-diam — tidak boleh batalkan operasi utama.
+ *
+ * FIX #1 — timestamp pakai _gasNow() → ISO UTC (dulu 'yyyy-MM-dd HH:mm:ss' lokal)
+ * FIX #6 — wrapped _gasWithLock() untuk cegah concurrent append race condition
+ * FIX #9 — catch block log ke system_log via console.error (tidak bisa _gasLogError
+ *           karena _gasLog sendiri pakai logActivity → infinite loop; console.error cukup)
+ *
  * @param {string} module          - 'Portal' | 'HRIS' | 'Smart Office'
  * @param {string} action          - 'LOGIN' | 'LOGOUT' | 'TAMBAH' | 'EDIT' | 'RESIGN' | 'PHK' | 'BUAT DOKUMEN'
  * @param {string} targetId        - employee_id / document_number
@@ -375,25 +392,29 @@ function setupActivityLogSheet() {
  */
 function logActivity(module, action, targetId, targetName, performedByName, performedByEmail, detail) {
   try {
-    var ss    = _getDB();
-    var sheet = ss.getSheetByName(ACTIVITY_LOG_SHEET_NAME);
-    if (!sheet) {
-      setupActivityLogSheet();
-      sheet = ss.getSheetByName(ACTIVITY_LOG_SHEET_NAME);
-    }
-    var tsStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
-    sheet.appendRow([
-      tsStr,
-      module           || '',
-      action           || '',
-      targetId         || '',
-      targetName       || '',
-      performedByName  || '',
-      performedByEmail || '',
-      detail           || '',
-    ]);
+    // FIX #6 — ScriptLock agar concurrent appendRow tidak tumpang tindih
+    _gasWithLock(function() {
+      var ss    = _getDB();
+      var sheet = ss.getSheetByName(ACTIVITY_LOG_SHEET_NAME);
+      if (!sheet) {
+        setupActivityLogSheet();
+        sheet = ss.getSheetByName(ACTIVITY_LOG_SHEET_NAME);
+      }
+      // FIX #1 — ISO UTC timestamp menggantikan 'yyyy-MM-dd HH:mm:ss' lokal
+      sheet.appendRow([
+        _gasNow(),           // ← ISO UTC: "2026-07-13T08:30:00.000Z"
+        module           || '',
+        action           || '',
+        targetId         || '',
+        targetName       || '',
+        performedByName  || '',
+        performedByEmail || '',
+        detail           || '',
+      ]);
+    });
   } catch (e) {
-    console.warn('logActivity gagal:', e.message);
+    // FIX #9 — gunakan console.error (bukan _gasLogError) untuk hindari rekursi
+    console.error('[RIFIM OS] logActivity gagal: ' + e.message);
   }
 }
 

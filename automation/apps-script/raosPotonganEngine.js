@@ -401,7 +401,8 @@ function _pindahDataPotonganByName(sheetName) {
 
   // ── Bangun baris untuk Database Potongan ──────────────────────
   var toAppend   = [];
-  var tsStr      = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
+  var tsISO      = _gasNow(); // FIX #11 — ISO UTC untuk CREATED_AT (col O), bukan 'dd/MM/yyyy HH:mm:ss'
+  var tsDisplay  = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss'); // hanya untuk alert dialog
   var adminEmail = Session.getActiveUser().getEmail();
   var lastIdRow  = sheetDB.getLastRow();
 
@@ -459,7 +460,7 @@ function _pindahDataPotonganByName(sheetName) {
       surchargeOffline,  // L: Surcharge Offline (price × 12% jika offline)
       potonganKantor,    // M: Total Potongan (sudah termasuk surcharge)
       'DONE',            // N: Status
-      tsStr,             // O: Created At
+      tsISO,             // O: Created At — ISO UTC (FIX #11)
     ]);
   }
 
@@ -469,11 +470,13 @@ function _pindahDataPotonganByName(sheetName) {
     return;
   }
 
-  // ── Append ke Database Potongan ───────────────────────────────
-  var dbLastRow = sheetDB.getLastRow();
-  sheetDB.getRange(
-    dbLastRow + 1, 1, toAppend.length, toAppend[0].length
-  ).setValues(toAppend);
+  // ── Append ke Database Potongan (FIX #12 — ScriptLock anti concurrent admin click) ─
+  _gasWithLock(function() {
+    var dbLastRow = sheetDB.getLastRow();
+    sheetDB.getRange(
+      dbLastRow + 1, 1, toAppend.length, toAppend[0].length
+    ).setValues(toAppend);
+  });
 
   // ── Cooldown SETELAH berhasil — pola Ops sistem final.gs ──────
   cache.put(cacheKey, 'true', 60);
@@ -509,7 +512,7 @@ function _pindahDataPotonganByName(sheetName) {
   SpreadsheetApp.getUi().alert(
     '✅ BERHASIL!\n\nBaris: ' + toAppend.length +
     '\nSheet: ' + sheetName +
-    '\nWaktu: ' + tsStr +
+    '\nWaktu: ' + tsDisplay +
     '\nAdmin: ' + adminEmail);
 }
 

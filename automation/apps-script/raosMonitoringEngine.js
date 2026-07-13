@@ -656,8 +656,10 @@ function cekSLASaldoPWA() {
 
   if (Object.keys(telatPerCabang).length === 0) return;
 
-  var props = PropertiesService.getScriptProperties();
-  var tsStr = Utilities.formatDate(now, tz, 'dd/MM/yyyy HH:mm:ss');
+  var props  = PropertiesService.getScriptProperties();
+  // FIX #13 — pisahkan ISO UTC (untuk storage) dari display string (untuk PropertiesService)
+  var tsISO  = _gasNow(); // ISO UTC untuk kolom sheet col I (Alert Terakhir)
+  var tsStr  = Utilities.formatDate(now, tz, 'dd/MM/yyyy HH:mm:ss'); // untuk PropertiesService (dibaca _monParseTs)
 
   Object.keys(telatPerCabang).forEach(function(kunci) {
     var group   = telatPerCabang[kunci];
@@ -681,10 +683,12 @@ function cekSLASaldoPWA() {
       }
       props.setProperty(alertKey, tsStr);
 
-      // Tandai H (Alert Terkirim) = TRUE dan I (Alert Terakhir) = timestamp
-      group.items.forEach(function(item) {
-        shPWA.getRange(item.sheetRow, 8).setValue(true); // H: Alert Terkirim
-        shPWA.getRange(item.sheetRow, 9).setValue(tsStr); // I: Alert Terakhir
+      // FIX #13 + #14 — tulis ISO UTC ke col I; wrapped ScriptLock anti concurrent trigger
+      _gasWithLock(function() {
+        group.items.forEach(function(item) {
+          shPWA.getRange(item.sheetRow, 8).setValue(true);  // H: Alert Terkirim
+          shPWA.getRange(item.sheetRow, 9).setValue(tsISO); // I: Alert Terakhir — ISO UTC
+        });
       });
 
       Logger.log('cekSLASaldoPWA: alert terkirim ke ' + (groupId || 'grup utama') + ' — ' + cabang);

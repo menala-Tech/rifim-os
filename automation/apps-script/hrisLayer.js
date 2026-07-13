@@ -380,7 +380,7 @@ function _countWorkdays(startStr, endStr) {
 
 function _deductLeaveBalance(leaveId) {
   try {
-    var cfg     = _getSupabaseConfig();
+    var cfg      = _getSupabaseConfig();
     var leaveUrl = cfg.url + '/rest/v1/leave_requests?id=eq.' + leaveId + '&select=employee_id,total_days';
     var leaveRes = UrlFetchApp.fetch(leaveUrl, { method: 'GET', headers: _sbHeaders(cfg.key), muteHttpExceptions: true });
     var leaves   = JSON.parse(leaveRes.getContentText());
@@ -390,9 +390,10 @@ function _deductLeaveBalance(leaveId) {
     var bal   = hrisGetLeaveBalance(leave.employee_id, year);
     _sbPatch('leave_balances',
       'employee_id=eq.' + encodeURIComponent(leave.employee_id) + '&year=eq.' + year,
-      { used_days: (bal.used_days || 0) + (leave.total_days || 0), updated_at: new Date().toISOString() }
+      { used_days: (bal.used_days || 0) + (leave.total_days || 0), updated_at: _gasNow() }
     );
   } catch (e) {
-    console.warn('Gagal kurangi saldo cuti:', e.message);
+    // FIX #10 — log ke system_log (bukan hanya console.warn)
+    _gasLogError('HRIS', '_deductLeaveBalance', e, { leaveId: leaveId });
   }
 }

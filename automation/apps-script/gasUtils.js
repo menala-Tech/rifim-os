@@ -148,6 +148,11 @@ function _gasLogWarn(source, action, message, payload) {
   _gasLog(source, action, 'WARN', message, payload);
 }
 
+/** Shorthand: log level INFO. */
+function _gasLogInfo(source, action, message, payload) {
+  _gasLog(source, action, 'INFO', message, payload);
+}
+
 /** Pastikan sheet system_log ada; buat kalau belum. */
 function _gasEnsureLogSheet(ss) {
   var sh = ss.getSheetByName(_SYS_LOG_SHEET);

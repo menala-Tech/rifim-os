@@ -7,35 +7,78 @@
  * id | document_number | document_type | document_code | document_date |
  * recipient_name | recipient_address | subject | attachment | body_summary |
  * status | gdoc_url | pdf_url | qr_url | created_by | created_at | updated_at
+ *
+ * PERUBAHAN (refactor konsistensi):
+ *   - saveDocumentRecord()   → attachment sanitized ke integer / '-'
+ *                            → wrapped _gasWithLock() (fix #4)
+ *   - updateDocumentStatus() → wrapped _gasWithLock() (fix #5)
+ *   - getDocumentList()      → Date object di created_at/updated_at selalu → ISO UTC
  */
+
+// ── Indeks kolom sheet documents (1-based) ──────────────────────────
+var _DOC_COL = {
+  ID: 1, DOC_NUMBER: 2, DOC_TYPE: 3, DOC_CODE: 4, DOC_DATE: 5,
+  RECIPIENT_NAME: 6, RECIPIENT_ADDR: 7, SUBJECT: 8, ATTACHMENT: 9,
+  BODY_SUMMARY: 10, STATUS: 11, GDOC_URL: 12, PDF_URL: 13, QR_URL: 14,
+  CREATED_BY: 15, CREATED_AT: 16, UPDATED_AT: 17,
+};
+
+/**
+ * Sanitasi nilai attachment:
+ *   - Angka bulat (atau string angka)  → integer
+ *   - Kosong / null / undefined        → 0
+ *   - String bebas '-', 'N/A', dll.    → 0  (tidak simpan teks di kolom angka)
+ * @private
+ */
+function _docSanitizeAttachment(raw) {
+  if (raw === undefined || raw === null || String(raw).trim() === '' || raw === '-') return 0;
+  var n = Number(raw);
+  if (isNaN(n)) return 0;
+  return Math.round(n); // paksa integer
+}
 
 /**
  * Simpan record dokumen ke sheet documents.
+ * Dilindungi ScriptLock — mencegah dua Smart Office request menulis bersamaan.
  * @param {object} record
  */
 function saveDocumentRecord(record) {
-  const sheet = _getDB().getSheetByName('documents');
-  if (!sheet) throw new Error('Sheet documents tidak ditemukan.');
+  // FIX #3 — sanitasi attachment ke integer sebelum simpan
+  var attachment = _docSanitizeAttachment(record.attachment);
 
-  sheet.appendRow([
-    record.id,
-    record.document_number,
-    record.document_type,
-    record.document_code   || '',
-    record.document_date,
-    record.recipient_name,
-    record.recipient_address || '',
-    record.subject,
-    record.attachment      || '-',
-    record.body_summary    || '',
-    record.status          || 'FINAL',
-    record.gdoc_url        || '',
-    record.pdf_url         || '',
-    record.qr_url          || '',
-    record.created_by      || '',
-    record.created_at,
-    record.updated_at,
-  ]);
+  // FIX #1 — pastikan timestamp pakai ISO UTC
+  var createdAt = record.created_at
+    ? (record.created_at instanceof Date ? record.created_at.toISOString() : String(record.created_at))
+    : _gasNow();
+  var updatedAt = record.updated_at
+    ? (record.updated_at instanceof Date ? record.updated_at.toISOString() : String(record.updated_at))
+    : createdAt;
+
+  // FIX #4 — proteksi race condition dengan ScriptLock
+  _gasWithLock(function() {
+    var sheet = _getDB().getSheetByName('documents');
+    if (!sheet) throw new Error('Sheet documents tidak ditemukan.');
+
+    sheet.appendRow([
+      record.id,
+      record.document_number,
+      record.document_type,
+      record.document_code    || '',
+      record.document_date    || '',
+      record.recipient_name   || '',
+      record.recipient_address || '',
+      record.subject,
+      attachment,              // ← selalu integer, bukan teks bebas
+      record.body_summary     || '',
+      record.status           || 'FINAL',
+      record.gdoc_url         || '',
+      record.pdf_url          || '',
+      record.qr_url           || '',
+      record.created_by       || '',
+      createdAt,               // ← ISO UTC
+      updatedAt,               // ← ISO UTC
+    ]);
+  });
 }
 
 /**
@@ -44,23 +87,27 @@ function saveDocumentRecord(record) {
  * @returns {Array}
  */
 function getDocuments(filters) {
-  const sheet = _getDB().getSheetByName('documents');
+  var sheet = _getDB().getSheetByName('documents');
   if (!sheet) throw new Error('Sheet documents tidak ditemukan.');
 
-  const data    = sheet.getDataRange().getValues();
-  const headers = data[0];
-  let records   = [];
+  var data    = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var records = [];
 
-  for (let i = 1; i < data.length; i++) {
-    const row    = data[i];
-    const record = {};
+  for (var i = 1; i < data.length; i++) {
+    var row    = data[i];
+    var record = {};
     headers.forEach(function(h, idx) { record[h] = row[idx]; });
     records.push(record);
   }
 
   if (filters) {
-    if (filters.documentCode) records = records.filter(function(r) { return r.document_code === filters.documentCode; });
-    if (filters.status)       records = records.filter(function(r) { return r.status === filters.status; });
+    if (filters.documentCode) {
+      records = records.filter(function(r) { return r.document_code === filters.documentCode; });
+    }
+    if (filters.status) {
+      records = records.filter(function(r) { return r.status === filters.status; });
+    }
   }
 
   return records;
@@ -80,36 +127,45 @@ function getDocumentList(options) {
 
   var rows = data.slice(1).filter(function(r) { return r[0]; }).reverse();
 
+  // FIX #1 — semua Date object dari Sheets dipaksa ke ISO UTC string
+  var toIso = function(v) {
+    if (v instanceof Date) return v.toISOString();
+    if (v && String(v).trim()) return String(v);
+    return '';
+  };
+
   var allDocs = rows.map(function(r) {
+    var docDate = r[4] instanceof Date
+      ? Utilities.formatDate(r[4], 'Asia/Jakarta', 'yyyy-MM-dd')
+      : (r[4] ? String(r[4]) : '');
+
     return {
-      id:               r[0]  || '',
-      document_number:  r[1]  || '',
-      document_type:    r[2]  || '',
-      document_code:    r[3]  || '',
-      document_date:    r[4] instanceof Date
-                          ? Utilities.formatDate(r[4], 'Asia/Jakarta', 'yyyy-MM-dd')
-                          : (r[4] ? String(r[4]) : ''),
-      recipient_name:   r[5]  || '',
-      recipient_address:r[6]  || '',
-      subject:          r[7]  || '',
-      attachment:       r[8]  || '',
-      body_summary:     r[9]  || '',
-      status:           r[10] || '',
-      gdoc_url:         r[11] || '',
-      pdf_url:          r[12] || '',
-      qr_url:           r[13] || '',
-      created_by:       r[14] || '',
-      created_at:       r[15] instanceof Date ? r[15].toISOString() : (r[15] ? String(r[15]) : ''),
-      updated_at:       r[16] instanceof Date ? r[16].toISOString() : (r[16] ? String(r[16]) : ''),
+      id:               r[_DOC_COL.ID - 1]               || '',
+      document_number:  r[_DOC_COL.DOC_NUMBER - 1]       || '',
+      document_type:    r[_DOC_COL.DOC_TYPE - 1]         || '',
+      document_code:    r[_DOC_COL.DOC_CODE - 1]         || '',
+      document_date:    docDate,
+      recipient_name:   r[_DOC_COL.RECIPIENT_NAME - 1]   || '',
+      recipient_address:r[_DOC_COL.RECIPIENT_ADDR - 1]   || '',
+      subject:          r[_DOC_COL.SUBJECT - 1]          || '',
+      attachment:       r[_DOC_COL.ATTACHMENT - 1]       || 0,
+      body_summary:     r[_DOC_COL.BODY_SUMMARY - 1]     || '',
+      status:           r[_DOC_COL.STATUS - 1]           || '',
+      gdoc_url:         r[_DOC_COL.GDOC_URL - 1]         || '',
+      pdf_url:          r[_DOC_COL.PDF_URL - 1]          || '',
+      qr_url:           r[_DOC_COL.QR_URL - 1]           || '',
+      created_by:       r[_DOC_COL.CREATED_BY - 1]       || '',
+      created_at:       toIso(r[_DOC_COL.CREATED_AT - 1]),  // ← selalu ISO UTC
+      updated_at:       toIso(r[_DOC_COL.UPDATED_AT - 1]),  // ← selalu ISO UTC
     };
   });
 
-  var now = new Date();
+  var now       = new Date();
   var thisMonth = now.getMonth();
   var thisYear  = now.getFullYear();
   var stats = {
-    total:      allDocs.length,
-    bulan_ini:  allDocs.filter(function(d) {
+    total:     allDocs.length,
+    bulan_ini: allDocs.filter(function(d) {
       if (!d.created_at) return false;
       var dt = new Date(d.created_at);
       return dt.getMonth() === thisMonth && dt.getFullYear() === thisYear;
@@ -121,7 +177,7 @@ function getDocumentList(options) {
   };
 
   var status = options && options.status ? options.status : 'ALL';
-  var docs = status !== 'ALL'
+  var docs   = status !== 'ALL'
     ? allDocs.filter(function(d) { return d.status === status; })
     : allDocs;
 
@@ -152,19 +208,24 @@ function getDocumentList(options) {
 
 /**
  * Update status dokumen berdasarkan document_number.
+ * Dilindungi ScriptLock — read-then-write adalah operasi non-atomik.
  * @param {string} documentNumber
  * @param {string} newStatus  DRAFT | FINAL | SENT | ARCHIVED
  */
 function updateDocumentStatus(documentNumber, newStatus) {
-  const sheet = _getDB().getSheetByName('documents');
-  const data  = sheet.getDataRange().getValues();
+  // FIX #5 — proteksi race condition dengan ScriptLock
+  return _gasWithLock(function() {
+    var sheet = _getDB().getSheetByName('documents');
+    if (!sheet) return false;
 
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][1] === documentNumber) {
-      sheet.getRange(i + 1, 11).setValue(newStatus);           // kolom 11 = status
-      sheet.getRange(i + 1, 17).setValue(new Date().toISOString()); // kolom 17 = updated_at
-      return true;
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][_DOC_COL.DOC_NUMBER - 1] === documentNumber) {
+        sheet.getRange(i + 1, _DOC_COL.STATUS).setValue(newStatus);
+        sheet.getRange(i + 1, _DOC_COL.UPDATED_AT).setValue(_gasNow()); // ← ISO UTC
+        return true;
+      }
     }
-  }
-  return false;
+    return false;
+  });
 }

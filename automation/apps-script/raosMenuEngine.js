@@ -239,7 +239,8 @@ function pindahTransaksiAISTKeDatabase() {
   }
 
   var toAppend   = [];
-  var tsStr      = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
+  var tsISO      = _gasNow(); // FIX #15 — ISO UTC untuk Created At (col I), bukan 'dd/MM/yyyy HH:mm:ss'
+  var tsDisplay  = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss'); // hanya untuk alert dialog
   var adminEmail = Session.getActiveUser().getEmail();
   var rowsToClear = [];
 
@@ -273,7 +274,7 @@ function pindahTransaksiAISTKeDatabase() {
       cabang,                            // F: Cabang
       sum,                               // G: Nominal AIST (SUM dari AIST)
       status || 'TRANSFERRED',           // H: Status Match
-      tsStr,                             // I: Created At
+      tsISO,                             // I: Created At — ISO UTC (FIX #15)
     ]);
 
     rowsToClear.push(i);
@@ -284,8 +285,10 @@ function pindahTransaksiAISTKeDatabase() {
     return;
   }
 
-  // ── Append ke Database AIST ───────────────────────────────────
-  sheetDB.getRange(dbLastRow + 1, 1, toAppend.length, toAppend[0].length).setValues(toAppend);
+  // ── Append ke Database AIST (FIX #16 — ScriptLock anti concurrent admin click) ──
+  _gasWithLock(function() {
+    sheetDB.getRange(dbLastRow + 1, 1, toAppend.length, toAppend[0].length).setValues(toAppend);
+  });
 
   // ── Cooldown SETELAH berhasil — pola Ops sistem final.gs ──────
   cache.put(cacheKey, 'true', 60);
@@ -308,7 +311,7 @@ function pindahTransaksiAISTKeDatabase() {
 
   SpreadsheetApp.getUi().alert(
     '✅ BERHASIL!\n\nBaris: ' + toAppend.length +
-    '\nWaktu: ' + tsStr +
+    '\nWaktu: ' + tsDisplay +
     '\nAdmin: ' + adminEmail);
 }
 

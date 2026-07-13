@@ -4,6 +4,11 @@
  *
  * Prinsip: satu fungsi GenerateDocument() untuk semua jenis dokumen.
  * Tidak ada GenerateSurat(), GenerateInvoice() terpisah.
+ *
+ * PERUBAHAN (refactor konsistensi):
+ *   - _buildRecord() → id pakai _gasUuid() bukan 'DOC-' + Date.now() (fix #2)
+ *   - _buildRecord() → attachment divalidasi ke integer via _docSanitizeAttachment() (fix #3)
+ *   - generateDocument() catch → error di-log ke system_log via _gasLogError() (fix #8)
  */
 
 // Import dari engine lain (di GAS semua file dalam satu project)
@@ -11,7 +16,7 @@
 // placeholderEngine.js → replacePlaceholders(), buildPlaceholderData()
 // driveManager.js      → saveDocument(), getTemplateCopy()
 // pdfEngine.js         → exportToPDF()
-// databaseLayer.js     → saveDocumentRecord()
+// databaseLayer.js     → saveDocumentRecord(), _docSanitizeAttachment()
 // configLoader.js      → getCompanyConfig()
 
 /**
@@ -24,7 +29,7 @@
  *   input.recipientCompany {string}
  *   input.recipientAddress {string}
  *   input.subject         {string} - Perihal
- *   input.attachment      {string} - Lampiran
+ *   input.attachment      {number} - Lampiran (integer). '-' atau kosong → 0
  *   input.body            {string} - Isi dokumen
  *   input.documentDate    {string} - Opsional, default hari ini
  *
@@ -52,18 +57,18 @@ function generateDocument(input) {
         director_title:  company.director_title,
       });
     }
-    const docPrefix  = company && company.doc_prefix ? String(company.doc_prefix) : 'RIFIM';
-    const docNumber  = generateDocumentNumber(input.documentType, docPrefix);
-    const templateId = _getTemplateId(input.documentType, config, input.company_code);
-    const docCopy    = getTemplateCopy(templateId, docNumber);
-    const data       = buildPlaceholderData(input, config, docNumber);
+    var docPrefix  = company && company.doc_prefix ? String(company.doc_prefix) : 'RIFIM';
+    var docNumber  = generateDocumentNumber(input.documentType, docPrefix);
+    var templateId = _getTemplateId(input.documentType, config, input.company_code);
+    var docCopy    = getTemplateCopy(templateId, docNumber);
+    var data       = buildPlaceholderData(input, config, docNumber);
 
     replacePlaceholders(docCopy.getId(), data);
 
-    const finalDoc   = saveDocument(docCopy, input.documentType, docNumber);
-    const qrUrl      = embedQrInDoc(finalDoc.getId(), finalDoc.getUrl());
-    const pdfFile    = exportToPDF(finalDoc.getId(), input.documentType, docNumber);
-    const record     = _buildRecord(input, config, docNumber, finalDoc, pdfFile, qrUrl);
+    var finalDoc = saveDocument(docCopy, input.documentType, docNumber);
+    var qrUrl    = embedQrInDoc(finalDoc.getId(), finalDoc.getUrl());
+    var pdfFile  = exportToPDF(finalDoc.getId(), input.documentType, docNumber);
+    var record   = _buildRecord(input, config, docNumber, finalDoc, pdfFile, qrUrl);
 
     saveDocumentRecord(record);
 
@@ -76,7 +81,12 @@ function generateDocument(input) {
     };
 
   } catch (err) {
-    console.error('DocumentEngine Error:', err.message);
+    // FIX #8 — log ke system_log (bukan hanya console.error)
+    _gasLogError('Smart Office', 'generateDocument', err, {
+      documentType: input && input.documentType || '',
+      subject:      input && input.subject      || '',
+      company_code: input && input.company_code || '',
+    });
     return {
       success: false,
       message: 'Gagal membuat dokumen: ' + err.message,
@@ -167,24 +177,29 @@ function _getTemplateId(docType, config, companyCode) {
  * @private
  */
 function _buildRecord(input, config, docNumber, finalDoc, pdfFile, qrUrl) {
-  const now = new Date().toISOString();
+  var now = _gasNow(); // ← ISO UTC via gasUtils
   return {
-    id:               'DOC-' + Date.now(),
+    // FIX #2 — UUID v4 menggantikan 'DOC-' + Date.now() (tidak unik saat concurrent)
+    id:               _gasUuid(),
     document_number:  docNumber,
-    document_type:    DOCUMENT_TYPES[input.documentType] ? DOCUMENT_TYPES[input.documentType].label : input.documentType,
+    document_type:    DOCUMENT_TYPES[input.documentType]
+                        ? DOCUMENT_TYPES[input.documentType].label
+                        : input.documentType,
     document_code:    input.documentType,
     document_date:    input.documentDate || now.split('T')[0],
-    recipient_name:   input.recipientName,
-    recipient_address: input.recipientAddress || '',
+    recipient_name:   input.recipientName    || '',
+    recipient_address:input.recipientAddress || '',
     subject:          input.subject,
-    attachment:       input.attachment || '-',
+    // FIX #3 — sanitasi attachment ke integer (bukan teks '-', 'N/A', dll.)
+    attachment:       _docSanitizeAttachment(input.attachment),
     body_summary:     (input.body || '').substring(0, 200),
     status:           'FINAL',
     gdoc_url:         finalDoc.getUrl(),
     pdf_url:          pdfFile.getUrl(),
     qr_url:           qrUrl || '',
-    created_by:       Session.getActiveUser().getEmail(),
-    created_at:       now,
-    updated_at:       now,
+    created_by:       (input.performed_by && input.performed_by.email)
+                        || Session.getActiveUser().getEmail(),
+    created_at:       now, // ← ISO UTC
+    updated_at:       now, // ← ISO UTC
   };
 }
