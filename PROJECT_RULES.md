@@ -225,6 +225,7 @@ Urutan setup yang harus dijalankan **sekali** dari GAS Editor setelah deploy ke 
 | 10c | `setupAbsensiFolder()` | `staffAppApi.js` | Folder ID utama Drive "Rifim OS" — foto absensi tersimpan bertingkat PWA/Foto Absensi/[Bulan]/[Cabang] |
 | 11 | `setupMonitoringSheets()` | `raosMonitoringEngine.js` | Buat sheet MONITORING_SALDO + MONITORING_POTONGAN |
 | 12 | `setupMonitoringTriggers()` | `raosMonitoringEngine.js` | Pasang trigger monitoring tiap 5 menit |
+| 13 | `setupTriggerExpiringContracts()` | `notificationEngine.js` | Trigger harian jam 08:00 WIB — cek kontrak berakhir ≤30 hari → email + WA HRD |
 
 ### Property Wajib untuk Staff PWA (PropertiesService)
 

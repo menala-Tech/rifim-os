@@ -67,11 +67,14 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/).
   (GitHub + Vercel + Google) sudah tidak bisa diakses → di-rebuild ke Staff PWA (antrian)
   dan Driver PWA (menyusul). Tidak ada data yang perlu diselamatkan.
 
-### In Progress — HRIS Sprint 2
+### Done — HRIS Sprint 2 (selesai 2026-07-13)
 - [x] Export rekap karyawan CSV (filter sesuai tampilan aktif)
 - [x] Filter absensi per departemen + kolom nama karyawan di tabel absensi
-- [ ] Test PKWT generation end-to-end dari kontrak baru
-- [ ] Setup trigger notifCheckExpiringContracts()
+- [x] Test PKWT generation end-to-end — PASSED: `009/RIFIM/PKWT/VII/2026`
+      (GDoc + PDF + QR + arsip; id UUID v4, attachment integer, timestamp ISO UTC)
+- [x] Setup trigger notifCheckExpiringContracts() — `setupTriggerExpiringContracts()`
+      baru di `notificationEngine.js` (harian 08:00 WIB, idempotent) + error logging
+      Rule 43 (per-kontrak try/catch → system_log, satu gagal tidak block sisanya)
 
 ### Planned — Sprint 3+
 - Modul Finance (cash flow, saldo driver, budget)

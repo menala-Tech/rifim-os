@@ -72,8 +72,16 @@ function notifDocumentCreated(params) {
  * Dipanggil dari time-based trigger (tiap hari).
  */
 function notifCheckExpiringContracts() {
-  var contracts = hrisGetExpiringContracts(30); // 30 hari ke depan
+  var contracts;
+  try {
+    contracts = hrisGetExpiringContracts(30); // 30 hari ke depan
+  } catch (err) {
+    // Rule 43a — trigger tanpa pengawasan: catat kegagalan ke system_log
+    _gasLogError('HRIS', 'notifCheckExpiringContracts', err);
+    return;
+  }
   contracts.forEach(function(c) {
+    try {
     var emp = hrisGetEmployee(c.employee_id);
     if (!emp) return;
     var daysLeft = _daysUntil(c.end_date);
@@ -104,6 +112,11 @@ function notifCheckExpiringContracts() {
       }));
     } catch (errWa) {
       Logger.log('notifCheckExpiringContracts WA gagal (non-fatal): ' + errWa.message);
+    }
+    } catch (errC) {
+      // Satu kontrak gagal → catat, lanjut ke kontrak berikutnya
+      _gasLogError('HRIS', 'notifCheckExpiringContracts', errC,
+        { employee_id: c.employee_id, end_date: c.end_date });
     }
   });
 }
@@ -212,6 +225,20 @@ function notifPayrollSiapDiproses(params) {
   } catch (errWa) {
     Logger.log('notifPayrollSiapDiproses WA gagal (non-fatal): ' + errWa.message);
   }
+}
+
+/**
+ * Buat trigger harian untuk notifCheckExpiringContracts (setiap hari jam 08:00 WIB).
+ * Cek kontrak yang berakhir ≤30 hari → email + WA ke tim HRD.
+ * Jalankan SEKALI dari GAS Editor. Idempotent — trigger lama dihapus dulu.
+ */
+function setupTriggerExpiringContracts() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'notifCheckExpiringContracts') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('notifCheckExpiringContracts')
+    .timeBased().everyDays(1).atHour(8).inTimezone('Asia/Jakarta').create();
+  Logger.log('Trigger notifCheckExpiringContracts aktif: setiap hari jam 08:00 WIB');
 }
 
 /**
