@@ -15,6 +15,11 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/).
 - `CLAUDE.md` — seksi **Integration Rules (MUTLAK, BACA PERTAMA)** v1.1: tabel 4 aturan
   + mapping ke utilitas kanonik `gasUtils.js`
 
+### Fixed — Pre-Sprint 3A compliance (2026-07-13)
+- `setupDatabase.js` — sample row `DOC-2026-001` attachment diganti integer `1` (sebelumnya string `"1 (Satu) Berkas Proposal"` — violation Rule 42a)
+- `setupDatabase.js` — tambah `patchSampleDocAttachment()`: patch baris lama di sheet `documents` yang masih tersimpan sebagai string attachment → integer `1`. Jalankan SEKALI dari GAS Editor.
+- `raosPotonganEngine.js` — ID baris `Database Potongan` diganti `_gasUuid()` (Rule 42d). Sebelumnya: pola `POT-0001` (sequential numeric — dilarang).
+
 ### Fixed — Konsistensi payload attachment (Fix #18)
 - `modules/smart-office/index.html` — field Lampiran jadi `<input type="number">`,
   payload kirim `parseInt(...) || 0` (integer, bukan teks bebas `"1 (Satu) Berkas"`)

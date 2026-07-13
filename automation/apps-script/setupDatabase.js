@@ -100,7 +100,7 @@ function _setupDocumentsSheet(ss) {
     'PT. Teknologi Perdana Indonesia',
     'Di Tempat',
     'Penawaran Kerjasama Strategic Marketing',
-    '1 (Satu) Berkas Proposal',
+    1,
     'Kami bermaksud mengajukan penawaran kerjasama...',
     'FINAL',
     'https://docs.google.com/...',
@@ -331,6 +331,32 @@ function resetMonthlySequences() {
   }
 
   Logger.log('Sequences direset untuk ' + roman + '/' + year);
+}
+
+
+// ─────────────────────────────────────────────
+// UTILITY: Lihat info spreadsheet ini
+// ─────────────────────────────────────────────
+
+/**
+ * Patch: fix attachment kolom I pada baris sample DOC-2026-001 yang tersimpan
+ * sebagai string lama sebelum Fix #18. Jalankan SEKALI dari GAS Editor.
+ */
+function patchSampleDocAttachment() {
+  var ss    = _getDB();
+  var sheet = ss.getSheetByName('documents');
+  if (!sheet) { Logger.log('Sheet documents tidak ditemukan.'); return; }
+  var data  = sheet.getDataRange().getValues();
+  var fixed = 0;
+  for (var i = 1; i < data.length; i++) {
+    var att = data[i][8]; // kolom I (0-based: 8) = attachment
+    if (typeof att === 'string' && att !== '') {
+      sheet.getRange(i + 1, 9).setValue(1); // konversi ke integer 1
+      Logger.log('Fixed row ' + (i + 1) + ': "' + att + '" → 1');
+      fixed++;
+    }
+  }
+  Logger.log(fixed ? (fixed + ' baris attachment dipatch ke integer.') : 'Tidak ada baris yang perlu dipatch.');
 }
 
 

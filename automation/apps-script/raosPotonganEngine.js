@@ -404,16 +404,6 @@ function _pindahDataPotonganByName(sheetName) {
   var tsISO      = _gasNow(); // FIX #11 — ISO UTC untuk CREATED_AT (col O), bukan 'dd/MM/yyyy HH:mm:ss'
   var tsDisplay  = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss'); // hanya untuk alert dialog
   var adminEmail = Session.getActiveUser().getEmail();
-  var lastIdRow  = sheetDB.getLastRow();
-
-  // Hitung ID terakhir di Database Potongan untuk generate ID baru
-  var lastIdNum = 0;
-  if (lastIdRow >= 3) {
-    var lastIdVal = sheetDB.getRange(lastIdRow, _DB_COL.ID).getValue().toString();
-    var match = lastIdVal.match(/(\d+)$/);
-    if (match) lastIdNum = parseInt(match[1]);
-  }
-
   for (var i = 0; i < data.length; i++) {
     var row = data[i];
 
@@ -442,11 +432,8 @@ function _pindahDataPotonganByName(sheetName) {
     var surchargeOffline = (offline === true) ? Math.round(Number(price) * 0.12) : 0;
     var tipeWaktu        = _tipeWaktu(waktuOrder); // _tipeWaktu() handle Date, number, dan string
 
-    lastIdNum++;
-    var newId = 'POT-' + ('0000' + lastIdNum).slice(-4);
-
     toAppend.push([
-      newId,             // A: ID
+      _gasUuid(),        // A: ID — UUID v4 (Rule 42d)
       waktuOrder,        // B: Tanggal (Waktu Order dari AIST)
       idCabang,          // C: Id Cabang
       loginId,           // D: Login ID
