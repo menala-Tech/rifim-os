@@ -100,6 +100,35 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 
 ---
 
+### RIFIM CHAT — Settings (Dokumentasi_Fitur_Settings_RIFIM_OS.md)
+
+**Mode Kerja (konsep KRITIS yang berdampak ke banyak modul):**
+Status: `BERTUGAS | ISTIRAHAT | SIAP_ORDER | OFF_DUTY | CUTI | SAKIT`
+Dampak: Smart Queue · HRIS · Dashboard · AI Insight · Notifikasi
+→ Driver OFF_DUTY/SAKIT tidak boleh masuk antrian Smart Queue
+→ Perlu field `work_status` di tabel `employees`/`drivers` Supabase
+
+**Dashboard Preferensi (home screen customizable per user):**
+Widget yang bisa dipilih: Smart Queue · Saldo & Transaksi · Pengumuman · Absensi Hari Ini · KPI & Target · AI Insight · Driver Datang · Approval
+→ Perlu tabel `user_preferences` di Supabase
+
+**Notifikasi granular (per event toggle):**
+Absensi · Smart Queue · Panggilan Antrian · Isi Saldo · Saldo Masuk · Smart Office · Approval · Driver Datang · Driver Idle · Driver Keluar Geofence · KPI & Target · Dashboard Update
+
+**Notification sounds per tipe:**
+Queue Call · Cash In · Warning 1 · Announce · Siren (Emergency) · AI Ping
+
+**⚠️ Discrepancy — ID Karyawan format:**
+Settings doc: `RFM-001234` | HRIS existing: `RIF0001` → perlu klarifikasi format resmi
+
+**Auto Lock vs Auto Logout:**
+Auto Lock (PIN): 1 menit tidak aktif | Auto Logout (session): 30 menit (Business Rule Book)
+Keduanya berbeda — lock = PIN required, logout = clear session
+
+**App Version:** RIFIM CHAT v2.1.0 (Build 210)
+
+---
+
 ### RIFIM CHAT — Fitur Mobile (Dokumentasi_Fitur_Mobile_RIFIM_OS.md)
 
 **Mission Mode (konsep baru — home screen task center):**
