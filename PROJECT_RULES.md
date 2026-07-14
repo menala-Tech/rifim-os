@@ -308,4 +308,20 @@ Urutan setup yang harus dijalankan **sekali** dari GAS Editor setelah deploy ke 
 
 ---
 
+---
+
+## Module Launch Checklist (WAJIB setiap modul baru selesai)
+
+Setiap modul baru yang selesai WAJIB update 3 file ini dalam satu commit:
+
+| # | File | Yang diupdate |
+|---|------|---------------|
+| 64 | `modules/<modul>/index.html` | Kode modul utama |
+| 65 | `modules/portal/index.html` | Card modul: `disabled-mod` → `active-mod`, tambah `onclick="goTo('/<modul>')"`, tag `Segera Hadir` → `Aktif` |
+| 66 | `vercel.json` | Tambah route `{ "source": "/<modul>", "destination": "/modules/<modul>/index.html" }` dan `/<modul>/(.*)` |
+
+Jangan merge modul baru tanpa ketiga file ini diupdate.
+
+---
+
 *Pelanggaran terhadap aturan ini harus didiskusikan sebelum implementasi.*
