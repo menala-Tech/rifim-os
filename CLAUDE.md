@@ -81,13 +81,30 @@ Berpikirlah seperti senior software architect, bukan code generator.
 
 ---
 
+## Trigger Sesi Baru — "lanjut rifim os chat"
+
+Setiap kali user mengetik **"lanjut rifim os chat"** (atau `/lanjut-rifim-os-chat`), Claude WAJIB langsung menjalankan startup sequence berikut **tanpa menunggu konfirmasi:**
+
+```
+1. Buka folder lokal: C:\Users\ADMIN\Documents\RIFIM\rifim-os
+2. Baca CLAUDE.md           ← operating manual, design system, engines
+3. Baca PROJECT_RULES.md    ← business rules, chat rules, design tokens
+4. Baca docs/STATUS.md      ← sprint aktual, backlog, temuan analisa
+5. Laporkan: sprint aktif, task pending, PR yang menunggu
+6. Siap menerima instruksi
+```
+
+Jangan tanya "apakah saya harus membaca file?" — langsung baca dan laporkan hasilnya.
+
+---
+
 ## Before Writing Any Code
 
 Jalankan langkah ini secara berurutan setiap sesi baru:
 
-1. Baca `README.md`
+1. Baca `CLAUDE.md` (file ini)
 2. Baca `PROJECT_RULES.md`
-3. Baca `docs/04-Architecture/SystemArchitecture.md`
+3. Baca `docs/STATUS.md`
 4. Pahami task yang sedang dikerjakan
 5. Analisis modul yang sudah ada
 6. Reuse komponen yang sudah ada sebisa mungkin
