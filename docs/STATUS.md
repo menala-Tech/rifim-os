@@ -100,6 +100,25 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 
 ---
 
+### RIFIM CHAT — Fitur Mobile (Dokumentasi_Fitur_Mobile_RIFIM_OS.md)
+
+**Mission Mode (konsep baru — home screen task center):**
+Dashboard harian satu layar: Sudah Absen ✅ · Driver Menunggu (12) · Antrian (A023 Dipanggil) · Isi Saldo (5 req) · Approval (3 pending) · Briefing Belum Dibaca (1)
+
+**Deep Link format:** `rifim://approval/123` · `rifim://queue/A023` → perlu route naming konsisten
+
+**NFC & QR Scan** untuk: Absensi · Driver Datang · Approval (WebNFC API + QR reader)
+
+**Offline Mode:** Service Worker cache → IndexedDB → auto-sync saat online (kritis untuk airport connectivity)
+
+**Fitur yang bisa di-PWA (Sprint 3B–4):**
+Push Notification (FCM) · Offline + Auto Sync · PWA Shortcuts · QR Scan · GPS Background
+
+**Fitur yang butuh native app (Sprint 5+):**
+Dynamic Island · Quick Settings Tile · Widget Home Screen · Wearable · Shake Phone · Voice Command
+
+---
+
 ### RIFIM CHAT — Struktur Room & Integrasi Notifikasi (Dokumentasi_Struktur_Room_Integrasi_RIFIM_OS.md)
 
 **7 Cabang + Kode Resmi (DEFINITIF):**
