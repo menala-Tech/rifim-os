@@ -4,30 +4,38 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#1a1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>RIFIM OS — RAOS</title>
 <link rel="manifest" href="/manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* ─── RESET & BASE ─── */
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --primary:#1a1a2e;
+  --nav-dark:#1a1a2e;
+  --primary:#1E88E5;
   --raos:#E8731A;
   --raos-dim:rgba(232,115,26,0.12);
-  --accent:#e94560;
   --bg:#f0f2f5;
   --card:#fff;
-  --border:#e0e0e0;
-  --text:#1f2328;
-  --muted:#6e7681;
-  --success:#1a7f37;
+  --border:#D1D5DB;
+  --text:#111827;
+  --muted:#6B7280;
+  --success:#43A047;
   --success-bg:#d1fae5;
-  --warning:#9a6700;
+  --warning:#FB8C00;
   --warning-bg:#fef3c7;
-  --danger:#cf222e;
+  --error:#E53935;
+  --error-bg:#fee2e2;
+  --danger:#E53935;
   --danger-bg:#fee2e2;
-  --info:#0969da;
+  --info:#00ACC1;
   --info-bg:#dbeafe;
-  --font:'Segoe UI',system-ui,sans-serif;
+  --font:'Poppins','Segoe UI',sans-serif;
 }
 body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
 button{cursor:pointer;font-family:var(--font)}
@@ -35,7 +43,7 @@ input,select,textarea{font-family:var(--font)}
 
 /* ─── AUTH GATE ─── */
 #auth-gate{
-  position:fixed;inset:0;background:var(--primary);
+  position:fixed;inset:0;background:var(--nav-dark);
   display:flex;align-items:center;justify-content:center;z-index:9999;
 }
 .auth-box{
@@ -72,7 +80,7 @@ input,select,textarea{font-family:var(--font)}
 
 /* ─── HEADER ─── */
 header{
-  background:var(--primary);color:#fff;
+  background:var(--nav-dark);color:#fff;
   display:flex;align-items:center;justify-content:space-between;
   padding:0 20px;height:54px;position:sticky;top:0;z-index:200;
   box-shadow:0 2px 8px rgba(0,0,0,.3);
@@ -85,6 +93,7 @@ header{
 }
 .hdr-back:hover{background:rgba(255,255,255,.2)}
 .hdr-logo{font-size:16px;font-weight:700;letter-spacing:.5px}
+.hdr-logo-img{height:28px;object-fit:contain;display:block}
 .hdr-module{
   background:var(--raos);color:#fff;font-size:10px;font-weight:700;
   padding:2px 8px;border-radius:4px;letter-spacing:.8px;
@@ -347,12 +356,24 @@ tr:hover td{background:rgba(232,115,26,.03)}
 
 /* ─── RESPONSIVE ─── */
 @media(max-width:640px){
-  main{padding:12px}
+  main{padding:12px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
   .stats-row{grid-template-columns:1fr 1fr}
   .queue-grid{grid-template-columns:1fr}
   .form-row{grid-template-columns:1fr}
   .hdr-right .btn-logout{display:none}
   #user-badge{display:none}
+  #toast{bottom:calc(20px + env(safe-area-inset-bottom,0px));right:12px;left:12px;text-align:center}
+  .btn{min-height:40px}
+  nav button{padding:10px 14px;font-size:12px}
+  .cabang-tab{padding:8px 12px;font-size:13px}
+  .refresh-bar{flex-direction:column;align-items:flex-start;gap:8px}
+  .refresh-bar > div{width:100%;flex-wrap:wrap}
+  .toolbar{flex-direction:column;align-items:stretch}
+  .toolbar-input{width:100%}
+  .hdr-logo-img{height:22px}
+}
+@supports(padding-top:env(safe-area-inset-top)){
+  header{padding-top:max(0px, env(safe-area-inset-top))}
 }
 </style>
 </head>
@@ -361,7 +382,9 @@ tr:hover td{background:rgba(232,115,26,.03)}
 <!-- ─── AUTH GATE ─── -->
 <div id="auth-gate">
   <div class="auth-box">
-    <div class="auth-logo">ROS</div>
+    <img src="/branding/logo/logo-rifim.png" alt="RIFIM" style="height:52px;object-fit:contain;margin-bottom:8px;"
+         onerror="this.style.display='none';document.getElementById('auth-logo-fb').style.display='inline-flex'">
+    <div class="auth-logo" id="auth-logo-fb" style="display:none">ROS</div>
     <h1>RIFIM OS — RAOS</h1>
     <p>Login dengan ID Staff + PIN untuk mengakses modul operasional.</p>
     <input class="auth-field" id="auth-id" type="text" placeholder="ID Staff (cth: RIF0001)"
@@ -380,7 +403,9 @@ tr:hover td{background:rgba(232,115,26,.03)}
   <header>
     <div class="hdr-left">
       <a class="hdr-back" href="/">← Portal</a>
-      <span class="hdr-logo">RIFIM OS</span>
+      <img src="/branding/logo/logo-rifim.png" alt="RIFIM OS" class="hdr-logo-img"
+           onerror="this.style.display='none';document.querySelector('.hdr-logo-text').style.display='inline'">
+      <span class="hdr-logo hdr-logo-text" style="display:none">RIFIM OS</span>
       <span class="hdr-module">RAOS</span>
     </div>
     <div class="hdr-right">
@@ -406,7 +431,8 @@ tr:hover td{background:rgba(232,115,26,.03)}
     <div id="tab-dashboard" class="tab-panel active">
       <div class="refresh-bar">
         <h2>Dashboard Operasional</h2>
-        <div style="display:flex;align-items:center;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <input type="date" class="toolbar-input" id="dash-date" onchange="loadDashboard()" style="padding:5px 10px;font-size:12px;">
           <span class="refresh-info" id="dash-last-update">–</span>
           <button class="btn btn-ghost btn-sm" onclick="loadDashboard()">↻ Refresh</button>
         </div>
@@ -430,7 +456,8 @@ tr:hover td{background:rgba(232,115,26,.03)}
     <div id="tab-antrian" class="tab-panel">
       <div class="refresh-bar">
         <h2>Antrian Bandara</h2>
-        <div style="display:flex;align-items:center;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <input type="date" class="toolbar-input" id="antrian-date" onchange="loadQueue()" style="padding:5px 10px;font-size:12px;">
           <span class="refresh-info" id="queue-last-update">–</span>
           <button class="btn btn-ghost btn-sm" onclick="loadQueue()">↻ Refresh</button>
           <button class="btn btn-primary" onclick="openAddQueue()">+ Tambah Driver</button>
@@ -498,7 +525,8 @@ tr:hover td{background:rgba(232,115,26,.03)}
     <div id="tab-saldo" class="tab-panel">
       <div class="refresh-bar">
         <h2>Rekap Saldo Cabang</h2>
-        <div style="display:flex;align-items:center;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <input type="date" class="toolbar-input" id="saldo-date" onchange="loadSaldo()" style="padding:5px 10px;font-size:12px;">
           <span class="refresh-info" id="saldo-last-update">–</span>
           <button class="btn btn-ghost btn-sm" onclick="loadSaldo()">↻ Refresh</button>
         </div>
@@ -599,7 +627,20 @@ let _activeKinerjaCabang = '';
 let _queueTimer = null;
 let _driverLookupCache = {};
 
-// CABANG LIST (dari saldoEngine.js _SD_TARGET)
+// ── BR-01: hanya DIREKTUR & ADMIN_PUSAT yang bisa lihat semua cabang
+function isGlobalRole() {
+  if (!_session) return false;
+  const r = (_session.role || _session.jabatan || '').toUpperCase().replace(/\s+/g, '_');
+  return r === 'DIREKTUR' || r === 'ADMIN_PUSAT';
+}
+function userCabang() {
+  return _session?.cabang || '';
+}
+function cabangFilter() {
+  return isGlobalRole() ? '' : userCabang();
+}
+
+// CABANG LIST — 7 cabang resmi + 2 baru (MKS, CGK)
 const CABANG_LIST = [
   'ID Rifim Airport Batam',
   'ID Rifim Batam',
@@ -608,6 +649,8 @@ const CABANG_LIST = [
   'ID Rifim Airport Balikpapan',
   'ID Rifim Airport Manado',
   'ID Rifim Airport Pekanbaru',
+  'ID Rifim Airport Makassar',   // MKS — Sultan Hasanuddin
+  'ID Rifim Airport Jakarta',    // CGK — Soekarno-Hatta
 ];
 const CABANG_SHORT = {
   'ID Rifim Airport Batam':      'Batam Airport',
@@ -617,6 +660,8 @@ const CABANG_SHORT = {
   'ID Rifim Airport Balikpapan': 'Balikpapan',
   'ID Rifim Airport Manado':     'Manado',
   'ID Rifim Airport Pekanbaru':  'Pekanbaru',
+  'ID Rifim Airport Makassar':   'Makassar',
+  'ID Rifim Airport Jakarta':    'Jakarta',
 };
 
 // ══════════════════════════════════════════════════════
@@ -688,14 +733,18 @@ function applySession() {
   document.getElementById('cabang-badge').textContent = CABANG_SHORT[cabang] || cabang || 'Semua Cabang';
   _activeCabang = cabang || CABANG_LIST[0];
 
-  // Populate cabang selectors
+  // Set default dates pada semua tab
+  const today = todayISO();
+  ['dash-date','antrian-date','saldo-date','kinerja-date'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = today;
+  });
+
+  // Populate cabang selectors (BR-01: non-global hanya lihat cabang sendiri)
   buildCabangTabs('cabang-tabs-antrian', loadQueue);
   buildCabangTabs('cabang-tabs-kinerja', loadKinerja);
   buildCabangSelect('q-cabang');
   buildCabangSelect('driver-filter-cabang', true);
-
-  // Set today as default kinerja date
-  document.getElementById('kinerja-date').value = todayISO();
 
   loadDashboard();
 }
@@ -736,15 +785,17 @@ function startQueueAutoRefresh() {
 async function loadDashboard() {
   document.getElementById('dash-stats').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   document.getElementById('dash-cabang').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const dashDate = document.getElementById('dash-date')?.value || todayISO();
+  const cf = cabangFilter(); // BR-01
   try {
     const [qRes, sRes] = await Promise.all([
-      api({ action: 'queueList', cabang: '' }),
-      api({ action: 'saldoGetRekapCabang' }),
+      api({ action: 'queueList', cabang: cf, tanggal: dashDate }),
+      api({ action: 'saldoGetRekapCabang', cabang: cf, tanggal: dashDate }),
     ]);
     const qAll = (qRes && qRes.ok && qRes.data) ? qRes.data : [];
     const sAll = (sRes && sRes.ok && sRes.data) ? sRes.data : [];
 
-    const today = qAll.filter(q => q.tanggal === todayISO());
+    const today = qAll.filter(q => !dashDate || q.tanggal === dashDate);
     const waiting = today.filter(q => q.status === 'WAITING').length;
     const called  = today.filter(q => q.status === 'CALLED').length;
     const picked  = today.filter(q => q.status === 'PICKED').length;
@@ -773,8 +824,11 @@ async function loadDashboard() {
       </div>
     `;
 
-    // Per-cabang summary
-    const html = CABANG_LIST.map(cab => {
+    // Per-cabang summary (BR-01: tampilkan hanya cabang yang bisa diakses)
+    const displayList = isGlobalRole()
+      ? CABANG_LIST
+      : CABANG_LIST.filter(c => c === userCabang());
+    const html = displayList.map(cab => {
       const qCab  = today.filter(q => q.cabang === cab);
       const saldo = sAll.find(s => s.cabang === cab) || {};
       const pct   = saldo.persen || 0;
@@ -802,8 +856,9 @@ async function loadDashboard() {
 async function loadQueue() {
   document.getElementById('queue-container').innerHTML =
     '<div class="loading"><div class="spinner"></div><div>Memuat antrian...</div></div>';
+  const antrianDate = document.getElementById('antrian-date')?.value || todayISO();
   try {
-    const res = await api({ action: 'queueList', cabang: _activeCabang, tanggal: todayISO() });
+    const res = await api({ action: 'queueList', cabang: _activeCabang, tanggal: antrianDate });
     if (!res.ok) throw new Error(res.error || 'Gagal memuat antrian.');
     _queueData = res.data || [];
     renderQueue();
@@ -854,7 +909,7 @@ function queueCardHtml(q, isKoord) {
   return `
     <div class="queue-card ${q.status}" id="qc-${q.id}">
       <div class="queue-header">
-        <span class="queue-num">#${q.noAntrian || '—'}</span>
+        <span class="queue-num">${fmtQueue(q.noAntrian)}</span>
         <span class="badge ${q.status}">${statusLabel(q.status)}</span>
       </div>
       <div class="queue-name">${esc(q.namaDriver)}</div>
@@ -948,7 +1003,7 @@ async function loadDrivers() {
   document.getElementById('driver-container').innerHTML =
     '<div class="loading"><div class="spinner"></div><div>Memuat database driver...</div></div>';
   try {
-    const res = await api({ action: 'raosGetDriverList' });
+    const res = await api({ action: 'raosGetDriverList', cabang: cabangFilter() }); // BR-01
     if (!res.ok) throw new Error(res.error || 'Gagal memuat driver.');
     _driverData = res.data || [];
     renderDrivers();
@@ -1020,8 +1075,9 @@ function renderDrivers() {
 async function loadSaldo() {
   document.getElementById('saldo-container').innerHTML =
     '<div class="loading"><div class="spinner"></div><div>Memuat data saldo...</div></div>';
+  const saldoDate = document.getElementById('saldo-date')?.value || todayISO();
   try {
-    const res = await api({ action: 'saldoGetRekapCabang' });
+    const res = await api({ action: 'saldoGetRekapCabang', cabang: cabangFilter(), tanggal: saldoDate }); // BR-01
     if (!res.ok) throw new Error(res.error || 'Gagal memuat saldo.');
     _saldoData = res.data || [];
     renderSaldo();
@@ -1193,11 +1249,16 @@ function renderKinerjaDriver(data, cabang) {
 function buildCabangTabs(containerId, onChangeFn) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  el.innerHTML = CABANG_LIST.map((cab, i) => `
+  // BR-01: non-global hanya tampilkan cabang sendiri
+  const list = isGlobalRole()
+    ? CABANG_LIST
+    : CABANG_LIST.filter(c => c === userCabang());
+  el.innerHTML = list.map((cab, i) => `
     <button class="cabang-tab ${i===0?'active':''}" onclick="_setCabang(this,'${cab}','${onChangeFn.name}')">
       ${CABANG_SHORT[cab]||cab}
     </button>
   `).join('');
+  if (list.length > 0) _activeCabang = list[0];
 }
 
 function _setCabang(btn, cabang, fnName) {
@@ -1211,14 +1272,27 @@ function _setCabang(btn, cabang, fnName) {
 function buildCabangSelect(selectId, addAll = false) {
   const el = document.getElementById(selectId);
   if (!el) return;
+  // BR-01: non-global hanya tampilkan cabang sendiri
+  const list = isGlobalRole()
+    ? CABANG_LIST
+    : CABANG_LIST.filter(c => c === userCabang());
   const opts = addAll ? '<option value="">Semua Cabang</option>' : '<option value="">-- Pilih Cabang --</option>';
-  el.innerHTML = opts + CABANG_LIST.map(c =>
+  el.innerHTML = opts + list.map(c =>
     `<option value="${c}">${CABANG_SHORT[c]||c}</option>`
   ).join('');
 }
 
 function statusLabel(s) {
   return { WAITING:'Menunggu', CALLED:'Dipanggil', PICKED:'Sedang Order', DONE:'Selesai', CANCEL:'Batal' }[s] || s;
+}
+// Format nomor antrian ke A-023 (CLAUDE.md Design System)
+function fmtQueue(noAntrian) {
+  if (!noAntrian) return '—';
+  const s = String(noAntrian).trim();
+  if (/^[A-Z]-\d{3}$/i.test(s)) return s.toUpperCase();
+  const m = s.match(/^([A-Z])(\d+)$/i);
+  if (m) return m[1].toUpperCase() + '-' + m[2].padStart(3, '0');
+  return s;
 }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function fmtNum(n) {
