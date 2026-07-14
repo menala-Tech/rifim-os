@@ -2,7 +2,7 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-07-14 (Analisa 12 dokumen desain selesai: Arsitektur V3/V4, Framework, Business Rules, Design System, RIFIM Chat UI/UX, Strategy, Room Types, Room Structure, Mobile Features, Settings, Chat Room Features)
+> Last updated: 2026-07-14 (Analisa 13 dokumen desain selesai — terakhir: Room Chat UI pixel-perfect spec)
 
 ---
 
@@ -68,6 +68,15 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | V4 — Arsitektur Definitif | RCP 4-level + 9 cabang | +Makassar (CGK) +HO, Analytics sebagai Platform Service, 4 dashboard |
 | Framework — Documentation | 8-level doc structure | RIFIM Enterprise Handbook (SSOT), Level 6 AI Knowledge Base |
 | Business Rule Book | Aturan bisnis konkret | 10 business rules, escalation matrix, 30-min auto-logout, approval chain |
+| Design System | Color tokens, typography | PRIMARY #1E88E5, SUCCESS #43A047, queue format A-023, Finance UI blueprint |
+| RIFIM Chat UI/UX | Home layout, branding | Dark #121212, Poppins, Yellow #FFC700, 7-section home, Logo spec |
+| RIFIM Chat Strategy | 5-phase roadmap | Redis/RAG/CDN/WAF, 7 obstacle, Chat sbg Platform Service |
+| Chat Room Types | 10 pre-defined rooms | Operasional/Driver/Finance/etc, Event Bus architecture, badge system |
+| Chat Room Structure | 6 scope, notif matrix | 7 cabang BTH/JBI/PKU/BPN/MDC/MKS/CGK, Supabase schema 3 tabel |
+| Mobile Features | OS integration | Mission Mode, Deep Link rifim://module/id, Offline SW+IndexedDB |
+| Settings | Config spec | Mode Kerja 6 status, Dashboard Preferensi, ⚠️ ID format discrepancy RFM- vs RIF |
+| Chat Room Features | 10 fitur detail | Voice record, @mention, Admin kick, AI Guard, Suspicious Link, Voice/Video Call |
+| **Room Chat UI Spec** | **Pixel-perfect render** | **Dark #1E1E1E, bubble admin kuning, bubble user #2B2B2B, Poppins, radius 16px, Safe Area 44px** |
 
 ### RIFIM CHAT — Peluang, Kendala & Strategi (Dokumentasi_Peluang_Strategi_RIFIM_Chat.md)
 
@@ -215,6 +224,57 @@ chat_rooms (id, name, icon, description, type, cabang, created_at)
 chat_messages (id uuid, room_id, sender_id, sender_name, content, type, metadata jsonb, cabang, created_at)
 chat_room_members (room_id, user_id, role, last_read_at)
 ```
+
+---
+
+### Room Chat UI Spec (Dokumentasi_Tampilan_Room_Chat_RIFIM.md)
+
+**Tampilan Room Chat — Dark Theme Pixel-Perfect Spec:**
+
+| Elemen | Detail |
+|--------|--------|
+| Background utama | `#1E1E1E` |
+| Bubble Admin | Kuning muda (`#FFC700` muted) |
+| Bubble User | `#2B2B2B` abu gelap |
+| Text utama | `#FFFFFF` |
+| Online indicator | `#00C853` hijau |
+| Warning/Delete | `#FF5252` merah |
+| Aksen | `#FFC700` kuning Maxim |
+
+**Header Room:**
+- Back button · Foto/Logo room (kiri) · Nama room + jumlah peserta + online count
+- Icon phone & video call grup · Menu ⋮ (kanan)
+
+**Bubble Chat:**
+- Avatar di kiri setiap pesan
+- Nama + Waktu + label "Admin" (kuning) jika admin
+- Mendukung: teks, emoji reaction, file attachment, gambar
+- Radius: 16px · Spasi antar pesan: 8-12px
+
+**Input Area (bottom):**
+- Tombol `+` → attachment menu: Foto / Kamera / File / Lokasi / Kontak / Polling
+- Text field "Ketik pesan..." (tengah)
+- Emoji picker · Tombol rekam suara
+
+**Menu ⋮ (Options):**
+Info Room · Cari Pesan · Bisukan Notifikasi · Media File & Link · Pengaturan Room (admin only) · Keluar Room (merah)
+
+**AI Guard Bar (system message):**
+> 🛡 "Hindari penggunaan kata kasar. Pesan Anda diawasi oleh AI."
+
+**Typography Room Chat:**
+- Judul Room: Poppins SemiBold 16px
+- Nama Pengirim: Poppins Medium 13px
+- Isi Pesan: Poppins Regular 14px
+- Waktu: Poppins Regular 11px
+- System/AI: Poppins Medium 12px
+
+**Technical Spec:**
+- Target resolusi: 1170×2532px (iPhone 12/13/14)
+- Safe Area: 44px atas & bawah
+- Corner radius komponen: 16px
+- Icon style: Line & Filled 2px
+- Shadow: Soft Elevation 4
 
 ---
 
