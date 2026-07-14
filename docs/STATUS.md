@@ -69,6 +69,45 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | Framework — Documentation | 8-level doc structure | RIFIM Enterprise Handbook (SSOT), Level 6 AI Knowledge Base |
 | Business Rule Book | Aturan bisnis konkret | 10 business rules, escalation matrix, 30-min auto-logout, approval chain |
 
+### Design System (Dokumentasi_Design_System_RIFIM_OS.md)
+
+**Color Tokens (Global):**
+| Token | Hex |
+|-------|-----|
+| PRIMARY | `#1E88E5` |
+| SECONDARY | `#FFC107` |
+| SUCCESS | `#43A047` |
+| WARNING | `#FB8C00` |
+| ERROR | `#E53935` |
+| INFO | `#00ACC1` |
+| Dark-900 | `#111827` |
+| Dark-700 | `#374151` |
+| Dark-500 | `#6B7280` |
+| Light-200 | `#D1D5DB` |
+| Light-100 | `#F3F4F6` |
+
+**Typography:**
+- H1: 32px Bold · H2: 24px Bold · H3: 20px SemiBold
+- Body1: 14px Regular · Body2: 12px Regular · Caption: 11px Medium
+
+**Queue Format:** `A-023` (A- prefix + 3-digit zero-padded, per cabang per hari)
+
+**Dashboard per Role:**
+- Direktur: Total Pendapatan + Total Driver + trend graph
+- Koordinator: Pendapatan Bulan Ini + Driver Aktif + Order Hari Ini
+- Staff: Task counters (Isi Saldo / Konfirmasi Order / Absensi / Pembinaan Driver)
+- Driver: Greeting + Saldo + Isi Saldo button
+
+**Finance Layout (blueprint untuk modules/finance/index.html):**
+- Saldo Card: hijau, nominal besar, tombol Isi Saldo
+- Ringkasan: Pendapatan Bulan Ini (+% vs bulan lalu), Invoice (count Belum Lunas), Pengeluaran, Laba Bersih
+
+**Animation:** Transition Fade 200ms · Queue Update Slide/Fade · Success Scale/Fade · Error Shake/Fade
+
+**Platform:** Web App + PWA + Android + iOS · Light Mode + Dark Mode
+
+---
+
 ### Keputusan Arsitektur dari Batch Ini
 
 | Area | Keputusan |
