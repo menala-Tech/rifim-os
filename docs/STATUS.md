@@ -67,6 +67,7 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | V3 — UI/UX Mockup | Layout visual sistem | RIFIM Chat di header, queue format A001, AI sebagai kontak |
 | V4 — Arsitektur Definitif | RCP 4-level + 9 cabang | +Makassar (CGK) +HO, Analytics sebagai Platform Service, 4 dashboard |
 | Framework — Documentation | 8-level doc structure | RIFIM Enterprise Handbook (SSOT), Level 6 AI Knowledge Base |
+| Business Rule Book | Aturan bisnis konkret | 10 business rules, escalation matrix, 30-min auto-logout, approval chain |
 
 ### Keputusan Arsitektur dari Batch Ini
 
@@ -89,6 +90,23 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | `automation/apps-script/authEngine.js` | Return 4-level RCP: role + cabang + permission[] + data_scope |
 | `automation/apps-script/staffAppApi.js` | Bangun Menu berdasarkan Permission (bukan hanya role) |
 | `docs/` | Buat struktur 8-level per Framework doc |
+
+### Business Rules → Implementation Checklist
+
+| Rule | Aturan | Modul | Status |
+|------|--------|-------|--------|
+| BR-01 | Koordinator hanya lihat data cabangnya (filter by cabang di setiap query) | HRIS, RAOS, Finance | ⬜ Belum |
+| BR-02 | Staff tidak bisa hapus data Absensi | HRIS | ⬜ Belum |
+| BR-03 | Driver keluar geofence → otomatis keluar antrian | RAOS | ⬜ Belum (Sprint 4) |
+| BR-04 | Isi Saldo > batas harian → reject + notif Koordinator | Finance | ⬜ Belum |
+| BR-05 | Nomor HP wajib unik di semua modul | Semua | ⬜ Belum |
+| BR-06 | Saldo tidak boleh negatif → tolak transaksi | Finance | ⬜ Belum |
+| BR-07 | Order > 15 menit tanpa update → notif Driver + Koordinator | RAOS | ⬜ Belum |
+| BR-08 | Login gagal > 5x → kunci 15 menit + notif Admin | Semua | ⬜ Belum |
+| BR-09 | Perangkat baru → OTP/email verifikasi | Semua | ⬜ Belum |
+| BR-10 | Approval Invoice: Staff → Koordinator → Finance | Finance | ⬜ Belum |
+| SEC-01 | Auto-logout 30 menit tidak aktif | Frontend semua modul | ⬜ Belum |
+| SEC-02 | Password minimal 8 karakter, kombinasi huruf+angka+simbol | Auth | ⬜ Belum |
 
 ---
 
