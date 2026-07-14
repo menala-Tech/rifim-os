@@ -100,6 +100,41 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 
 ---
 
+### RIFIM CHAT ROOM — 10 Channel (Dokumentasi_Jenis_Ruang_Chat_RIFIM_OS.md)
+
+**Bottom Nav definitif (update dari doc sebelumnya):**
+`Home | Chat | AI Assistant | Kontak | Profil`
+
+**Home Dashboard Koordinator — 4 stats:**
+Driver Online (128 ↑12%) · Order Selesai (532 ↑8%) · Pendapatan (Rp 8.450.000 ↑10%) · Rating (4.8 ↑0.2)
+
+**10 Chat Rooms (pre-defined channels, bukan user-created):**
+| # | Room | Tipe | Sumber Event Otomatis |
+|---|------|------|----------------------|
+| 1 | Operasional | operational | Briefing harian, koordinasi, laporan |
+| 2 | Driver | module_feed | Info order, edukasi driver |
+| 3 | Absensi | module_feed | Check-in/out HRIS, reminder shift |
+| 4 | Finance | module_feed | Isi saldo, invoice, laporan keuangan |
+| 5 | Smart Office | module_feed | Surat/memo/SOP baru, dokumen |
+| 6 | Approval | module_feed | Invoice/cuti/reimbursement pending |
+| 7 | Smart Queue | module_feed | Driver masuk antrian, panggilan, selesai |
+| 8 | Pengumuman | broadcast | Pengumuman resmi kantor pusat |
+| 9 | AI Insight | ai | Insight harian, rekomendasi, prediksi |
+| 10 | System | system | Maintenance, update aplikasi, keamanan |
+
+**Arsitektur Chat = Event Bus:**
+Setiap modul (RAOS, Finance, HRIS, Smart Office) otomatis push event ke room terkait.
+Pengguna tidak perlu pindah aplikasi — semua aktivitas teragregasi di chat room.
+
+**Supabase schema yang dibutuhkan:**
+```sql
+chat_rooms (id, name, icon, description, type, cabang, created_at)
+chat_messages (id uuid, room_id, sender_id, sender_name, content, type, metadata jsonb, cabang, created_at)
+chat_room_members (room_id, user_id, role, last_read_at)
+```
+
+---
+
 ### RIFIM CHAT UI/UX (Dokumentasi_Prompt_UI_UX_RIFIM.md)
 
 **RIFIM CHAT — Dark Theme (berbeda dari modul lain):**
