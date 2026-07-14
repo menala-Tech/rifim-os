@@ -2,8 +2,9 @@
 
 > RIFIM OS — Claude Code Operating Manual
 
-Version: 1.1
+Version: 1.2
 Status: Active
+Last updated: 2026-07-14 (Design System, 7 Cabang, RCP 4-level, Mode Kerja, Chat Engine)
 
 ---
 
@@ -80,13 +81,73 @@ Berpikirlah seperti senior software architect, bukan code generator.
 
 ---
 
+## Trigger Perintah Sesi
+
+### BUKA SESI — "lanjut rifim os chat" (atau `/lanjut-rifim-os-chat`)
+
+Setiap kali user mengetik perintah ini, Claude WAJIB langsung menjalankan startup sequence **tanpa menunggu konfirmasi:**
+
+```
+1. Buka folder lokal: C:\Users\ADMIN\Documents\RIFIM\rifim-os
+2. Baca CLAUDE.md           ← operating manual, design system, engines
+3. Baca PROJECT_RULES.md    ← business rules, chat rules, design tokens
+4. Baca docs/STATUS.md      ← sprint aktual, backlog, temuan analisa
+5. Laporkan: sprint aktif, task pending, PR yang menunggu
+6. Siap menerima instruksi
+```
+
+### TUTUP SESI — "simpan sesi rifim os" (atau `/simpan-sesi-rifim-os`)
+
+Setiap kali user mengetik perintah ini, Claude WAJIB langsung menjalankan save sequence **tanpa menunggu konfirmasi:**
+
+```
+1. Cek git status             ← file apa yang berubah
+2. Update docs/STATUS.md      ← tandai task selesai ✅, catat progress, update tanggal
+3. Commit semua perubahan     ← pesan commit deskriptif
+4. Push ke branch aktif       ← git push -u origin <branch>
+5. Laporkan ringkasan sesi:
+   ✅ Task selesai hari ini
+   ⬜ Task pending lanjut
+   ⚠️ Blocker / keputusan pending
+   🔜 Task pertama sesi berikutnya
+```
+
+Jangan tanya konfirmasi — langsung eksekusi dan laporkan hasilnya.
+
+### KOREKSI JALUR — "reset alur rifim os" (atau `/reset-alur-rifim-os`)
+
+Gunakan **di tengah sesi** ketika Claude mulai menyimpang dari arsitektur atau melanggar rules.
+
+```
+1. STOP — hentikan semua coding yang sedang berjalan
+2. Re-baca CLAUDE.md + PROJECT_RULES.md
+3. Evaluasi pekerjaan terakhir:
+   - Apakah ada hardcode warna / nilai?
+   - Apakah ada duplikasi fungsi yang sudah ada?
+   - Apakah Business Rules BR-01–BR-10 diterapkan?
+   - Apakah RCP 4-level, cabang, queue format sudah benar?
+4. Laporkan: apa yang menyimpang + kenapa + rencana koreksi
+5. TUNGGU konfirmasi user sebelum lanjut coding
+```
+
+**Tanda-tanda wajib reset:**
+- Hardcode hex color (harusnya CSS variable)
+- Queue format `A001` (harusnya `A-023`)
+- Koordinator bisa lihat semua cabang (langgar BR-01)
+- Saldo bisa negatif (langgar BR-06)
+- Auth hanya return role, bukan RCP 4-level
+- Write GAS tanpa `_gasWithLock()` (langgar Rule 41)
+- Commit langsung ke `main`
+
+---
+
 ## Before Writing Any Code
 
 Jalankan langkah ini secara berurutan setiap sesi baru:
 
-1. Baca `README.md`
+1. Baca `CLAUDE.md` (file ini)
 2. Baca `PROJECT_RULES.md`
-3. Baca `docs/04-Architecture/SystemArchitecture.md`
+3. Baca `docs/STATUS.md`
 4. Pahami task yang sedang dikerjakan
 5. Analisis modul yang sudah ada
 6. Reuse komponen yang sudah ada sebisa mungkin
@@ -132,6 +193,102 @@ Jika ada jawaban "Ya" → redesign sebelum coding.
 
 ---
 
+## Design System (WAJIB — Jangan Hardcode)
+
+Semua warna, font, dan ukuran HARUS menggunakan CSS variable dari design system.
+Jangan pernah hardcode hex color langsung di HTML/CSS.
+
+### Global Color Tokens
+
+| Token | Hex | Penggunaan |
+|-------|-----|-----------|
+| `--primary` | `#1E88E5` | Tombol utama, link, header modul |
+| `--secondary` | `#FFC107` | Aksen, badge, highlight |
+| `--success` | `#43A047` | Status sukses, saldo positif |
+| `--warning` | `#FB8C00` | Peringatan, threshold |
+| `--error` | `#E53935` | Error, saldo negatif, delete |
+| `--info` | `#00ACC1` | Informasi, tips |
+| `--dark-900` | `#111827` | Background gelap |
+| `--dark-700` | `#374151` | Card dark |
+| `--dark-500` | `#6B7280` | Teks sekunder |
+| `--light-200` | `#D1D5DB` | Border, divider |
+| `--light-100` | `#F3F4F6` | Background card light |
+
+### RIFIM Chat Dark Theme (BERBEDA dari modul lain)
+
+| Token | Hex | Penggunaan |
+|-------|-----|-----------|
+| `--chat-bg` | `#111111` atau `#121212` | Background chat |
+| `--chat-accent` | `#FFC700` | Kuning Maxim, tab aktif, admin bubble |
+| `--chat-bubble-user` | `#2B2B2B` | Bubble pesan user |
+| `--chat-online` | `#00C853` | Indikator online |
+| `--chat-danger` | `#FF5252` | Delete, kick, warning |
+| `--chat-surface` | `#1E1E1E` | Room chat background |
+
+Font seluruh aplikasi: **Poppins** (fallback: Inter)
+- H1: 32px Bold · H2: 24px Bold · H3: 20px SemiBold
+- Body: 14px Regular · Caption: 11px Medium
+
+### Queue Number Format
+
+**Format wajib:** `A-023` (huruf prefix + tanda hubung + 3 digit zero-padded)
+- Bukan `A001` (lama) — harus diupdate di RAOS UI
+- Reset per hari, per cabang
+- Prefix bisa `A`, `B`, dst sesuai gate/counter
+
+---
+
+## Cabang (7 Definitif)
+
+| Kode | Nama | Bandara |
+|------|------|---------|
+| `BTH` | Batam | Hang Nadim |
+| `JBI` | Jambi | Sultan Thaha |
+| `PKU` | Pekanbaru | Sultan Syarif Kasim II |
+| `BPN` | Balikpapan | Sultan Aji Muhammad Sulaiman |
+| `MDC` | Manado | Sam Ratulangi |
+| `MKS` | Makassar | Sultan Hasanuddin |
+| `CGK` | Jakarta | Soekarno-Hatta |
+
+Semua kode cabang UPPERCASE 3 huruf. Jangan hardcode nama panjang, gunakan kode.
+
+---
+
+## Auth — RCP 4-Level Model
+
+Setiap session login HARUS mengembalikan 4 level akses (bukan hanya role):
+
+```
+Role → Cabang → Permission[] → DataScope
+```
+
+| Level | Contoh | Keterangan |
+|-------|--------|-----------|
+| Role | `KOORDINATOR` | 8 roles: DIREKTUR, ADMIN_PUSAT, KOORDINATOR, STAFF, FINANCE, DRIVER, IT_SUPPORT, AUDITOR |
+| Cabang | `BTH` | 7 kode cabang + `ALL` untuk Direktur/Admin Pusat |
+| Permission[] | `["read_finance","approve_invoice"]` | Array hak akses spesifik |
+| DataScope | `{cabang:"BTH"}` | Filter data yang boleh dilihat |
+
+**Aturan:** Koordinator HANYA boleh lihat data cabangnya sendiri (BR-01).
+Auth Engine WAJIB upgrade ke RCP 4-level sebelum Chat module dibangun.
+
+---
+
+## Mode Kerja (Work Mode)
+
+Setiap driver dan staff memiliki status kerja aktif. Enum wajib uppercase:
+
+```
+BERTUGAS | ISTIRAHAT | SIAP_ORDER | OFF_DUTY | CUTI | SAKIT
+```
+
+Status ini mempengaruhi: Smart Queue · HRIS · Dashboard · AI Insight · Notifikasi
+
+Field `work_status` wajib ada di tabel Supabase `drivers` dan `employees`.
+Driver dengan status `OFF_DUTY`, `CUTI`, atau `SAKIT` tidak boleh masuk antrian.
+
+---
+
 ## Engines (Build These First)
 
 | Engine | Purpose | Status |
@@ -145,10 +302,12 @@ Jika ada jawaban "Ya" → redesign sebelum coding.
 | Notification Engine | Email & WhatsApp | ✅ Phase 3 Done (WA terintegrasi semua modul) |
 | WA Engine | Fonnte API, templates per modul | ✅ Phase 3 Done |
 | QR Engine | Generate QR code | ✅ Phase 2 Done |
-| Auth Engine | Authentication & role | ✅ Phase 2 Done |
+| Auth Engine | Authentication & role | ✅ Phase 2 Done — upgrade ke RCP 4-level (Sprint 3B) |
 | Branding Engine | Logo perusahaan ke Sheet (PDF-ready) | ✅ Sprint 2 Done |
 | Driver Layer | CRUD driver RAOS + sync Supabase→Sheet | ✅ Sprint 2 Done |
 | Staff Sync Layer | CRUD staff HRIS + sync Supabase→Sheet | ✅ Sprint 2 Done |
+| Chat Engine | Supabase Realtime, 10 rooms, event bus | ⬜ Sprint 3B |
+| Mode Kerja Engine | Work status management, impact routing | ⬜ Sprint 3B |
 
 ---
 

@@ -2,8 +2,9 @@
 
 > Aturan ini wajib diikuti oleh seluruh developer dan AI yang berkontribusi pada RIFIM OS.
 
-Version: 1.0
+Version: 1.1
 Status: Active
+Last updated: 2026-07-14 (Business Rules BR-01–BR-10, Chat Rules, Design Token Rules)
 
 ---
 
@@ -244,6 +245,82 @@ Urutan setup yang harus dijalankan **sekali** dari GAS Editor setelah deploy ke 
 | `STAFF_PIN_<ID>` | string PIN | Auto-dibuat saat staff Ganti PIN mandiri. Override PIN sheet — sync-safe. Hapus property = kembali ke PIN sheet |
 
 > **Reminder Redeploy:** setiap perubahan file `automation/apps-script/*.js` di GitHub → clasp push otomatis, tapi **Web App wajib redeploy manual**: Deploy → Manage deployments → ✏️ → Version: New version → Deploy.
+
+---
+
+---
+
+## Business Rules (WAJIB diimplementasi di semua modul)
+
+> Sumber: Dokumentasi_Business_Rule_Book_RIFIM_OS.md. Setiap BR harus ada di backend DAN frontend.
+
+| ID | Rule | Modul | Status |
+|----|------|-------|--------|
+| **BR-01** | Koordinator HANYA boleh lihat & kelola data cabangnya sendiri | HRIS, RAOS, Finance | ⬜ Belum |
+| **BR-02** | Driver tidak aktif / OFF_DUTY tidak boleh masuk antrian Smart Queue | RAOS, Smart Queue | ⬜ Belum |
+| **BR-03** | Absensi hanya valid dalam radius geofence bandara (kecuali bebas absensi) | HRIS, Absensi | ✅ Done |
+| **BR-04** | Pengisian saldo harian tidak boleh melebihi batas maksimum per driver | Finance, RAOS | ⬜ Belum |
+| **BR-05** | Dokumen PKWT wajib disetujui HRD sebelum aktif | Smart Office, HRIS | ⬜ Belum |
+| **BR-06** | Saldo driver/staff tidak boleh negatif — tolak transaksi jika saldo tidak cukup | Finance, RAOS | ⬜ Belum |
+| **BR-07** | Semua transaksi keuangan ≥ Rp500.000 wajib approval Koordinator | Finance | ⬜ Belum |
+| **BR-08** | Login gagal >5x berturut-turut → akun terkunci 15 menit | Auth, Semua | ⬜ Belum |
+| **BR-09** | Data driver eksternal tidak boleh tercampur dengan driver airport dalam laporan | RAOS, Finance | ⬜ Belum |
+| **BR-10** | Approval invoice: Staff buat → Koordinator approve → Finance eksekusi | Finance, Approval | ⬜ Belum |
+| **SEC-01** | Auto-logout setelah 30 menit tidak aktif di semua modul frontend | Semua Frontend | ⬜ Belum |
+| **SEC-02** | Semua aksi admin Chat (hapus pesan, kick peserta, lock room) WAJIB tercatat di audit log yang tidak bisa dihapus | Chat Management | ⬜ Belum |
+
+---
+
+## Design Token Rules
+
+| # | Rule |
+|---|------|
+| 48 | Jangan hardcode hex color di HTML/CSS — selalu gunakan CSS variable `--primary`, `--success`, dst |
+| 49 | RIFIM Chat pakai dark theme terpisah (`--chat-bg`, `--chat-accent`) — jangan pakai global theme di chat |
+| 50 | Semua komponen mobile: corner radius 16px, Safe Area 44px atas/bawah, font Poppins |
+| 51 | Queue number format WAJIB `A-023` (prefix + tanda hubung + 3 digit) — bukan `A001` |
+| 52 | Icon style: Line & Filled 2px — konsisten di semua layar |
+
+---
+
+## Chat Module Rules
+
+| # | Rule |
+|---|------|
+| 53 | 10 pre-defined room wajib dibuat saat setup: Operasional/Driver/Absensi/Finance/SmartOffice/Approval/SmartQueue/Pengumuman/AI Insight/System |
+| 54 | Setiap modul yang menghasilkan event WAJIB push ke room terkait via Event Bus — pengguna tidak perlu switch app |
+| 55 | Audit log chat TIDAK BOLEH dihapus — tabel `chat_audit_log` tidak memiliki endpoint DELETE |
+| 56 | Retention policy default per tipe data: Pengumuman=Permanent, Dokumen=Permanent, AI Log=Permanent, Chat Ops=1 Tahun, Voice=90 Hari, Video=90 Hari |
+| 57 | Driver HANYA bisa read + send pesan — tidak punya akses Chat Management (kick, lock, delete, archive) |
+| 58 | Storage per room: quota 50GB; breakdown wajib tersedia per tipe (Foto/Video/Dokumen/Voice/Lainnya) |
+| 59 | Lock Room (hanya admin bisa kirim) ≠ Archive Room (read-only total, dipindah ke arsip) |
+| 60 | AI Guard aktif real-time: profanity filter + suspicious link detection — peringatan dikirim ke pengguna DAN admin |
+
+---
+
+## Cabang Rules
+
+| # | Rule |
+|---|------|
+| 61 | Hanya 7 kode cabang valid: `BTH`, `JBI`, `PKU`, `BPN`, `MDC`, `MKS`, `CGK` — tambahan harus via config, bukan hardcode |
+| 62 | Direktur & Admin Pusat scope = `ALL` (semua cabang); role lain scope = cabang sendiri saja (BR-01) |
+| 63 | Field `cabang` di semua tabel Supabase WAJIB uppercase 3 huruf — validasi di backend |
+
+---
+
+---
+
+## Module Launch Checklist (WAJIB setiap modul baru selesai)
+
+Setiap modul baru yang selesai WAJIB update 3 file ini dalam satu commit:
+
+| # | File | Yang diupdate |
+|---|------|---------------|
+| 64 | `modules/<modul>/index.html` | Kode modul utama |
+| 65 | `modules/portal/index.html` | Card modul: `disabled-mod` → `active-mod`, tambah `onclick="goTo('/<modul>')"`, tag `Segera Hadir` → `Aktif` |
+| 66 | `vercel.json` | Tambah route `{ "source": "/<modul>", "destination": "/modules/<modul>/index.html" }` dan `/<modul>/(.*)` |
+
+Jangan merge modul baru tanpa ketiga file ini diupdate.
 
 ---
 
