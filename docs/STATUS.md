@@ -2,7 +2,7 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-07-14 (Analisa 13 dokumen desain selesai — terakhir: Room Chat UI pixel-perfect spec)
+> Last updated: 2026-07-14 (Analisa 14 dokumen desain selesai — terakhir: Notification Page UI spec)
 
 ---
 
@@ -76,7 +76,8 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | Mobile Features | OS integration | Mission Mode, Deep Link rifim://module/id, Offline SW+IndexedDB |
 | Settings | Config spec | Mode Kerja 6 status, Dashboard Preferensi, ⚠️ ID format discrepancy RFM- vs RIF |
 | Chat Room Features | 10 fitur detail | Voice record, @mention, Admin kick, AI Guard, Suspicious Link, Voice/Video Call |
-| **Room Chat UI Spec** | **Pixel-perfect render** | **Dark #1E1E1E, bubble admin kuning, bubble user #2B2B2B, Poppins, radius 16px, Safe Area 44px** |
+| Room Chat UI Spec | Pixel-perfect render | Dark #1E1E1E, bubble admin kuning, bubble user #2B2B2B, Poppins, radius 16px, Safe Area 44px |
+| **Notification Page UI** | **Halaman notifikasi** | **Dark #111111, 3-tab filter (Semua/Belum Dibaca/Penting), 8 kategori berwarna, dot kuning=unread, swipe-left→Pin/Delete, Bottom Nav: Beranda·Chat·AI·Notif·Akun** |
 
 ### RIFIM CHAT — Peluang, Kendala & Strategi (Dokumentasi_Peluang_Strategi_RIFIM_Chat.md)
 
@@ -224,6 +225,50 @@ chat_rooms (id, name, icon, description, type, cabang, created_at)
 chat_messages (id uuid, room_id, sender_id, sender_name, content, type, metadata jsonb, cabang, created_at)
 chat_room_members (room_id, user_id, role, last_read_at)
 ```
+
+---
+
+### Notification Page UI Spec (Dokumentasi_Tampilan_Notifikasi_RIFIM.md)
+
+**Header:** Title "Notifikasi" white bold + gear icon (kanan atas) · Background hitam `#111111`
+
+**Tab Filter (3 tab):**
+- `Semua` (aktif = kuning `#FFC700`)
+- `Belum Dibaca 8` (badge jumlah)
+- `Penting` (prioritas tinggi)
+
+**Item Notifikasi (tiap baris):**
+- Icon kategori berwarna (kiri) · Judul bold · Deskripsi singkat · Waktu (kanan) · Titik kuning jika belum dibaca
+- Swipe kiri → opsi Pin / Hapus
+- Tap → buka detail atau langsung ke room terkait
+
+**8 Kategori Notifikasi + Warna Icon:**
+| Kategori | Warna | Contoh |
+|----------|-------|--------|
+| Driver Datang | Ungu | "Andi - A023 sudah datang di counter 2" |
+| Smart Queue | Hijau | "Nomor antrian baru: B045" |
+| Isi Saldo Berhasil | Hijau | "Saldo Rp150.000 berhasil ditambahkan" |
+| Approval Baru | Oranye | "Invoice INV/2024/051" |
+| Pengumuman | Ungu | "Briefing pagi jam 07:00 di Meeting Point" |
+| AI Insight | Biru | "Peningkatan driver idle jam 13:00-15:00" |
+| Warning | Merah | "Kata tidak pantas terdeteksi di Room Staff" |
+| System | Abu-abu | "Maintenance malam ini 23:00-01:00" |
+
+**Color Tokens Notifikasi:**
+| Token | Hex |
+|-------|-----|
+| Background | `#111111` |
+| Aksen/Tab aktif | `#FFC700` |
+| Teks utama | `#FFFFFF` |
+| Teks sekunder | `#7E7E7E` |
+| Light surface | `#F5F5F5` |
+| Warning/Badge | `#E53935` |
+
+**Typography:** Poppins · Judul SemiBold 16px · Deskripsi Regular 13px · Waktu Medium 12px
+
+**Bottom Nav (konfirmasi dari layar ini):** Beranda · Chat · AI Insight · **Notifikasi** (badge 8, aktif) · Akun
+
+**Technical Spec:** 1170×2532px · Safe Area 44px · Card radius 16px · Dark Theme
 
 ---
 
