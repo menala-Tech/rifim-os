@@ -81,9 +81,11 @@ Berpikirlah seperti senior software architect, bukan code generator.
 
 ---
 
-## Trigger Sesi Baru — "lanjut rifim os chat"
+## Trigger Perintah Sesi
 
-Setiap kali user mengetik **"lanjut rifim os chat"** (atau `/lanjut-rifim-os-chat`), Claude WAJIB langsung menjalankan startup sequence berikut **tanpa menunggu konfirmasi:**
+### BUKA SESI — "lanjut rifim os chat" (atau `/lanjut-rifim-os-chat`)
+
+Setiap kali user mengetik perintah ini, Claude WAJIB langsung menjalankan startup sequence **tanpa menunggu konfirmasi:**
 
 ```
 1. Buka folder lokal: C:\Users\ADMIN\Documents\RIFIM\rifim-os
@@ -94,7 +96,23 @@ Setiap kali user mengetik **"lanjut rifim os chat"** (atau `/lanjut-rifim-os-cha
 6. Siap menerima instruksi
 ```
 
-Jangan tanya "apakah saya harus membaca file?" — langsung baca dan laporkan hasilnya.
+### TUTUP SESI — "simpan sesi rifim os" (atau `/simpan-sesi-rifim-os`)
+
+Setiap kali user mengetik perintah ini, Claude WAJIB langsung menjalankan save sequence **tanpa menunggu konfirmasi:**
+
+```
+1. Cek git status             ← file apa yang berubah
+2. Update docs/STATUS.md      ← tandai task selesai ✅, catat progress, update tanggal
+3. Commit semua perubahan     ← pesan commit deskriptif
+4. Push ke branch aktif       ← git push -u origin <branch>
+5. Laporkan ringkasan sesi:
+   ✅ Task selesai hari ini
+   ⬜ Task pending lanjut
+   ⚠️ Blocker / keputusan pending
+   🔜 Task pertama sesi berikutnya
+```
+
+Jangan tanya konfirmasi — langsung eksekusi dan laporkan hasilnya.
 
 ---
 
