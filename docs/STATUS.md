@@ -2,7 +2,7 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-07-14 (Analisa 14 dokumen desain selesai — terakhir: Notification Page UI spec)
+> Last updated: 2026-07-14 (Analisa 15 dokumen desain selesai — terakhir: Chat Management admin panel)
 
 ---
 
@@ -77,7 +77,8 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | Settings | Config spec | Mode Kerja 6 status, Dashboard Preferensi, ⚠️ ID format discrepancy RFM- vs RIF |
 | Chat Room Features | 10 fitur detail | Voice record, @mention, Admin kick, AI Guard, Suspicious Link, Voice/Video Call |
 | Room Chat UI Spec | Pixel-perfect render | Dark #1E1E1E, bubble admin kuning, bubble user #2B2B2B, Poppins, radius 16px, Safe Area 44px |
-| **Notification Page UI** | **Halaman notifikasi** | **Dark #111111, 3-tab filter (Semua/Belum Dibaca/Penting), 8 kategori berwarna, dot kuning=unread, swipe-left→Pin/Delete, Bottom Nav: Beranda·Chat·AI·Notif·Akun** |
+| Notification Page UI | Halaman notifikasi | Dark #111111, 3-tab filter (Semua/Belum Dibaca/Penting), 8 kategori berwarna, dot kuning=unread, swipe-left→Pin/Delete |
+| **Chat Management** | **Admin panel room** | **18 fitur: Hapus/Lock/Archive/AutoDelete/MediaManager/AuditLog/BackupExport/RetentionPolicy/GoogleDriveSync/AIDetection; storage 50GB/room; audit log permanent** |
 
 ### RIFIM CHAT — Peluang, Kendala & Strategi (Dokumentasi_Peluang_Strategi_RIFIM_Chat.md)
 
@@ -225,6 +226,54 @@ chat_rooms (id, name, icon, description, type, cabang, created_at)
 chat_messages (id uuid, room_id, sender_id, sender_name, content, type, metadata jsonb, cabang, created_at)
 chat_room_members (room_id, user_id, role, last_read_at)
 ```
+
+---
+
+### Chat Management Module (Dokumentasi_Chat_Management_RIFIM_OS.md)
+
+**Admin panel untuk kelola chat, media, arsip & pengaturan per-room.**
+
+**Room Summary (header panel):**
+- Chat: 12.540 total · Media: 3.245 · Dokumen: 563 · Peserta: 128
+- Storage bar: 21.45 GB / 50 GB (42%)
+- Breakdown: Foto 6.12GB | Video 9.35GB | Dokumen 2.41GB | Voice 1.12GB | Lainnya 2.45GB
+
+**18 Fitur Chat Management:**
+
+| # | Fitur | Ringkasan |
+|---|-------|-----------|
+| 1 | **Hapus Chat** | User: delete self/unsend 5min; Admin: hapus peserta; Super Admin: hapus semua+restore |
+| 2 | **Media Manager** | Kelola Foto/Video/Dokumen/Voice/Lokasi/Link/QR/PDF/Lainnya per room |
+| 3 | **Clean Room** | Hapus berdasar waktu: 7/30/90 hari, 1 tahun; toggle auto-clean setiap 30 hari |
+| 4 | **Archive Room** | Room → READ ONLY; tetap bisa cari & export, tidak bisa kirim |
+| 5 | **Auto Delete** | Per tipe: Foto 30H · Voice 7H · Dokumen 1Y · Video 90H · Lainnya 180H |
+| 6 | **Lock Room** | READ ONLY semua (hanya admin bisa kirim) — untuk pengumuman/briefing |
+| 7 | **Hapus Peserta** | Kick dari room; chat lama tetap ada; tidak bisa masuk lagi |
+| 8 | **Clear Announcement** | Hapus pengumuman lama; data tetap di arsip |
+| 9 | **Smart Search** | Chip filter: Foto/PDF/Driver/Isi Saldo/Approval/SP1/Invoice/DLL |
+| 10 | **AI Media Detection** | Deteksi otomatis: foto tidak pantas, phishing link, malware, spam → alert admin |
+| 11 | **Audit Log** | Semua aksi admin tercatat; **log tidak dapat dihapus** |
+| 12 | **Backup Chat** | Export: PDF / Excel / ZIP / Markdown |
+| 13 | **Export Media** | Filter tipe + tanggal → Export ZIP |
+| 14 | **Storage Manager** | Pie chart per tipe; tombol Detail Penggunaan |
+| 15 | **Google Drive Sync** | Hapus/restore/arsip/pindah folder otomatis ke Drive |
+| 16 | **Retention Policy** | Configurable per room per tipe: Chat Ops 1Y · Pengumuman/Dokumen/AI Log/Audit Log = Permanent |
+| 17 | **Hak Akses Admin** | Super Admin=semua · Admin Airport=room+peserta · Koordinator=peserta+media · Staff=terbatas · Driver=read+send |
+| 18 | **Catatan & Reminder** | Backup rutin + audit log wajib periksa berkala |
+
+**Supabase tables tambahan yang dibutuhkan:**
+```sql
+chat_audit_log (id, room_id, actor_id, actor_role, action, target, timestamp) -- PERMANENT, no delete
+chat_retention_policy (room_id, data_type, retention_days, is_permanent)
+chat_storage_usage (room_id, type, size_bytes, updated_at)
+```
+
+**Hak akses Chat Management per role:**
+- Super Admin → semua fitur (termasuk restore & archive global)
+- Admin Airport → kelola room + peserta cabang sendiri
+- Koordinator → kelola peserta + media cabang sendiri
+- Staff → akses terbatas
+- Driver → hanya read + send (tidak punya akses Chat Management)
 
 ---
 
