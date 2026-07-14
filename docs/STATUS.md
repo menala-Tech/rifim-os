@@ -2,7 +2,7 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-07-13 (Sprint 3A RAOS selesai + 4 Dokumen Arsitektur dianalisa)
+> Last updated: 2026-07-14 (Analisa 12 dokumen desain selesai: Arsitektur V3/V4, Framework, Business Rules, Design System, RIFIM Chat UI/UX, Strategy, Room Types, Room Structure, Mobile Features, Settings, Chat Room Features)
 
 ---
 
@@ -465,6 +465,16 @@ RADMS (Batch 7) sudah production:
 - [ ] **RLS drivers** — enable Row Level Security + policy untuk GAS service key
 
 ### Sprint 3B — RCP Auth + Chat (Backlog)
+**Chat Room Features (10 fitur dari Dokumentasi_Fitur_Room_Chat_RIFIM.md):**
+- Sprint 3B (core): Text · @mention · Upload file/foto · Rooms
+- Sprint 4 (advanced): Voice record · Silent Room · AI profanity filter · AI link detection
+- Sprint 5 (enterprise): Voice Call 1-1 · Group Call (WebRTC)
+
+**Schema tambahan dari fitur room:**
+`chat_rooms` perlu: `is_silent bool`, `allow_media bool`, `allow_reactions bool`
+`chat_room_members` perlu: `role enum(admin,member)`, `violation_count int`
+
+
 - [ ] **Auth RCP upgrade** — authEngine return 4-level (role + cabang + permission[] + data_scope)
 - [ ] **Menu Builder** — bangun menu dinamis berdasarkan permission (bukan hardcoded)
 - [ ] **RIFIM Chat** — Supabase Realtime, kontak list, grup, broadcast, AI sebagai kontak
