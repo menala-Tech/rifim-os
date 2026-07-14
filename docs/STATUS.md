@@ -100,6 +100,41 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 
 ---
 
+### RIFIM CHAT — Struktur Room & Integrasi Notifikasi (Dokumentasi_Struktur_Room_Integrasi_RIFIM_OS.md)
+
+**7 Cabang + Kode Resmi (DEFINITIF):**
+| Kode | Cabang | Bandara |
+|------|--------|---------|
+| BTH | Batam | Hang Nadim |
+| JBI | Jambi | Sultan Thaha |
+| PKU | Pekanbaru | Sultan Syarif Kasim II |
+| BPN | Balikpapan | Sultan Aji Muhammad S. |
+| MDC | Manado | Sam Ratulangi |
+| MKS | Makassar | Sultan Hasanuddin |
+| CGK | Jakarta | Soekarno-Hatta |
+
+**6 Room Scope (dimensi siapa yang menerima):**
+1. Seluruh Staff Semua Cabang — global scope
+2. Khusus Koordinator — semua koordinator 7 cabang
+3. Khusus Admin Pusat — head office only
+4. Khusus Manajemen Pusat — top management
+5. Khusus Staff per Cabang — per-branch staff
+6. Khusus Driver per Cabang — per-branch drivers
+
+**Notification Matrix — Driver tidak dapat:**
+Smart Card, Approval, KPI & Target, AI Insight, System Info, Reward & Apresiasi
+
+**Smart Card format (actionable notification):**
+`[Judul] [Konten ringkas] [Tombol aksi]` → contoh: "Lihat Detail" / "Lihat Dashboard" / "Review"
+
+**Notification Flow:**
+`Event/Trigger → Notification Engine → Routing by Room (Scope & Role) → Smart Card → User`
+
+**Bottom Nav (versi terbaru):**
+`Chats (99+) | Kontak | AI Assistant | Notifikasi | Profil`
+
+---
+
 ### RIFIM CHAT ROOM — 10 Channel (Dokumentasi_Jenis_Ruang_Chat_RIFIM_OS.md)
 
 **Bottom Nav definitif (update dari doc sebelumnya):**
