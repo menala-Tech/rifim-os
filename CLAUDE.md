@@ -114,6 +114,31 @@ Setiap kali user mengetik perintah ini, Claude WAJIB langsung menjalankan save s
 
 Jangan tanya konfirmasi — langsung eksekusi dan laporkan hasilnya.
 
+### KOREKSI JALUR — "reset alur rifim os" (atau `/reset-alur-rifim-os`)
+
+Gunakan **di tengah sesi** ketika Claude mulai menyimpang dari arsitektur atau melanggar rules.
+
+```
+1. STOP — hentikan semua coding yang sedang berjalan
+2. Re-baca CLAUDE.md + PROJECT_RULES.md
+3. Evaluasi pekerjaan terakhir:
+   - Apakah ada hardcode warna / nilai?
+   - Apakah ada duplikasi fungsi yang sudah ada?
+   - Apakah Business Rules BR-01–BR-10 diterapkan?
+   - Apakah RCP 4-level, cabang, queue format sudah benar?
+4. Laporkan: apa yang menyimpang + kenapa + rencana koreksi
+5. TUNGGU konfirmasi user sebelum lanjut coding
+```
+
+**Tanda-tanda wajib reset:**
+- Hardcode hex color (harusnya CSS variable)
+- Queue format `A001` (harusnya `A-023`)
+- Koordinator bisa lihat semua cabang (langgar BR-01)
+- Saldo bisa negatif (langgar BR-06)
+- Auth hanya return role, bukan RCP 4-level
+- Write GAS tanpa `_gasWithLock()` (langgar Rule 41)
+- Commit langsung ke `main`
+
 ---
 
 ## Before Writing Any Code
