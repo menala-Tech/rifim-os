@@ -6,7 +6,9 @@
     { "source": "/smart-office", "destination": "/modules/smart-office/index.html" },
     { "source": "/smart-office/(.*)", "destination": "/modules/smart-office/$1" },
     { "source": "/hris", "destination": "/modules/hris/index.html" },
-    { "source": "/hris/(.*)", "destination": "/modules/hris/$1" }
+    { "source": "/hris/(.*)", "destination": "/modules/hris/$1" },
+    { "source": "/raos", "destination": "/modules/raos/index.html" },
+    { "source": "/raos/(.*)", "destination": "/modules/raos/$1" }
   ],
   "headers": [
     {
