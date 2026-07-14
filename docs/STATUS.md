@@ -69,6 +69,40 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | Framework — Documentation | 8-level doc structure | RIFIM Enterprise Handbook (SSOT), Level 6 AI Knowledge Base |
 | Business Rule Book | Aturan bisnis konkret | 10 business rules, escalation matrix, 30-min auto-logout, approval chain |
 
+### RIFIM CHAT UI/UX (Dokumentasi_Prompt_UI_UX_RIFIM.md)
+
+**RIFIM CHAT — Dark Theme (berbeda dari modul lain):**
+| Token | Hex | Keterangan |
+|-------|-----|-----------|
+| Background | `#121212` | Hitam gelap |
+| Primary Accent | `#FFC700` | Kuning utama |
+| Krem/Card | `#FFF6E0` | Card briefing & pengumuman |
+| Success | `#22C55E` | Status online |
+| Warning | `#F59E0B` | Oranye |
+| Info | `#3B82F6` | Biru |
+| Purple | `#8B5CF6` | Ungu akses |
+| Error/Badge | `#EF4444` | Merah badge |
+| Text/Icon | `#E5E7EB` | Abu-abu |
+
+**Font:** Poppins (SemiBold judul, Regular subjudul, Bold angka statistik) · 14-18px body · 22-28px big stats
+
+**Home Dashboard Layout (7 sections):**
+1. Header: Avatar + Nama + Role + Cabang (Status: Online) + Search/Chat/Bell icon
+2. Banner: Foto airport sunset + Logo RIFIM+Maxim
+3. Card Briefing: background krem, tombol kuning "Lihat Detail"
+4. Ringkasan Hari Ini: 4 stat cards dark — Driver Datang / Smart Queue / Isi Saldo / Approval + angka perubahan
+5. Menu Cepat: 2 baris icon (Absensi, Smart Queue, Driver, Isi Saldo, Approval, Pengumuman, AI Insight, Dokumen, Finance, Lainnya)
+6. Pengumuman Terbaru: card krem + tombol kuning "Baca Selengkapnya"
+7. Bottom Nav: Beranda (aktif=kuning) | Chat | AI Insight | Notifikasi (badge merah) | Akun
+
+**Logo RIFIM (branding spec):**
+- Frame "Ri" kotak merah metalik 3D · "FIM" merah metalik 3D · Panah dinamis melengkung ke kanan atas
+- "maxim" di bawah: m=kuning, a=merah, xim=putih/silver
+- Warna: `#D71920` (merah) · `#FFC700` (kuning) · `#F2F2F2` (putih) · `#BFBFBF` (abu)
+- Background: airport sunset cinematic
+
+---
+
 ### Design System (Dokumentasi_Design_System_RIFIM_OS.md)
 
 **Color Tokens (Global):**
