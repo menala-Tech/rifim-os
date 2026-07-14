@@ -2,7 +2,7 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-07-14 (Analisa 15 dokumen desain selesai — terakhir: Chat Management admin panel)
+> Last updated: 2026-07-14 (Analisa 16 dokumen desain selesai — terakhir: Settings page UI spec)
 
 ---
 
@@ -78,7 +78,8 @@ Tunggu batch berikutnya — JANGAN mulai coding sebelum semua batch selesai
 | Chat Room Features | 10 fitur detail | Voice record, @mention, Admin kick, AI Guard, Suspicious Link, Voice/Video Call |
 | Room Chat UI Spec | Pixel-perfect render | Dark #1E1E1E, bubble admin kuning, bubble user #2B2B2B, Poppins, radius 16px, Safe Area 44px |
 | Notification Page UI | Halaman notifikasi | Dark #111111, 3-tab filter (Semua/Belum Dibaca/Penting), 8 kategori berwarna, dot kuning=unread, swipe-left→Pin/Delete |
-| **Chat Management** | **Admin panel room** | **18 fitur: Hapus/Lock/Archive/AutoDelete/MediaManager/AuditLog/BackupExport/RetentionPolicy/GoogleDriveSync/AIDetection; storage 50GB/room; audit log permanent** |
+| Chat Management | Admin panel room | 18 fitur: Hapus/Lock/Archive/AutoDelete/MediaManager/AuditLog/BackupExport/RetentionPolicy/GoogleDriveSync/AIDetection; storage 50GB/room; audit log permanent |
+| **Settings Page UI** | **Halaman pengaturan** | **12 menu (Akun/Notif/Suara/Tampilan/Bahasa/Privasi/Storage/AI/Lokasi/Bantuan/Tentang) + Mode Kerja + Dashboard Preferensi + Download Manager; ⚠️ Bottom Nav ke-5 context-sensitive** |
 
 ### RIFIM CHAT — Peluang, Kendala & Strategi (Dokumentasi_Peluang_Strategi_RIFIM_Chat.md)
 
@@ -226,6 +227,54 @@ chat_rooms (id, name, icon, description, type, cabang, created_at)
 chat_messages (id uuid, room_id, sender_id, sender_name, content, type, metadata jsonb, cabang, created_at)
 chat_room_members (room_id, user_id, role, last_read_at)
 ```
+
+---
+
+### Settings Page UI Spec (Dokumentasi_Tampilan_Setting_RIFIM_OS.md)
+
+**Struktur halaman Settings — pixel-perfect dark theme:**
+
+**Header:** `← Pengaturan` (kiri) + Search + menu icon (kanan) · Background hitam · Teks putih
+
+**Profile card:** Avatar + Nama + Role/Cabang (online dot) + Tombol "Ubah Profil >" · ID Karyawan RFM-001234 (⚠️ discrepancy vs RIF0001 di Supabase)
+
+**12 Menu Settings (dengan judul grup kuning, item = icon + teks + panah):**
+1. Akun — Edit Profil · Ganti Password · Ganti PIN · Fingerprint/Face ID · Keluar (Logout)
+2. Notifikasi — A.Chat (Pribadi/Grup/Broadcast/Mention) B.Operasional (Absensi/SmartQueue/Panggilan/IsiSaldo/SaldoMasuk/SmartOffice/Approval/Driver/KPI/Dashboard)
+3. Suara Notifikasi — per tipe (Chime1/Chime2/Announcement/Warning/Beep/CashIn/QueueCall/etc); Volume 80%; Getar+LED
+4. Tampilan — Mode Terang/Gelap/**Ikuti Sistem** (checked)
+5. Tampilan Aplikasi — Ukuran Huruf A-/A/A+; Skala 90/100/110/120%; Mode Compact/Normal/Large; Kepadatan Rapat/Normal/Renggang
+6. Bahasa — **Bahasa Indonesia** (selected) / English
+7. Privasi & Keamanan — Visibilitas/Kontak/StatusOnline/ReadReceipt/Screenshot/PINLock/AutoLock 1 menit/DeviceMgmt
+8. Penyimpanan & Data — Cache 256MB/Bersihkan; Download Wi-Fi only; Gunakan Data Seluler off; Storage 2.4GB
+9. AI Assistant — Toggle: AI Assistant/Ringkasan Otomatis/Rekomendasi/InsightKPI/Prediksi/AI Chat + tombol "Kelola Preferensi AI"
+10. Lokasi — Akurasi GPS Tinggi; Background Location; Geofence; Riwayat Lokasi (peta mini)
+11. Bantuan & Panduan — Cara Penggunaan/Video Tutorial/FAQ/Hubungi Admin/Laporkan Bug/Kirim Masukan
+12. Tentang — RIFIM CHAT Versi 2.1.0 (Build 210); Kebijakan Privasi/Syarat/Lisensi/Tentang RIFIM OS
+
+**Panel bawah (3 fitur tambahan):**
+- **Mode Kerja:** Sedang Bertugas (aktif) · Istirahat · Siap Order · Off Duty · Cuti · Sakit → impacts Smart Queue/HRIS/Dashboard/AI/Notif
+- **Dashboard Preferensi:** checklist widget: Smart Queue/Saldo/Pengumuman/Absensi/KPI/AI Insight/Driver/Approval
+- **Download Manager:** Wi-Fi only; simpan ke Google Drive; hapus lokal setelah 30 hari; arsip otomatis; 2.4GB/10GB
+
+**Color Tokens Settings:**
+| Token | Hex |
+|-------|-----|
+| Primary | `#FFC700` yellow |
+| Red | `#FF2D2D` |
+| Black BG | `#0D0D0D`, `#1A1A1A`, `#2A2A2A` |
+| Secondary text | `#838383` / `#83B3B3` |
+| Success | `#22C55E` |
+| Warning | `#F59E0B` |
+| Info | `#3B82F6` |
+| Error | `#EF4444` |
+
+**⚠️ Bottom Nav Discrepancy:**
+- Doc text: `Beranda · Chat · AI Insight · Notifikasi · Akun` (Akun aktif)
+- Image (Settings screen): `Chats · Room · AI Insight · Notifikasi · Settings` (Settings aktif)
+- **Kesimpulan:** Nav item ke-5 kemungkinan context-sensitive: "Akun" di home → berubah label/icon saat di dalam Settings. Perlu klarifikasi saat build Chat module.
+
+**Logout button:** Tombol tebal kuning di bottom settings, dengan konfirmasi dialog.
 
 ---
 
