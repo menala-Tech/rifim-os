@@ -259,6 +259,15 @@ function doGet(e) {
     }
   }
 
+  // Satu kali setup: isi kolom tpl_* di sheet companies
+  if (action === 'fill_company_tpls') {
+    try {
+      return _json(fillCompanyTemplates());
+    } catch (err) {
+      return _json({ success: false, message: err.message });
+    }
+  }
+
   if (action === 'auth') {
     try {
       var email      = ((e.parameter.email || '').toLowerCase()).trim();
