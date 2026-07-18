@@ -668,7 +668,7 @@ RADMS (Batch 7) sudah production:
 - [x] `brandingEngine.js` — fix MIG logo ID → `1kignpz3yYYwdLMUkD-Vb5Gp-FhtwMVMo`
 - [x] `modules/smart-office/index.html` — Preview button + modal overlay + `buildPayload()` helper
 - [x] `docs/DOCUMENT_ENGINE.md` — Blueprint Enterprise Document Engine v1.0 (14 sub-engine, ERP foundation)
-- [ ] **DEPLOY** — copy `htmlTemplateEngine.js` ke GAS Editor → Save → Update deployment Web App
+- [x] **DEPLOY** — GAS deployed 2026-07-19, commit 849e01c, Vercel auto-deploy via GitHub push
 - [ ] Test E2E: Preview → Generate PDF → verifikasi folder Drive `1XZDBwNNDrcLquTaKB-1cbegz7rniXdgK`
 - [ ] Workflow Engine (Draft→Approval→Signed) — belum dibangun
 - [ ] Revision Engine (versioning) — belum dibangun
