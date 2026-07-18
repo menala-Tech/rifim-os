@@ -440,6 +440,49 @@
       #arsipFilterBar { flex-direction: column; }
       #arsipSearch { min-width: unset !important; }
     }
+
+    /* ─── Document Detail Modal ─────────────────────────────────── */
+    #docDetailOverlay {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.55);
+      z-index:9985; align-items:flex-end; justify-content:center;
+    }
+    @media(min-width:480px){ #docDetailOverlay { align-items:center; } }
+    #docDetailOverlay.open { display:flex; }
+    .doc-detail-sheet {
+      background:#fff; width:100%; max-width:520px;
+      border-radius:20px 20px 0 0; padding:24px 20px 32px;
+      max-height:88vh; overflow-y:auto;
+    }
+    @media(min-width:480px){ .doc-detail-sheet { border-radius:16px; margin:16px; } }
+    .doc-detail-drag { width:36px;height:4px;background:#e0e0e0;border-radius:2px;margin:0 auto 18px; }
+    .doc-detail-num  { font-family:'Courier New',monospace;font-size:15px;font-weight:900;color:#C40000;margin-bottom:4px; }
+    .doc-detail-sub  { font-size:13px;color:#666;margin-bottom:16px; }
+    .doc-detail-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-bottom:16px; }
+    .ddg-item label  { display:block;font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px; }
+    .ddg-item span   { font-size:13px;color:#1A1A1A; }
+    .doc-detail-status-row { display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap; }
+    .dd-status-btn   { flex:1;min-width:80px;padding:8px 10px;border:1.5px solid var(--border);
+                       border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;
+                       background:#fff;transition:all .15s; }
+    .dd-status-btn.active { background:#C40000;color:#fff;border-color:#C40000; }
+    .doc-detail-links { display:flex;gap:8px;margin-bottom:16px; }
+    .doc-detail-links a { flex:1;text-align:center;padding:10px;border-radius:8px;
+                          font-size:12.5px;font-weight:700;text-decoration:none; }
+    .doc-detail-links a.lnk-gdoc { background:#C40000;color:#fff; }
+    .doc-detail-links a.lnk-pdf  { background:#1A1A1A;color:#fff; }
+    .doc-detail-links a.lnk-dis  { background:#f0f0f0;color:#bbb;pointer-events:none; }
+    .doc-detail-close { width:100%;padding:11px;border:1.5px solid #ddd;border-radius:8px;
+                        background:#fff;color:#888;font-size:13px;cursor:pointer; }
+    /* clickable row in arsip table */
+    .arsip-row { cursor:pointer; transition:background .1s; }
+    .arsip-row:hover { background:#FFF8F8; }
+    /* arsip company pills */
+    .arsip-company-pills { display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px; }
+    .arsip-cpill {
+      padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);
+      background:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;color:var(--text);
+    }
+    .arsip-cpill.active { background:rgba(196,0,0,0.07);border-color:#C40000;color:#C40000;font-weight:800; }
   </style>
 </head>
 <body>
@@ -815,6 +858,9 @@
       <div class="page-title">Arsip Dokumen</div>
       <div class="page-sub">Data real-time dari Google Sheets database.</div>
 
+      <!-- Company filter pills -->
+      <div class="arsip-company-pills" id="arsipCompanyPills" style="display:none"></div>
+
       <div id="arsipCatChip" style="display:none" class="cat-chip">
         <span id="arsipCatLabel"></span>
         <span class="cat-chip-x" onclick="clearCatFilter()">✕</span>
@@ -972,6 +1018,26 @@
     <div style="font-size:40px;margin-bottom:14px;animation:spin 1s linear infinite;display:inline-block">⚙️</div>
     <div style="font-size:16px;font-weight:700;color:#1A1A1A;margin-bottom:6px">Memproses Dokumen...</div>
     <div id="loadingStatus" style="font-size:12px;color:#888">Menghubungi engine...</div>
+  </div>
+</div>
+
+<!-- ── Document Detail Modal ─────────────────────────────── -->
+<div id="docDetailOverlay" onclick="if(event.target===this)closeDocDetail()">
+  <div class="doc-detail-sheet">
+    <div class="doc-detail-drag"></div>
+    <div class="doc-detail-num"  id="ddNum">—</div>
+    <div class="doc-detail-sub"  id="ddSub">Memuat…</div>
+
+    <div class="doc-detail-grid" id="ddGrid"></div>
+
+    <div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Ubah Status</div>
+    <div class="doc-detail-status-row" id="ddStatusRow"></div>
+
+    <div class="doc-detail-links" id="ddLinks">
+      <a class="lnk-dis">Doc —</a>
+      <a class="lnk-dis">PDF —</a>
+    </div>
+    <button class="doc-detail-close" onclick="closeDocDetail()">Tutup</button>
   </div>
 </div>
 
@@ -1188,6 +1254,7 @@
       _companiesCache  = data.companies;
       _activeCompany   = data.companies[0];
       _renderCompanyPills(data.companies);
+      _renderArsipCompanyPills(data.companies);
       updateDocNum();
     } catch(_) {}
   }
@@ -1546,6 +1613,15 @@
 
       if (!data.docs || !data.docs.length) { document.getElementById('arsipEmpty').style.display = 'block'; return; }
 
+      // Company filter (client-side, same pattern as category)
+      if (_arsipCompany) {
+        const pfx = _arsipCompany + '/';
+        data.docs  = (data.docs || []).filter(d => (d.document_number || '').includes(pfx));
+        data.total = data.docs.length;
+      }
+
+      if (!data.docs || !data.docs.length) { document.getElementById('arsipEmpty').style.display = 'block'; return; }
+
       document.getElementById('arsipTableWrap').style.display = 'block';
       document.getElementById('arsipBody').innerHTML = data.docs.map(doc => {
         const tgl = doc.document_date
@@ -1554,10 +1630,10 @@
         const cls  = STATUS_BADGE[doc.status] || 'badge-draft';
         const lbl  = STATUS_LABEL[doc.status] || doc.status;
         const lnks = [
-          doc.gdoc_url ? `<a class="act" href="${doc.gdoc_url}" target="_blank">Doc ↗</a>` : '',
-          doc.pdf_url  ? `<a class="act" href="${doc.pdf_url}"  target="_blank">PDF ↗</a>` : '',
+          doc.gdoc_url ? `<a class="act" href="${doc.gdoc_url}" target="_blank" onclick="event.stopPropagation()">Doc ↗</a>` : '',
+          doc.pdf_url  ? `<a class="act" href="${doc.pdf_url}"  target="_blank" onclick="event.stopPropagation()">PDF ↗</a>` : '',
         ].filter(Boolean).join(' ');
-        return `<tr>
+        return `<tr class="arsip-row" onclick="openDocDetail('${doc.id}')">
           <td class="doc-num">${doc.document_number || '—'}</td>
           <td>${doc.document_type   || '—'}</td>
           <td>${doc.subject         || '—'}</td>
@@ -1720,6 +1796,122 @@
     t.textContent = msg;
     t.className   = 'toast show' + (ok ? ' ok' : '');
     setTimeout(() => t.className = 'toast', 3500);
+  }
+
+  // ── ARSIP COMPANY FILTER ─────────────────────────────────────
+  let _arsipCompany = null;
+
+  function _renderArsipCompanyPills(companies) {
+    const wrap = document.getElementById('arsipCompanyPills');
+    if (!wrap || !companies || companies.length <= 1) return;
+    const allPill = `<button class="arsip-cpill active" id="arsip-cpill-ALL" onclick="selectArsipCompany('')">Semua</button>`;
+    const rest = companies.map(c =>
+      `<button class="arsip-cpill" id="arsip-cpill-${c.code}" onclick="selectArsipCompany('${c.code}')">${c.name}</button>`
+    ).join('');
+    wrap.innerHTML = allPill + rest;
+    wrap.style.display = 'flex';
+  }
+
+  function selectArsipCompany(code) {
+    _arsipCompany = code || null;
+    document.querySelectorAll('.arsip-cpill').forEach(b => b.classList.remove('active'));
+    const el = document.getElementById(code ? 'arsip-cpill-' + code : 'arsip-cpill-ALL');
+    if (el) el.classList.add('active');
+    loadArsip();
+  }
+
+  // ── DOCUMENT DETAIL MODAL ────────────────────────────────────
+  let _currentDocId = null;
+
+  async function openDocDetail(id) {
+    if (!id) return;
+    _currentDocId = id;
+    const overlay = document.getElementById('docDetailOverlay');
+    overlay.classList.add('open');
+    document.getElementById('ddNum').textContent     = 'Memuat…';
+    document.getElementById('ddSub').textContent     = '';
+    document.getElementById('ddGrid').innerHTML      = '';
+    document.getElementById('ddStatusRow').innerHTML = '';
+    document.getElementById('ddLinks').innerHTML     = '<a class="lnk-dis">Doc —</a><a class="lnk-dis">PDF —</a>';
+
+    try {
+      const res  = await fetch(`${GAS_WEB_APP_URL}?action=get_document&id=${encodeURIComponent(id)}`);
+      const data = await res.json();
+      if (!data.success || !data.doc) {
+        document.getElementById('ddNum').textContent = '⚠ Dokumen tidak ditemukan';
+        return;
+      }
+      _renderDocDetail(data.doc);
+    } catch (err) {
+      document.getElementById('ddNum').textContent = '❌ Gagal memuat: ' + err.message;
+    }
+  }
+
+  function _renderDocDetail(doc) {
+    document.getElementById('ddNum').textContent = doc.document_number || '—';
+    document.getElementById('ddSub').textContent = doc.subject || '';
+
+    const tgl = doc.document_date
+      ? new Date(doc.document_date).toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' })
+      : '—';
+    const createdAt = doc.created_at
+      ? new Date(doc.created_at).toLocaleString('id-ID', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+      : '—';
+
+    document.getElementById('ddGrid').innerHTML = `
+      <div class="ddg-item"><label>Jenis</label><span>${doc.document_type || '—'}</span></div>
+      <div class="ddg-item"><label>Tanggal</label><span>${tgl}</span></div>
+      <div class="ddg-item"><label>Penerima</label><span>${doc.recipient_name || '—'}</span></div>
+      <div class="ddg-item"><label>Lampiran</label><span>${doc.attachment || 0} berkas</span></div>
+      <div class="ddg-item"><label>Dibuat oleh</label><span>${doc.created_by || '—'}</span></div>
+      <div class="ddg-item"><label>Dibuat pada</label><span>${createdAt}</span></div>
+    `;
+
+    const STATUSES = ['DRAFT','FINAL','SENT','ARCHIVED'];
+    const STATUS_LBL = { DRAFT:'Draft', FINAL:'Final', SENT:'Terkirim', ARCHIVED:'Diarsip' };
+    document.getElementById('ddStatusRow').innerHTML = STATUSES.map(s =>
+      `<button class="dd-status-btn${doc.status === s ? ' active' : ''}"
+         onclick="updateDocStatus('${doc.id}','${s}')">${STATUS_LBL[s]}</button>`
+    ).join('');
+
+    document.getElementById('ddLinks').innerHTML = [
+      doc.gdoc_url
+        ? `<a class="lnk-gdoc" href="${doc.gdoc_url}" target="_blank">📄 Google Doc</a>`
+        : `<a class="lnk-dis">📄 Doc —</a>`,
+      doc.pdf_url
+        ? `<a class="lnk-pdf" href="${doc.pdf_url}" target="_blank">📥 PDF</a>`
+        : `<a class="lnk-dis">📥 PDF —</a>`,
+    ].join('');
+  }
+
+  function closeDocDetail() {
+    document.getElementById('docDetailOverlay').classList.remove('open');
+    _currentDocId = null;
+  }
+
+  async function updateDocStatus(id, newStatus) {
+    const _soAuth = JSON.parse(localStorage.getItem('rifim_auth') || '{}');
+    try {
+      const res  = await fetch(GAS_WEB_APP_URL, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'update_status', id, status: newStatus,
+          performed_by: { name: _soAuth.name || '', email: _soAuth.email || '' } }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Status diperbarui → ' + newStatus, true);
+        document.querySelectorAll('.dd-status-btn').forEach(b => b.classList.remove('active'));
+        const STATUS_LBL = { DRAFT:'Draft', FINAL:'Final', SENT:'Terkirim', ARCHIVED:'Diarsip' };
+        const clicked = [...document.querySelectorAll('.dd-status-btn')]
+          .find(b => b.textContent.trim() === STATUS_LBL[newStatus]);
+        if (clicked) clicked.classList.add('active');
+        loadArsip();
+      } else {
+        showToast('❌ ' + (data.message || 'Gagal update status'), false);
+      }
+    } catch (err) {
+      showToast('❌ Koneksi gagal: ' + err.message, false);
+    }
   }
 
   // ── BOOT ─────────────────────────────────────────────────────

@@ -41,6 +41,32 @@ function doPost(e) {
       return _json(_handleHrisPost(input));
     }
 
+    // ── Smart Office: update document status ────────────────────────
+    if (input.action === 'update_status') {
+      if (!input.id || !input.status) {
+        return _json({ success: false, message: 'Parameter id dan status wajib.' });
+      }
+      var validStatuses = ['DRAFT', 'FINAL', 'SENT', 'ARCHIVED'];
+      if (validStatuses.indexOf(input.status) === -1) {
+        return _json({ success: false, message: 'Status tidak valid: ' + input.status });
+      }
+      try {
+        var updated = updateDocumentStatusById(input.id, input.status);
+        if (updated) {
+          var byU = input.performed_by || {};
+          logActivity('Smart Office', 'UPDATE STATUS',
+            input.id, input.status,
+            byU.name || '', byU.email || '',
+            'Status → ' + input.status);
+        }
+        return _json({ success: updated,
+          message: updated ? 'Status diperbarui.' : 'Dokumen tidak ditemukan.' });
+      } catch (err) {
+        _gasLogError('doPost', 'update_status', err, { id: input.id, status: input.status });
+        return _json({ success: false, message: err.message });
+      }
+    }
+
     // ── Staff App PWA actions (staffLogin, staffSaldoSubmit, dll.) ─
     if (input.action && input.action !== 'log_activity') {
       var staffResult = routeStaffApp(input.action, input);
@@ -330,6 +356,13 @@ function doGet(e) {
         .createTextOutput(JSON.stringify({ success: false, message: err.message }))
         .setMimeType(ContentService.MimeType.JSON);
     }
+  }
+
+  if (action === 'get_document') {
+    try {
+      var doc = getDocumentById(e.parameter.id || '');
+      return _json(doc ? { success: true, doc: doc } : { success: false, message: 'Dokumen tidak ditemukan.' });
+    } catch (err) { return _json({ success: false, message: err.message }); }
   }
 
   // Default: health check

@@ -229,3 +229,69 @@ function updateDocumentStatus(documentNumber, newStatus) {
     return false;
   });
 }
+
+/**
+ * Update status dokumen berdasarkan document ID (UUID atau DOC-xxx).
+ * Digunakan oleh Smart Office UI untuk archive / workflow transition.
+ * @param {string} docId
+ * @param {string} newStatus  DRAFT | FINAL | SENT | ARCHIVED
+ * @returns {boolean}
+ */
+function updateDocumentStatusById(docId, newStatus) {
+  return _gasWithLock(function() {
+    var sheet = _getDB().getSheetByName('documents');
+    if (!sheet) return false;
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][_DOC_COL.ID - 1]) === String(docId)) {
+        sheet.getRange(i + 1, _DOC_COL.STATUS).setValue(newStatus);
+        sheet.getRange(i + 1, _DOC_COL.UPDATED_AT).setValue(_gasNow());
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
+/**
+ * Ambil satu dokumen berdasarkan ID.
+ * @param {string} docId
+ * @returns {object|null}
+ */
+function getDocumentById(docId) {
+  var sheet = _getDB().getSheetByName('documents');
+  if (!sheet) return null;
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return null;
+  var toIso = function(v) {
+    if (v instanceof Date) return v.toISOString();
+    return v ? String(v) : '';
+  };
+  for (var i = 1; i < data.length; i++) {
+    var r = data[i];
+    if (String(r[_DOC_COL.ID - 1]) !== String(docId)) continue;
+    var docDate = r[4] instanceof Date
+      ? Utilities.formatDate(r[4], 'Asia/Jakarta', 'yyyy-MM-dd')
+      : (r[4] ? String(r[4]) : '');
+    return {
+      id:               r[_DOC_COL.ID - 1]              || '',
+      document_number:  r[_DOC_COL.DOC_NUMBER - 1]      || '',
+      document_type:    r[_DOC_COL.DOC_TYPE - 1]        || '',
+      document_code:    r[_DOC_COL.DOC_CODE - 1]        || '',
+      document_date:    docDate,
+      recipient_name:   r[_DOC_COL.RECIPIENT_NAME - 1]  || '',
+      recipient_address:r[_DOC_COL.RECIPIENT_ADDR - 1]  || '',
+      subject:          r[_DOC_COL.SUBJECT - 1]         || '',
+      attachment:       r[_DOC_COL.ATTACHMENT - 1]      || 0,
+      body_summary:     r[_DOC_COL.BODY_SUMMARY - 1]    || '',
+      status:           r[_DOC_COL.STATUS - 1]          || '',
+      gdoc_url:         r[_DOC_COL.GDOC_URL - 1]        || '',
+      pdf_url:          r[_DOC_COL.PDF_URL - 1]         || '',
+      qr_url:           r[_DOC_COL.QR_URL - 1]          || '',
+      created_by:       r[_DOC_COL.CREATED_BY - 1]      || '',
+      created_at:       toIso(r[_DOC_COL.CREATED_AT - 1]),
+      updated_at:       toIso(r[_DOC_COL.UPDATED_AT - 1]),
+    };
+  }
+  return null;
+}
