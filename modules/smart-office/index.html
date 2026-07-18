@@ -36,8 +36,7 @@
     #loginScreen {
       position: fixed; inset: 0; z-index: 9999;
       background:
-        linear-gradient(145deg, rgba(26,26,26,.88) 0%, rgba(58,0,0,.88) 60%, rgba(43,43,43,.88) 100%),
-        url('/branding/logo/rifim-logo-building.png') center/cover no-repeat;
+        linear-gradient(145deg, rgba(26,26,26,.95) 0%, rgba(58,0,0,.95) 60%, rgba(43,43,43,.95) 100%);
       display: flex; align-items: center; justify-content: center; padding: 20px;
     }
     .login-card {
@@ -492,7 +491,7 @@
 ════════════════════════════════════════════ -->
 <div id="loginScreen" style="display:none">
   <div class="login-card">
-    <img src="/branding/logo/rifim-logo.png" class="login-logo-img" alt="RIFIM"
+    <img src="/branding/logo/logo-rifim.png" class="login-logo-img" alt="RIFIM"
       onerror="this.style.display='none';document.getElementById('loginLogoMark').style.display='flex'">
     <div class="login-logo-mark" id="loginLogoMark">
       <svg width="44" height="44" viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg">
@@ -530,7 +529,7 @@
     </button>
     <a class="nav-brand" href="#">
       <div class="logo-mark-nav">
-        <img src="/branding/logo/rifim-logo.png" alt="RIFIM"
+        <img src="/branding/logo/logo-rifim.png" alt="RIFIM"
           onerror="this.outerHTML='<svg width=\'34\' height=\'34\' viewBox=\'0 0 34 34\' xmlns=\'http://www.w3.org/2000/svg\'><rect width=\'34\' height=\'34\' rx=\'7\' fill=\'%23C40000\'/><text x=\'17\' y=\'25\' text-anchor=\'middle\' fill=\'white\' font-family=\'Arial Black,Arial\' font-weight=\'900\' font-size=\'18\'>R</text></svg>'">
       </div>
       <div>
@@ -1086,7 +1085,7 @@
       const res  = await fetch(`${GAS_WEB_APP_URL}?action=auth&source=Smart+Office&email=${encodeURIComponent(email)}`);
       const data = await res.json();
       if (data.success) {
-        storeAuth({ email, name: data.user.name, role: data.user.role });
+        storeAuth({ email, name: data.user.full_name || data.user.name || email, role: data.user.role });
       } else if (localAllowed) {
         // GAS menolak tapi email ada di daftar lokal — izinkan masuk
         storeAuth({ email, name: 'Bobby Rahman M.B', role: 'Direktur Utama' });

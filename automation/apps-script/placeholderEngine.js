@@ -12,13 +12,20 @@ function replacePlaceholders(docId, data) {
   if (!docId) throw new Error('docId diperlukan.');
   if (!data || typeof data !== 'object') throw new Error('data harus berupa object.');
 
-  const doc  = DocumentApp.openById(docId);
-  const body = doc.getBody();
+  var doc = DocumentApp.openById(docId);
+
+  // Sections to search: body + header + footer (company info biasanya di header template)
+  var sections = [doc.getBody()];
+  try { var h = doc.getHeader(); if (h) sections.push(h); } catch (_) {}
+  try { var f = doc.getFooter(); if (f) sections.push(f); } catch (_) {}
 
   Object.keys(data).forEach(function(key) {
-    const placeholder = '{{' + key + '}}';
-    const value       = (data[key] !== undefined && data[key] !== null) ? String(data[key]) : '';
-    body.replaceText(placeholder, value);
+    // Escape curly braces untuk Java regex yang dipakai GAS replaceText
+    var placeholder = '\\{\\{' + key + '\\}\\}';
+    var value       = (data[key] !== undefined && data[key] !== null) ? String(data[key]) : '';
+    sections.forEach(function(section) {
+      try { section.replaceText(placeholder, value); } catch (_) {}
+    });
   });
 
   doc.saveAndClose();
