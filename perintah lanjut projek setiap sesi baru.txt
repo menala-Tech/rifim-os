@@ -1,0 +1,5 @@
+
+
+lanjut rifim os chat	/lanjut-rifim-os-chat	Awal sesi — baca context, laporkan status
+reset alur rifim os	/reset-alur-rifim-os	Tengah sesi — Claude mulai menyimpang dari rules
+simpan sesi rifim os	/simpan-sesi-rifim-os	Akhir sesi — commit, push, ringkasan/simpan-sesi-rifim-os

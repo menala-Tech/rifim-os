@@ -515,10 +515,54 @@ function saldoDailyRekap() {
  * Route action Saldo Engine → fungsi handler.
  * Return null jika action bukan milik Saldo Engine.
  */
+/**
+ * Saldo realtime driver bulan ini dari Form Input Saldo PWA (data staff, belum diverifikasi AIST).
+ * Lebih real-time dari saldoGetDriverBalance (yang butuh saldoProcessAIST dulu).
+ */
+function driverGetSaldoRealtime(params) {
+  try {
+    _gasValidate(params, { loginId: { type: 'string', required: true } });
+    var loginId = String(params.loginId).trim();
+    var ss      = SpreadsheetApp.openById(RAOS_SS_ID);
+    var sh      = ss.getSheetByName(_SD_PWA_F);  // 'Form Input Saldo PWA'
+    if (!sh) return { ok: false, error: 'Sheet Form Input Saldo PWA tidak ditemukan.' };
+
+    var last = sh.getLastRow();
+    if (last < _SD_DATA_START) return { ok: true, totalNominal: 0, jumlahPengisian: 0, entries: [] };
+
+    var data   = sh.getRange(_SD_DATA_START, 1, last - _SD_DATA_START + 1, 12).getValues();
+    var tz     = ss.getSpreadsheetTimeZone();
+    var thnBln = Utilities.formatDate(new Date(), tz, 'yyyy-MM');
+
+    var total = 0, count = 0, entries = [];
+    data.forEach(function(row) {
+      // _FP_C.LOGIN_ID = 5, _FP_C.TIMESTAMP = 1, _FP_C.NOMINAL = 4
+      var lid = String(row[_FP_C.LOGIN_ID - 1] || '').trim();
+      if (lid !== loginId) return;
+      var ts  = row[_FP_C.TIMESTAMP - 1];
+      var tgl = (ts instanceof Date)
+        ? Utilities.formatDate(ts, tz, 'yyyy-MM-dd')
+        : String(ts || '').substring(0, 10);
+      if (!tgl.startsWith(thnBln)) return;
+      var nominal  = Number(row[_FP_C.NOMINAL - 1]) || 0;
+      var validasi = String(row[9] || '').trim(); // col 10 = VALIDASI
+      total += nominal;
+      count++;
+      entries.push({ tanggal: tgl, nominal: nominal, validasi: validasi || 'PENDING' });
+    });
+
+    return { ok: true, loginId: loginId, totalNominal: total, jumlahPengisian: count, entries: entries };
+  } catch (err) {
+    _gasLogError('driverGetSaldoRealtime', 'get', err, params || {});
+    return { ok: false, error: err.message };
+  }
+}
+
 function routeSaldoEngine(action, params) {
   switch (action) {
-    case 'saldoGetDriverBalance': return saldoGetDriverBalance(params);
-    case 'saldoGetRekapCabang':  return saldoGetRekapCabang(params);
+    case 'saldoGetDriverBalance':   return saldoGetDriverBalance(params);
+    case 'saldoGetRekapCabang':     return saldoGetRekapCabang(params);
+    case 'driverGetSaldoRealtime':  return driverGetSaldoRealtime(params);
     default: return null;
   }
 }

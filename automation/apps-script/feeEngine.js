@@ -420,6 +420,76 @@ function feeGetKinerjaDriver(params) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// REALTIME — DRIVER PWA
+// ══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Kinerja realtime driver dari Database Potongan (bukan DB Driver Kinerja).
+ * Dipakai Driver PWA — data langsung, tidak menunggu trigger 01:00.
+ * @param params { loginId }
+ * @returns { ok, data:[{tanggal,jumlahOrder,totalHakDriver,totalFee}], totalOrder, totalHakDriver, totalFee }
+ */
+function driverGetKinerjaRealtime(params) {
+  var errs = _gasValidate(params, {
+    loginId: { required: true, type: 'string' },
+  });
+  if (errs.length) return { ok: false, error: errs.join('; ') };
+
+  try {
+    var loginId = String(params.loginId).trim();
+    var ss = SpreadsheetApp.openById(RAOS_SS_ID);
+    var sh = ss.getSheetByName('Database Potongan');
+    if (!sh) return { ok: false, error: 'Sheet Database Potongan tidak ditemukan.' };
+
+    var tz    = ss.getSpreadsheetTimeZone();
+    var bulan = Utilities.formatDate(new Date(), tz, 'yyyy-MM');
+
+    var lastRow = sh.getLastRow();
+    if (lastRow < _FE_DATA_START) {
+      return { ok: true, data: [], totalOrder: 0, totalHakDriver: 0, totalFee: 0 };
+    }
+
+    var data = sh.getRange(_FE_DATA_START, 1, lastRow - _FE_DATA_START + 1, 15).getValues();
+
+    var byDate     = {};
+    var totalOrder = 0, totalHak = 0, totalFee = 0;
+
+    data.forEach(function(row) {
+      if (String(row[_FE_DB_COL.LOGIN_ID - 1] || '').trim() !== loginId) return;
+
+      var tgl = row[_FE_DB_COL.TANGGAL - 1];
+      var tglStr = (tgl instanceof Date)
+        ? Utilities.formatDate(tgl, tz, 'yyyy-MM-dd')
+        : String(tgl || '').substring(0, 10);
+      if (!tglStr || tglStr.substring(0, 7) !== bulan) return;
+
+      if (!byDate[tglStr]) byDate[tglStr] = { jumlahOrder: 0, totalHakDriver: 0, totalFee: 0 };
+      byDate[tglStr].jumlahOrder++;
+      byDate[tglStr].totalHakDriver += Number(row[_FE_DB_COL.HAK_DRIVER - 1]) || 0;
+      byDate[tglStr].totalFee       += Number(row[_FE_DB_COL.TOTAL_POTONGAN - 1]) || 0;
+
+      totalOrder++;
+      totalHak += Number(row[_FE_DB_COL.HAK_DRIVER - 1]) || 0;
+      totalFee += Number(row[_FE_DB_COL.TOTAL_POTONGAN - 1]) || 0;
+    });
+
+    var result = Object.keys(byDate).sort(function(a, b) { return b > a ? 1 : -1; }).map(function(tgl) {
+      return {
+        tanggal:        tgl,
+        jumlahOrder:    byDate[tgl].jumlahOrder,
+        totalHakDriver: byDate[tgl].totalHakDriver,
+        totalFee:       byDate[tgl].totalFee,
+      };
+    });
+
+    return { ok: true, data: result, totalOrder: totalOrder, totalHakDriver: totalHak, totalFee: totalFee };
+  } catch (err) {
+    _gasLogError('feeEngine', 'driverGetKinerjaRealtime', err, params || {});
+    return { ok: false, error: err.message };
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // ROUTER
 // ══════════════════════════════════════════════════════════════════════════
 
@@ -429,9 +499,10 @@ function feeGetKinerjaDriver(params) {
  */
 function routeFeeEngine(action, params) {
   switch (action) {
-    case 'feeGetRekapHarian':   return feeGetRekapHarian(params);
-    case 'feeGetRekapBulanan':  return feeGetRekapBulanan(params);
-    case 'feeGetKinerjaDriver': return feeGetKinerjaDriver(params);
+    case 'feeGetRekapHarian':        return feeGetRekapHarian(params);
+    case 'feeGetRekapBulanan':       return feeGetRekapBulanan(params);
+    case 'feeGetKinerjaDriver':      return feeGetKinerjaDriver(params);
+    case 'driverGetKinerjaRealtime': return driverGetKinerjaRealtime(params);
     default: return null;
   }
 }

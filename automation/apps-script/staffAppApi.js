@@ -264,7 +264,12 @@ function staffLookupDriver(params) {
   var loginId = String(params.loginId || '').trim();
   if (!loginId) return { ok: false, error: 'ID Login wajib.' };
   var driver = _cariDriverByLoginId(loginId);
-  return { ok: true, ditemukan: !!driver, nama: driver ? driver.nama : null };
+  return {
+    ok: true,
+    ditemukan: !!driver,
+    nama:   driver ? driver.nama      : null,
+    cabang: driver ? driver.idCabang  : null,
+  };
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -970,6 +975,121 @@ function queueUpdate(params) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+// DRIVER PWA — ANTRIAN SELF-SERVICE
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * Cek status antrian driver by loginId hari ini.
+ * @param params { loginId, cabang }
+ */
+function driverCekAntrian(params) {
+  var errs = _gasValidate(params, {
+    loginId: { required: true, type: 'string', regex: /^\d{5,20}$/ },
+    cabang:  { required: true, type: 'string' },
+  });
+  if (errs.length) return { ok: false, error: errs.join('; ') };
+
+  var loginId = String(params.loginId).trim();
+  var cabang  = String(params.cabang).trim();
+
+  try {
+    var ss = SpreadsheetApp.openById(RAOS_SS_ID);
+    var sh = ss.getSheetByName(_SA_QUEUE_SHEET);
+    if (!sh) return { ok: false, error: 'Sheet Antrian Bandara belum di-setup.' };
+
+    var tz    = ss.getSpreadsheetTimeZone();
+    var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+    var lastRow = sh.getLastRow();
+
+    if (lastRow < _SA_DATA_START) {
+      return { ok: true, dalamAntrian: false, antrian: null, posisi: null, totalWaiting: 0, totalCalled: 0 };
+    }
+
+    var data = sh.getRange(_SA_DATA_START, 1, lastRow - _SA_DATA_START + 1, 10).getValues();
+
+    var totalWaiting = 0, totalCalled = 0;
+    var driverEntry  = null, posisiWaiting = 0;
+
+    var fmtJam = function(raw) {
+      if (!raw) return '';
+      var parsed = _monParseTs(raw);
+      return parsed ? Utilities.formatDate(parsed, tz, 'HH:mm') : String(raw).substring(11, 16);
+    };
+
+    data.forEach(function(row, idx) {
+      if (String(row[1]) !== today) return;
+      if (String(row[2]).trim().toLowerCase() !== cabang.toLowerCase()) return;
+      var status = String(row[5]).trim().toUpperCase();
+      if (status === 'DONE' || status === 'CANCEL') return;
+
+      if (status === 'WAITING') totalWaiting++;
+      if (status === 'CALLED')  totalCalled++;
+
+      if (String(row[3]).trim() === loginId) {
+        driverEntry = {
+          row:       idx + _SA_DATA_START,
+          id:        String(row[0]),
+          status:    status,
+          masuk:     fmtJam(row[6]),
+          dipanggil: fmtJam(row[7]),
+        };
+        if (status === 'WAITING') posisiWaiting = totalWaiting;
+      }
+    });
+
+    return {
+      ok:          true,
+      dalamAntrian: !!driverEntry,
+      antrian:     driverEntry,
+      posisi:      (driverEntry && driverEntry.status === 'WAITING') ? posisiWaiting : null,
+      totalWaiting: totalWaiting,
+      totalCalled:  totalCalled,
+    };
+  } catch (err) {
+    _gasLogError('Staff PWA', 'driverCekAntrian', err, params || {});
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * Driver join antrian sendiri.
+ * @param params { loginId, cabang }
+ */
+function driverJoinQueue(params) {
+  var errs = _gasValidate(params, {
+    loginId: { required: true, type: 'string', regex: /^\d{5,20}$/ },
+    cabang:  { required: true, type: 'string', maxLen: 100 },
+  });
+  if (errs.length) return { ok: false, error: errs.join('; ') };
+  return queueAdd({ cabang: params.cabang, loginId: params.loginId, staffNama: 'Driver PWA' });
+}
+
+/**
+ * Driver keluar antrian sendiri.
+ * @param params { loginId, cabang }
+ */
+function driverLeaveQueue(params) {
+  var errs = _gasValidate(params, {
+    loginId: { required: true, type: 'string', regex: /^\d{5,20}$/ },
+    cabang:  { required: true, type: 'string' },
+  });
+  if (errs.length) return { ok: false, error: errs.join('; ') };
+
+  try {
+    var cek = driverCekAntrian(params);
+    if (!cek.ok) return cek;
+    if (!cek.dalamAntrian) return { ok: false, error: 'Anda tidak dalam antrian.' };
+    if (cek.antrian.status === 'CALLED') {
+      return { ok: false, error: 'Anda sudah dipanggil. Hubungi staff untuk keluar antrian.' };
+    }
+    return queueUpdate({ row: cek.antrian.row, status: 'CANCEL' });
+  } catch (err) {
+    _gasLogError('Staff PWA', 'driverLeaveQueue', err, params || {});
+    return { ok: false, error: err.message };
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
 // ROUTER — dipanggil dari webApp.js doPost
 // ══════════════════════════════════════════════════════════════════
 
@@ -992,6 +1112,9 @@ function routeStaffApp(action, params) {
     case 'queueList':          return queueList(params);
     case 'queueAdd':           return queueAdd(params);
     case 'queueUpdate':        return queueUpdate(params);
+    case 'driverCekAntrian':   return driverCekAntrian(params);
+    case 'driverJoinQueue':    return driverJoinQueue(params);
+    case 'driverLeaveQueue':   return driverLeaveQueue(params);
     default: return null;
   }
 }
