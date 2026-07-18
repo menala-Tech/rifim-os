@@ -19,7 +19,7 @@
 // Jalankan setupBrandingLogosDefault() dari GAS Editor setelah ID diisi.
 var _BRAND_DEFAULT_IDS = {
   rifim      : '1ylC1QAjPRT4OiRsCh1BfbrNNZI9JRpTE',  // logo-rifim.png
-  menala     : '1mN9jmuWej2PjdlxqzmU90LsDhz1N1mVf',  // logo-menala.png
+  menala     : '1kignpz3yYYwdLMUkD-Vb5Gp-FhtwMVMo',  // brand Menala 1.png (logo baru)
   lailan     : '1WC0wBexm6zIjuoKF_KEb7Znpk3Bwdv6V',  // logo-lailan.png
   maxim      : '1OC2cFMTGhGSzfkRwtLYs_ZBlaHGBe6gh',  // logo-maxim.png
   rifimGroup : '1oX0JnQSRFlVfgoctTqJQ9cz30F-Oehw3',  // logo-rifim-group.jpg

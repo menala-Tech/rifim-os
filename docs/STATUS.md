@@ -2,7 +2,7 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-07-14 (Analisa 16 dokumen desain selesai — terakhir: Settings page UI spec)
+> Last updated: 2026-07-19 (Document Studio — HTML→PDF pipeline selesai: htmlTemplateEngine.js, preview modal, webApp.js actions)
 
 ---
 
@@ -658,6 +658,20 @@ RADMS (Batch 7) sudah production:
 ### Sprint 2 (lanjutan)
 - [ ] Test PKWT generation end-to-end
 - [ ] Setup GAS trigger `notifCheckExpiringContracts()`
+
+### Document Studio — HTML→PDF Pipeline (selesai 2026-07-19)
+
+- [x] `automation/apps-script/htmlTemplateEngine.js` — engine baru, 5 template type, 20 doc types, 3 perusahaan
+- [x] Asset IDs final terkonfirmasi: RIFIM/MIG/LAILAN logo + TTD Bobby + stempel masing-masing
+- [x] `webApp.js` — action `previewDocument` + `generateDocumentHtml`
+- [x] `documentEngine.js` — route HTML pipeline via `input.use_html_pipeline = true`
+- [x] `brandingEngine.js` — fix MIG logo ID → `1kignpz3yYYwdLMUkD-Vb5Gp-FhtwMVMo`
+- [x] `modules/smart-office/index.html` — Preview button + modal overlay + `buildPayload()` helper
+- [x] `docs/DOCUMENT_ENGINE.md` — Blueprint Enterprise Document Engine v1.0 (14 sub-engine, ERP foundation)
+- [ ] **DEPLOY** — copy `htmlTemplateEngine.js` ke GAS Editor → Save → Update deployment Web App
+- [ ] Test E2E: Preview → Generate PDF → verifikasi folder Drive `1XZDBwNNDrcLquTaKB-1cbegz7rniXdgK`
+- [ ] Workflow Engine (Draft→Approval→Signed) — belum dibangun
+- [ ] Revision Engine (versioning) — belum dibangun
 
 ### Sprint 3A — Modul Baru
 - [x] **RAOS UI** — 5-tab (Dashboard, Antrian, Driver, Saldo, Kinerja) — PR #3 merged

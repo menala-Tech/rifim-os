@@ -2,9 +2,9 @@
 
 > RIFIM OS — Claude Code Operating Manual
 
-Version: 1.2
+Version: 1.3
 Status: Active
-Last updated: 2026-07-14 (Design System, 7 Cabang, RCP 4-level, Mode Kerja, Chat Engine)
+Last updated: 2026-07-19 (Document Studio — HTML→PDF pipeline, Document Engine blueprint v1.0)
 
 ---
 
@@ -293,20 +293,23 @@ Driver dengan status `OFF_DUTY`, `CUTI`, atau `SAKIT` tidak boleh masuk antrian.
 
 | Engine | Purpose | Status |
 |--------|---------|--------|
-| Document Engine | Generate semua jenis dokumen | ✅ Phase 1 Done |
+| Document Engine | Generate semua jenis dokumen | ✅ Phase 1 Done — HTML→PDF pipeline tersedia (htmlTemplateEngine.js) |
 | Placeholder Engine | Replace placeholder di template | ✅ Phase 1 Done |
 | Numbering Engine | Auto-generate nomor dokumen | ✅ Phase 1 Done |
-| PDF Engine | Convert ke PDF | ✅ Phase 1 Done |
+| PDF Engine | Convert ke PDF | ✅ Phase 1 Done + ✅ HTML→PDF via Drive.Files.insert |
 | Drive Manager | Kelola Google Drive | ✅ Phase 1 Done |
 | Database Layer | Abstraksi akses database | ✅ Phase 1 Done |
 | Notification Engine | Email & WhatsApp | ✅ Phase 3 Done (WA terintegrasi semua modul) |
 | WA Engine | Fonnte API, templates per modul | ✅ Phase 3 Done |
 | QR Engine | Generate QR code | ✅ Phase 2 Done |
 | Auth Engine | Authentication & role | ✅ Phase 2 Done — upgrade ke RCP 4-level (Sprint 3B) |
-| Branding Engine | Logo perusahaan ke Sheet (PDF-ready) | ✅ Sprint 2 Done |
+| Branding Engine | Logo perusahaan ke Sheet (PDF-ready) | ✅ Sprint 2 Done — MIG logo ID difix 2026-07-19 |
 | Driver Layer | CRUD driver RAOS + sync Supabase→Sheet | ✅ Sprint 2 Done |
 | Staff Sync Layer | CRUD staff HRIS + sync Supabase→Sheet | ✅ Sprint 2 Done |
 | Chat Engine | Supabase Realtime, 10 rooms, event bus | ⬜ Sprint 3B |
+| Workflow Engine | Draft→Review→Approval→Signed lifecycle | ⬜ Backlog (lihat docs/DOCUMENT_ENGINE.md) |
+| Revision Engine | Versioning dokumen + change log | ⬜ Backlog |
+| Audit Engine (immutable) | Seluruh aktivitas dokumen tercatat permanen | ⬜ Backlog |
 | Mode Kerja Engine | Work status management, impact routing | ⬜ Sprint 3B |
 
 ---

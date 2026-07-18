@@ -44,6 +44,16 @@ function generateDocument(input) {
   try {
     _validateInput(input);
 
+    // Route ke HTML pipeline jika diminta (atau jika flag global aktif)
+    if (input.use_html_pipeline) {
+      var htmlConfig  = getCompanyConfig();
+      var htmlCompany = input.company_code ? getCompanyByCode(input.company_code) : null;
+      var htmlPrefix  = htmlCompany && htmlCompany.doc_prefix ? String(htmlCompany.doc_prefix) : 'RIFIM';
+      var htmlNum     = generateDocumentNumber(input.documentType, htmlPrefix);
+      var htmlData    = buildPlaceholderData(input, htmlConfig, htmlNum);
+      return generateDocumentViaHtml(input, htmlConfig, htmlCompany, htmlNum, htmlData);
+    }
+
     var config  = getCompanyConfig();
     var company = input.company_code ? getCompanyByCode(input.company_code) : null;
     if (company) {

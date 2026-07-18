@@ -1496,23 +1496,18 @@
     return `<div class="field"><label>${f.label}</label><input type="text" id="${f.id}" placeholder="${f.ph||''}"></div>`;
   }
 
-  // ── GENERATE DOKUMEN ──────────────────────────────────────────
-  async function generateDoc() {
-    if (!GAS_WEB_APP_URL) { showToast('GAS_WEB_APP_URL belum diisi', false); return; }
-    const subject = document.getElementById('subject').value.trim();
-    if (!subject) { showToast('⚠️ Perihal / Judul wajib diisi', false); return; }
-
+  // ── BUILD PAYLOAD (shared antara generateDoc & previewDoc) ───────
+  function buildPayload() {
     const extra = {};
     (DOC_FIELDS[currentCode] || []).forEach(f => {
       const el = document.getElementById(f.id);
       if (el) extra[f.id] = el.value;
     });
-
     const _soAuth = JSON.parse(localStorage.getItem('rifim_auth') || '{}');
-    const input = {
+    return {
       documentType:  currentCode,
       company_code:  _activeCompany ? _activeCompany.code : 'RIFIM',
-      subject,
+      subject:       document.getElementById('subject').value.trim(),
       attachment:    parseInt(document.getElementById('attachment').value, 10) || 0,
       documentDate:  document.getElementById('docDate').value,
       directorName:  document.getElementById('signerName').value.trim(),
@@ -1520,6 +1515,15 @@
       extra,
       performed_by:  { name: _soAuth.name || '', email: _soAuth.email || '' },
     };
+  }
+
+  // ── GENERATE DOKUMEN ──────────────────────────────────────────
+  async function generateDoc() {
+    if (!GAS_WEB_APP_URL) { showToast('GAS_WEB_APP_URL belum diisi', false); return; }
+    const subject = document.getElementById('subject').value.trim();
+    if (!subject) { showToast('⚠️ Perihal / Judul wajib diisi', false); return; }
+
+    const input = buildPayload();
 
     setLoading(true, 'Menghubungi engine RIFIM OS...');
     const btn = document.querySelector('.btn.btn-primary');
@@ -1545,9 +1549,87 @@
     }
   }
 
-  function previewDoc() {
-    if (lastResult && lastResult.gdocUrl) window.open(lastResult.gdocUrl, '_blank');
-    else showToast('Belum ada dokumen yang dibuat di sesi ini', false);
+  async function previewDoc() {
+    if (!GAS_WEB_APP_URL) { showToast('GAS_WEB_APP_URL belum diisi', false); return; }
+    const subject = document.getElementById('subject').value.trim();
+    if (!subject) { showToast('Isi minimal Perihal sebelum preview', false); return; }
+
+    const payload = buildPayload();
+    payload.action = 'previewDocument';
+
+    const previewBtn = document.querySelector('.btn.btn-secondary');
+    previewBtn.disabled = true;
+    previewBtn.textContent = '⏳ Memuat...';
+
+    try {
+      const res  = await fetch(GAS_WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!data.success) { showToast('Preview gagal: ' + (data.message || ''), false); return; }
+      _openPreviewModal(data.html, payload.documentType);
+    } catch (err) {
+      showToast('Koneksi preview gagal: ' + err.message, false);
+    } finally {
+      previewBtn.disabled = false;
+      previewBtn.textContent = '👁 Preview';
+    }
+  }
+
+  function _openPreviewModal(html, docType) {
+    let modal = document.getElementById('previewModal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'previewModal';
+      modal.style.cssText = [
+        'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;',
+        'background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;',
+        'padding:16px;',
+      ].join('');
+      modal.innerHTML = [
+        '<div style="background:#fff;border-radius:12px;max-width:780px;width:100%;',
+          'max-height:92vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.25);">',
+          '<div style="display:flex;align-items:center;justify-content:space-between;',
+            'padding:14px 20px;border-bottom:1px solid #eee;flex-shrink:0;">',
+            '<span id="previewModalTitle" style="font-weight:700;font-size:14px;color:#1A1A1A;">',
+              'Preview Dokumen</span>',
+            '<div style="display:flex;gap:8px;">',
+              '<button onclick="previewToGenerate()" style="background:#C40000;color:#fff;border:none;',
+                'border-radius:7px;padding:8px 18px;cursor:pointer;font-size:12.5px;font-weight:700;">',
+                '⚡ Generate PDF Sekarang</button>',
+              '<button onclick="document.getElementById(\'previewModal\').style.display=\'none\'" ',
+                'style="background:#f5f5f5;border:none;border-radius:7px;padding:8px 14px;',
+                'cursor:pointer;font-size:12.5px;">✕ Tutup</button>',
+            '</div>',
+          '</div>',
+          '<div id="previewModalBody" style="overflow-y:auto;padding:24px 28px;flex:1;',
+            'background:#f8f8f8;">',
+          '</div>',
+        '</div>',
+      ].join('');
+      document.body.appendChild(modal);
+    }
+
+    const titleMap = {
+      SURAT:'Surat Resmi', ST:'Surat Tugas', SIZ:'Surat Izin',
+      SKT:'Surat Keterangan', INV:'Invoice', KWT:'Kwitansi',
+      PROP:'Proposal', CP:'Company Profile', MOU:'MOU', PKS:'Perjanjian Kerjasama',
+      SP1:'Surat Peringatan I', SP2:'Surat Peringatan II', SP3:'Surat Peringatan III',
+      PHK:'SK Pemutusan Hubungan Kerja', PKWT:'Kontrak PKWT', SPG:'SPG',
+      SMT:'Surat Mutasi', PI:'Surat Promosi', BA:'Berita Acara', FCO:'FCO',
+    };
+    document.getElementById('previewModalTitle').textContent =
+      'Preview — ' + (titleMap[docType] || docType);
+    document.getElementById('previewModalBody').innerHTML =
+      '<div style="background:#fff;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.08);">' + html + '</div>';
+    modal.style.display = 'flex';
+  }
+
+  async function previewToGenerate() {
+    document.getElementById('previewModal').style.display = 'none';
+    await generateDoc();
   }
 
   function clearForm() {

@@ -41,6 +41,48 @@ function doPost(e) {
       return _json(_handleHrisPost(input));
     }
 
+    // ── Smart Office: preview dokumen HTML (browser preview sebelum generate PDF) ─
+    if (input.action === 'previewDocument') {
+      if (!input.documentType || !input.company_code) {
+        return _json({ success: false, message: 'documentType dan company_code wajib untuk preview.' });
+      }
+      try {
+        var pvConfig  = getCompanyConfig();
+        var pvCompany = getCompanyByCode(input.company_code);
+        var pvPrefix  = pvCompany && pvCompany.doc_prefix ? String(pvCompany.doc_prefix) : 'RIFIM';
+        var pvNum     = pvPrefix + '-' + input.documentType + '-PREVIEW';
+        var pvData    = buildPlaceholderData(input, pvConfig, pvNum);
+        var pvCo = {
+          name:           (pvCompany && pvCompany.name)           || pvConfig['company_name']    || '',
+          address:        (pvCompany && pvCompany.address)        || pvConfig['company_address'] || '',
+          phone:          (pvCompany && pvCompany.phone)          || pvConfig['company_phone']   || '',
+          email:          (pvCompany && pvCompany.email)          || pvConfig['company_email']   || '',
+          director_name:  input.directorName  || (pvCompany && pvCompany.director_name)  || '',
+          director_title: input.directorTitle || (pvCompany && pvCompany.director_title) || '',
+        };
+        var previewHtml = buildDocumentPreviewHtml(input.documentType, pvData, input.company_code.toUpperCase(), pvCo);
+        return _json({ success: true, html: previewHtml });
+      } catch (err) {
+        _gasLogError('doPost', 'previewDocument', err, { documentType: input.documentType });
+        return _json({ success: false, message: err.message });
+      }
+    }
+
+    // ── Smart Office: generate dokumen via HTML pipeline (HTML → PDF) ──────────
+    if (input.action === 'generateDocumentHtml') {
+      input.use_html_pipeline = true;
+      // Re-use flow generateDocument() yang sudah ada route ke HTML pipeline
+      var htmlResult = generateDocument(input);
+      if (htmlResult && htmlResult.success) {
+        var byH = input.performed_by || {};
+        logActivity('Smart Office', 'BUAT DOKUMEN (HTML)',
+          htmlResult.documentNumber || '', input.subject || '',
+          byH.name || '', byH.email || '',
+          'Tipe: ' + (input.documentType || '') + ' · ' + (input.company_code || ''));
+      }
+      return _json(htmlResult);
+    }
+
     // ── Smart Office: update document status ────────────────────────
     if (input.action === 'update_status') {
       if (!input.id || !input.status) {
