@@ -167,8 +167,11 @@ function _baseCss() {
  * @private
  */
 function _kop(assets, company) {
+  // Container overflow:hidden agar logo file berisi >1 varian hanya tampil bagian atas
   var logoSrc = assets.logo
-    ? '<img src="' + assets.logo + '" width="90" height="65" style="display:block;">'
+    ? '<div style="width:90px;height:65px;overflow:hidden;display:block;">' +
+        '<img src="' + assets.logo + '" width="90" style="display:block;min-height:65px;object-fit:cover;object-position:top center;">' +
+      '</div>'
     : '<div style="width:90px;height:65px;background:#eee;display:block;"></div>';
 
   return [
@@ -654,8 +657,8 @@ function htmlToPdf(htmlContent, fileName, folderId) {
     return pdfFile;
 
   } finally {
-    // Hapus temp Google Doc
-    try { Drive.Files.trash(tempDoc.id); } catch (_) {}
+    // Hapus temp Google Doc — gunakan DriveApp (lebih reliable dari Drive.Files.trash v2)
+    try { DriveApp.getFileById(tempDoc.id).setTrashed(true); } catch (_) {}
   }
 }
 
@@ -785,8 +788,11 @@ function buildDocumentPreviewHtml(docType, d, companyCode, company) {
     return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w300';
   }
 
+  // Logo dikrop dari atas agar hanya tampil satu varian (file PNG bisa berisi >1 logo stacked)
   var previewAssets = {
-    logo:    '<img src="' + thumbUrl(ids.logo_id)    + '" width="80" height="60" style="display:block;">',
+    logo:    '<div style="width:88px;height:64px;overflow:hidden;display:block;">' +
+               '<img src="' + thumbUrl(ids.logo_id) + '" width="88" style="display:block;min-height:64px;object-fit:cover;object-position:top center;">' +
+             '</div>',
     ttd:     '<img src="' + thumbUrl(ids.ttd_id)     + '" width="90" height="45" style="display:block;">',
     stempel: '<img src="' + thumbUrl(ids.stempel_id) + '" width="68" height="68" style="display:block;">',
     color:   ids.color || '#C40000',
