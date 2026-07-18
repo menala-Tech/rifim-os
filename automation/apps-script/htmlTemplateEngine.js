@@ -723,12 +723,37 @@ function generateDocumentViaHtml(input, config, company, docNumber, placeholderD
   // 6. Convert HTML → PDF
   var pdfFile = htmlToPdf(htmlContent, docNumber, folderId);
 
+  // Simpan record ke sheet documents
+  try {
+    saveDocumentRecord({
+      id:               _gasUuid(),
+      document_number:  docNumber,
+      document_type:    docType,
+      document_code:    companyCode,
+      document_date:    placeholderData.DOCUMENT_DATE || _gasToday('short'),
+      recipient_name:   input.recipientName  || '',
+      recipient_address: input.recipientAddress || '',
+      subject:          input.subject || '',
+      attachment:       input.attachment || 0,
+      body_summary:     (input.body || '').substring(0, 200),
+      status:           'FINAL',
+      gdoc_url:         '',
+      pdf_url:          pdfFile.getUrl(),
+      qr_url:           'qr:' + docNumber,
+      created_by:       (input.performed_by && input.performed_by.email) || '',
+      pipeline_type:    'html',
+    });
+  } catch (recErr) {
+    _gasLogError('htmlTemplateEngine', 'saveRecord', recErr, { docNumber: docNumber });
+  }
+
   return {
-    success:    true,
-    pdfUrl:     pdfFile.getUrl(),
-    pdfFileId:  pdfFile.getId(),
-    gdocUrl:    '',  // HTML pipeline tidak buat GDoc permanen
-    message:    'Dokumen berhasil dibuat: ' + docNumber,
+    success:        true,
+    documentNumber: docNumber,
+    pdfUrl:         pdfFile.getUrl(),
+    pdfFileId:      pdfFile.getId(),
+    gdocUrl:        '',
+    message:        'Dokumen berhasil dibuat: ' + docNumber,
   };
 }
 

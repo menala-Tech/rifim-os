@@ -77,6 +77,7 @@ function saveDocumentRecord(record) {
       record.created_by       || '',
       createdAt,               // ← ISO UTC
       updatedAt,               // ← ISO UTC
+      record.pipeline_type    || 'gdocs',   // 'html' | 'gdocs'
     ]);
   });
 }
