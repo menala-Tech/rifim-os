@@ -2,7 +2,7 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-07-14 (Analisa 16 dokumen desain selesai — terakhir: Settings page UI spec)
+> Last updated: 2026-07-14 (Sesi 3: RAOS portal fix + RAOS UI patch selesai — BR-01, logo, date picker, Android, design tokens)
 
 ---
 
@@ -539,7 +539,16 @@ Info Room · Cari Pesan · Bisukan Notifikasi · Media File & Link · Pengaturan
 
 **Sprint 3A — RAOS Module + Finance UI + Dashboard** 
 
-Status: 🟡 In Progress (RAOS selesai, Finance + Dashboard berikutnya)
+Status: 🟡 In Progress (RAOS ✅ selesai lengkap, Finance UI berikutnya)
+
+### Selesai Sesi 2026-07-14 (PR #4 + PR #5 merged)
+- ✅ Portal fix: RAOS card aktif + route `/raos` di vercel.json (PR #4)
+- ✅ CLAUDE.md v1.2 + PROJECT_RULES.md v1.1 + 3 session commands (PR #4)
+- ✅ RAOS UI patch: logo RIFIM, date picker semua tab, BR-01 filter cabang per role (PR #5)
+- ✅ Design tokens update sesuai CLAUDE.md (`--primary #1E88E5`, `--success #43A047`, dll)
+- ✅ Font Poppins + Android safe area CSS
+- ✅ Format nomor antrian `fmtQueue()` → A-023
+- ✅ CABANG_LIST: tambah MKS (Makassar) + CGK (Jakarta)
 
 ### Infrastruktur Data (Selesai)
 
@@ -662,7 +671,7 @@ RADMS (Batch 7) sudah production:
 ### Sprint 3A — Modul Baru
 - [x] **RAOS UI** — 5-tab (Dashboard, Antrian, Driver, Saldo, Kinerja) — PR #3 merged
 - [x] `routeRaosDriverLayer()` — routing raosGetDriverList/raosAddDriver/raosUpdateDriver
-- [ ] RAOS UI patch: queue auto-numbering A001, tambah cabang Makassar + CGK
+- [x] **RAOS UI patch** — logo, date picker, BR-01 filter, design tokens, Android, A-023, MKS+CGK — PR #5 merged
 - [ ] **Finance UI** — cash flow viewer, tagihan tracker, rekap harian/bulanan
 - [ ] **Executive Dashboard** — agregasi KPI, revenue, operasional (4 varian: Direktur/Koordinator/Staff/Driver)
 - [ ] **RLS drivers** — enable Row Level Security + policy untuk GAS service key
