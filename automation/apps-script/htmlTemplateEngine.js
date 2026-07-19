@@ -94,9 +94,9 @@ function _loadCompanyAssets(companyCode) {
   var token  = ScriptApp.getOAuthToken();
   var color  = ids.color || '#C40000';
 
-  function fetchAsBase64(fileId, maxWidth) {
+    function fetchAsBase64(fileId, szParam) {
     try {
-      var url  = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w' + (maxWidth || 300);
+      var url  = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w' + (szParam || 300);
       var resp = UrlFetchApp.fetch(url, {
         headers: { Authorization: 'Bearer ' + token },
         muteHttpExceptions: true,
@@ -111,7 +111,9 @@ function _loadCompanyAssets(companyCode) {
   }
 
   return {
-    logo:    fetchAsBase64(ids.logo_id,    300),
+    // Logo: server-side crop 90×65 agar file PNG multi-varian hanya tampil bagian atas.
+    // sz=w90-h65-c → Google Drive resize + center-crop ke tepat 90×65px.
+    logo:    fetchAsBase64(ids.logo_id,    '90-h65-c'),
     ttd:     fetchAsBase64(ids.ttd_id,     250),
     stempel: fetchAsBase64(ids.stempel_id, 200),
     color:   color,
@@ -167,11 +169,10 @@ function _baseCss() {
  * @private
  */
 function _kop(assets, company) {
-  // Container overflow:hidden agar logo file berisi >1 varian hanya tampil bagian atas
+  // Logo sudah di-crop server-side ke tepat 90×65 via thumbnail sz=w90-h65-c.
+  // Tidak perlu CSS overflow/object-fit — langsung embed dengan dimensi eksplisit.
   var logoSrc = assets.logo
-    ? '<div style="width:90px;height:65px;overflow:hidden;display:block;">' +
-        '<img src="' + assets.logo + '" width="90" style="display:block;min-height:65px;object-fit:cover;object-position:top center;">' +
-      '</div>'
+    ? '<img src="' + assets.logo + '" width="90" height="65" style="display:block;vertical-align:top;">'
     : '<div style="width:90px;height:65px;background:#eee;display:block;"></div>';
 
   return [
@@ -636,12 +637,18 @@ function htmlToPdf(htmlContent, fileName, folderId) {
   );
 
   try {
-    // Set margin A4 via DocumentApp setelah konversi
+    // Post-processing via DocumentApp: margin + paksa dimensi logo
     try {
       var gasDoc = DocumentApp.openById(tempDoc.id);
       var body   = gasDoc.getBody();
       // 25mm ≈ 70.87 points
       body.setMarginTop(70.87).setMarginBottom(72).setMarginLeft(70.87).setMarginRight(70.87);
+      // Paksa dimensi logo (elemen gambar pertama = logo kop) ke 90×65.
+      // Ini sebagai safety net jika server-side crop belum sempurna.
+      var imgs = body.getImages();
+      if (imgs.length > 0) {
+        imgs[0].setWidth(90).setHeight(65);
+      }
       gasDoc.saveAndClose();
     } catch (_) { /* non-fatal */ }
 

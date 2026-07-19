@@ -44,7 +44,13 @@ function generateDocument(input) {
   try {
     _validateInput(input);
 
-    // Route ke HTML pipeline jika diminta (atau jika flag global aktif)
+    // HTML pipeline adalah DEFAULT — Document Engine always uses HTML→PDF
+    // Gunakan use_gdocs_pipeline: true untuk fallback ke pipeline GDocs lama (emergency only)
+    if (!input.use_gdocs_pipeline) {
+      input.use_html_pipeline = true;
+    }
+
+    // Route ke HTML pipeline
     if (input.use_html_pipeline) {
       var htmlConfig  = getCompanyConfig();
       var htmlCompany = input.company_code ? getCompanyByCode(input.company_code) : null;

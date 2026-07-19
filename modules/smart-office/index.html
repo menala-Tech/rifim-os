@@ -1524,6 +1524,7 @@
     if (!subject) { showToast('⚠️ Perihal / Judul wajib diisi', false); return; }
 
     const input = buildPayload();
+    input.action = 'generateDocumentHtml'; // gunakan HTML pipeline (Document Engine)
 
     setLoading(true, 'Menghubungi engine RIFIM OS...');
     const btn = document.querySelector('.btn.btn-primary');
