@@ -738,7 +738,7 @@ RADMS (Batch 7) sudah production:
 |------|--------|
 | Repo | `github.com/menala-Tech/rifim-os` |
 | Hosting | Vercel |
-| GAS Web App | `https://script.google.com/macros/s/AKfycbx9_RVyi_58XIeSH-fvrg7CpsUJUpOP5Mim0Q5IDiBiQI7d--WboYhgt7MF6JQl32dW/exec` |
+| GAS Web App | `https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec` |
 | Spreadsheet ID | `1jHeA-w1bM32S3-AU-ENN2UjiaCb4iLzRhaf4G7y4ozM` |
 | Supabase | `vlievtojpmrbsmzlqswl.supabase.co` |
 | Deploy GAS | GitHub Actions → clasp push (lokal ETIMEDOUT) |

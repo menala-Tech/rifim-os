@@ -10,7 +10,7 @@
 |------|-------|
 | Script ID | `1IK8-2anrxahce1X1MG7Bi3aGe6e-_4e3obanTRprT6brYSdla9rEYOxp` |
 | GAS Editor URL | https://script.google.com/u/0/home/projects/1IK8-2anrxahce1X1MG7Bi3aGe6e-_4e3obanTRprT6brYSdla9rEYOxp/edit |
-| Web App URL | `https://script.google.com/macros/s/AKfycbx9_RVyi_58XIeSH-fvrg7CpsUJUpOP5Mim0Q5IDiBiQI7d--WboYhgt7MF6JQl32dW/exec` |
+| Web App URL | `https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec` |
 | Tipe | Standalone (tidak terikat spreadsheet) |
 | Database | `SpreadsheetApp.openById(SPREADSHEET_ID)` via `configLoader.js` |
 

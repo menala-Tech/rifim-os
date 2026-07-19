@@ -20,7 +20,7 @@
 - **Repo:** `github.com/menala-Tech/rifim-os`
 - **Branch aktif:** lihat `git branch` atau STATUS.md
 - **Supabase:** `vlievtojpmrbsmzlqswl.supabase.co`
-- **GAS Web App:** `https://script.google.com/macros/s/AKfycbx9_RVyi_58XIeSH-fvrg7CpsUJUpOP5Mim0Q5IDiBiQI7d--WboYhgt7MF6JQl32dW/exec`
+- **GAS Web App:** `https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec`
 
 ## Aturan Sesi
 
