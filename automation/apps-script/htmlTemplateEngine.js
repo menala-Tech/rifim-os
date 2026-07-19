@@ -637,7 +637,7 @@ function htmlToPdf(htmlContent, fileName, folderId) {
   );
 
   try {
-    // Post-processing via DocumentApp: margin + paksa dimensi logo
+    // Post-processing via DocumentApp: margin + paksa dimensi logo + hapus border table
     try {
       var gasDoc = DocumentApp.openById(tempDoc.id);
       var body   = gasDoc.getBody();
@@ -648,6 +648,13 @@ function htmlToPdf(htmlContent, fileName, folderId) {
       var imgs = body.getImages();
       if (imgs.length > 0) {
         imgs[0].setWidth(90).setHeight(65);
+      }
+      // Hapus semua border table — Google Docs HTML converter default menambah border 1px
+      // walau CSS border-collapse:collapse diset. Set border width 0 pada semua table.
+      var tables = body.getTables();
+      for (var t = 0; t < tables.length; t++) {
+        try { tables[t].setBorderWidth(0); } catch (_) {}
+        try { tables[t].setBorderColor('#FFFFFF'); } catch (_) {}
       }
       gasDoc.saveAndClose();
     } catch (_) { /* non-fatal */ }
