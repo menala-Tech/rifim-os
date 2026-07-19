@@ -54,6 +54,11 @@ var HTML_TPL_ASSETS = {
 // Root: 1XZDBwNNDrcLquTaKB-1cbegz7rniXdgK
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Folder Drive untuk cache PNG composite TTD+stempel (Alternative A image compositing).
+// PNG di-generate sekali per perusahaan via SlidesApp, disimpan di sini,
+// lalu di-reuse untuk semua dokumen berikutnya.
+var HTML_TPL_SIG_CACHE_FOLDER = '19taBn0YXxjXTb-SxqFXGhwOPShZ4VlIt';
+
 var HTML_TPL_FOLDERS = {
   SURAT: '12xonf6PjSMJRzpcQyIcuYsPzAMwIq_DO',
   ST:    '12xonf6PjSMJRzpcQyIcuYsPzAMwIq_DO',
@@ -76,6 +81,101 @@ var HTML_TPL_FOLDERS = {
   BA:    '1glIeErIjRpYX2zUcAlaWGPPBRPPRqQB3',
   FCO:   '183ASv9IYr7T0x5LbpR4IQeu4w5xZflI4',
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SIGNATURE COMPOSITOR (Alternative A — TTD overlay stempel jadi 1 PNG)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Composite TTD + Stempel jadi satu PNG lewat SlidesApp API.
+ * Stempel di-place di background, TTD overlay di atasnya (offset kiri-atas)
+ * — sama seperti tanda tangan asli.
+ *
+ * PNG hasil di-cache di Drive folder HTML_TPL_SIG_CACHE_FOLDER, jadi
+ * proses composite hanya jalan sekali per perusahaan (~5-8 detik pertama).
+ *
+ * @param {string} companyCode - 'RIFIM' | 'MIG' | 'LAILAN'
+ * @returns {string} Drive file ID PNG hasil composite
+ * @private
+ */
+function _getCombinedSignatureId(companyCode) {
+  var cacheKey  = 'sig_combined_' + companyCode;
+  var cacheSvc  = CacheService.getScriptCache();
+  var cachedId  = cacheSvc.get(cacheKey);
+  if (cachedId) {
+    // Verify file masih ada (mungkin sudah di-trash user)
+    try { DriveApp.getFileById(cachedId).getName(); return cachedId; } catch (_) {}
+  }
+
+  var fileName  = 'signature-combined-' + companyCode + '.png';
+  var folder    = DriveApp.getFolderById(HTML_TPL_SIG_CACHE_FOLDER);
+
+  // Cek apakah file sudah ada di Drive folder
+  var existing = folder.getFilesByName(fileName);
+  if (existing.hasNext()) {
+    var existId = existing.next().getId();
+    cacheSvc.put(cacheKey, existId, 21600); // cache 6 jam
+    return existId;
+  }
+
+  // Belum ada — composite baru via SlidesApp
+  var newId = _composeSignatureViaSlides(companyCode, fileName, folder);
+  cacheSvc.put(cacheKey, newId, 21600);
+  return newId;
+}
+
+/**
+ * Composite TTD + Stempel via SlidesApp (satu-satunya cara image composition di GAS).
+ * @private
+ */
+function _composeSignatureViaSlides(companyCode, fileName, targetFolder) {
+  var ids = HTML_TPL_ASSETS[companyCode] || HTML_TPL_ASSETS['RIFIM'];
+  var pres = SlidesApp.create('_tmp_sig_' + companyCode + '_' + new Date().getTime());
+  var presId = pres.getId();
+
+  try {
+    // Set slide size ke 260x160 pt (rasio kompak untuk signature)
+    pres.setPageSize(SlidesApp.PageSize.CUSTOM, 260, 160);
+
+    var slide = pres.getSlides()[0];
+    // Bersihkan default placeholders
+    slide.getPageElements().forEach(function(e) { try { e.remove(); } catch (_) {} });
+
+    // 1. Insert Stempel dulu (background layer)
+    var stempelBlob = DriveApp.getFileById(ids.stempel_id).getBlob();
+    var stempelImg  = slide.insertImage(stempelBlob);
+    stempelImg.setLeft(85).setTop(18).setWidth(160).setHeight(120);
+
+    // 2. Insert TTD di atas (foreground overlay, offset kiri-atas)
+    // TTD posisi kiri sedikit menutupi kiri stempel — mirip goresan real
+    var ttdBlob = DriveApp.getFileById(ids.ttd_id).getBlob();
+    var ttdImg  = slide.insertImage(ttdBlob);
+    ttdImg.setLeft(0).setTop(30).setWidth(160).setHeight(85);
+
+    pres.saveAndClose();
+
+    // Export slide sebagai PNG lewat Slides export URL
+    var pageObjectId = slide.getObjectId();
+    var exportUrl = 'https://docs.google.com/presentation/d/' + presId +
+                    '/export/png?id=' + presId + '&pageid=' + pageObjectId;
+    var resp = UrlFetchApp.fetch(exportUrl, {
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+      muteHttpExceptions: true,
+    });
+
+    if (resp.getResponseCode() !== 200) {
+      throw new Error('Slides export gagal: HTTP ' + resp.getResponseCode());
+    }
+
+    var pngBlob = resp.getBlob().setName(fileName);
+    var file    = targetFolder.createFile(pngBlob);
+    return file.getId();
+
+  } finally {
+    // Hapus temp Slides file
+    try { DriveApp.getFileById(presId).setTrashed(true); } catch (_) {}
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ASSET LOADER
@@ -110,13 +210,22 @@ function _loadCompanyAssets(companyCode) {
     }
   }
 
+  // Combined signature (TTD overlay stempel jadi 1 PNG) via SlidesApp compositor.
+  // Cache di Drive folder, jadi composite jalan sekali per perusahaan.
+  var signatureId = '';
+  try { signatureId = _getCombinedSignatureId(companyCode); } catch (e) {
+    Logger.log('_getCombinedSignatureId error: ' + e.message);
+  }
+
   return {
     // Logo: server-side crop 150×110 agar file PNG multi-varian hanya tampil varian atas.
-    // Ukuran lebih besar sesuai referensi user (dominan di kop surat).
-    logo:    fetchAsBase64(ids.logo_id,    '150-h110-c'),
-    ttd:     fetchAsBase64(ids.ttd_id,     400),
-    stempel: fetchAsBase64(ids.stempel_id, 400),
-    color:   color,
+    logo:      fetchAsBase64(ids.logo_id, '150-h110-c'),
+    // Signature composite (TTD + stempel dalam 1 PNG, overlap seperti asli)
+    signature: signatureId ? fetchAsBase64(signatureId, 500) : '',
+    // TTD & stempel individual masih di-load sebagai fallback (kalau composite gagal)
+    ttd:       fetchAsBase64(ids.ttd_id,     400),
+    stempel:   fetchAsBase64(ids.stempel_id, 400),
+    color:     color,
   };
 }
 
@@ -198,21 +307,29 @@ function _kop(assets, company) {
  * @private
  */
 function _signature(assets, company, placeDate, docNumber, qrDataUri) {
-  // Proporsi sesuai referensi user (gambar 3):
-  // - Stempel: 170x125 (background — dominan, bulat/persegi biru)
-  // - TTD: 150x90 (foreground — overlay di atas kiri stempel)
-  // - QR: 100x100 (terpisah di pojok kanan bawah)
-  //
-  // Trik overlap: pakai satu cell tabel dengan positioning image via
-  // Google Docs image "wrap" tidak reliable di HTML converter. Solusi:
-  // gabung TTD dan stempel dalam satu tabel 1x1 dengan negative margin
-  // supaya TTD overlap ke kiri stempel.
-  var ttdSrc = assets.ttd
-    ? '<img src="' + assets.ttd + '" width="150" height="90" style="display:block;">'
-    : '';
-  var stempelSrc = assets.stempel
-    ? '<img src="' + assets.stempel + '" width="170" height="125" style="display:block;">'
-    : '';
+  // Signature block:
+  // - Prioritas 1: single combined PNG (TTD overlay stempel, dari SlidesApp compositor)
+  //   Ukuran: 220x140 (proporsi 260x160 slide dijaga)
+  // - Fallback: TTD 150x90 + Stempel 170x125 side-by-side
+  var sigBlock;
+  if (assets.signature) {
+    sigBlock = '<img src="' + assets.signature + '" width="220" height="140" style="display:block;">';
+  } else {
+    var ttdSrc = assets.ttd
+      ? '<img src="' + assets.ttd + '" width="150" height="90" style="display:block;">'
+      : '';
+    var stempelSrc = assets.stempel
+      ? '<img src="' + assets.stempel + '" width="170" height="125" style="display:block;">'
+      : '';
+    sigBlock = [
+      '<table style="width:auto;border-collapse:collapse;border:0;margin:0;">',
+      '<tr>',
+      '<td style="vertical-align:middle;padding:0;">' + ttdSrc + '</td>',
+      '<td style="vertical-align:middle;padding:0 0 0 8px;">' + stempelSrc + '</td>',
+      '</tr>',
+      '</table>',
+    ].join('');
+  }
 
   var qrSrc = qrDataUri
     ? '<img src="' + qrDataUri + '" width="100" height="100" style="display:block;margin-left:auto;">'
@@ -223,17 +340,11 @@ function _signature(assets, company, placeDate, docNumber, qrDataUri) {
     '<p style="text-align:right;margin:0 0 14px 0;">' + _esc(placeDate) + '</p>',
     '<p style="margin:0 0 2px 0;">Pimpinan Perusahaan</p>',
     '<p style="font-weight:bold;margin:0 0 6px 0;">' + _esc(company.name || '') + '</p>',
-    // TTD dan Stempel — TTD sedikit overlap kiri stempel (negative margin-right di TTD cell)
-    '<table style="width:auto;border-collapse:collapse;border:0;margin:0;">',
-    '<tr>',
-    '<td style="vertical-align:middle;padding:0;">' + ttdSrc + '</td>',
-    '<td style="vertical-align:middle;padding:0;margin-left:-40px;">' + stempelSrc + '</td>',
-    '</tr>',
-    '</table>',
+    sigBlock,
     '<p style="font-weight:bold;text-decoration:underline;margin:4px 0 0 0;">' + _esc(company.director_name || '') + '</p>',
     '<p style="font-weight:bold;margin:0;">' + _esc(company.director_title || '') + '</p>',
     '</div>',
-    // QR Code — di pojok kanan bawah, terpisah dari signature block
+    // QR Code — pojok kanan bawah, terpisah
     '<table style="width:100%;margin-top:24px;border-collapse:collapse;">',
     '<tr>',
     '<td style="text-align:right;vertical-align:bottom;">',
@@ -658,13 +769,17 @@ function htmlToPdf(htmlContent, fileName, folderId) {
       // 1.27 cm = 36 points. Left/right lebih besar (~2 cm = 56.7 pts) agar teks tidak
       // terlalu mepet ke tepi.
       body.setMarginTop(36).setMarginBottom(36).setMarginLeft(56.7).setMarginRight(56.7);
-      // Paksa dimensi gambar sesuai proporsi referensi user (safety net):
-      // - imgs[0] = logo kop → 150x110
-      // - imgs[1] = TTD → 150x90 (foreground overlay)
-      // - imgs[2] = Stempel → 170x125 (background dominan)
-      // - imgs[3] = QR code → 100x100
+      // Paksa dimensi gambar (safety net setelah HTML conversion).
+      // 2 skenario:
+      //   Composite mode (3 image): [logo, signature-composite, QR]
+      //   Fallback mode  (4 image): [logo, TTD, stempel, QR]
       var imgs = body.getImages();
-      var dims = [[150,110],[150,90],[170,125],[100,100]];
+      var dims;
+      if (imgs.length === 3) {
+        dims = [[150,110],[220,140],[100,100]];      // composite mode
+      } else {
+        dims = [[150,110],[150,90],[170,125],[100,100]]; // fallback mode
+      }
       for (var i = 0; i < imgs.length && i < dims.length; i++) {
         try { imgs[i].setWidth(dims[i][0]).setHeight(dims[i][1]); } catch (_) {}
       }
