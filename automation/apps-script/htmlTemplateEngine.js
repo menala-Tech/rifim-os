@@ -36,7 +36,7 @@ var HTML_TPL_ASSETS = {
     color:      '#C40000',
   },
   MIG: {
-    logo_id:    '1kignpz3yYYwdLMUkD-Vb5Gp-FhtwMVMo',  // brand Menala 1.png (logo baru)
+    logo_id:    '1WWB7GnD16XCM7BDsIR1YUZaY0ejnF5jV',  // logo Menala baru (per 2026-07-19)
     ttd_id:     '1hacw-5aFC2RNASx2iV2fSaZTk4Ry6SZ7',  // TTD bobby.png
     stempel_id: '1QgSBv_Avbmadxh7j9QuIcA2my-1Jpt6T',  // stempel Menala.png
     color:      '#C40000',
