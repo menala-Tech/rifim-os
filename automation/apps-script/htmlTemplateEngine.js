@@ -197,38 +197,44 @@ function _kop(assets, company) {
  * @private
  */
 function _signature(assets, company, placeDate, docNumber, qrDataUri) {
+  // Proporsi:
+  // - TTD: 130x55 (rasio landscape ~2.4:1, seperti tanda tangan asli)
+  // - Stempel: 95x95 (bujursangkar, sedikit lebih besar dari TTD height)
+  // - QR: 90x90 (rapi di kanan)
+  // Overlap TTD dan stempel via negatif margin agar stempel menutup sebagian TTD (realistic)
   var ttdSrc = assets.ttd
-    ? '<img src="' + assets.ttd + '" width="95" height="48" style="display:block;">'
+    ? '<img src="' + assets.ttd + '" width="130" height="55" style="display:block;">'
     : '';
   var stempelSrc = assets.stempel
-    ? '<img src="' + assets.stempel + '" width="72" height="72" style="display:block;">'
+    ? '<img src="' + assets.stempel + '" width="95" height="95" style="display:block;">'
     : '';
 
   var qrSrc = qrDataUri
-    ? '<img src="' + qrDataUri + '" width="84" height="84" style="display:block;margin-left:auto;">'
+    ? '<img src="' + qrDataUri + '" width="90" height="90" style="display:block;margin-left:auto;">'
     : '';
 
   return [
-    '<table class="sig-wrap" style="width:100%;page-break-inside:avoid;margin-top:44px;">',
+    '<table class="sig-wrap" style="width:100%;page-break-inside:avoid;margin-top:20px;">',
     '<tr>',
     '<!-- KIRI: TTD + Stempel -->',
-    '<td class="sig-left">',
-    '<p class="sig-city">' + _esc(placeDate) + '</p>',
-    '<p class="sig-co">' + _esc(company.name || '') + '</p>',
-    '<table style="width:auto;border-collapse:collapse;border:0;">',
+    '<td class="sig-left" style="width:60%;vertical-align:top;padding-right:8px;">',
+    '<p style="margin:0 0 3px 0;">' + _esc(placeDate) + '</p>',
+    '<p style="font-weight:bold;margin:0 0 4px 0;">' + _esc(company.name || '') + '</p>',
+    // Table TTD+stempel: stempel overlap TTD sekitar 30% via negative margin
+    '<table style="width:auto;border-collapse:collapse;border:0;margin:2px 0 0 0;">',
     '<tr>',
-    '<td style="padding-right:6px;vertical-align:bottom;">' + ttdSrc + '</td>',
-    '<td style="vertical-align:bottom;">' + stempelSrc + '</td>',
+    '<td style="vertical-align:middle;padding:0;">' + ttdSrc + '</td>',
+    '<td style="vertical-align:middle;padding:0 0 0 -30px;">' + stempelSrc + '</td>',
     '</tr>',
     '</table>',
-    '<p class="sig-name">' + _esc(company.director_name || '') + '</p>',
-    '<p class="sig-title">' + _esc(company.director_title || '') + '</p>',
+    '<p style="font-weight:bold;margin:0;">' + _esc(company.director_name || '') + '</p>',
+    '<p style="font-size:9.5pt;color:#555;margin:0;">' + _esc(company.director_title || '') + '</p>',
     '</td>',
     '<!-- KANAN: QR Code -->',
-    '<td class="sig-right" style="vertical-align:bottom;">',
+    '<td class="sig-right" style="width:40%;vertical-align:bottom;text-align:right;">',
     qrSrc,
-    '<p class="qr-label">Scan untuk verifikasi dokumen</p>',
-    '<p class="qr-label" style="font-size:7.5pt;">' + _esc(docNumber) + '</p>',
+    '<p class="qr-label" style="margin:2px 0 0 0;">Scan untuk verifikasi dokumen</p>',
+    '<p class="qr-label" style="font-size:7.5pt;margin:0;">' + _esc(docNumber) + '</p>',
     '</td>',
     '</tr>',
     '</table>',
@@ -274,22 +280,24 @@ function _tplSurat(d, assets, company) {
   return [
     _kop(assets, company),
     '<p class="doc-title">' + _esc(d.DOCUMENT_TITLE) + '</p>',
-    '<table style="width:auto;"><tr>',
-    '<td style="padding:0 8px 4px 0;font-weight:bold;white-space:nowrap;">Nomor</td>',
-    '<td style="padding:0 8px 4px 0;">: ' + _esc(d.DOCUMENT_NUMBER) + '</td>',
+    // Tabel nomor/lampiran/perihal - label column width tetap agar ":" rapi
+    '<table style="width:auto;border-collapse:collapse;">',
+    '<tr>',
+    '<td style="padding:1px 0 1px 0;font-weight:bold;white-space:nowrap;width:80px;">Nomor</td>',
+    '<td style="padding:1px 0 1px 0;">: ' + _esc(d.DOCUMENT_NUMBER) + '</td>',
     '</tr><tr>',
-    '<td style="padding:0 8px 4px 0;white-space:nowrap;">Lampiran</td>',
-    '<td style="padding:0 8px 4px 0;">: ' + _esc(d.ATTACHMENT || '-') + '</td>',
+    '<td style="padding:1px 0 1px 0;white-space:nowrap;">Lampiran</td>',
+    '<td style="padding:1px 0 1px 0;">: ' + _esc(d.ATTACHMENT || '-') + '</td>',
     '</tr><tr>',
-    '<td style="padding:0 8px 6px 0;white-space:nowrap;">Perihal</td>',
-    '<td style="padding:0 8px 6px 0;">: <strong>' + _esc(d.SUBJECT) + '</strong></td>',
+    '<td style="padding:1px 0 1px 0;white-space:nowrap;">Perihal</td>',
+    '<td style="padding:1px 0 1px 0;">: <strong>' + _esc(d.SUBJECT) + '</strong></td>',
     '</tr></table>',
-    '<p style="text-align:right;margin:8px 0 10px;">' + _esc(d.PLACE_DATE) + '</p>',
-    '<p>Kepada Yth.</p>',
-    '<p><strong>' + _esc(d.RECIPIENT_NAME || '') + '</strong><br>' + _esc(d.RECIPIENT_ADDRESS || '') + '</p>',
-    '<p>Dengan hormat,</p>',
-    '<p>' + _esc(d.BODY || '') + '</p>',
-    '<p>Demikian surat ini kami sampaikan. Atas perhatian dan kerjasamanya kami ucapkan terima kasih.</p>',
+    '<p style="text-align:right;margin:6px 0 8px;">' + _esc(d.PLACE_DATE) + '</p>',
+    '<p style="margin:0 0 2px 0;">Kepada Yth.</p>',
+    '<p style="margin:0 0 8px 0;"><strong>' + _esc(d.RECIPIENT_NAME || '') + '</strong><br>' + _esc(d.RECIPIENT_ADDRESS || '') + '</p>',
+    '<p style="margin:0 0 6px 0;">Dengan hormat,</p>',
+    '<p style="margin:0 0 6px 0;">' + _esc(d.BODY || '') + '</p>',
+    '<p style="margin:0 0 4px 0;">Demikian surat ini kami sampaikan. Atas perhatian dan kerjasamanya kami ucapkan terima kasih.</p>',
     d._signature,
   ].join('');
 }
