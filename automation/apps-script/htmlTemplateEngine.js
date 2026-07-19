@@ -139,26 +139,28 @@ function _getCombinedSignatureId(companyCode) {
  */
 function _composeSignatureViaSlides(companyCode, fileName, targetFolder) {
   var ids = HTML_TPL_ASSETS[companyCode] || HTML_TPL_ASSETS['RIFIM'];
-  var pres = SlidesApp.create('_tmp_sig_' + companyCode + '_' + new Date().getTime());
-  var presId = pres.getId();
+  // Buat presentation custom size 70x55 mm via Slides API v1
+  // SlidesApp.create() tidak support custom page size — harus via advanced service
+  var createRes = Slides.Presentations.create({
+    title: '_tmp_sig_' + companyCode + '_' + new Date().getTime(),
+    pageSize: {
+      width:  { magnitude: 198.4, unit: 'PT' },
+      height: { magnitude: 155.9, unit: 'PT' },
+    },
+  });
+  var presId = createRes.presentationId;
 
   try {
-    // SIGNATURE BLOCK spec: 70 x 55 mm = 198.4 x 155.9 pt
-    pres.setPageSize(SlidesApp.PageSize.CUSTOM, 198.4, 155.9);
-
+    var pres  = SlidesApp.openById(presId);
     var slide = pres.getSlides()[0];
-    // Bersihkan default placeholders
     slide.getPageElements().forEach(function(e) { try { e.remove(); } catch (_) {} });
 
-    // 1. STAMP (background) — 30 mm width = 85 pt, offset X 18mm=51pt Y 6mm=17pt
-    //    Layer: behind signature (di-insert dulu)
+    // 1. STAMP (background) — 30 mm width, offset X:18mm Y:6mm
     var stempelBlob = DriveApp.getFileById(ids.stempel_id).getBlob();
     var stempelImg  = slide.insertImage(stempelBlob);
     stempelImg.setLeft(51).setTop(17).setWidth(85).setHeight(85);
 
-    // 2. SIGNATURE (TTD) — 45 mm width = 127.6 pt, offset X 0 Y 0
-    //    Layer: front (di-insert setelah stamp, otomatis di atas)
-    //    Height dijaga proporsional ~19mm (rasio landscape ~2.4:1)
+    // 2. SIGNATURE (TTD) — 45 mm width, offset X:0 Y:0, front layer
     var ttdBlob = DriveApp.getFileById(ids.ttd_id).getBlob();
     var ttdImg  = slide.insertImage(ttdBlob);
     ttdImg.setLeft(0).setTop(0).setWidth(127.6).setHeight(54);
@@ -275,8 +277,8 @@ function _baseCss() {
     'table.data td{padding:6px;border:1px solid #DADCE0;vertical-align:middle;}',
     // Info table (label/value) — borderless, tight padding
     'table.info td{padding:3px 0;}',
-    // Signature block
-    '.sig-wrap{margin-top:24pt;page-break-inside:avoid;}',
+    // Signature block — TIDAK page-break-inside:avoid supaya konten flow natural
+    '.sig-wrap{margin-top:24pt;}',
     '.qr-label{font-size:8pt;color:#999;}',
     'hr.thin{border:0;border-top:1px solid #DDD;margin:8px 0;}',
   ].join('\n');
@@ -815,32 +817,41 @@ function htmlToPdf(htmlContent, fileName, folderId) {
       // Left/Right: 25 mm = 70.87 pt
       body.setMarginTop(28.35).setMarginBottom(28.35).setMarginLeft(70.87).setMarginRight(70.87);
       // Paksa dimensi gambar sesuai DOCUMENT DESIGN SYSTEM spec (safety net).
-      // A4 body width (setelah margin 25mm x 2 = 50mm): 210-50 = 160 mm = 453 pt
-      // Aturan ukuran gambar:
-      //   Kop banner:    453 x 82 pt (~160x29mm, aspect ratio letterhead)
-      //   Signature:     265 x 208 pt (70x55 mm) — composite mode
-      //   TTD (fallback):170 x 72 pt (45mm), Stempel: 113x113 pt (30mm)
-      //   QR code:       100 x 100 pt
-      //   Footer banner: 453 x 69 pt (~160x24mm, aspect ratio footer)
+      // Untuk BANNER (kop + footer): pakai getOriginalWidth/Height agar aspect ratio
+      // preserved. Untuk elemen lain (signature, QR, TTD, stempel): fixed dimensi.
       //
-      // Urutan image di dokumen (bergantung ada/tidak-nya composite):
-      //   Composite mode (4 image): [kop, signature, QR, footer]
-      //   Fallback mode  (5 image): [kop, TTD, stempel, QR, footer]
-      var imgs = body.getImages();
-      var dims;
-      if (imgs.length === 4) {
-        dims = [[453,82],[265,208],[100,100],[453,69]];  // composite
-      } else if (imgs.length === 5) {
-        dims = [[453,82],[170,72],[113,113],[100,100],[453,69]];  // fallback
-      } else if (imgs.length === 3) {
-        // Composite tanpa footer banner
-        dims = [[453,82],[265,208],[100,100]];
-      } else {
-        // Fallback tanpa footer banner
-        dims = [[453,82],[170,72],[113,113],[100,100]];
+      // Urutan image di dokumen:
+      //   Composite mode: [kop, signature, QR, footer]
+      //   Fallback mode:  [kop, TTD, stempel, QR, footer]
+      var imgs        = body.getImages();
+      var BODY_WIDTH  = 453;  // 160 mm = A4 body width setelah margin
+      var isComposite = (imgs.length === 4 || imgs.length === 3);
+
+      // Helper: scale banner ke full body width, preserve aspect
+      function scaleBanner(img) {
+        try {
+          var ow = img.getWidth(), oh = img.getHeight();
+          if (ow > 0 && oh > 0) {
+            var h = Math.round(BODY_WIDTH * (oh / ow));
+            img.setWidth(BODY_WIDTH).setHeight(h);
+          }
+        } catch (_) {}
       }
-      for (var i = 0; i < imgs.length && i < dims.length; i++) {
-        try { imgs[i].setWidth(dims[i][0]).setHeight(dims[i][1]); } catch (_) {}
+
+      // Image [0] = kop banner (semua mode)
+      if (imgs.length >= 1) scaleBanner(imgs[0]);
+
+      if (isComposite) {
+        // [1] signature 70x55mm, [2] QR, [3] footer banner
+        try { imgs[1].setWidth(265).setHeight(208); } catch (_) {}
+        try { imgs[2].setWidth(100).setHeight(100); } catch (_) {}
+        if (imgs.length >= 4) scaleBanner(imgs[3]);
+      } else {
+        // [1] TTD, [2] stempel, [3] QR, [4] footer banner
+        try { imgs[1].setWidth(170).setHeight(72); } catch (_) {}
+        try { imgs[2].setWidth(113).setHeight(113); } catch (_) {}
+        try { imgs[3].setWidth(100).setHeight(100); } catch (_) {}
+        if (imgs.length >= 5) scaleBanner(imgs[4]);
       }
       // Hapus semua border table — Google Docs HTML converter default menambah border 1px
       // walau CSS border-collapse:collapse diset. Set border width 0 pada semua table.
