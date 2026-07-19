@@ -28,33 +28,32 @@
 // KONSTANTA ASET (Drive File ID — jangan hapus komentar nama file-nya)
 // ═══════════════════════════════════════════════════════════════════════════
 
+// File ID Letterhead (kop) + Footer PNG per 2026-07-19, sesuai
+// ROLE Document Letterhead & Footer 3 Perusahaan.md
 var HTML_TPL_ASSETS = {
   RIFIM: {
-    logo_id:      '1ylC1QAjPRT4OiRsCh1BfbrNNZI9JRpTE',  // logo-rifim.png
-    ttd_id:       '1hacw-5aFC2RNASx2iV2fSaZTk4Ry6SZ7',  // TTD bobby.png
-    stempel_id:   '1o4bTu5Xl_fU71NqRJy0AnQmnVyuVMQEA',  // stempel Rifim.png
-    // Banner mode: kalau kop_banner_id dan footer_banner_id diisi, template
-    // pakai banner PNG full-width alih-alih kop+text style default.
-    // Upload file PNG ke Drive, paste file ID di sini.
-    kop_banner_id:    '',  // TODO: upload kop-banner-rifim.png (1240x280 recommended)
-    footer_banner_id: '',  // TODO: upload footer-banner-rifim.png (1240x140 recommended)
-    color:        '#C40000',
+    logo_id:          '1ylC1QAjPRT4OiRsCh1BfbrNNZI9JRpTE',   // logo-rifim.png
+    ttd_id:           '1hacw-5aFC2RNASx2iV2fSaZTk4Ry6SZ7',   // TTD bobby.png
+    stempel_id:       '1o4bTu5Xl_fU71NqRJy0AnQmnVyuVMQEA',   // stempel Rifim.png
+    kop_banner_id:    '1KqbGdFhVlb2pQYTndK12gHR_qLnl-Q3r',   // Letterhead Rifim.png
+    footer_banner_id: '1XkLnh6C-zBFGnVRiK6YZM045c1Nqe1Lx',   // Footer Banner Rifim.png
+    color:            '#C40000',
   },
   MIG: {
-    logo_id:      '1WWB7GnD16XCM7BDsIR1YUZaY0ejnF5jV',  // logo Menala baru (per 2026-07-19)
-    ttd_id:       '1hacw-5aFC2RNASx2iV2fSaZTk4Ry6SZ7',  // TTD bobby.png
-    stempel_id:   '1QgSBv_Avbmadxh7j9QuIcA2my-1Jpt6T',  // stempel Menala.png
-    kop_banner_id:    '',  // TODO: upload kop-banner-mig.png
-    footer_banner_id: '',  // TODO: upload footer-banner-mig.png
-    color:        '#C40000',
+    logo_id:          '1WWB7GnD16XCM7BDsIR1YUZaY0ejnF5jV',   // logo Menala baru
+    ttd_id:           '1hacw-5aFC2RNASx2iV2fSaZTk4Ry6SZ7',   // TTD bobby.png
+    stempel_id:       '1QgSBv_Avbmadxh7j9QuIcA2my-1Jpt6T',   // stempel Menala.png
+    kop_banner_id:    '11B-Lbj8q9A5g6rypAytl70Wtn8f6uFPp',   // Letterhead Menala.png
+    footer_banner_id: '1OA31Z4pi031wECayRQhEIKOB5kENdx40',   // Footer Menala.png
+    color:            '#C40000',
   },
   LAILAN: {
-    logo_id:      '1WC0wBexm6zIjuoKF_KEb7Znpk3Bwdv6V',  // logo-lailan.png
-    ttd_id:       '1hacw-5aFC2RNASx2iV2fSaZTk4Ry6SZ7',  // TTD bobby.png
-    stempel_id:   '1Jt45lz3VaKrXMVKNaq99vEHyIHD7Ae9Q',  // stempel lailankalilan.png
-    kop_banner_id:    '',  // TODO: upload kop-banner-lailan.png
-    footer_banner_id: '',  // TODO: upload footer-banner-lailan.png
-    color:        '#C40000',
+    logo_id:          '1WC0wBexm6zIjuoKF_KEb7Znpk3Bwdv6V',   // logo-lailan.png
+    ttd_id:           '1hacw-5aFC2RNASx2iV2fSaZTk4Ry6SZ7',   // TTD bobby.png
+    stempel_id:       '1Jt45lz3VaKrXMVKNaq99vEHyIHD7Ae9Q',   // stempel lailankalilan.png
+    kop_banner_id:    '1GVFsr7nf8fi6DMCUDZKA-LDYZVFd8gTe',   // Letterhead Lailan.png
+    footer_banner_id: '14w0nukjGWWAu6UFhPTq_Kz4jda0Y66SN',   // Footer Banner Lailan.png
+    color:            '#C40000',
   },
 };
 
@@ -253,37 +252,31 @@ function _loadCompanyAssets(companyCode) {
  * @private
  */
 function _baseCss() {
+  // Sesuai ROLE Document Letterhead spec:
+  // Font Aptos (fallback Calibri, Arial), 12pt, #000, justify, line-height 1.6,
+  // paragraph spacing after 12pt, first-line-indent none.
   return [
-    // Body: font 12pt Arial, line-height 1.6, warna hitam pekat
-    'body{font-family:Arial,Helvetica,sans-serif;font-size:12pt;color:#000;margin:0;padding:0;line-height:1.6;}',
+    'body{font-family:Aptos,Calibri,Arial,Helvetica,sans-serif;font-size:12pt;color:#000;margin:0;padding:0;line-height:1.6;}',
     'table{border-collapse:collapse;width:100%;}',
     'td,th{vertical-align:top;padding:0;}',
-    // Paragraf: spacing 12pt after (jarak antar paragraf generous seperti referensi)
-    'p{margin:0 0 12pt 0;line-height:1.6;}',
+    // Paragraf: justify + spacing 12pt after
+    'p{margin:0 0 12pt 0;line-height:1.6;text-align:justify;}',
     'strong{font-weight:bold;}',
-    '.kop-td-info{padding-left:12px;border-left:3px solid __COLOR__;}',
-    '.kop-nama{font-size:13pt;font-weight:bold;color:__COLOR__;text-transform:uppercase;line-height:1.2;}',
-    '.kop-alamat{font-size:9pt;color:#555;margin-top:3px;}',
-    '.divider{border:0;border-top:2.5px solid __COLOR__;margin:8px 0 16px;}',
-    '.doc-title{font-size:13pt;font-weight:bold;color:__COLOR__;text-align:center;text-transform:uppercase;margin:10px 0 14px;}',
-    '.doc-nomor{font-size:10pt;margin-bottom:2px;}',
-    '.label{font-size:9pt;color:#555;}',
-    '.section-title{font-size:10pt;font-weight:bold;color:__COLOR__;border-bottom:1.5px solid __COLOR__;padding-bottom:4px;margin:14px 0 8px;}',
-    '.sig-wrap{margin-top:40px;page-break-inside:avoid;}',
-    '.sig-left{width:50%;vertical-align:bottom;padding-right:8px;}',
-    '.sig-right{width:50%;vertical-align:bottom;text-align:right;}',
-    '.sig-city{margin-bottom:8px;}',
-    '.sig-co{font-weight:bold;margin-bottom:32px;}',
-    '.sig-name{font-weight:bold;margin-top:4px;}',
-    '.sig-title{font-size:9.5pt;color:#555;}',
-    '.qr-label{font-size:8pt;color:#999;margin-top:4px;}',
-    '.watermark{color:#F0F0F0;font-size:72pt;font-weight:bold;text-align:center;',
-    '  opacity:0.08;letter-spacing:8px;margin:30px 0;pointer-events:none;}',
-    '.two-col{display:table;width:100%;}',
-    '.col-left{display:table-cell;width:50%;padding-right:10px;}',
-    '.col-right{display:table-cell;width:50%;padding-left:10px;}',
+    // Title dokumen: 14pt bold center uppercase, spacing after 18pt
+    '.doc-title{font-size:14pt;font-weight:bold;color:#000;text-align:center;text-transform:uppercase;margin:0 0 18pt 0;letter-spacing:0.5px;}',
+    // Section heading: 12pt bold, spacing before 18pt after 8pt
+    '.section-title{font-size:12pt;font-weight:bold;color:#000;margin:18pt 0 8pt 0;}',
+    // Data table style: header bold white on dark gray, border 1px solid #DADCE0, padding 6px
+    'table.data{border-collapse:collapse;width:100%;margin:8pt 0;}',
+    'table.data th{background:#3C4043;color:#fff;font-weight:bold;padding:6px;border:1px solid #DADCE0;text-align:left;vertical-align:middle;}',
+    'table.data td{padding:6px;border:1px solid #DADCE0;vertical-align:middle;}',
+    // Info table (label/value) — borderless, tight padding
+    'table.info td{padding:3px 0;}',
+    // Signature block
+    '.sig-wrap{margin-top:24pt;page-break-inside:avoid;}',
+    '.qr-label{font-size:8pt;color:#999;}',
     'hr.thin{border:0;border-top:1px solid #DDD;margin:8px 0;}',
-  ].join('\n').replace(/__COLOR__/g, '#C40000');
+  ].join('\n');
 }
 
 /**
@@ -372,22 +365,27 @@ function _signature(assets, company, placeDate, docNumber, qrDataUri) {
     ? '<img src="' + qrDataUri + '" width="100" height="100" style="display:block;margin-left:auto;">'
     : '';
 
+  // Struktur sesuai spec:
+  // Hormat kami,              (regular)
+  // Nama Perusahaan           (bold)
+  // [24pt distance from body — TTD+Stempel composite]
+  // Director Name             (bold)
+  // Position                  (regular, NOT bold)
   return [
-    '<div style="page-break-inside:avoid;margin-top:24px;">',
-    '<p style="text-align:right;margin:0 0 14px 0;">' + _esc(placeDate) + '</p>',
-    '<p style="margin:0 0 2px 0;">Pimpinan Perusahaan</p>',
-    '<p style="font-weight:bold;margin:0 0 6px 0;">' + _esc(company.name || '') + '</p>',
+    '<div class="sig-wrap">',
+    '<p style="text-align:left;margin:0 0 4pt 0;">Hormat kami,</p>',
+    '<p style="font-weight:bold;text-align:left;margin:0 0 6pt 0;">' + _esc(company.name || '') + '</p>',
     sigBlock,
-    '<p style="font-weight:bold;text-decoration:underline;margin:4px 0 0 0;">' + _esc(company.director_name || '') + '</p>',
-    '<p style="font-weight:bold;margin:0;">' + _esc(company.director_title || '') + '</p>',
+    '<p style="font-weight:bold;text-align:left;margin:4pt 0 0 0;">' + _esc(company.director_name || '') + '</p>',
+    '<p style="text-align:left;margin:0;">' + _esc(company.director_title || '') + '</p>',
     '</div>',
     // QR Code — pojok kanan bawah, terpisah
-    '<table style="width:100%;margin-top:24px;border-collapse:collapse;">',
+    '<table style="width:100%;margin-top:24pt;border-collapse:collapse;">',
     '<tr>',
     '<td style="text-align:right;vertical-align:bottom;">',
     qrSrc,
-    '<p style="font-size:8pt;color:#999;margin:2px 0 0 0;">Scan untuk verifikasi dokumen</p>',
-    '<p style="font-size:7.5pt;color:#999;margin:0;">' + _esc(docNumber) + '</p>',
+    '<p style="font-size:8pt;color:#999;text-align:right;margin:2px 0 0 0;">Scan untuk verifikasi dokumen</p>',
+    '<p style="font-size:7.5pt;color:#999;text-align:right;margin:0;">' + _esc(docNumber) + '</p>',
     '</td>',
     '</tr>',
     '</table>',
@@ -433,22 +431,23 @@ function _tplSurat(d, assets, company) {
   return [
     _kop(assets, company),
     '<p class="doc-title">' + _esc(d.DOCUMENT_TITLE) + '</p>',
-    // Tabel nomor/lampiran/perihal — label column width fixed, spacing rapi, tanpa bold
-    '<table style="width:auto;border-collapse:collapse;margin-bottom:24pt;">',
+    // Info header (Nomor/Lampiran/Perihal) — label column width 140px, borderless
+    '<table class="info" style="width:auto;">',
     '<tr>',
-    '<td style="padding:3px 0;white-space:nowrap;width:110px;">Nomor</td>',
-    '<td style="padding:3px 0;">: ' + _esc(d.DOCUMENT_NUMBER) + '</td>',
+    '<td style="width:140px;white-space:nowrap;">Nomor</td>',
+    '<td>: ' + _esc(d.DOCUMENT_NUMBER) + '</td>',
     '</tr><tr>',
-    '<td style="padding:3px 0;white-space:nowrap;">Lampiran</td>',
-    '<td style="padding:3px 0;">: ' + _esc(d.ATTACHMENT || '-') + '</td>',
+    '<td style="white-space:nowrap;">Lampiran</td>',
+    '<td>: ' + _esc(d.ATTACHMENT || '-') + '</td>',
     '</tr><tr>',
-    '<td style="padding:3px 0;white-space:nowrap;">Perihal</td>',
-    '<td style="padding:3px 0;">: ' + _esc(d.SUBJECT) + '</td>',
+    '<td style="white-space:nowrap;">Perihal</td>',
+    '<td>: ' + _esc(d.SUBJECT) + '</td>',
     '</tr></table>',
-    '<p>Kepada Yth.</p>',
-    '<p>' + _esc(d.RECIPIENT_NAME || '') + '</p>',
-    '<p>' + _esc(d.RECIPIENT_ADDRESS || 'Di Tempat') + '</p>',
-    '<p>Dengan hormat,</p>',
+    // Blank line via paragraph margin
+    '<p style="text-align:left;">Kepada Yth.<br>' +
+      _esc(d.RECIPIENT_NAME || '') + '<br>' +
+      _esc(d.RECIPIENT_ADDRESS || 'Di Tempat') + '</p>',
+    '<p style="text-align:left;">Dengan hormat,</p>',
     '<p>' + _esc(d.BODY || '') + '</p>',
     '<p>Demikian surat ini kami sampaikan. Atas perhatian dan kerjasamanya kami ucapkan terima kasih.</p>',
     d._signature,
@@ -807,10 +806,11 @@ function htmlToPdf(htmlContent, fileName, folderId) {
     try {
       var gasDoc = DocumentApp.openById(tempDoc.id);
       var body   = gasDoc.getBody();
-      // Margin dokumen 1.27 cm sesuai referensi user (Header/Footer standar Google Docs).
-      // 1.27 cm = 36 points. Left/right lebih besar (~2 cm = 56.7 pts) agar teks tidak
-      // terlalu mepet ke tepi.
-      body.setMarginTop(36).setMarginBottom(36).setMarginLeft(56.7).setMarginRight(56.7);
+      // Margin sesuai ROLE Document spec:
+      // Top: 1 cm = 28.35 pt, Bottom: 1.5 cm = 42.52 pt
+      // Left/Right: 2.5 cm = 70.87 pt
+      // (Header/Footer margin 1 cm sudah di-cover top margin dokumen)
+      body.setMarginTop(28.35).setMarginBottom(42.52).setMarginLeft(70.87).setMarginRight(70.87);
       // Paksa dimensi gambar (safety net setelah HTML conversion).
       // 2 skenario:
       //   Composite mode (3 image): [logo, signature-composite, QR]
