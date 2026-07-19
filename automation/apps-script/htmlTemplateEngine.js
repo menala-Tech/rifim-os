@@ -170,6 +170,7 @@ function _baseCss() {
  */
 function _kop(assets, company) {
   // Logo 150x110 (server-side crop via sz=w150-h110-c) sesuai referensi user.
+  // Kop layout: logo kiri + info kanan (semua rata kiri, tanpa garis vertikal)
   var logoSrc = assets.logo
     ? '<img src="' + assets.logo + '" width="150" height="110" style="display:block;vertical-align:top;">'
     : '<div style="width:150px;height:110px;background:#eee;display:block;"></div>';
@@ -177,15 +178,16 @@ function _kop(assets, company) {
   return [
     '<table style="width:100%;margin-bottom:0;border-collapse:collapse;">',
     '<tr>',
-    '<td style="width:160px;padding:0 14px 0 0;vertical-align:middle;">' + logoSrc + '</td>',
-    '<td style="vertical-align:middle;">',
-    '<div style="font-size:14pt;font-weight:bold;color:#C40000;text-transform:uppercase;line-height:1.2;">' + _esc(company.name || '') + '</div>',
-    '<div style="font-size:9.5pt;color:#333;margin-top:4px;">' + _esc(company.address || '') + '</div>',
-    '<div style="font-size:9.5pt;color:#333;margin-top:2px;">Telp: ' + _esc(company.phone || '') + ' &nbsp;|&nbsp; Email: ' + _esc(company.email || '') + '</div>',
+    '<td style="width:170px;padding:0 16px 0 0;vertical-align:middle;">' + logoSrc + '</td>',
+    // Info company rata kiri, tanpa border-left, tanpa padding-left
+    '<td style="vertical-align:middle;padding:0;">',
+    '<div style="font-size:15pt;font-weight:bold;color:#C40000;text-transform:uppercase;line-height:1.15;margin:0;">' + _esc(company.name || '') + '</div>',
+    '<div style="font-size:10pt;color:#333;line-height:1.4;margin:3px 0 0 0;">' + _esc(company.address || '') + '</div>',
+    '<div style="font-size:10pt;color:#333;line-height:1.4;margin:1px 0 0 0;">Telp: ' + _esc(company.phone || '') + ' &nbsp;|&nbsp; Email: ' + _esc(company.email || '') + '</div>',
     '</td>',
     '</tr>',
     '</table>',
-    '<hr class="divider" style="border:0;border-top:2.5px solid #C40000;margin:10px 0 18px;">',
+    '<hr style="border:0;border-top:2.5px solid #C40000;margin:8px 0 16px;">',
   ].join('');
 }
 
@@ -196,15 +198,20 @@ function _kop(assets, company) {
  * @private
  */
 function _signature(assets, company, placeDate, docNumber, qrDataUri) {
-  // Proporsi sesuai referensi Google Doc user:
-  // - TTD: 180x100 (dominan, landscape)
-  // - Stempel: 150x110 (side-by-side dengan TTD, bukan overlap)
-  // - QR: 100x100 di pojok kanan bawah halaman (terpisah dari TTD block)
+  // Proporsi sesuai referensi user (gambar 3):
+  // - Stempel: 170x125 (background — dominan, bulat/persegi biru)
+  // - TTD: 150x90 (foreground — overlay di atas kiri stempel)
+  // - QR: 100x100 (terpisah di pojok kanan bawah)
+  //
+  // Trik overlap: pakai satu cell tabel dengan positioning image via
+  // Google Docs image "wrap" tidak reliable di HTML converter. Solusi:
+  // gabung TTD dan stempel dalam satu tabel 1x1 dengan negative margin
+  // supaya TTD overlap ke kiri stempel.
   var ttdSrc = assets.ttd
-    ? '<img src="' + assets.ttd + '" width="180" height="100" style="display:block;">'
+    ? '<img src="' + assets.ttd + '" width="150" height="90" style="display:block;">'
     : '';
   var stempelSrc = assets.stempel
-    ? '<img src="' + assets.stempel + '" width="150" height="110" style="display:block;">'
+    ? '<img src="' + assets.stempel + '" width="170" height="125" style="display:block;">'
     : '';
 
   var qrSrc = qrDataUri
@@ -213,22 +220,21 @@ function _signature(assets, company, placeDate, docNumber, qrDataUri) {
 
   return [
     '<div style="page-break-inside:avoid;margin-top:24px;">',
-    // Blok signature — kiri saja (tidak dua kolom lagi)
     '<p style="text-align:right;margin:0 0 14px 0;">' + _esc(placeDate) + '</p>',
-    '<p style="margin:0 0 2px 0;">Pimpinan Perusahaan,</p>',
-    '<p style="font-weight:bold;margin:0 0 4px 0;">' + _esc(company.name || '') + '</p>',
-    // TTD dan Stempel side-by-side dalam mini-table
+    '<p style="margin:0 0 2px 0;">Pimpinan Perusahaan</p>',
+    '<p style="font-weight:bold;margin:0 0 6px 0;">' + _esc(company.name || '') + '</p>',
+    // TTD dan Stempel — TTD sedikit overlap kiri stempel (negative margin-right di TTD cell)
     '<table style="width:auto;border-collapse:collapse;border:0;margin:0;">',
     '<tr>',
     '<td style="vertical-align:middle;padding:0;">' + ttdSrc + '</td>',
-    '<td style="vertical-align:middle;padding:0 0 0 8px;">' + stempelSrc + '</td>',
+    '<td style="vertical-align:middle;padding:0;margin-left:-40px;">' + stempelSrc + '</td>',
     '</tr>',
     '</table>',
-    '<p style="font-weight:bold;text-decoration:underline;margin:2px 0 0 0;">' + _esc(company.director_name || '') + '</p>',
+    '<p style="font-weight:bold;text-decoration:underline;margin:4px 0 0 0;">' + _esc(company.director_name || '') + '</p>',
     '<p style="font-weight:bold;margin:0;">' + _esc(company.director_title || '') + '</p>',
     '</div>',
     // QR Code — di pojok kanan bawah, terpisah dari signature block
-    '<table style="width:100%;margin-top:30px;border-collapse:collapse;">',
+    '<table style="width:100%;margin-top:24px;border-collapse:collapse;">',
     '<tr>',
     '<td style="text-align:right;vertical-align:bottom;">',
     qrSrc,
@@ -648,15 +654,17 @@ function htmlToPdf(htmlContent, fileName, folderId) {
     try {
       var gasDoc = DocumentApp.openById(tempDoc.id);
       var body   = gasDoc.getBody();
-      // 25mm ≈ 70.87 points
-      body.setMarginTop(70.87).setMarginBottom(72).setMarginLeft(70.87).setMarginRight(70.87);
-      // Paksa dimensi gambar sesuai proporsi target (safety net setelah HTML conversion):
+      // Margin dokumen 1.27 cm sesuai referensi user (Header/Footer standar Google Docs).
+      // 1.27 cm = 36 points. Left/right lebih besar (~2 cm = 56.7 pts) agar teks tidak
+      // terlalu mepet ke tepi.
+      body.setMarginTop(36).setMarginBottom(36).setMarginLeft(56.7).setMarginRight(56.7);
+      // Paksa dimensi gambar sesuai proporsi referensi user (safety net):
       // - imgs[0] = logo kop → 150x110
-      // - imgs[1] = TTD → 180x100 (landscape)
-      // - imgs[2] = Stempel → 150x110 (bujursangkar dominan)
+      // - imgs[1] = TTD → 150x90 (foreground overlay)
+      // - imgs[2] = Stempel → 170x125 (background dominan)
       // - imgs[3] = QR code → 100x100
       var imgs = body.getImages();
-      var dims = [[150,110],[180,100],[150,110],[100,100]];
+      var dims = [[150,110],[150,90],[170,125],[100,100]];
       for (var i = 0; i < imgs.length && i < dims.length; i++) {
         try { imgs[i].setWidth(dims[i][0]).setHeight(dims[i][1]); } catch (_) {}
       }
