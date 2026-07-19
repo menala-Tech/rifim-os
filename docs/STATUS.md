@@ -2,7 +2,19 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-07-19 (Document Studio — HTML→PDF pipeline selesai: htmlTemplateEngine.js, preview modal, webApp.js actions)
+> Last updated: 2026-07-19 (Document Studio — HTML→PDF pipeline selesai + 3 bug fixes: logo crop, HTML pipeline sebagai default, action `generateDocumentHtml` di frontend)
+
+## Reference Cepat (WAJIB PAKAI MCP)
+
+| Item | Lokasi |
+|------|--------|
+| Folder lokal | `C:\Projects\menala\rifim-os` |
+| Google Drive | https://drive.google.com/drive/folders/19taBn0YXxjXTb-SxqFXGhwOPShZ4VlIt |
+| Spreadsheet DB | https://docs.google.com/spreadsheets/d/1jHeA-w1bM32S3-AU-ENN2UjiaCb4iLzRhaf4G7y4ozM |
+| GAS Editor | https://script.google.com/u/0/home/projects/1IK8-2anrxahce1X1MG7Bi3aGe6e-_4e3obanTRprT6brYSdla9rEYOxp/edit |
+| Web App URL | https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec |
+
+**Selalu gunakan MCP** (`Google_Workspace_MCP`, `Claude_Browser`, Supabase MCP) untuk membaca/menulis ke sumber di atas.
 
 ---
 

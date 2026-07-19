@@ -56,12 +56,28 @@ C:\Users\ADMIN\Documents\RIFIM\rifim-os\branding\logo\
 
 ---
 
+## External Resources (WAJIB PAKAI — jangan buat sumber lain)
+
+Semua sumber daya eksternal RIFIM OS ada di lokasi berikut. Gunakan **MCP tools** (`Google_Workspace_MCP`, `Claude_Browser`, `Supabase MCP`) untuk mengaksesnya — jangan copy-paste manual atau hardcode ID di tempat lain.
+
+| Item | Lokasi |
+|------|--------|
+| Folder lokal proyek | `C:\Projects\menala\rifim-os` |
+| Google Drive folder (aset kop/TTD/stempel + PDF output) | https://drive.google.com/drive/folders/19taBn0YXxjXTb-SxqFXGhwOPShZ4VlIt |
+| Google Spreadsheet DB | https://docs.google.com/spreadsheets/d/1jHeA-w1bM32S3-AU-ENN2UjiaCb4iLzRhaf4G7y4ozM |
+| GAS Project Editor | https://script.google.com/u/0/home/projects/1IK8-2anrxahce1X1MG7Bi3aGe6e-_4e3obanTRprT6brYSdla9rEYOxp/edit |
+| GAS Web App URL (aktif) | https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec |
+
+⚠️ URL Web App mengandung `scIl` (huruf besar I + huruf kecil l) — mudah tertukar dengan `scll`. Copy dari file ini, jangan retype.
+
+---
+
 ## Working Directory (WAJIB)
 
 **Semua file proyek HANYA boleh dibaca dan disimpan di:**
 
 ```
-C:\Users\ADMIN\Documents\RIFIM\rifim-os
+C:\Projects\menala\rifim-os
 ```
 
 - Jangan buat file di luar folder ini
