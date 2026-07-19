@@ -2,9 +2,27 @@
 
 > RIFIM OS — Claude Code Operating Manual
 
-Version: 1.3
+Version: 1.4
 Status: Active
-Last updated: 2026-07-19 (Document Studio — HTML→PDF pipeline, Document Engine blueprint v1.0)
+Last updated: 2026-07-19 (Document Studio — DDS v3.0 applied: kop+footer banner PNG, signature composite via Slides API, spec presisi mm; docs/09-UI-UX/document-design-system/ + docs/10-AI/AI_RULES.md reorganized)
+
+### Referensi Sistem Dokumen (WAJIB baca sebelum ubah engine dokumen)
+
+| Modul | File |
+|---|---|
+| Blueprint arsitektur | [docs/04-Architecture/DOCUMENT_ENGINE.md](docs/04-Architecture/DOCUMENT_ENGINE.md) |
+| Design system induk | [docs/09-UI-UX/document-design-system/DDS_v1.0.md](docs/09-UI-UX/document-design-system/DDS_v1.0.md) |
+| Spec presisi layout | [docs/09-UI-UX/document-design-system/PAGE_LAYOUT.md](docs/09-UI-UX/document-design-system/PAGE_LAYOUT.md), [HEADER_SYSTEM.md](docs/09-UI-UX/document-design-system/HEADER_SYSTEM.md), [FOOTER_SYSTEM.md](docs/09-UI-UX/document-design-system/FOOTER_SYSTEM.md), [SIGNATURE_SYSTEM.md](docs/09-UI-UX/document-design-system/SIGNATURE_SYSTEM.md) |
+| Struktur & tipografi | [TYPOGRAPHY.md](docs/09-UI-UX/document-design-system/TYPOGRAPHY.md), [LETTER_STRUCTURE.md](docs/09-UI-UX/document-design-system/LETTER_STRUCTURE.md), [TABLE_SYSTEM.md](docs/09-UI-UX/document-design-system/TABLE_SYSTEM.md) |
+| Export target | [PDF_EXPORT.md](docs/09-UI-UX/document-design-system/PDF_EXPORT.md), [GOOGLE_DOCS.md](docs/09-UI-UX/document-design-system/GOOGLE_DOCS.md), [MICROSOFT_WORD.md](docs/09-UI-UX/document-design-system/MICROSOFT_WORD.md), [QR_SYSTEM.md](docs/09-UI-UX/document-design-system/QR_SYSTEM.md) |
+| Batasan AI | [docs/10-AI/AI_RULES.md](docs/10-AI/AI_RULES.md) |
+| Spec sumber | [docs/09-UI-UX/document-design-system/_source/ROLE_Document_letterhead_dan_Footer_3_Perusahaan.md](docs/09-UI-UX/document-design-system/_source/ROLE_Document_letterhead_dan_Footer_3_Perusahaan.md) |
+
+Implementasi engine dokumen: [automation/apps-script/htmlTemplateEngine.js](automation/apps-script/htmlTemplateEngine.js) (HTML→PDF pipeline default untuk semua dokumen).
+
+**GAS Advanced Services yang WAJIB enabled** (`appsscript.json`): Drive v2 + Slides v1. Scope: `/auth/documents`, `/auth/drive`, `/auth/presentations`.
+
+**Missing (belum ada, tapi link sudah disiapkan)**: `docs/09-UI-UX/document-design-system/AUTOMATION_RULES.md`.
 
 ---
 

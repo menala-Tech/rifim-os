@@ -2,7 +2,33 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-07-19 (Document Studio — HTML→PDF pipeline selesai + 3 bug fixes: logo crop, HTML pipeline sebagai default, action `generateDocumentHtml` di frontend)
+> Last updated: 2026-07-19 (Document Studio v3 — DDS presisi mm applied, kop+footer banner PNG per 3 perusahaan, signature composite via Slides API v1, DDS docs reorganized ke docs/09-UI-UX/document-design-system/, path refs semua di-relative-link)
+
+## Sesi 2026-07-19 — Document Studio v3 (Complete)
+
+### Selesai
+- ✅ HTML→PDF pipeline default untuk semua 20 dokumen × 3 perusahaan (60 kombinasi)
+- ✅ Kop banner + footer banner PNG full-width per perusahaan (6 file: `1KqbGdF…`, `11B-Lbj…`, `1GVFsr7…`, `1XkLnh…`, `1OA31Z…`, `14w0nuk…`)
+- ✅ Signature composite via Slides API v1 (`_composeSignatureViaSlides` — TTD 45mm overlay stempel 30mm, offset X:18mm Y:6mm), cached di Drive folder `19taBn0Y…` dengan suffix `-v2`
+- ✅ DOCUMENT DESIGN SYSTEM spec presisi mm: margin 10mm/10mm/25mm, font Aptos 12pt #000 justify, line-height 1.6, paragraph 12pt, title 14pt bold center uppercase, director name bold+underline, position regular
+- ✅ Drive API v2 + Slides API v1 advanced services enabled di `appsscript.json`, scope `/auth/presentations` ditambahkan
+- ✅ Spreadsheet DB update: `companies.kop_banner_id/footer_banner_id`, `company_config` 14 keys baru, `document_types.use_html_pipeline`
+- ✅ Bug fixes: logo Menala baru, Drive is not defined, page-break whitespace, banner terpotong, temp GDoc tidak ter-trash, table border 1px
+- ✅ Konsolidasi 3 monitor-* PWA ke Web App v49 URL tunggal
+- ✅ Docs reorganized:
+  - `docs/04-Architecture/DOCUMENT_ENGINE.md` (blueprint)
+  - `docs/09-UI-UX/document-design-system/` (12 file DDS + `_source/`)
+  - `docs/10-AI/AI_RULES.md`
+- ✅ Path references di 13 file DDS + AI_RULES sudah semua relative link
+
+### Debt / Belum selesai
+- ⏳ `docs/09-UI-UX/document-design-system/AUTOMATION_RULES.md` — draft user, belum di-share ke repo (semua link referensi sudah disiapkan di 5 file lain)
+- ⏳ Real-world test PDF hasil generate — user perlu deploy v61 di GAS Editor + test round trip di Smart Office
+- ⏳ Data identitas Menala + Lailan di `DDS_v1.0.md` §4 masih perlu konfirmasi (alamat, email — mungkin duplikat dengan RIFIM)
+
+### Deployment
+- Vercel: auto-deploy commits main (last commit `89219fb`)
+- GAS: `clasp push --force` sudah otomatis via terminal per commit; user perlu **Kelola Deployment → Versi baru → v61 → Terapkan** manual untuk aktifkan versi baru
 
 ## Reference Cepat (WAJIB PAKAI MCP)
 

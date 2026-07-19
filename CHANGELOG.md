@@ -8,6 +8,50 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added / Fixed — Document Studio HTML→PDF Pipeline + DDS v3.0 (2026-07-19)
+
+**HTML→PDF Pipeline enhancements** (`automation/apps-script/htmlTemplateEngine.js`):
+- Signature composite via **Slides API v1 advanced service** — TTD 45mm overlay stempel 30mm (offset X:18mm Y:6mm) sesuai DOCUMENT DESIGN SYSTEM spec, disimpan sebagai PNG di Drive folder `19taBn0Y...` dan di-cache 6 jam via `CacheService` (nama file `signature-combined-{CODE}-v2.png`)
+- **Kop + Footer banner** full-width per perusahaan — 6 file PNG letterhead+footer di-load sebagai `<img>` dengan `scaleBanner()` helper yang preserve aspect ratio original
+- **DOCUMENT DESIGN SYSTEM spec** applied end-to-end: font Aptos/Calibri 12pt #000 justify line-height 1.6, paragraph spacing 12pt, margin top/bottom 10mm + left/right 25mm, title 14pt bold center uppercase, signature block 70×55mm, director name bold+underline (dist 6mm), director title regular (dist 2mm)
+- HTML pipeline default untuk semua dokumen — 20 jenis × 3 perusahaan (60 kombinasi) pakai design system yang sama
+- Cache versioning `-v2` untuk force re-generate signature composite saat spec berubah
+
+**Bug fixes**:
+- Fix logo Menala kop MIG: `1WWB7GnD16XCM7BDsIR1YUZaY0ejnF5jV` (ganti file lama)
+- Fix `Drive is not defined`: enable Drive API v2 advanced service di `appsscript.json`
+- Fix `page-break-inside:avoid` yang menyebabkan whitespace besar di halaman 2
+- Fix banner PNG terpotong: pakai `img.getWidth()/getHeight()` original untuk hitung target height proporsional
+- Fix table border 1px muncul di kop/tanda tangan: post-processing `body.getTables()[i].setBorderWidth(0)` + `setBorderColor('#FFFFFF')`
+- Fix temp Google Doc tidak terhapus: ganti `Drive.Files.trash()` (v2 unreliable) → `DriveApp.getFileById().setTrashed(true)`
+- Konsolidasi 3 monitor-* PWA (monitor-saldo/order/koordinator) ke Web App v49 URL tunggal `AKfycbzz...scIl24Hk...` — total 10 file di repo pakai URL sama
+
+**Frontend** (`modules/smart-office/index.html`):
+- Preview modal + `generateDocumentHtml` action explicit routing ke HTML pipeline
+- `buildPayload()` shared helper untuk `previewDoc()` + `generateDoc()`
+
+**Spreadsheet DB updates** (via MCP Google Workspace):
+- `companies` sheet: tambah kolom `kop_banner_id` (S) + `footer_banner_id` (T) untuk 3 perusahaan
+- `company_config` sheet: update `logo_mig_drive_id`, tambah 14 keys baru (`kop_banner_*_drive_id`, `footer_banner_*_drive_id`, `signature_cache_folder_id`, `html_pipeline_default`, `doc_font_family`, `doc_font_size`, `doc_line_height`, `doc_margin_*_mm`)
+- `document_types` sheet: tambah kolom `use_html_pipeline` (I) = TRUE untuk semua 20 dokumen
+
+**Documentation reorganization** (`docs/`):
+- `DOCUMENT_ENGINE.md` → `docs/04-Architecture/DOCUMENT_ENGINE.md`
+- 12 file DDS → `docs/09-UI-UX/document-design-system/` (DDS_v1.0, PAGE_LAYOUT, HEADER_SYSTEM, FOOTER_SYSTEM, TYPOGRAPHY, LETTER_STRUCTURE, TABLE_SYSTEM, SIGNATURE_SYSTEM, QR_SYSTEM, PDF_EXPORT, GOOGLE_DOCS, MICROSOFT_WORD)
+- `AI_RULES.md` → `docs/10-AI/AI_RULES.md`
+- Source spec: `docs/09-UI-UX/document-design-system/_source/ROLE_Document_letterhead_dan_Footer_3_Perusahaan.md`
+- Batch fix path references di 13 file (relative link `[./NAMA.md](./NAMA.md)`, `../../10-AI/AI_RULES.md`, `../../04-Architecture/DOCUMENT_ENGINE.md`)
+- **Missing (belum ada)**: `AUTOMATION_RULES.md` — draft user terpisah, semua link referensi sudah disiapkan
+
+**GAS Advanced Services** (`appsscript.json`):
+- Drive API v2 enabled
+- Slides API v1 enabled (untuk signature compositor)
+- OAuth scope `/auth/presentations` ditambahkan
+
+**Web App deployment**: v49 → v52 → v58 → v61 (masih pakai deployment ID URL yang sama)
+
+---
+
 ### Added — Integration Rules SSoT (2026-07-13)
 - `PROJECT_RULES.md` — seksi baru **Integration Rules — SSoT Data Contract** (Rule 40–47):
   timestamp ISO UTC, ScriptLock 10s, validasi tipe/enum, error logging ke system_log,

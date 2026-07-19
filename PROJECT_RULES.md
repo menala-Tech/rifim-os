@@ -2,9 +2,29 @@
 
 > Aturan ini wajib diikuti oleh seluruh developer dan AI yang berkontribusi pada RIFIM OS.
 
-Version: 1.1
+Version: 1.2
 Status: Active
-Last updated: 2026-07-14 (Business Rules BR-01–BR-10, Chat Rules, Design Token Rules)
+Last updated: 2026-07-19 (Tambah Document System Rules — merujuk ke DDS di docs/09-UI-UX/document-design-system/ sebagai SSoT visual dokumen resmi)
+
+---
+
+## Document System Rules (WAJIB — semua dokumen resmi RIFIM Group)
+
+| # | Rule |
+|---|------|
+| DS-01 | Semua dokumen resmi (20 jenis) untuk 3 entitas (RIFIM, MIG, LAILAN) WAJIB pakai HTML→PDF pipeline via `automation/apps-script/htmlTemplateEngine.js`. Fallback ke GDocs template lama hanya via flag eksplisit `use_gdocs_pipeline: true` untuk emergency. |
+| DS-02 | Spec visual dokumen adalah [`docs/09-UI-UX/document-design-system/DDS_v1.0.md`](docs/09-UI-UX/document-design-system/DDS_v1.0.md) — semua nilai styling (font, margin, warna, layout) HARUS diambil dari sini. Kode TIDAK boleh punya nilai styling sendiri yang berbeda. |
+| DS-03 | 6 aset banner (kop + footer per perusahaan) di-load dari Drive file ID yang dikonfigurasi di `HTML_TPL_ASSETS` di `htmlTemplateEngine.js` DAN di sheet `companies` kolom `kop_banner_id` + `footer_banner_id` — dua sumber ini WAJIB sinkron. |
+| DS-04 | Signature composite (TTD 45mm overlay stempel 30mm sesuai [SIGNATURE_SYSTEM.md](docs/09-UI-UX/document-design-system/SIGNATURE_SYSTEM.md)) di-generate via `_composeSignatureViaSlides()` sekali per perusahaan dan di-cache di Drive folder `19taBn0YXxjXTb-SxqFXGhwOPShZ4VlIt`. Kalau TTD/stempel berubah, hapus file `signature-combined-{CODE}-v2.png` supaya re-composite otomatis. |
+| DS-05 | Perubahan spec DDS (dimensi, font, layout) wajib bump version di [`DDS_v1.0.md`](docs/09-UI-UX/document-design-system/DDS_v1.0.md) §Riwayat Versi + update cache suffix di `htmlTemplateEngine.js` (`-v2` → `-v3` dst) untuk force re-composite. |
+| DS-06 | GAS advanced services yang WAJIB enabled di `appsscript.json`: **Drive v2** (untuk `Drive.Files.insert` HTML→GDoc conversion) + **Slides v1** (untuk signature compositor). OAuth scope wajib termasuk `/auth/presentations`. |
+| DS-07 | Setiap perubahan `htmlTemplateEngine.js` WAJIB test dengan preview + generate PDF di Smart Office untuk minimal 1 perusahaan × 1 jenis dokumen sebelum di-deploy ke GAS. |
+| DS-08 | File di [`docs/09-UI-UX/document-design-system/_source/`](docs/09-UI-UX/document-design-system/_source/) adalah spec ASLI dari user — TIDAK boleh diedit AI. Perubahan visual harus dituangkan ke file DDS turunan, bukan ke source. |
+| DS-09 | Batasan AI saat generate/audit dokumen ada di [`docs/10-AI/AI_RULES.md`](docs/10-AI/AI_RULES.md) — baca sebelum kerja di area dokumen. |
+
+---
+
+
 
 ---
 
