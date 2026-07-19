@@ -107,7 +107,7 @@ var HTML_TPL_FOLDERS = {
  * @private
  */
 function _getCombinedSignatureId(companyCode) {
-  var cacheKey  = 'sig_combined_' + companyCode;
+  var cacheKey  = 'sig_combined_' + companyCode + '_v2';
   var cacheSvc  = CacheService.getScriptCache();
   var cachedId  = cacheSvc.get(cacheKey);
   if (cachedId) {
@@ -115,7 +115,8 @@ function _getCombinedSignatureId(companyCode) {
     try { DriveApp.getFileById(cachedId).getName(); return cachedId; } catch (_) {}
   }
 
-  var fileName  = 'signature-combined-' + companyCode + '.png';
+  // Version suffix bump kalau spec composite berubah — force re-generate
+  var fileName  = 'signature-combined-' + companyCode + '-v2.png';
   var folder    = DriveApp.getFolderById(HTML_TPL_SIG_CACHE_FOLDER);
 
   // Cek apakah file sudah ada di Drive folder
@@ -142,23 +143,25 @@ function _composeSignatureViaSlides(companyCode, fileName, targetFolder) {
   var presId = pres.getId();
 
   try {
-    // Set slide size ke 260x160 pt (rasio kompak untuk signature)
-    pres.setPageSize(SlidesApp.PageSize.CUSTOM, 260, 160);
+    // SIGNATURE BLOCK spec: 70 x 55 mm = 198.4 x 155.9 pt
+    pres.setPageSize(SlidesApp.PageSize.CUSTOM, 198.4, 155.9);
 
     var slide = pres.getSlides()[0];
     // Bersihkan default placeholders
     slide.getPageElements().forEach(function(e) { try { e.remove(); } catch (_) {} });
 
-    // 1. Insert Stempel dulu (background layer)
+    // 1. STAMP (background) — 30 mm width = 85 pt, offset X 18mm=51pt Y 6mm=17pt
+    //    Layer: behind signature (di-insert dulu)
     var stempelBlob = DriveApp.getFileById(ids.stempel_id).getBlob();
     var stempelImg  = slide.insertImage(stempelBlob);
-    stempelImg.setLeft(85).setTop(18).setWidth(160).setHeight(120);
+    stempelImg.setLeft(51).setTop(17).setWidth(85).setHeight(85);
 
-    // 2. Insert TTD di atas (foreground overlay, offset kiri-atas)
-    // TTD posisi kiri sedikit menutupi kiri stempel — mirip goresan real
+    // 2. SIGNATURE (TTD) — 45 mm width = 127.6 pt, offset X 0 Y 0
+    //    Layer: front (di-insert setelah stamp, otomatis di atas)
+    //    Height dijaga proporsional ~19mm (rasio landscape ~2.4:1)
     var ttdBlob = DriveApp.getFileById(ids.ttd_id).getBlob();
     var ttdImg  = slide.insertImage(ttdBlob);
-    ttdImg.setLeft(0).setTop(30).setWidth(160).setHeight(85);
+    ttdImg.setLeft(0).setTop(0).setWidth(127.6).setHeight(54);
 
     pres.saveAndClose();
 
@@ -337,19 +340,18 @@ function _footer(assets) {
  * @private
  */
 function _signature(assets, company, placeDate, docNumber, qrDataUri) {
-  // Signature block:
-  // - Prioritas 1: single combined PNG (TTD overlay stempel, dari SlidesApp compositor)
-  //   Ukuran: 220x140 (proporsi 260x160 slide dijaga)
-  // - Fallback: TTD 150x90 + Stempel 170x125 side-by-side
+  // SIGNATURE BLOCK spec: 70 x 55 mm (198.4 x 155.9 pt)
+  // Composite (SlidesApp): TTD 45mm front + Stamp 30mm behind (offset X:18mm Y:6mm)
   var sigBlock;
   if (assets.signature) {
-    sigBlock = '<img src="' + assets.signature + '" width="220" height="140" style="display:block;">';
+    // 70 mm = 265 px, 55 mm = 208 px @ 96 DPI
+    sigBlock = '<img src="' + assets.signature + '" width="265" height="208" style="display:block;">';
   } else {
     var ttdSrc = assets.ttd
-      ? '<img src="' + assets.ttd + '" width="150" height="90" style="display:block;">'
+      ? '<img src="' + assets.ttd + '" width="170" height="72" style="display:block;">'
       : '';
     var stempelSrc = assets.stempel
-      ? '<img src="' + assets.stempel + '" width="170" height="125" style="display:block;">'
+      ? '<img src="' + assets.stempel + '" width="113" height="113" style="display:block;">'
       : '';
     sigBlock = [
       '<table style="width:auto;border-collapse:collapse;border:0;margin:0;">',
@@ -365,19 +367,21 @@ function _signature(assets, company, placeDate, docNumber, qrDataUri) {
     ? '<img src="' + qrDataUri + '" width="100" height="100" style="display:block;margin-left:auto;">'
     : '';
 
-  // Struktur sesuai spec:
-  // Hormat kami,              (regular)
-  // Nama Perusahaan           (bold)
-  // [24pt distance from body — TTD+Stempel composite]
-  // Director Name             (bold)
-  // Position                  (regular, NOT bold)
+  // Struktur signature area sesuai spec:
+  // Hormat kami,                              (regular)
+  // Nama Perusahaan                           (bold)
+  // [SIGNATURE BLOCK 70x55 mm]
+  // Director Name                             (Bold + Underline, distance 6mm)
+  // Position                                  (Regular, distance 2mm)
   return [
     '<div class="sig-wrap">',
     '<p style="text-align:left;margin:0 0 4pt 0;">Hormat kami,</p>',
     '<p style="font-weight:bold;text-align:left;margin:0 0 6pt 0;">' + _esc(company.name || '') + '</p>',
     sigBlock,
-    '<p style="font-weight:bold;text-align:left;margin:4pt 0 0 0;">' + _esc(company.director_name || '') + '</p>',
-    '<p style="text-align:left;margin:0;">' + _esc(company.director_title || '') + '</p>',
+    // Director Name: Bold + Underline, 6 mm (17 pt) dari signature block
+    '<p style="font-weight:bold;text-decoration:underline;text-align:left;margin:17pt 0 0 0;">' + _esc(company.director_name || '') + '</p>',
+    // Director Title: Regular, 2 mm (5.67 pt) dari nama
+    '<p style="text-align:left;margin:5.67pt 0 0 0;">' + _esc(company.director_title || '') + '</p>',
     '</div>',
     // QR Code — pojok kanan bawah, terpisah
     '<table style="width:100%;margin-top:24pt;border-collapse:collapse;">',
@@ -806,21 +810,34 @@ function htmlToPdf(htmlContent, fileName, folderId) {
     try {
       var gasDoc = DocumentApp.openById(tempDoc.id);
       var body   = gasDoc.getBody();
-      // Margin sesuai ROLE Document spec:
-      // Top: 1 cm = 28.35 pt, Bottom: 1.5 cm = 42.52 pt
-      // Left/Right: 2.5 cm = 70.87 pt
-      // (Header/Footer margin 1 cm sudah di-cover top margin dokumen)
-      body.setMarginTop(28.35).setMarginBottom(42.52).setMarginLeft(70.87).setMarginRight(70.87);
-      // Paksa dimensi gambar (safety net setelah HTML conversion).
-      // 2 skenario:
-      //   Composite mode (3 image): [logo, signature-composite, QR]
-      //   Fallback mode  (4 image): [logo, TTD, stempel, QR]
+      // Margin sesuai DOCUMENT DESIGN SYSTEM spec:
+      // Top: 10 mm = 28.35 pt, Bottom: 10 mm = 28.35 pt
+      // Left/Right: 25 mm = 70.87 pt
+      body.setMarginTop(28.35).setMarginBottom(28.35).setMarginLeft(70.87).setMarginRight(70.87);
+      // Paksa dimensi gambar sesuai DOCUMENT DESIGN SYSTEM spec (safety net).
+      // A4 body width (setelah margin 25mm x 2 = 50mm): 210-50 = 160 mm = 453 pt
+      // Aturan ukuran gambar:
+      //   Kop banner:    453 x 82 pt (~160x29mm, aspect ratio letterhead)
+      //   Signature:     265 x 208 pt (70x55 mm) — composite mode
+      //   TTD (fallback):170 x 72 pt (45mm), Stempel: 113x113 pt (30mm)
+      //   QR code:       100 x 100 pt
+      //   Footer banner: 453 x 69 pt (~160x24mm, aspect ratio footer)
+      //
+      // Urutan image di dokumen (bergantung ada/tidak-nya composite):
+      //   Composite mode (4 image): [kop, signature, QR, footer]
+      //   Fallback mode  (5 image): [kop, TTD, stempel, QR, footer]
       var imgs = body.getImages();
       var dims;
-      if (imgs.length === 3) {
-        dims = [[150,110],[220,140],[100,100]];      // composite mode
+      if (imgs.length === 4) {
+        dims = [[453,82],[265,208],[100,100],[453,69]];  // composite
+      } else if (imgs.length === 5) {
+        dims = [[453,82],[170,72],[113,113],[100,100],[453,69]];  // fallback
+      } else if (imgs.length === 3) {
+        // Composite tanpa footer banner
+        dims = [[453,82],[265,208],[100,100]];
       } else {
-        dims = [[150,110],[150,90],[170,125],[100,100]]; // fallback mode
+        // Fallback tanpa footer banner
+        dims = [[453,82],[170,72],[113,113],[100,100]];
       }
       for (var i = 0; i < imgs.length && i < dims.length; i++) {
         try { imgs[i].setWidth(dims[i][0]).setHeight(dims[i][1]); } catch (_) {}
