@@ -30,22 +30,31 @@
 
 var HTML_TPL_ASSETS = {
   RIFIM: {
-    logo_id:    '1ylC1QAjPRT4OiRsCh1BfbrNNZI9JRpTE',  // logo-rifim.png
-    ttd_id:     '1hacw-5aFC2RNASx2iV2fSaZTk4Ry6SZ7',  // TTD bobby.png
-    stempel_id: '1o4bTu5Xl_fU71NqRJy0AnQmnVyuVMQEA',  // stempel Rifim.png
-    color:      '#C40000',
+    logo_id:      '1ylC1QAjPRT4OiRsCh1BfbrNNZI9JRpTE',  // logo-rifim.png
+    ttd_id:       '1hacw-5aFC2RNASx2iV2fSaZTk4Ry6SZ7',  // TTD bobby.png
+    stempel_id:   '1o4bTu5Xl_fU71NqRJy0AnQmnVyuVMQEA',  // stempel Rifim.png
+    // Banner mode: kalau kop_banner_id dan footer_banner_id diisi, template
+    // pakai banner PNG full-width alih-alih kop+text style default.
+    // Upload file PNG ke Drive, paste file ID di sini.
+    kop_banner_id:    '',  // TODO: upload kop-banner-rifim.png (1240x280 recommended)
+    footer_banner_id: '',  // TODO: upload footer-banner-rifim.png (1240x140 recommended)
+    color:        '#C40000',
   },
   MIG: {
-    logo_id:    '1WWB7GnD16XCM7BDsIR1YUZaY0ejnF5jV',  // logo Menala baru (per 2026-07-19)
-    ttd_id:     '1hacw-5aFC2RNASx2iV2fSaZTk4Ry6SZ7',  // TTD bobby.png
-    stempel_id: '1QgSBv_Avbmadxh7j9QuIcA2my-1Jpt6T',  // stempel Menala.png
-    color:      '#C40000',
+    logo_id:      '1WWB7GnD16XCM7BDsIR1YUZaY0ejnF5jV',  // logo Menala baru (per 2026-07-19)
+    ttd_id:       '1hacw-5aFC2RNASx2iV2fSaZTk4Ry6SZ7',  // TTD bobby.png
+    stempel_id:   '1QgSBv_Avbmadxh7j9QuIcA2my-1Jpt6T',  // stempel Menala.png
+    kop_banner_id:    '',  // TODO: upload kop-banner-mig.png
+    footer_banner_id: '',  // TODO: upload footer-banner-mig.png
+    color:        '#C40000',
   },
   LAILAN: {
-    logo_id:    '1WC0wBexm6zIjuoKF_KEb7Znpk3Bwdv6V',  // logo-lailan.png
-    ttd_id:     '1hacw-5aFC2RNASx2iV2fSaZTk4Ry6SZ7',  // TTD bobby.png
-    stempel_id: '1Jt45lz3VaKrXMVKNaq99vEHyIHD7Ae9Q',  // stempel lailankalilan.png
-    color:      '#C40000',
+    logo_id:      '1WC0wBexm6zIjuoKF_KEb7Znpk3Bwdv6V',  // logo-lailan.png
+    ttd_id:       '1hacw-5aFC2RNASx2iV2fSaZTk4Ry6SZ7',  // TTD bobby.png
+    stempel_id:   '1Jt45lz3VaKrXMVKNaq99vEHyIHD7Ae9Q',  // stempel lailankalilan.png
+    kop_banner_id:    '',  // TODO: upload kop-banner-lailan.png
+    footer_banner_id: '',  // TODO: upload footer-banner-lailan.png
+    color:        '#C40000',
   },
 };
 
@@ -219,13 +228,16 @@ function _loadCompanyAssets(companyCode) {
 
   return {
     // Logo: server-side crop 150×110 agar file PNG multi-varian hanya tampil varian atas.
-    logo:      fetchAsBase64(ids.logo_id, '150-h110-c'),
+    logo:         fetchAsBase64(ids.logo_id, '150-h110-c'),
+    // Banner kop + footer (kalau ada) — load full-width high-res
+    kop_banner:   ids.kop_banner_id    ? fetchAsBase64(ids.kop_banner_id,    1240) : '',
+    footer_banner: ids.footer_banner_id ? fetchAsBase64(ids.footer_banner_id, 1240) : '',
     // Signature composite (TTD + stempel dalam 1 PNG, overlap seperti asli)
-    signature: signatureId ? fetchAsBase64(signatureId, 500) : '',
+    signature:    signatureId ? fetchAsBase64(signatureId, 500) : '',
     // TTD & stempel individual masih di-load sebagai fallback (kalau composite gagal)
-    ttd:       fetchAsBase64(ids.ttd_id,     400),
-    stempel:   fetchAsBase64(ids.stempel_id, 400),
-    color:     color,
+    ttd:          fetchAsBase64(ids.ttd_id,     400),
+    stempel:      fetchAsBase64(ids.stempel_id, 400),
+    color:        color,
   };
 }
 
@@ -280,8 +292,18 @@ function _baseCss() {
  * @private
  */
 function _kop(assets, company) {
-  // Logo 150x110 (server-side crop via sz=w150-h110-c) sesuai referensi user.
-  // Kop layout: logo kiri + info kanan (semua rata kiri, tanpa garis vertikal)
+  // BANNER MODE: kalau kop_banner PNG tersedia, embed sebagai gambar full-width.
+  // Ini support design premium (logo + tagline + badge + background gradient +
+  // shape) yang tidak bisa direplikasi via HTML/CSS di Google Docs converter.
+  if (assets.kop_banner) {
+    return [
+      '<div style="margin:0 0 20px 0;">',
+      '<img src="' + assets.kop_banner + '" style="display:block;width:100%;height:auto;">',
+      '</div>',
+    ].join('');
+  }
+
+  // FALLBACK: kop teks style (logo kiri + info kanan) — dipakai kalau banner belum di-upload
   var logoSrc = assets.logo
     ? '<img src="' + assets.logo + '" width="150" height="110" style="display:block;vertical-align:top;">'
     : '<div style="width:150px;height:110px;background:#eee;display:block;"></div>';
@@ -290,7 +312,6 @@ function _kop(assets, company) {
     '<table style="width:100%;margin-bottom:0;border-collapse:collapse;">',
     '<tr>',
     '<td style="width:170px;padding:0 16px 0 0;vertical-align:middle;">' + logoSrc + '</td>',
-    // Info company rata kiri, tanpa border-left, tanpa padding-left
     '<td style="vertical-align:middle;padding:0;">',
     '<div style="font-size:15pt;font-weight:bold;color:#C40000;text-transform:uppercase;line-height:1.15;margin:0;">' + _esc(company.name || '') + '</div>',
     '<div style="font-size:10pt;color:#333;line-height:1.4;margin:3px 0 0 0;">' + _esc(company.address || '') + '</div>',
@@ -299,6 +320,20 @@ function _kop(assets, company) {
     '</tr>',
     '</table>',
     '<hr style="border:0;border-top:2.5px solid #C40000;margin:8px 0 16px;">',
+  ].join('');
+}
+
+/**
+ * Footer banner (kalau footer_banner tersedia).
+ * Render di bagian bawah dokumen setelah QR block.
+ * @private
+ */
+function _footer(assets) {
+  if (!assets.footer_banner) return '';
+  return [
+    '<div style="margin:24px 0 0 0;">',
+    '<img src="' + assets.footer_banner + '" style="display:block;width:100%;height:auto;">',
+    '</div>',
   ].join('');
 }
 
@@ -733,6 +768,9 @@ function buildDocumentHtml(docType, d, assets, company, qrDataUri) {
     default:                           body = _tplSurat(d, assets, company); break;
   }
 
+  // Append footer banner (kalau tersedia)
+  body = body + _footer(assets);
+
   return _wrapHtml(body, assets);
 }
 
@@ -952,17 +990,29 @@ function buildDocumentPreviewHtml(docType, d, companyCode, company) {
 
   // Override kop dan signature untuk mode preview (gunakan <img> tag biasa, tanpa base64)
   function kopPreview(company) {
+    // Banner mode preview
+    if (ids.kop_banner_id) {
+      return '<div style="margin:0 0 20px 0;"><img src="' + thumbUrl(ids.kop_banner_id) +
+             '" style="display:block;width:100%;height:auto;"></div>';
+    }
+    // Fallback teks style
     return [
       '<table style="width:100%;border-collapse:collapse;margin-bottom:0;">',
       '<tr>',
-      '<td style="width:100px;padding:0 12px 0 0;vertical-align:middle;">' + previewAssets.logo + '</td>',
-      '<td style="padding-left:12px;border-left:3px solid #C40000;vertical-align:middle;">',
-      '<div style="font-size:13pt;font-weight:bold;color:#C40000;text-transform:uppercase;">' + _esc(company.name || '') + '</div>',
-      '<div style="font-size:9pt;color:#555;margin-top:3px;">' + _esc(company.address || '') + '</div>',
-      '<div style="font-size:9pt;color:#555;margin-top:2px;">Telp: ' + _esc(company.phone || '') + ' &nbsp;|&nbsp; Email: ' + _esc(company.email || '') + '</div>',
+      '<td style="width:170px;padding:0 16px 0 0;vertical-align:middle;">' + previewAssets.logo + '</td>',
+      '<td style="vertical-align:middle;padding:0;">',
+      '<div style="font-size:15pt;font-weight:bold;color:#C40000;text-transform:uppercase;line-height:1.15;">' + _esc(company.name || '') + '</div>',
+      '<div style="font-size:10pt;color:#333;margin-top:3px;">' + _esc(company.address || '') + '</div>',
+      '<div style="font-size:10pt;color:#333;margin-top:1px;">Telp: ' + _esc(company.phone || '') + ' &nbsp;|&nbsp; Email: ' + _esc(company.email || '') + '</div>',
       '</td></tr></table>',
       '<hr style="border:0;border-top:2.5px solid #C40000;margin:8px 0 16px;">',
     ].join('');
+  }
+
+  function footerPreview() {
+    if (!ids.footer_banner_id) return '';
+    return '<div style="margin:24px 0 0 0;"><img src="' + thumbUrl(ids.footer_banner_id) +
+           '" style="display:block;width:100%;height:auto;"></div>';
   }
 
   function sigPreview(company, placeDate, docNumber) {
@@ -1007,8 +1057,9 @@ function buildDocumentPreviewHtml(docType, d, companyCode, company) {
     case 'KWT': body = kopPreview(company) + _tplKwitansiBody(dPreview, company); break;
     default:    body = kopPreview(company) + _tplSuratBody(dPreview, company); break;
   }
+  body = body + footerPreview();
 
-  return '<div style="font-family:Arial,sans-serif;font-size:11pt;color:#1A1A1A;max-width:680px;margin:0 auto;padding:24px 32px;">' + body + '</div>';
+  return '<div style="font-family:Arial,sans-serif;font-size:12pt;color:#000;max-width:680px;margin:0 auto;padding:24px 32px;line-height:1.6;">' + body + '</div>';
 }
 
 // Helper: body-only (tanpa kop) untuk masing-masing template
