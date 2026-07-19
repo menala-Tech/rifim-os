@@ -111,11 +111,11 @@ function _loadCompanyAssets(companyCode) {
   }
 
   return {
-    // Logo: server-side crop 90×65 agar file PNG multi-varian hanya tampil bagian atas.
-    // sz=w90-h65-c → Google Drive resize + center-crop ke tepat 90×65px.
-    logo:    fetchAsBase64(ids.logo_id,    '90-h65-c'),
-    ttd:     fetchAsBase64(ids.ttd_id,     250),
-    stempel: fetchAsBase64(ids.stempel_id, 200),
+    // Logo: server-side crop 150×110 agar file PNG multi-varian hanya tampil varian atas.
+    // Ukuran lebih besar sesuai referensi user (dominan di kop surat).
+    logo:    fetchAsBase64(ids.logo_id,    '150-h110-c'),
+    ttd:     fetchAsBase64(ids.ttd_id,     400),
+    stempel: fetchAsBase64(ids.stempel_id, 400),
     color:   color,
   };
 }
@@ -169,24 +169,23 @@ function _baseCss() {
  * @private
  */
 function _kop(assets, company) {
-  // Logo sudah di-crop server-side ke tepat 90×65 via thumbnail sz=w90-h65-c.
-  // Tidak perlu CSS overflow/object-fit — langsung embed dengan dimensi eksplisit.
+  // Logo 150x110 (server-side crop via sz=w150-h110-c) sesuai referensi user.
   var logoSrc = assets.logo
-    ? '<img src="' + assets.logo + '" width="90" height="65" style="display:block;vertical-align:top;">'
-    : '<div style="width:90px;height:65px;background:#eee;display:block;"></div>';
+    ? '<img src="' + assets.logo + '" width="150" height="110" style="display:block;vertical-align:top;">'
+    : '<div style="width:150px;height:110px;background:#eee;display:block;"></div>';
 
   return [
-    '<table style="width:100%;margin-bottom:0;">',
+    '<table style="width:100%;margin-bottom:0;border-collapse:collapse;">',
     '<tr>',
-    '<td style="width:100px;padding:0 12px 0 0;vertical-align:middle;">' + logoSrc + '</td>',
-    '<td class="kop-td-info" style="vertical-align:middle;">',
-    '<div class="kop-nama">' + _esc(company.name || '') + '</div>',
-    '<div class="kop-alamat">' + _esc(company.address || '') + '</div>',
-    '<div class="kop-alamat">Telp: ' + _esc(company.phone || '') + ' &nbsp;|&nbsp; Email: ' + _esc(company.email || '') + '</div>',
+    '<td style="width:160px;padding:0 14px 0 0;vertical-align:middle;">' + logoSrc + '</td>',
+    '<td style="vertical-align:middle;">',
+    '<div style="font-size:14pt;font-weight:bold;color:#C40000;text-transform:uppercase;line-height:1.2;">' + _esc(company.name || '') + '</div>',
+    '<div style="font-size:9.5pt;color:#333;margin-top:4px;">' + _esc(company.address || '') + '</div>',
+    '<div style="font-size:9.5pt;color:#333;margin-top:2px;">Telp: ' + _esc(company.phone || '') + ' &nbsp;|&nbsp; Email: ' + _esc(company.email || '') + '</div>',
     '</td>',
     '</tr>',
     '</table>',
-    '<hr class="divider">',
+    '<hr class="divider" style="border:0;border-top:2.5px solid #C40000;margin:10px 0 18px;">',
   ].join('');
 }
 
@@ -197,44 +196,44 @@ function _kop(assets, company) {
  * @private
  */
 function _signature(assets, company, placeDate, docNumber, qrDataUri) {
-  // Proporsi:
-  // - TTD: 130x55 (rasio landscape ~2.4:1, seperti tanda tangan asli)
-  // - Stempel: 95x95 (bujursangkar, sedikit lebih besar dari TTD height)
-  // - QR: 90x90 (rapi di kanan)
-  // Overlap TTD dan stempel via negatif margin agar stempel menutup sebagian TTD (realistic)
+  // Proporsi sesuai referensi Google Doc user:
+  // - TTD: 180x100 (dominan, landscape)
+  // - Stempel: 150x110 (side-by-side dengan TTD, bukan overlap)
+  // - QR: 100x100 di pojok kanan bawah halaman (terpisah dari TTD block)
   var ttdSrc = assets.ttd
-    ? '<img src="' + assets.ttd + '" width="130" height="55" style="display:block;">'
+    ? '<img src="' + assets.ttd + '" width="180" height="100" style="display:block;">'
     : '';
   var stempelSrc = assets.stempel
-    ? '<img src="' + assets.stempel + '" width="95" height="95" style="display:block;">'
+    ? '<img src="' + assets.stempel + '" width="150" height="110" style="display:block;">'
     : '';
 
   var qrSrc = qrDataUri
-    ? '<img src="' + qrDataUri + '" width="90" height="90" style="display:block;margin-left:auto;">'
+    ? '<img src="' + qrDataUri + '" width="100" height="100" style="display:block;margin-left:auto;">'
     : '';
 
   return [
-    '<table class="sig-wrap" style="width:100%;page-break-inside:avoid;margin-top:20px;">',
-    '<tr>',
-    '<!-- KIRI: TTD + Stempel -->',
-    '<td class="sig-left" style="width:60%;vertical-align:top;padding-right:8px;">',
-    '<p style="margin:0 0 3px 0;">' + _esc(placeDate) + '</p>',
+    '<div style="page-break-inside:avoid;margin-top:24px;">',
+    // Blok signature — kiri saja (tidak dua kolom lagi)
+    '<p style="text-align:right;margin:0 0 14px 0;">' + _esc(placeDate) + '</p>',
+    '<p style="margin:0 0 2px 0;">Pimpinan Perusahaan,</p>',
     '<p style="font-weight:bold;margin:0 0 4px 0;">' + _esc(company.name || '') + '</p>',
-    // Table TTD+stempel: stempel overlap TTD sekitar 30% via negative margin
-    '<table style="width:auto;border-collapse:collapse;border:0;margin:2px 0 0 0;">',
+    // TTD dan Stempel side-by-side dalam mini-table
+    '<table style="width:auto;border-collapse:collapse;border:0;margin:0;">',
     '<tr>',
     '<td style="vertical-align:middle;padding:0;">' + ttdSrc + '</td>',
-    '<td style="vertical-align:middle;padding:0 0 0 -30px;">' + stempelSrc + '</td>',
+    '<td style="vertical-align:middle;padding:0 0 0 8px;">' + stempelSrc + '</td>',
     '</tr>',
     '</table>',
-    '<p style="font-weight:bold;margin:0;">' + _esc(company.director_name || '') + '</p>',
-    '<p style="font-size:9.5pt;color:#555;margin:0;">' + _esc(company.director_title || '') + '</p>',
-    '</td>',
-    '<!-- KANAN: QR Code -->',
-    '<td class="sig-right" style="width:40%;vertical-align:bottom;text-align:right;">',
+    '<p style="font-weight:bold;text-decoration:underline;margin:2px 0 0 0;">' + _esc(company.director_name || '') + '</p>',
+    '<p style="font-weight:bold;margin:0;">' + _esc(company.director_title || '') + '</p>',
+    '</div>',
+    // QR Code — di pojok kanan bawah, terpisah dari signature block
+    '<table style="width:100%;margin-top:30px;border-collapse:collapse;">',
+    '<tr>',
+    '<td style="text-align:right;vertical-align:bottom;">',
     qrSrc,
-    '<p class="qr-label" style="margin:2px 0 0 0;">Scan untuk verifikasi dokumen</p>',
-    '<p class="qr-label" style="font-size:7.5pt;margin:0;">' + _esc(docNumber) + '</p>',
+    '<p style="font-size:8pt;color:#999;margin:2px 0 0 0;">Scan untuk verifikasi dokumen</p>',
+    '<p style="font-size:7.5pt;color:#999;margin:0;">' + _esc(docNumber) + '</p>',
     '</td>',
     '</tr>',
     '</table>',
@@ -651,11 +650,15 @@ function htmlToPdf(htmlContent, fileName, folderId) {
       var body   = gasDoc.getBody();
       // 25mm ≈ 70.87 points
       body.setMarginTop(70.87).setMarginBottom(72).setMarginLeft(70.87).setMarginRight(70.87);
-      // Paksa dimensi logo (elemen gambar pertama = logo kop) ke 90×65.
-      // Ini sebagai safety net jika server-side crop belum sempurna.
+      // Paksa dimensi gambar sesuai proporsi target (safety net setelah HTML conversion):
+      // - imgs[0] = logo kop → 150x110
+      // - imgs[1] = TTD → 180x100 (landscape)
+      // - imgs[2] = Stempel → 150x110 (bujursangkar dominan)
+      // - imgs[3] = QR code → 100x100
       var imgs = body.getImages();
-      if (imgs.length > 0) {
-        imgs[0].setWidth(90).setHeight(65);
+      var dims = [[150,110],[180,100],[150,110],[100,100]];
+      for (var i = 0; i < imgs.length && i < dims.length; i++) {
+        try { imgs[i].setWidth(dims[i][0]).setHeight(dims[i][1]); } catch (_) {}
       }
       // Hapus semua border table — Google Docs HTML converter default menambah border 1px
       // walau CSS border-collapse:collapse diset. Set border width 0 pada semua table.
