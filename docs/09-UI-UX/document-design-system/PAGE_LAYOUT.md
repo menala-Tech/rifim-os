@@ -1,4 +1,4 @@
-# PAGE_LAYOUT.md — RIFIM Group DDS v2.0
+﻿# PAGE_LAYOUT.md — RIFIM Group DDS v2.0
 _(Berlaku untuk PT. RIFIM Internasional Gemilang, Menala, dan Lailan — 1 sistem desain, aset berbeda per perusahaan)_
 
 ## 1. Ukuran Halaman

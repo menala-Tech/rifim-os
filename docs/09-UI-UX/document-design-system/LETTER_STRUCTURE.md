@@ -1,46 +1,66 @@
-# LETTER_STRUCTURE.md — RIFIM Group DDS v2.0
+﻿# LETTER_STRUCTURE.md — RIFIM Group DDS v2.1
 
 ## 1. Format Penomoran Dokumen
-Tidak berubah dari sebelumnya (mengikuti sistem live RIFIM OS):
 ```
-{nomor_urut}/RIFIM/{KODE_JENIS}/{bulan_romawi}/{tahun}
+{nomor_urut}/{PREFIX_ENTITAS}/{KODE_JENIS}/{bulan_romawi}/{tahun}
 ```
-Untuk Menala dan Lailan, ganti `RIFIM` dengan kode entitas yang
-bersangkutan (mis. `MENALA`, `LAILAN`) — konvensi lain tetap sama.
+Contoh: `001/RIFIM/SURAT/VII/2026`
 
-## 2. Struktur Resmi Surat (URUTAN WAJIB, TIDAK BOLEH DIUBAH)
-1. Header/letterhead (lihat [HEADER_SYSTEM.md](./HEADER_SYSTEM.md))
-2. Nomor
-3. Lampiran
-4. Perihal
-5. (baris kosong)
-6. Kepada Yth.
-7. Nama Perusahaan/Penerima
-8. Alamat / Di Tempat
-9. (baris kosong)
-10. "Dengan hormat,"
-11. Isi (body)
-12. Paragraf penutup
-13. "Hormat kami,"
-14. Nama Perusahaan
-15. Tanda tangan (lihat [SIGNATURE_SYSTEM.md](./SIGNATURE_SYSTEM.md))
-16. Nama
-17. Jabatan
-18. Footer (lihat [FOOTER_SYSTEM.md](./FOOTER_SYSTEM.md))
+Prefix entitas (dikonfirmasi dari sheet `companies`, field `doc_prefix`):
+| Entitas | Prefix |
+|---|---|
+| PT. RIFIM Internasional Gemilang | `RIFIM` |
+| PT. Menala Internasional Gemilang | `MIG` |
+| CV. Lailan Kalilan Indonesia | `LAILAN` |
 
-## 3. Catatan Penting Soal Tanggal
-Spec resmi secara eksplisit melarang tanggal ditempatkan di sisi kanan,
-dan struktur baku di atas TIDAK menyertakan baris tanggal tersendiri.
-**Asumsi kerja** (perlu dikonfirmasi ke pemilik spec): tanggal ditulis
-rata kiri, sebagai bagian dari blok Nomor/Lampiran/Perihal (mis. baris
-tambahan "Batam, 19 Juli 2026" di atas atau di bawah blok Nomor), bukan
-disandingkan dengan tanda tangan seperti format surat Indonesia
-konvensional. **Konfirmasi posisi tanggal yang benar ke penulis spec
-sebelum diimplementasikan di engine**, supaya tidak salah tebak.
+- `nomor_urut` — 3 digit, reset ke 001 setiap awal tahun, per kombinasi
+  entitas + jenis dokumen (dikonfirmasi dari sheet `numbering_sequences`:
+  counter disimpan per `document_code` + `year` + `month`).
+- `KODE_JENIS` — salah satu dari: SURAT, ST, SIZ, SKT, BA, INV, KWT, PROP,
+  CP, MOU, PKS, SP1, SP2, SP3, PKWT, SPG, SMT, PHK, PI, FCO (lihat
+  [DDS_v1.0.md](./DDS_v1.0.md) §5 untuk katalog lengkap).
+- `bulan_romawi` — bulan pembuatan dalam angka Romawi (I–XII).
+- `tahun` — tahun 4 digit.
+- Nomor di-generate OTOMATIS oleh sistem saat dokumen di-generate, tidak
+  boleh diinput manual oleh user (mencegah duplikasi/race condition).
+
+## 2. Posisi Tanggal (dikonfirmasi — tidak lagi asumsi)
+Tanggal ditulis **rata kiri, sejajar/menyatu dengan blok Nomor Surat**
+(BUKAN rata kanan seperti surat konvensional Indonesia pada umumnya —
+sengaja beda, sesuai [TYPOGRAPHY.md](./TYPOGRAPHY.md) §5 yang melarang tanggal di kanan).
+Contoh penempatan:
+```
+Batam, 19 Juli 2026
+
+Nomor   : 001/RIFIM/SURAT/VII/2026
+Lampiran: 1 berkas
+Perihal : Penawaran Kerjasama
+```
+
+## 3. Struktur Resmi Surat (URUTAN WAJIB)
+1. Header/letterhead (lihat HEADER_SYSTEM.md)
+2. Tanggal & kota (lihat §2 di atas)
+3. Nomor
+4. Lampiran
+5. Perihal
+6. (baris kosong)
+7. Kepada Yth.
+8. Nama Perusahaan/Penerima
+9. Alamat / Di Tempat
+10. (baris kosong)
+11. "Dengan hormat,"
+12. Isi (body)
+13. Paragraf penutup
+14. "Hormat kami,"
+15. Nama Perusahaan
+16. Tanda tangan (lihat SIGNATURE_SYSTEM.md)
+17. Nama
+18. Jabatan
+19. Footer (lihat FOOTER_SYSTEM.md)
 
 ## 4. Aturan Tegas Lainnya
-- Nama penerima surat (poin 7): **tidak boleh bold**.
-- Nilai field Perihal (poin 4): **tidak boleh bold** (label "Perihal:"
+- Nama penerima surat (poin 8): **tidak boleh bold**.
+- Nilai field Perihal (poin 5): **tidak boleh bold** (label "Perihal:"
   boleh bold, isinya tidak).
 - Body surat selalu **justify**, tidak pernah center.
 - Tidak ada baris kosong berlebih di antara paragraf — spacing diatur
@@ -48,4 +68,4 @@ sebelum diimplementasikan di engine**, supaya tidak salah tebak.
 
 ## 5. Bahasa
 Bahasa Indonesia formal/baku untuk semua dokumen resmi, konsisten di
-ketiga entitas (RIFIM, Menala, Lailan).
+ketiga entitas (RIFIM, Menala/MIG, Lailan).

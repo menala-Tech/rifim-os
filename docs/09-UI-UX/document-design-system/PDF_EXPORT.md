@@ -1,4 +1,4 @@
-# PDF_EXPORT.md — RIFIM Group DDS v2.0
+﻿# PDF_EXPORT.md — RIFIM Group DDS v2.0
 
 ## 1. Kualitas Output
 - **High Quality PDF**

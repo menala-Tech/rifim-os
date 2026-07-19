@@ -1,4 +1,4 @@
-# SIGNATURE_SYSTEM.md — RIFIM Group DDS v2.0
+﻿# SIGNATURE_SYSTEM.md — RIFIM Group DDS v2.0
 
 ## 1. Aset
 - `Signature.png` — tanda tangan digital (PNG transparan)

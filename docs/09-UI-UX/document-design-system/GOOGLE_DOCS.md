@@ -1,4 +1,4 @@
-# GOOGLE_DOCS.md — RIFIM DDS v1.0
+﻿# GOOGLE_DOCS.md — RIFIM DDS v1.0
 
 ## 1. Konteks
 RIFIM OS menyediakan tombol "Buka Google Doc" di samping "Download PDF"

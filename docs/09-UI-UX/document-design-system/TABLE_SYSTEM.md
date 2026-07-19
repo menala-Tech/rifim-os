@@ -1,4 +1,4 @@
-# TABLE_SYSTEM.md — RIFIM Group DDS v2.0
+﻿# TABLE_SYSTEM.md — RIFIM Group DDS v2.0
 
 ## 1. Style Umum (Clean Enterprise Table)
 - Header: **bold, teks putih, background dark gray** (BUKAN warna brand

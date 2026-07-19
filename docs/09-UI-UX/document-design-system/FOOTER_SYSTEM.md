@@ -1,4 +1,4 @@
-# FOOTER_SYSTEM.md — RIFIM Group DDS v2.0
+﻿# FOOTER_SYSTEM.md — RIFIM Group DDS v2.0
 
 ## 1. Aset per Perusahaan
 | Perusahaan | File |
