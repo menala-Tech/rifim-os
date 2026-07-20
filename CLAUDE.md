@@ -401,6 +401,16 @@ Daftar GAS project yang terhubung ke RIFIM OS. Gunakan Script ID ini saat `clasp
 | RIFIM OS (Main) | `1IK8-2anrxahce1X1MG7Bi3aGe6e-_4e3obanTRprT6brYSdla9rEYOxp` | `automation/apps-script/` | `raosMonitoringEngine.js`, `saldoEngine.js`, `staffAppApi.js` dll | `1jHeA-w1bM32S3-AU-ENN2UjiaCb4iLzRhaf4G7y4ozM` |
 | Pengisian Saldo | `1_V2BOS56ac1v0mzte2rfl3at4wmc31foeKoLddZ6SeYRhSc_B2icbcUz` | `C:\Projects\menala\rifim-isi-saldo\New folder\` (clasp-linked) | `MonitoringSaldo.gs`, `Main.gs`, `Matching.gs` dll | `1T7gvlIPt2Un2mca43803oGpdMakaFuEUiSF7Z_KeXqU` |
 
+### Status Migrasi PWA Monitor Saldo & Koordinator (per 20 Jul 2026)
+
+Sebelumnya kedua PWA (`rifim-monitor-saldo.vercel.app` & `rifim-monitor-koordinator.vercel.app`) point ke RIFIM OS `AKfycbzzK75…ZZtw`, tapi endpoint hanya balikin default `{"success":true,"app":"RIFIM OS…","status":"running"}` — bukan data monitoring. Karena RIFIM OS masih dalam pengembangan dan data saldo aktual ada di spreadsheet Pengisian Saldo, kedua PWA dimigrasikan ke endpoint Pengisian Saldo `AKfycbzq…omm` @52 (backend `doGetJSONSaldo` + `doGetJSONKoordinator` di `Main.gs`). Verified: data cabang muncul.
+
+Konsekuensi untuk RIFIM OS:
+
+- **3 trigger saldo/potongan dinonaktifkan** (`cekSLASaldo`, `cekSLASaldoPWA`, `cekSLAPotongan`) supaya tidak kirim WA duplikat ke grup cabang yang sama (`_MON_WA_SALDO_GRUP` = mirror `SAL_WA_GROUP_PER_CABANG` Pengisian Saldo). Setup ulang (`setupPotonganTriggers` dll) HANYA setelah RIFIM OS live dengan token & grup Fonnte terpisah.
+- Fungsi backend saldo/potongan (`refreshMonitoringSaldo`, `cekSLASaldo`, `saldoEngine.js`, dll) TETAP ADA di kode — tinggal pasang trigger ulang saat siap live.
+- Sheet `Form Input Saldo PWA` & `Form Input Saldo AIST` di spreadsheet RIFIM OS akan tetap kosong sampai PWA staff RIFIM OS (via `staffSaldoSubmit`) di-release. Selama itu, PWA staff isi saldo tetap di `isisaldo.vercel.app` (project Pengisian Saldo → `Jawaban Formulir 1`).
+
 ### Vercel PWA — Endpoint Map (per 20 Jul 2026)
 
 | PWA | Vercel URL | GAS Endpoint (deployment) | Project GAS |
