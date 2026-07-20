@@ -28,6 +28,15 @@ Implementasi engine dokumen: [automation/apps-script/htmlTemplateEngine.js](auto
 
 ## Integration Rules — SSoT Data Contract (MUTLAK, BACA PERTAMA)
 
+## AI API Integration (Prompt Caching)
+
+Untuk pengembangan Modul AI Assistant atau integrasi Claude API via Google Apps Script (Sprint 3+), WAJIB menerapkan **Cache Otomatis (Prompt Caching)** guna menghemat pengeluaran biaya token input hingga 90% untuk dokumen operasional statis (SOP, pedoman).
+
+**Standar Implementasi:**
+1. Header permintaan *fetch* WAJIB menyertakan flag beta: `"anthropic-beta": "prompt-caching-2024-07-31"`.
+2. Parameter `"cache_control": {"type": "ephemeral"}` WAJIB disisipkan pada objek `system` atau `messages` yang memuat teks konteks berat/panjang.
+3. Dokumen referensi operasional harus diposisikan di awal permintaan agar sistem AI dapat mengenali *hash* dan menggunakan skema harga *Read* ($0,20 / MTok) pada eksekusi skrip selanjutnya.
+
 Empat aturan ini WAJIB diterapkan pada SETIAP kode yang menyentuh data
 (PWA payload, Modul Backend, GAS). Detail lengkap: `PROJECT_RULES.md`
 seksi **Integration Rules** (Rule 40–47). Utilitas kanonik:
@@ -387,10 +396,27 @@ drivers (external) →    sheet "Database Driver External"
 
 Daftar GAS project yang terhubung ke RIFIM OS. Gunakan Script ID ini saat `clasp push` ke project tertentu.
 
-| Nama Project | Script ID | Lokasi Lokal | File Utama |
+| Nama Project | Script ID | Lokasi Lokal | File Utama | Spreadsheet Bound |
+|---|---|---|---|---|
+| RIFIM OS (Main) | `1IK8-2anrxahce1X1MG7Bi3aGe6e-_4e3obanTRprT6brYSdla9rEYOxp` | `automation/apps-script/` | `raosMonitoringEngine.js`, `saldoEngine.js`, `staffAppApi.js` dll | `1jHeA-w1bM32S3-AU-ENN2UjiaCb4iLzRhaf4G7y4ozM` |
+| Pengisian Saldo | `1_V2BOS56ac1v0mzte2rfl3at4wmc31foeKoLddZ6SeYRhSc_B2icbcUz` | `C:\Projects\menala\rifim-isi-saldo\New folder\` (clasp-linked) | `MonitoringSaldo.gs`, `Main.gs`, `Matching.gs` dll | `1T7gvlIPt2Un2mca43803oGpdMakaFuEUiSF7Z_KeXqU` |
+
+### Vercel PWA — Endpoint Map (per 20 Jul 2026)
+
+| PWA | Vercel URL | GAS Endpoint (deployment) | Project GAS |
 |---|---|---|---|
-| RIFIM OS (Main) | `1IK8-2anrxahce1X1MG7Bi3aGe6e-_4e3obanTRprT6brYSdla9rEYOxp` | `automation/apps-script/` | `raosMonitoringEngine.js` dll |
-| Pengisian Saldo | `1_V2BOS56ac1v0mzte2rfl3at4wmc31foeKoLddZ6SeYRhSc_B2icbcUz` | `C:\Users\ADMIN\Documents\RIFIM\RIFIM\ADM Surat\isi saldo` | `MonitoringSaldo.js` |
+| Isi Saldo Staff | `isisaldo.vercel.app/?cabang=…&staff=…` | `AKfycbzq…omm` @52 | **Pengisian Saldo** |
+| Admin Isi Saldo | `isisaldo.vercel.app/admin` | `AKfycbzq…omm` @52 (sama) | **Pengisian Saldo** |
+| Monitor Saldo | `rifim-monitor-saldo.vercel.app` | `AKfycbzzK75…ZZtw` @52 "V55" | **RIFIM OS (Main)** |
+| Monitor Koordinator | `rifim-monitor-koordinator.vercel.app` | `AKfycbzzK75…ZZtw` @52 "V55" (sama) | **RIFIM OS (Main)** |
+
+**Konsekuensi penting:**
+- Perubahan pada `Pengisian Saldo` (Matching.gs, MonitoringSaldo.gs, dll) **TIDAK berlaku** untuk Monitor Saldo/Koordinator. Sebaliknya juga.
+- 2 project GAS punya fungsi dengan **nama sama tapi logika berbeda** (`refreshMonitoringSaldo`, `cekSLASaldo`). Selalu pastikan folder/scriptId yang benar sebelum edit.
+- Sheet sumber data saldo juga berbeda:
+  - Pengisian Saldo → `Jawaban Formulir 1` (PWA staff submit)
+  - RIFIM OS → `Form Input Saldo PWA` (PWA staff submit via `staffSaldoSubmit`) + `Form Input Saldo AIST` (admin paste dari Maxim)
+- Konfigurasi WA group per cabang **di-duplicate manual** — `SAL_WA_GROUP_PER_CABANG` (Pengisian Saldo/MonitoringSaldo.gs) ↔ `_MON_WA_SALDO_GRUP` (RIFIM OS/raosMonitoringEngine.js). Kalau salah satu diedit, yang lain harus di-sync manual.
 
 ### Cara Push ke GAS Project Tertentu
 
