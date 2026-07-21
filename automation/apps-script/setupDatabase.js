@@ -120,11 +120,27 @@ function _setupDocumentsSheet(ss) {
 // SHEET 2: numbering_sequences
 // ─────────────────────────────────────────────
 
+// Kode entitas resmi RIFIM Group (sinkron dengan sheet companies.doc_prefix).
+// Setiap kombinasi (document_code, prefix) punya counter sendiri per periode
+// (LETTER_STRUCTURE.md §1 — "reset per kombinasi entitas + jenis dokumen").
+var NUMBERING_PREFIXES = ['RIFIM', 'MIG', 'LAILAN'];
+
+// Kode jenis dokumen resmi (DDS §5 katalog 20 jenis).
+var NUMBERING_DOC_CODES = [
+  'SURAT','ST','SIZ','SKT',          // Korespondensi
+  'INV','KWT',                        // Keuangan
+  'PROP','CP','MOU','PKS',            // Kerjasama
+  'SP1','SP2','SP3','PKWT',           // HR/SDM
+  'SPG','SMT','PHK','PI',
+  'BA','FCO',                         // Operasional
+];
+
 function _setupNumberingSheet(ss) {
   var sheet = ss.getSheetByName('numbering_sequences') || ss.insertSheet('numbering_sequences');
   sheet.clear();
 
-  var headers = ['document_code', 'year', 'month', 'month_roman', 'last_sequence'];
+  // Skema 6-kolom dengan prefix sebagai bagian composite key.
+  var headers = ['document_code', 'prefix', 'year', 'month', 'month_roman', 'last_sequence'];
   var headerRange = sheet.getRange(1, 1, 1, headers.length);
   headerRange.setValues([headers]);
   headerRange.setBackground('#C40000');
@@ -132,41 +148,147 @@ function _setupNumberingSheet(ss) {
   headerRange.setFontWeight('bold');
   headerRange.setFontSize(10);
 
-  sheet.setColumnWidth(1, 140);
-  sheet.setColumnWidth(2, 80);
-  sheet.setColumnWidth(3, 80);
-  sheet.setColumnWidth(4, 120);
-  sheet.setColumnWidth(5, 130);
+  sheet.setColumnWidth(1, 140); // document_code
+  sheet.setColumnWidth(2, 100); // prefix
+  sheet.setColumnWidth(3, 80);  // year
+  sheet.setColumnWidth(4, 80);  // month
+  sheet.setColumnWidth(5, 120); // month_roman
+  sheet.setColumnWidth(6, 130); // last_sequence
   sheet.setFrozenRows(1);
 
-  // Init sequences untuk semua 20 jenis dokumen
   var MONTHS_ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
   var now   = new Date();
   var year  = now.getFullYear();
   var month = now.getMonth() + 1;
   var roman = MONTHS_ROMAN[now.getMonth()];
 
-  var codes = [
-    'SURAT','ST','SIZ','SKT',          // Korespondensi
-    'INV','KWT',                        // Keuangan
-    'PROP','CP','MOU','PKS',            // Kerjasama
-    'SP1','SP2','SP3','PKWT',           // HR/SDM
-    'SPG','SMT','PHK','PI',
-    'BA','FCO',                         // Operasional
-  ];
-
-  var rows = codes.map(function(code) {
-    return [code, year, month, roman, 0];
+  // Cartesian product: 20 kode × 3 entitas = 60 baris awal.
+  var rows = [];
+  NUMBERING_DOC_CODES.forEach(function(code) {
+    NUMBERING_PREFIXES.forEach(function(prefix) {
+      rows.push([code, prefix, year, month, roman, 0]);
+    });
   });
 
-  sheet.getRange(2, 1, rows.length, 5).setValues(rows);
+  sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
 
-  // Format last_sequence as number
-  sheet.getRange(2, 5, rows.length, 1)
+  // Format last_sequence sebagai angka 3 digit
+  sheet.getRange(2, 6, rows.length, 1)
     .setNumberFormat('000')
     .setHorizontalAlignment('center');
 
-  Logger.log('✅ Sheet numbering_sequences selesai (' + codes.length + ' kode dokumen)');
+  Logger.log('✅ Sheet numbering_sequences selesai (' +
+    NUMBERING_DOC_CODES.length + ' kode × ' + NUMBERING_PREFIXES.length + ' entitas = ' +
+    rows.length + ' baris)');
+}
+
+/**
+ * Migrasi sheet numbering_sequences dari skema lama (5 kolom, per document_code saja)
+ * ke skema baru (6 kolom, composite key document_code + prefix).
+ *
+ * Aturan migrasi (idempoten — bisa dijalankan berulang kali dengan aman):
+ *   - Kalau kolom 'prefix' sudah ada, cukup tambah baris untuk entitas yang belum lengkap.
+ *   - Kalau kolom 'prefix' belum ada, insert kolom baru di posisi B, lalu:
+ *     * Baris existing di-tag 'RIFIM' (backward compat — semua nomor lama pakai RIFIM).
+ *     * Baris baru dibuat untuk MIG dan LAILAN dengan last_sequence = 0.
+ *
+ * Jalankan SEKALI dari GAS Editor setelah deploy fix #3.6:
+ *   migrateNumberingSequencesToPerEntity()
+ */
+function migrateNumberingSequencesToPerEntity() {
+  var ss    = _getDB();
+  var sheet = ss.getSheetByName('numbering_sequences');
+  if (!sheet) throw new Error('Sheet numbering_sequences tidak ditemukan.');
+
+  // Guard concurrency — sheet ini di-mutate.
+  return _gasWithLock(function() {
+    var lastCol = sheet.getLastColumn();
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+                       .map(function(h) { return String(h).trim(); });
+    var codeIdx   = headers.indexOf('document_code');
+    var prefixIdx = headers.indexOf('prefix');
+    var yearIdx   = headers.indexOf('year');
+    var monthIdx  = headers.indexOf('month');
+    var romanIdx  = headers.indexOf('month_roman');
+    var seqIdx    = headers.indexOf('last_sequence');
+
+    if (codeIdx < 0 || yearIdx < 0 || monthIdx < 0 || romanIdx < 0 || seqIdx < 0) {
+      throw new Error('Sheet numbering_sequences: kolom wajib tidak lengkap. Header: ' + headers.join(', '));
+    }
+
+    // Fase 1 — kalau kolom prefix belum ada, insert di posisi B & tag existing sebagai RIFIM.
+    if (prefixIdx < 0) {
+      sheet.insertColumnAfter(codeIdx + 1); // kolom baru di sebelah kanan document_code
+      prefixIdx = codeIdx + 1;
+      sheet.getRange(1, prefixIdx + 1).setValue('prefix')
+           .setBackground('#C40000').setFontColor('#FFFFFF').setFontWeight('bold').setFontSize(10);
+      sheet.setColumnWidth(prefixIdx + 1, 100);
+
+      // Tag semua row lama dengan 'RIFIM' (backward compat).
+      var oldLastRow = sheet.getLastRow();
+      if (oldLastRow > 1) {
+        var tagRange = sheet.getRange(2, prefixIdx + 1, oldLastRow - 1, 1);
+        var tagVals  = [];
+        for (var t = 0; t < oldLastRow - 1; t++) tagVals.push(['RIFIM']);
+        tagRange.setValues(tagVals);
+      }
+
+      Logger.log('Migrasi: kolom prefix ditambahkan, semua row existing di-tag RIFIM.');
+    }
+
+    // Refresh header setelah kemungkinan insert kolom di atas.
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+                   .map(function(h) { return String(h).trim(); });
+    codeIdx   = headers.indexOf('document_code');
+    prefixIdx = headers.indexOf('prefix');
+    yearIdx   = headers.indexOf('year');
+    monthIdx  = headers.indexOf('month');
+    romanIdx  = headers.indexOf('month_roman');
+    seqIdx    = headers.indexOf('last_sequence');
+    var ncol  = sheet.getLastColumn();
+
+    // Fase 2 — tambah row untuk entitas yang belum lengkap.
+    var MONTHS = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+    var now    = new Date();
+    var year   = now.getFullYear();
+    var month  = now.getMonth() + 1;
+    var roman  = MONTHS[now.getMonth()];
+
+    var data = sheet.getDataRange().getValues();
+    var existing = {}; // "code|prefix" → true
+    for (var i = 1; i < data.length; i++) {
+      var c = String(data[i][codeIdx] || '').trim();
+      var p = String(data[i][prefixIdx] || '').trim().toUpperCase();
+      if (c && p) existing[c + '|' + p] = true;
+    }
+
+    var toAdd = [];
+    NUMBERING_DOC_CODES.forEach(function(code) {
+      NUMBERING_PREFIXES.forEach(function(prefix) {
+        if (existing[code + '|' + prefix]) return;
+        var row = new Array(ncol).fill('');
+        row[codeIdx]   = code;
+        row[prefixIdx] = prefix;
+        row[yearIdx]   = year;
+        row[monthIdx]  = month;
+        row[romanIdx]  = roman;
+        row[seqIdx]    = 0;
+        toAdd.push(row);
+      });
+    });
+
+    if (toAdd.length > 0) {
+      var startRow = sheet.getLastRow() + 1;
+      sheet.getRange(startRow, 1, toAdd.length, ncol).setValues(toAdd);
+      // Format last_sequence di row baru
+      sheet.getRange(startRow, seqIdx + 1, toAdd.length, 1)
+           .setNumberFormat('000').setHorizontalAlignment('center');
+    }
+
+    Logger.log('Migrasi selesai. Row ditambahkan: ' + toAdd.length +
+               '. Total row sekarang: ' + (sheet.getLastRow() - 1));
+    return { success: true, rowsAdded: toAdd.length, totalRows: sheet.getLastRow() - 1 };
+  });
 }
 
 
@@ -313,24 +435,47 @@ function _setupDocTypesSheet(ss) {
 // UTILITY: Reset sequence bulan baru
 // ─────────────────────────────────────────────
 
+/**
+ * Reset last_sequence semua row ke 0 dan periode ke bulan/tahun sekarang.
+ * Bekerja untuk skema lama (5 kolom) maupun skema baru (6 kolom dengan prefix)
+ * — indeks kolom dibaca dari header, bukan hardcode.
+ *
+ * Dilindungi ScriptLock — tidak boleh race dengan generateDocumentNumber().
+ */
 function resetMonthlySequences() {
   var ss     = SpreadsheetApp.getActiveSpreadsheet();
   var sheet  = ss.getSheetByName('numbering_sequences');
-  var MONTHS = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
-  var now    = new Date();
-  var year   = now.getFullYear();
-  var month  = now.getMonth() + 1;
-  var roman  = MONTHS[now.getMonth()];
-  var data   = sheet.getDataRange().getValues();
+  if (!sheet) throw new Error('Sheet numbering_sequences tidak ditemukan.');
 
-  for (var i = 1; i < data.length; i++) {
-    sheet.getRange(i+1, 2).setValue(year);
-    sheet.getRange(i+1, 3).setValue(month);
-    sheet.getRange(i+1, 4).setValue(roman);
-    sheet.getRange(i+1, 5).setValue(0);
-  }
+  return _gasWithLock(function() {
+    var MONTHS = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+    var now    = new Date();
+    var year   = now.getFullYear();
+    var month  = now.getMonth() + 1;
+    var roman  = MONTHS[now.getMonth()];
 
-  Logger.log('Sequences direset untuk ' + roman + '/' + year);
+    var lastCol  = sheet.getLastColumn();
+    var headers  = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+                        .map(function(h) { return String(h).trim(); });
+    var yearIdx  = headers.indexOf('year');
+    var monthIdx = headers.indexOf('month');
+    var romanIdx = headers.indexOf('month_roman');
+    var seqIdx   = headers.indexOf('last_sequence');
+    if (yearIdx < 0 || monthIdx < 0 || romanIdx < 0 || seqIdx < 0) {
+      throw new Error('Sheet numbering_sequences: kolom wajib tidak lengkap. Header: ' + headers.join(', '));
+    }
+
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      sheet.getRange(i + 1, yearIdx  + 1).setValue(year);
+      sheet.getRange(i + 1, monthIdx + 1).setValue(month);
+      sheet.getRange(i + 1, romanIdx + 1).setValue(roman);
+      sheet.getRange(i + 1, seqIdx   + 1).setValue(0);
+    }
+
+    Logger.log('Sequences direset untuk ' + roman + '/' + year +
+               ' (' + (data.length - 1) + ' baris)');
+  });
 }
 
 
