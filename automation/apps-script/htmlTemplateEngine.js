@@ -437,6 +437,9 @@ function _tplSurat(d, assets, company) {
   return [
     _kop(assets, company),
     '<p class="doc-title">' + _esc(d.DOCUMENT_TITLE) + '</p>',
+    // FIX #4.2: LETTER_STRUCTURE §2 & §3 — Tanggal & kota rata KIRI, sejajar/menyatu
+    // dengan blok Nomor Surat, DI ATAS Nomor. TYPOGRAPHY §5 melarang tanggal di kanan.
+    '<p style="text-align:left;margin:0 0 12pt 0;">' + _esc(d.PLACE_DATE || '') + '</p>',
     // Info header (Nomor/Lampiran/Perihal) — label column width 140px, borderless
     '<table class="info" style="width:auto;">',
     '<tr>',
@@ -447,9 +450,10 @@ function _tplSurat(d, assets, company) {
     '<td>: ' + _esc(d.ATTACHMENT || '-') + '</td>',
     '</tr><tr>',
     '<td style="white-space:nowrap;">Perihal</td>',
+    // LETTER_STRUCTURE §4: nilai field Perihal TIDAK boleh bold (label boleh).
     '<td>: ' + _esc(d.SUBJECT) + '</td>',
     '</tr></table>',
-    // Blank line via paragraph margin
+    // LETTER_STRUCTURE §4: nama penerima surat TIDAK boleh bold.
     '<p style="text-align:left;">Kepada Yth.<br>' +
       _esc(d.RECIPIENT_NAME || '') + '<br>' +
       _esc(d.RECIPIENT_ADDRESS || 'Di Tempat') + '</p>',
@@ -479,7 +483,8 @@ function _tplInvoice(d, assets, company) {
     '<td style="padding:3px 0;">: ' + _esc(d.DUE_DATE || '') + '</td>',
     '</tr><tr>',
     '<td style="padding:3px 0;white-space:nowrap;">Status Pembayaran</td>',
-    '<td style="padding:3px 0;">: <strong style="color:#C40000;">' + _esc(d.STATUS || 'BELUM LUNAS') + '</strong></td>',
+    // TYPOGRAPHY §5: warna body text selalu #000. Status disorot via bold + UPPERCASE.
+    '<td style="padding:3px 0;">: <strong>' + _esc(d.STATUS || 'BELUM LUNAS') + '</strong></td>',
     '</tr></table>',
     '<hr class="thin">',
     '<p class="section-title">DITAGIHKAN KEPADA</p>',
@@ -497,7 +502,8 @@ function _tplInvoice(d, assets, company) {
     '<td>: ' + _esc(d.TAX_AMOUNT || 'Rp 0') + '</td>',
     '</tr><tr>',
     '<td style="padding:3px 12px 3px 0;font-weight:bold;">GRAND TOTAL</td>',
-    '<td style="font-weight:bold;color:#C40000;font-size:12pt;">: ' + _esc(d.GRAND_TOTAL || '') + '</td>',
+    // TYPOGRAPHY §5: body text hitam. Emphasis via bold + size, bukan warna.
+    '<td style="font-weight:bold;font-size:12pt;">: ' + _esc(d.GRAND_TOTAL || '') + '</td>',
     '</tr></table>',
     '<hr class="thin">',
     '<p class="section-title">INFORMASI PEMBAYARAN</p>',
@@ -544,7 +550,8 @@ function _tplKwitansi(d, assets, company) {
     '<hr class="thin" style="margin:10px 0;">',
     '<table style="width:auto;margin-left:auto;"><tr>',
     '<td style="padding:3px 12px 3px 0;font-weight:bold;font-size:12pt;">JUMLAH</td>',
-    '<td style="font-size:12pt;font-weight:bold;color:#C40000;">: ' + _esc(d.AMOUNT || '') + '</td>',
+    // TYPOGRAPHY §5: body text hitam. Nominal disorot via bold + size, bukan warna.
+    '<td style="font-size:12pt;font-weight:bold;">: ' + _esc(d.AMOUNT || '') + '</td>',
     '</tr></table>',
     '<p style="font-size:9.5pt;margin-top:4px;">Terbilang: <em>' + _esc(d.AMOUNT_TEXT || '') + '</em></p>',
     '<hr class="thin">',
@@ -784,16 +791,20 @@ function buildDocumentHtml(docType, d, assets, company, qrDataUri) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Convert HTML string ke PDF, simpan ke folder Drive.
+ * Convert HTML string ke PDF BLOB (tanpa simpan ke Drive).
  * Metode: Upload sebagai Google Doc (Drive convert HTML→Doc), export PDF,
  * hapus temp Doc.
  *
+ * Dipisah dari htmlToPdf() agar bisa dipakai skenario pre-allocated file ID
+ * (lihat generateDocumentViaHtml — pra-alokasi PDF file agar QR bisa
+ *  merujuk balik ke URL PDF-nya sendiri sesuai QR_SYSTEM §2 & §5).
+ *
  * @param {string} htmlContent  - HTML dokumen lengkap
  * @param {string} fileName     - Nama file tanpa ekstensi
- * @param {string} folderId     - Drive folder ID tujuan
- * @returns {DriveFile} File PDF yang sudah tersimpan
+ * @returns {Blob} PDF blob siap dipakai `Drive.Files.update` atau `folder.createFile`
+ * @private
  */
-function htmlToPdf(htmlContent, fileName, folderId) {
+function _htmlToPdfBlob(htmlContent, fileName) {
   var htmlBlob = Utilities.newBlob(htmlContent, 'text/html', fileName + '.html');
 
   // Upload HTML → konversi ke Google Doc
@@ -863,16 +874,10 @@ function htmlToPdf(htmlContent, fileName, folderId) {
       gasDoc.saveAndClose();
     } catch (_) { /* non-fatal */ }
 
-    // Export sebagai PDF
-    var pdfBlob = DriveApp.getFileById(tempDoc.id)
+    // Export sebagai PDF blob
+    return DriveApp.getFileById(tempDoc.id)
       .getAs(MimeType.PDF)
       .setName(fileName + '.pdf');
-
-    // Simpan ke folder tujuan
-    var folder  = DriveApp.getFolderById(folderId);
-    var pdfFile = folder.createFile(pdfBlob);
-
-    return pdfFile;
 
   } finally {
     // Hapus temp Google Doc — gunakan DriveApp (lebih reliable dari Drive.Files.trash v2)
@@ -881,19 +886,44 @@ function htmlToPdf(htmlContent, fileName, folderId) {
 }
 
 /**
- * Generate QR code sebagai base64 data URI untuk embed di HTML.
- * @param {string} data - Konten QR (biasanya nomor dokumen + URL)
- * @returns {string} base64 data URI atau ''
+ * Convert HTML string ke PDF, simpan ke folder Drive.
+ * Wrapper thin di atas _htmlToPdfBlob() untuk backward compatibility —
+ * dipakai skenario simple (tanpa pre-allocation).
+ *
+ * @param {string} htmlContent  - HTML dokumen lengkap
+ * @param {string} fileName     - Nama file tanpa ekstensi
+ * @param {string} folderId     - Drive folder ID tujuan
+ * @returns {DriveFile} File PDF yang sudah tersimpan
  */
-function generateQrBase64(data) {
+function htmlToPdf(htmlContent, fileName, folderId) {
+  var pdfBlob = _htmlToPdfBlob(htmlContent, fileName);
+  return DriveApp.getFolderById(folderId).createFile(pdfBlob);
+}
+
+/**
+ * Generate QR code sebagai base64 data URI untuk embed di HTML.
+ * Menggunakan endpoint & parameter yang SAMA dengan generateQrImageUrl()
+ * di qrEngine.js — konsisten dengan QR_SYSTEM §2.
+ *
+ * @param {string} data - Konten QR (URL akses dokumen, sesuai QR_SYSTEM §5)
+ * @param {object} [ctx] - Context untuk error log (mis. { docNumber })
+ * @returns {string} base64 data URI atau '' jika gagal
+ */
+function generateQrBase64(data, ctx) {
   try {
-    var qrUrl  = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=4&data=' + encodeURIComponent(data);
+    var qrUrl  = generateQrImageUrl(data); // dari qrEngine.js — satu sumber format URL
     var resp   = UrlFetchApp.fetch(qrUrl, { muteHttpExceptions: true });
-    if (resp.getResponseCode() !== 200) return '';
+    if (resp.getResponseCode() !== 200) {
+      // Non-blocking, tetap log sebagai warning (QR_SYSTEM §7)
+      try { _gasLogWarn('htmlTemplateEngine', 'generateQrBase64',
+        'QR service HTTP ' + resp.getResponseCode(), ctx || { data: String(data).substring(0, 200) }); } catch (_) {}
+      return '';
+    }
     var blob   = resp.getBlob();
     return 'data:image/png;base64,' + Utilities.base64Encode(blob.getBytes());
   } catch (e) {
-    Logger.log('generateQrBase64 error: ' + e.message);
+    try { _gasLogWarn('htmlTemplateEngine', 'generateQrBase64', e.message,
+      ctx || { data: String(data).substring(0, 200) }); } catch (_) {}
     return '';
   }
 }
@@ -931,26 +961,70 @@ function generateDocumentViaHtml(input, config, company, docNumber, placeholderD
     director_title: input.directorTitle || (company && company.director_title) || config['director_title'] || '',
   };
 
-  // 3. Generate QR code (gunakan nomor dokumen sebagai konten)
-  var qrData    = docNumber + ' | RIFIM OS';
-  var qrBase64  = generateQrBase64(qrData);
-
-  // 4. Build HTML
-  var htmlContent = buildDocumentHtml(docType, placeholderData, assets, co, qrBase64);
-
-  // 5. Tentukan folder PDF tujuan
+  // 3. Tentukan folder PDF tujuan
   var folderId = HTML_TPL_FOLDERS[docType] || '1XZDBwNNDrcLquTaKB-1cbegz7rniXdgK';
 
-  // 6. Convert HTML → PDF
-  var pdfFile = htmlToPdf(htmlContent, docNumber, folderId);
+  // 4. PRE-ALLOCATE PDF FILE — reserve ID + URL sebelum generate content.
+  //    Tujuan: QR yang di-embed di PDF bisa POINT ke URL PDF-nya sendiri
+  //    (memenuhi QR_SYSTEM §2 "QR mengarah LANGSUNG ke dokumen" + §5 rekomendasi).
+  var folder      = DriveApp.getFolderById(folderId);
+  var placeholder = Utilities.newBlob('%PDF-1.4\n%%EOF\n', 'application/pdf', docNumber + '.pdf');
+  var pdfFile     = folder.createFile(placeholder);
+  var pdfFileId   = pdfFile.getId();
+  var pdfUrl      = pdfFile.getUrl();
 
-  // Simpan record ke sheet documents
+  // 5. Generate QR — target = URL PDF sungguhan
+  //    - qrImageUrl : URL image dari api.qrserver.com (untuk disimpan di sheet qr_url)
+  //    - qrBase64   : data URI base64 (untuk di-embed di HTML sebelum convert PDF)
+  var qrImageUrl = '';
+  var qrBase64   = '';
+  try {
+    qrImageUrl = generateQrImageUrl(pdfUrl);
+    qrBase64   = generateQrBase64(pdfUrl, { docNumber: docNumber });
+    // Kalau fetch gagal (qrBase64 kosong), jangan simpan qrImageUrl sepihak —
+    // konsistensi antara isi PDF (tanpa QR) dan sheet qr_url (§7 fallback).
+    if (!qrBase64) qrImageUrl = '';
+  } catch (qrErr) {
+    try { _gasLogWarn('htmlTemplateEngine', 'generateQr', qrErr.message,
+      { docNumber: docNumber, targetUrl: pdfUrl }); } catch (_) {}
+    qrImageUrl = ''; qrBase64 = '';
+  }
+
+  // 6. Build HTML dengan QR base64 (kalau berhasil)
+  var htmlContent = buildDocumentHtml(docType, placeholderData, assets, co, qrBase64);
+
+  // 7. Generate PDF blob via HTML → Google Doc → PDF export
+  var pdfBlob = _htmlToPdfBlob(htmlContent, docNumber);
+
+  // 8. Update pre-allocated file content (ID + URL tidak berubah)
+  //    Fallback: kalau update gagal, trash placeholder dan createFile baru
+  //    → ID & URL berubah, dan qr_url perlu di-regenerate agar konsisten.
+  var finalPdfUrl    = pdfUrl;
+  var finalPdfFileId = pdfFileId;
+  try {
+    Drive.Files.update({ title: docNumber }, pdfFileId, pdfBlob);
+  } catch (updErr) {
+    _gasLogError('htmlTemplateEngine', 'updatePdfContent', updErr, { docNumber: docNumber });
+    try { pdfFile.setTrashed(true); } catch (_) {}
+    var newPdf     = folder.createFile(pdfBlob.setName(docNumber + '.pdf'));
+    finalPdfFileId = newPdf.getId();
+    finalPdfUrl    = newPdf.getUrl();
+    // qrImageUrl skarang stale (point ke URL lama) — regenerate agar sheet konsisten
+    try {
+      qrImageUrl = qrBase64 ? generateQrImageUrl(finalPdfUrl) : '';
+    } catch (_) { qrImageUrl = ''; }
+  }
+
+  // 9. Simpan record ke sheet documents
   try {
     saveDocumentRecord({
       id:               _gasUuid(),
       document_number:  docNumber,
       document_type:    docType,
-      document_code:    companyCode,
+      // FIX #2.9: samakan semantik dengan pipeline gdocs (documentEngine.js:204)
+      // — document_code = kode jenis dokumen (SURAT/INV/dst), BUKAN kode entitas
+      // (entitas sudah terikut di docNumber sebagai prefix "RIFIM/MIG/LAILAN").
+      document_code:    docType,
       document_date:    placeholderData.DOCUMENT_DATE || _gasToday('short'),
       recipient_name:   input.recipientName  || '',
       recipient_address: input.recipientAddress || '',
@@ -959,8 +1033,9 @@ function generateDocumentViaHtml(input, config, company, docNumber, placeholderD
       body_summary:     (input.body || '').substring(0, 200),
       status:           'FINAL',
       gdoc_url:         '',
-      pdf_url:          pdfFile.getUrl(),
-      qr_url:           'qr:' + docNumber,
+      pdf_url:          finalPdfUrl,
+      // FIX #1.3: URL QR image sungguhan (api.qrserver.com), BUKAN placeholder "qr:..."
+      qr_url:           qrImageUrl,
       created_by:       (input.performed_by && input.performed_by.email) || '',
       pipeline_type:    'html',
     });
@@ -971,8 +1046,8 @@ function generateDocumentViaHtml(input, config, company, docNumber, placeholderD
   return {
     success:        true,
     documentNumber: docNumber,
-    pdfUrl:         pdfFile.getUrl(),
-    pdfFileId:      pdfFile.getId(),
+    pdfUrl:         finalPdfUrl,
+    pdfFileId:      finalPdfFileId,
     gdocUrl:        '',
     message:        'Dokumen berhasil dibuat: ' + docNumber,
   };
@@ -1095,7 +1170,11 @@ function buildDocumentPreviewHtml(docType, d, companyCode, company) {
 
 function _tplSuratBody(d, company) {
   return [
-    '<p style="font-size:13pt;font-weight:bold;color:#C40000;text-align:center;text-transform:uppercase;margin:10px 0 14px;">' + _esc(d.DOCUMENT_TITLE) + '</p>',
+    // TYPOGRAPHY §2 Title: 14pt bold #000 center UPPERCASE (bukan warna brand)
+    '<p style="font-size:14pt;font-weight:bold;color:#000;text-align:center;text-transform:uppercase;margin:10px 0 18pt;">' + _esc(d.DOCUMENT_TITLE) + '</p>',
+    // FIX #4.4: PLACE_DATE rata KIRI, DI ATAS Nomor (LETTER_STRUCTURE §2).
+    // TYPOGRAPHY §5: "Jangan pernah menempatkan tanggal di sisi kanan."
+    '<p style="text-align:left;margin:0 0 12pt 0;">' + _esc(d.PLACE_DATE) + '</p>',
     '<table style="border-collapse:collapse;width:auto;"><tr>',
     '<td style="padding:3px 0;font-weight:bold;white-space:nowrap;">Nomor</td>',
     '<td>: ' + _esc(d.DOCUMENT_NUMBER) + '</td>',
@@ -1104,11 +1183,12 @@ function _tplSuratBody(d, company) {
     '<td>: ' + _esc(d.ATTACHMENT || '-') + '</td>',
     '</tr><tr>',
     '<td style="padding:3px 0;white-space:nowrap;">Perihal</td>',
-    '<td>: <strong>' + _esc(d.SUBJECT) + '</strong></td>',
+    // LETTER_STRUCTURE §4: nilai field Perihal TIDAK boleh bold (hanya label yang boleh).
+    '<td>: ' + _esc(d.SUBJECT) + '</td>',
     '</tr></table>',
-    '<p style="text-align:right;margin:8px 0 10px;">' + _esc(d.PLACE_DATE) + '</p>',
     '<p>Kepada Yth.</p>',
-    '<p><strong>' + _esc(d.RECIPIENT_NAME || '') + '</strong><br>' + _esc(d.RECIPIENT_ADDRESS || '') + '</p>',
+    // LETTER_STRUCTURE §4: nama penerima surat TIDAK boleh bold.
+    '<p>' + _esc(d.RECIPIENT_NAME || '') + '<br>' + _esc(d.RECIPIENT_ADDRESS || '') + '</p>',
     '<p>Dengan hormat,</p>',
     '<p>' + _esc(d.BODY || '[ Isi surat akan muncul di sini ]') + '</p>',
     '<p>Demikian surat ini kami sampaikan. Atas perhatian dan kerjasamanya kami ucapkan terima kasih.</p>',
@@ -1118,7 +1198,8 @@ function _tplSuratBody(d, company) {
 
 function _tplInvoiceBody(d, company) {
   return [
-    '<p style="font-size:13pt;font-weight:bold;color:#C40000;text-align:center;text-transform:uppercase;margin:10px 0 14px;">I N V O I C E</p>',
+    // TYPOGRAPHY §2 Title: 14pt bold #000 center UPPERCASE
+    '<p style="font-size:14pt;font-weight:bold;color:#000;text-align:center;text-transform:uppercase;margin:10px 0 18pt;">I N V O I C E</p>',
     '<table style="border-collapse:collapse;width:auto;"><tr>',
     '<td style="padding:3px 0;white-space:nowrap;">Nomor Invoice</td>',
     '<td>: <strong>' + _esc(d.DOCUMENT_NUMBER) + '</strong></td>',
@@ -1130,12 +1211,14 @@ function _tplInvoiceBody(d, company) {
     '<td>: ' + _esc(d.DUE_DATE || '') + '</td>',
     '</tr><tr>',
     '<td style="padding:3px 0;white-space:nowrap;">Status Pembayaran</td>',
-    '<td>: <strong style="color:#C40000;">' + _esc(d.STATUS || 'BELUM LUNAS') + '</strong></td>',
+    // TYPOGRAPHY §5: body text hitam. Status disorot via bold, bukan warna.
+    '<td>: <strong>' + _esc(d.STATUS || 'BELUM LUNAS') + '</strong></td>',
     '</tr></table>',
     '<hr style="border:0;border-top:1px solid #DDD;margin:10px 0;">',
-    '<p style="font-size:10pt;font-weight:bold;color:#C40000;border-bottom:1.5px solid #C40000;padding-bottom:4px;margin:14px 0 8px;">DITAGIHKAN KEPADA</p>',
+    // TYPOGRAPHY §2 Section heading: 12pt bold #000. §5: jangan tambah border dekoratif.
+    '<p style="font-size:12pt;font-weight:bold;color:#000;margin:18pt 0 8pt;">DITAGIHKAN KEPADA</p>',
     '<p><strong>' + _esc(d.CLIENT_NAME || '') + '</strong><br>' + _esc(d.CLIENT_ADDRESS || '') + '</p>',
-    '<p style="font-size:10pt;font-weight:bold;color:#C40000;border-bottom:1.5px solid #C40000;padding-bottom:4px;margin:14px 0 8px;">RINCIAN LAYANAN</p>',
+    '<p style="font-size:12pt;font-weight:bold;color:#000;margin:18pt 0 8pt;">RINCIAN LAYANAN</p>',
     '<p>' + _esc(d.ITEMS || '[ Item akan muncul di sini ]') + '</p>',
     '<hr style="border:0;border-top:1px solid #DDD;margin:8px 0;">',
     '<table style="border-collapse:collapse;width:auto;margin-left:auto;"><tr>',
@@ -1146,7 +1229,8 @@ function _tplInvoiceBody(d, company) {
     '<td>: ' + _esc(d.TAX_AMOUNT || 'Rp 0') + '</td>',
     '</tr><tr>',
     '<td style="padding:3px 12px 3px 0;font-weight:bold;">GRAND TOTAL</td>',
-    '<td style="font-weight:bold;color:#C40000;font-size:12pt;">: ' + _esc(d.GRAND_TOTAL || '') + '</td>',
+    // TYPOGRAPHY §5: body text hitam. Emphasis via bold + size, bukan warna.
+    '<td style="font-weight:bold;font-size:12pt;">: ' + _esc(d.GRAND_TOTAL || '') + '</td>',
     '</tr></table>',
     d._signature,
   ].join('');
@@ -1154,7 +1238,8 @@ function _tplInvoiceBody(d, company) {
 
 function _tplKwitansiBody(d, company) {
   return [
-    '<p style="font-size:13pt;font-weight:bold;color:#C40000;text-align:center;text-transform:uppercase;margin:10px 0 6px;">K W I T A N S I</p>',
+    // TYPOGRAPHY §2 Title: 14pt bold #000 center UPPERCASE
+    '<p style="font-size:14pt;font-weight:bold;color:#000;text-align:center;text-transform:uppercase;margin:10px 0 6px;">K W I T A N S I</p>',
     '<p style="text-align:center;font-size:10pt;color:#555;margin-bottom:12px;">Nomor: ' + _esc(d.DOCUMENT_NUMBER) + '</p>',
     '<hr style="border:0;border-top:1px solid #DDD;margin:8px 0 10px;">',
     '<table style="border-collapse:collapse;width:100%;"><tr>',
@@ -1167,7 +1252,8 @@ function _tplKwitansiBody(d, company) {
     '<hr style="border:0;border-top:1px solid #DDD;margin:10px 0;">',
     '<table style="border-collapse:collapse;width:auto;margin-left:auto;"><tr>',
     '<td style="padding:3px 12px 3px 0;font-weight:bold;font-size:12pt;">JUMLAH</td>',
-    '<td style="font-size:12pt;font-weight:bold;color:#C40000;">: ' + _esc(d.AMOUNT || '') + '</td>',
+    // TYPOGRAPHY §5: body text hitam. Nominal disorot via bold + size, bukan warna.
+    '<td style="font-size:12pt;font-weight:bold;">: ' + _esc(d.AMOUNT || '') + '</td>',
     '</tr></table>',
     '<p style="font-size:9.5pt;margin-top:4px;">Terbilang: <em>' + _esc(d.AMOUNT_TEXT || '') + '</em></p>',
     d._signature,
