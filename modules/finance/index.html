@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1A1A1A">
+<title>RIFIM OS — Finance</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --red:#C40000;--red-dark:#3A0000;--red-mid:#8B0000;
+  --dark:#1A1A1A;--dark2:#2B2B2B;--dark3:#111;
+  --font:'Segoe UI',system-ui,sans-serif;
+  --ok:#16a34a;--warn:#eab308;--err:#dc2626;--info:#0ea5e9;
+}
+body{font-family:var(--font);background:var(--dark);color:#fff;min-height:100vh;display:flex;flex-direction:column}
+
+#gate{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:linear-gradient(145deg,rgba(26,26,26,.88) 0%,rgba(58,0,0,.88) 60%,rgba(43,43,43,.88) 100%)}
+.gate-card{background:#fff;color:var(--dark);border-radius:16px;padding:32px;max-width:420px;text-align:center}
+.gate-card h1{font-size:20px;margin-bottom:8px}
+.gate-card p{color:#888;font-size:13px;margin-bottom:20px}
+.gate-card a{display:inline-block;padding:11px 20px;background:var(--red);color:#fff;border-radius:8px;text-decoration:none;font-weight:600}
+
+#app{flex:1;display:none;flex-direction:column;min-height:100vh;
+  background:linear-gradient(145deg,rgba(26,26,26,.88) 0%,rgba(58,0,0,.88) 60%,rgba(43,43,43,.88) 100%)}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;
+  border-bottom:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.3);backdrop-filter:blur(8px);position:sticky;top:0;z-index:50}
+.brand-name{font-size:16px;font-weight:800;letter-spacing:1px}
+.brand-sub{font-size:10px;opacity:.5;letter-spacing:.5px;text-transform:uppercase}
+.header-right{display:flex;align-items:center;gap:12px}
+.user-name{font-size:13px;font-weight:600;text-align:right}
+.user-role{display:inline-block;margin-top:2px;padding:1px 8px;background:rgba(196,0,0,.3);border:1px solid rgba(196,0,0,.5);
+  border-radius:20px;font-size:10px;color:#ff9999;font-weight:600}
+.btn-back{padding:6px 14px;background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff;
+  border-radius:8px;cursor:pointer;font-size:12px;text-decoration:none}
+.btn-back:hover{background:rgba(255,255,255,.08)}
+
+main{max-width:1400px;margin:0 auto;padding:24px;width:100%}
+.page-title{font-size:24px;font-weight:800;margin-bottom:4px}
+.page-sub{font-size:13px;opacity:.6;margin-bottom:20px;line-height:1.5}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px 16px}
+.stat .lbl{font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.stat .val{font-size:20px;font-weight:800;font-family:'Consolas','Menlo',monospace}
+.stat.in .val{color:#4ade80}
+.stat.out .val{color:#f87171}
+.stat.net .val{color:#38bdf8}
+.stat.pending .val{color:#facc15}
+.stat .sub{font-size:10px;color:#666;margin-top:4px}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:20px;overflow-x:auto}
+.tab{padding:11px 16px;background:transparent;border:none;color:#aaa;cursor:pointer;font-size:13px;font-weight:600;
+  border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
+.tab:hover{color:#fff}
+.tab.active{color:#fff;border-bottom-color:var(--red)}
+
+.panel{display:none;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px}
+.panel.active{display:block}
+.panel h2{font-size:17px;margin-bottom:6px}
+.panel .desc{color:#aaa;font-size:13px;margin-bottom:14px}
+
+.sinks{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.sink{padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600}
+.sink.sheet{background:rgba(22,163,74,.15);color:#4ade80;border:1px solid rgba(22,163,74,.3)}
+.sink.supabase{background:rgba(14,165,233,.15);color:#38bdf8;border:1px solid rgba(14,165,233,.3)}
+.sink.gform{background:rgba(147,51,234,.15);color:#c084fc;border:1px solid rgba(147,51,234,.3)}
+.sink.gas{background:rgba(234,179,8,.15);color:#facc15;border:1px solid rgba(234,179,8,.3)}
+.sink.raos{background:rgba(196,0,0,.15);color:#ff8888;border:1px solid rgba(196,0,0,.3)}
+
+.roadmap{background:rgba(196,0,0,.08);border:1px dashed rgba(196,0,0,.4);border-radius:8px;padding:11px 13px;margin-bottom:14px;font-size:12px;color:#ffb3b3;line-height:1.55}
+.roadmap strong{color:#ff6b6b}
+.roadmap code{background:rgba(0,0,0,.4);padding:1px 5px;border-radius:3px;font-size:11px}
+
+.toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.toolbar input,.toolbar select{padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+  border-radius:8px;color:#fff;font-size:13px;outline:none}
+.toolbar input:focus{border-color:var(--red)}
+.toolbar .grow{flex:1;min-width:200px}
+.btn{padding:9px 16px;background:var(--red);color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer}
+.btn:hover{background:var(--red-mid)}
+.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.2)}
+.btn.ghost:hover{background:rgba(255,255,255,.06)}
+.btn.small{padding:5px 10px;font-size:11px}
+.btn.ok{background:var(--ok)}
+.btn.ok:hover{background:#15803d}
+.btn.info{background:var(--info)}
+.btn.info:hover{background:#0284c7}
+
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th,.tbl td{padding:9px 11px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)}
+.tbl th{background:rgba(0,0,0,.2);color:#aaa;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;position:sticky;top:0}
+.tbl tr:hover td{background:rgba(255,255,255,.03)}
+.tbl .num{font-family:'Consolas','Menlo',monospace;font-weight:700;text-align:right}
+.tbl .num.in{color:#4ade80}
+.tbl .num.out{color:#f87171}
+.badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.badge.in{background:rgba(22,163,74,.15);color:#4ade80}
+.badge.out{background:rgba(220,38,38,.15);color:#f87171}
+.badge.pending{background:rgba(234,179,8,.15);color:#facc15}
+.badge.paid{background:rgba(22,163,74,.15);color:#4ade80}
+.badge.overdue{background:rgba(220,38,38,.15);color:#f87171}
+
+.empty{text-align:center;padding:36px;color:#666;font-size:13px}
+.empty .icon{font-size:44px;margin-bottom:10px;opacity:.3}
+
+.cabang-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:16px}
+.cab-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;cursor:pointer;transition:all .15s}
+.cab-card:hover{background:rgba(255,255,255,.06);border-color:rgba(196,0,0,.5)}
+.cab-card.active{background:rgba(196,0,0,.15);border-color:var(--red)}
+.cab-card .cab-name{font-size:13px;font-weight:600;margin-bottom:4px}
+.cab-card .cab-total{font-size:11px;color:#aaa;font-family:'Consolas','Menlo',monospace}
+
+.launcher{display:flex;flex-direction:column;align-items:center;gap:16px;padding:32px;
+  background:linear-gradient(135deg,rgba(196,0,0,.15),rgba(147,51,234,.1));border-radius:14px;border:1px solid rgba(196,0,0,.3)}
+.launcher .big-icon{font-size:56px}
+.launcher h3{font-size:18px;font-weight:700}
+.launcher p{font-size:13px;color:#ddd;text-align:center;max-width:520px;line-height:1.55}
+.launcher .btn{font-size:14px;padding:12px 24px}
+
+footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="gate-card">
+    <h1>🔒 Akses Terbatas</h1>
+    <p>Login di Portal Rifim OS dulu untuk mengakses modul Finance.</p>
+    <a href="/portal">Buka Portal</a>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div>
+      <div class="brand-name">RIFIM OS · FINANCE</div>
+      <div class="brand-sub">Keuangan Terpadu — Pemasukan · Pengeluaran · Tagihan</div>
+    </div>
+    <div class="header-right">
+      <div>
+        <div class="user-name" id="hdr-name">—</div>
+        <div class="user-role" id="hdr-role">—</div>
+      </div>
+      <a href="/portal" class="btn-back">← Portal</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-title">Finance Dashboard</div>
+    <div class="page-sub">
+      Konsolidasi keuangan lintas cabang. Data ditarik dari
+      <strong>Google Sheet "Pengeluaran dan pemasukan"</strong>
+      (<code>1AgpEqhpDU4BUxcN_i_jaF8Ccw6RwptV2TOJjyTCVPSo</code>) yang di-input
+      lewat <strong>rifim-finance-pwa</strong> (Google Form) + integrasi
+      Isi Saldo dari <strong>Supabase RAOS</strong>.
+    </div>
+
+    <!-- SUMMARY STATS -->
+    <div class="stats">
+      <div class="stat in"><div class="lbl">Total Pemasukan (bulan ini)</div><div class="val" id="s-in">Rp —</div><div class="sub" id="s-in-sub">10 cabang</div></div>
+      <div class="stat out"><div class="lbl">Total Pengeluaran (bulan ini)</div><div class="val" id="s-out">Rp —</div><div class="sub" id="s-out-sub">10 cabang</div></div>
+      <div class="stat net"><div class="lbl">Net (In − Out)</div><div class="val" id="s-net">Rp —</div><div class="sub" id="s-net-sub">saldo bersih</div></div>
+      <div class="stat pending"><div class="lbl">Tagihan Belum Bayar</div><div class="val" id="s-bill">—</div><div class="sub" id="s-bill-sub">Rp —</div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="dashboard">📊 Dashboard</button>
+      <button class="tab" data-tab="cabang">🏢 Per Cabang</button>
+      <button class="tab" data-tab="tagihan">📄 Tagihan</button>
+      <button class="tab" data-tab="rekap">📆 Rekap Harian/Bulanan</button>
+      <button class="tab" data-tab="saldo-raos">💳 Isi Saldo (RAOS)</button>
+      <button class="tab" data-tab="input">📝 Input Baru</button>
+      <button class="tab" data-tab="log">📋 System Log</button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 1: DASHBOARD (sheet FINANCE — master ledger)                -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel active" data-panel="dashboard">
+      <h2>Ledger Utama (Sheet FINANCE)</h2>
+      <div class="desc">Master ledger semua transaksi pemasukan &amp; pengeluaran. Dibaca dari sheet <code>FINANCE</code> (979 baris per snapshot).</div>
+      <div class="sinks">
+        <span class="sink sheet">📊 Sheet: <code>FINANCE</code></span>
+        <span class="sink gas">🔧 Backend: GAS endpoint <code>?action=finance_list</code></span>
+      </div>
+      <div class="roadmap">
+        <strong>Kolom sheet:</strong> Timestamp, Tanggal, Sumber, Kategori, Jenis, Jumlah, Cabang, Keterangan.<br>
+        <strong>Read path (TODO):</strong> extend GAS di spreadsheet 1AgpEqhpDU4B dengan
+        <code>doGet</code> action <code>finance_list</code> return JSON. Pagination server-side
+        (979 baris → chunk 100).<br>
+        <strong>Filter yang perlu:</strong> range tanggal, kategori, jenis (in/out), cabang, sumber.
+      </div>
+
+      <div class="toolbar">
+        <input type="date" id="d-from"> — <input type="date" id="d-to">
+        <select id="d-jenis"><option value="">Semua Jenis</option><option>Pemasukan</option><option>Pengeluaran</option></select>
+        <select id="d-cabang" class="grow"><option value="">Semua Cabang</option></select>
+        <button class="btn ghost small" id="d-refresh">🔄 Refresh</button>
+        <button class="btn info small">📤 Export XLSX</button>
+      </div>
+
+      <table class="tbl">
+        <thead><tr>
+          <th>Tanggal</th><th>Sumber</th><th>Kategori</th><th>Jenis</th>
+          <th style="text-align:right">Jumlah</th><th>Cabang</th><th>Keterangan</th>
+        </tr></thead>
+        <tbody id="d-body">
+          <tr><td colspan="7"><div class="empty"><div class="icon">🔌</div>Belum terhubung. GAS endpoint <code>finance_list</code> belum dibuat.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 2: PER CABANG (10 sheet cabang)                             -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel" data-panel="cabang">
+      <h2>Journal Per Cabang</h2>
+      <div class="desc">Buku besar per cabang — pemasukan/pengeluaran/kasbon. Pilih cabang di bawah.</div>
+      <div class="sinks">
+        <span class="sink sheet">📊 10 sheet cabang di spreadsheet Finance</span>
+      </div>
+      <div class="roadmap">
+        <strong>Kolom per cabang:</strong> Timestamp, Pemasukan, Pengeluaran, Jumlah, Keterangan,
+        Nama Staff (Kasbon), Total Pemasukan, Total Pengeluaran.<br>
+        <strong>TODO GAS:</strong> action <code>cabang_list&amp;sheet={nama_tab}</code>.
+      </div>
+
+      <div class="cabang-grid" id="cab-picker">
+        <!-- populated by JS -->
+      </div>
+
+      <div class="toolbar">
+        <input class="grow" placeholder="Cari keterangan atau staff kasbon…" id="c-search">
+        <button class="btn ghost small" id="c-refresh">🔄 Refresh</button>
+      </div>
+
+      <table class="tbl">
+        <thead><tr>
+          <th>Timestamp</th><th style="text-align:right">Pemasukan</th><th style="text-align:right">Pengeluaran</th>
+          <th style="text-align:right">Saldo Berjalan</th><th>Keterangan</th><th>Kasbon</th>
+        </tr></thead>
+        <tbody id="c-body">
+          <tr><td colspan="6"><div class="empty">Pilih cabang di atas untuk melihat detail.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 3: TAGIHAN (Invoicing)                                      -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel" data-panel="tagihan">
+      <h2>Manajemen Tagihan</h2>
+      <div class="desc">Invoicing per instansi — jenis, no tagihan, bulan, jumlah, rekening tujuan, status bayar.</div>
+      <div class="sinks">
+        <span class="sink sheet">📊 Sheet: <code>Tagihan</code> (1026 baris) + <code>New Tagihan</code> + per-bulan (mis. <code>Juli 2026</code>)</span>
+      </div>
+      <div class="roadmap">
+        <strong>Kolom:</strong> No, Jenis, No Tagihan, Instansi, Bulan, Jumlah, Tanggal Bayar, No Rekening.<br>
+        <strong>3 sheet terkait:</strong>
+        (a) <code>Tagihan</code> = arsip semua tagihan (27 kolom, ada rumus),
+        (b) <code>New Tagihan</code> = staging tagihan baru,
+        (c) per-bulan (<code>Juli 2026</code>, dst) = filter view bulanan.<br>
+        <strong>TODO GAS:</strong> <code>tagihan_list/add/mark_paid</code>. Add tagihan baru
+        write ke <code>New Tagihan</code>, lalu daily cron pindah ke <code>Tagihan</code> + sheet bulan.
+      </div>
+
+      <div class="toolbar">
+        <select id="t-status"><option value="">Semua Status</option><option>Belum Bayar</option><option>Sudah Bayar</option><option>Overdue</option></select>
+        <select id="t-bulan"><option value="">Semua Bulan</option></select>
+        <input class="grow" placeholder="Cari instansi atau no tagihan…" id="t-search">
+        <button class="btn ok small">+ Tagihan Baru</button>
+      </div>
+
+      <table class="tbl">
+        <thead><tr>
+          <th>No Tagihan</th><th>Instansi</th><th>Jenis</th><th>Bulan</th>
+          <th style="text-align:right">Jumlah</th><th>No Rekening</th><th>Tgl Bayar</th><th>Status</th>
+        </tr></thead>
+        <tbody id="t-body">
+          <tr><td colspan="8"><div class="empty"><div class="icon">📄</div>Belum terhubung ke GAS endpoint <code>tagihan_list</code>.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 4: REKAP HARIAN & BULANAN                                   -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel" data-panel="rekap">
+      <h2>Rekap Harian &amp; Bulanan</h2>
+      <div class="desc">Pivot otomatis dari sheet <code>TABEL HARIAN</code> &amp; <code>TABEL BULANAN</code>.</div>
+      <div class="sinks">
+        <span class="sink sheet">📊 Sheet: <code>TABEL HARIAN</code>, <code>TABEL BULANAN</code></span>
+      </div>
+      <div class="roadmap">
+        <strong>TODO:</strong> parse pivot sheet (bukan raw ledger). Kalau chart perlu, pakai
+        Chart.js CDN. 2 chart: (a) stacked bar per cabang per bulan, (b) line trend harian
+        30 hari terakhir.
+      </div>
+      <div class="empty"><div class="icon">📆</div>Belum di-implementasi. Bikin GAS action <code>rekap_harian</code> + <code>rekap_bulanan</code>.</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 5: ISI SALDO RAOS (Supabase raos_saldo_requests)            -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel" data-panel="saldo-raos">
+      <h2>Pelunasan Isi Saldo — RAOS</h2>
+      <div class="desc">Approve pengajuan Isi Saldo driver &amp; tandai lunas. Data langsung dari Supabase RAOS.</div>
+      <div class="sinks">
+        <span class="sink supabase">🔵 Supabase: <code>raos_saldo_requests</code></span>
+        <span class="sink raos">🚗 Owner logic: RAOS</span>
+      </div>
+      <div class="roadmap">
+        <strong>Migrasi dari RAOS PWA (sesi 2026-08-02):</strong> tab <code>/finance</code> di
+        RAOS PWA sudah dihapus. Fungsionalitasnya pindah ke sini — role admin/mgmt/direksi
+        cuma bisa akses via Rifim-OS.<br>
+        <strong>TODO:</strong> load <code>supabase-js</code> CDN, connect ke
+        <code>vlievtojpmrbsmzlqswl.supabase.co</code> pakai anon key + auth token yg di-link
+        dengan session portal (lihat CRM tab User Supabase RAOS untuk provisioning).
+      </div>
+      <div class="toolbar">
+        <select id="sr-status">
+          <option value="semua">Semua Status</option>
+          <option value="pending">Pending Approval</option>
+          <option value="approved">Disetujui Belum Lunas</option>
+          <option value="paid">Sudah Lunas</option>
+          <option value="rejected">Ditolak</option>
+        </select>
+        <select id="sr-branch"><option value="">Semua Cabang</option></select>
+        <input class="grow" placeholder="Cari driver / staff / no request…" id="sr-search">
+        <button class="btn ghost small">🔄 Refresh</button>
+      </div>
+      <table class="tbl">
+        <thead><tr>
+          <th>No Request</th><th>Cabang</th><th>Driver</th>
+          <th style="text-align:right">Nominal</th><th>Status</th><th>Diajukan</th><th>Aksi</th>
+        </tr></thead>
+        <tbody id="sr-body">
+          <tr><td colspan="7"><div class="empty"><div class="icon">💳</div>Belum terhubung ke Supabase.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 6: INPUT BARU (link ke Google Form via rifim-finance-pwa)   -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel" data-panel="input">
+      <h2>Input Transaksi Baru</h2>
+      <div class="desc">Buka Google Form via PWA <code>rifim-finance-pwa</code> untuk catat pemasukan / pengeluaran / kasbon dari HP.</div>
+      <div class="sinks">
+        <span class="sink gform">📝 Google Form (via rifim-finance-pwa)</span>
+        <span class="sink sheet">📊 Auto-append ke sheet LIA</span>
+      </div>
+      <div class="roadmap">
+        <strong>Flow:</strong> Klik tombol di bawah → buka <code>rifim-finance-pwa.vercel.app</code>
+        (halaman boarding-pass) → tap "Buka Form" → Google Form input → response auto-tersimpan
+        di sheet <code>LIA</code> (474 baris per snapshot) → cron GAS pindah ke sheet
+        <code>FINANCE</code> + sheet cabang yang sesuai.<br>
+        <strong>Kolom form (dari sheet LIA):</strong> Timestamp, Email, Pemasukan, Pengeluaran,
+        Cabang, Keterangan, Bukti Foto, Nama Staff (Kasbon).<br>
+        <strong>Alternatif inline (later):</strong> port form ke modul CRM/Finance sebagai
+        modal internal supaya user tidak perlu keluar portal.
+      </div>
+
+      <div class="launcher">
+        <div class="big-icon">🎫</div>
+        <h3>rifim-finance-pwa</h3>
+        <p>PWA "boarding pass" installable di HP. Satu tap buka Google Form untuk catat
+          pemasukan, pengeluaran, tagihan, atau kasbon staff. Response otomatis masuk sheet
+          Finance.</p>
+        <a href="https://rifim-finance-pwa.vercel.app/" target="_blank" rel="noopener" class="btn">
+          🚀 Buka rifim-finance-pwa ↗
+        </a>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 7: SYSTEM LOG                                               -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel" data-panel="log">
+      <h2>System Log GAS</h2>
+      <div class="desc">Audit trail semua fungsi GAS Finance (cron, sync, form response handler).</div>
+      <div class="sinks">
+        <span class="sink sheet">📊 Sheet: <code>SYSTEM LOG</code> (1635 baris)</span>
+      </div>
+      <div class="roadmap">
+        <strong>Kolom:</strong> Tanggal, Jam, Fungsi, Status, Pesan.<br>
+        <strong>TODO:</strong> GAS action <code>log_list?limit=200</code>. Filter status
+        (SUCCESS/ERROR/WARN), filter fungsi. Auto-scroll ke terbaru.
+      </div>
+      <div class="toolbar">
+        <input type="date" id="l-from"> — <input type="date" id="l-to">
+        <select id="l-status"><option value="">Semua Status</option><option>SUCCESS</option><option>ERROR</option><option>WARN</option></select>
+        <input class="grow" placeholder="Cari nama fungsi atau pesan…" id="l-search">
+        <button class="btn ghost small">🔄 Refresh</button>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Tanggal</th><th>Jam</th><th>Fungsi</th><th>Status</th><th>Pesan</th></tr></thead>
+        <tbody id="l-body">
+          <tr><td colspan="5"><div class="empty">Log belum di-fetch.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+
+  <footer>
+    RIFIM OS · Finance &copy; 2026 · Sheet SSoT: <code>1AgpEqhpDU4B...</code> ·
+    Input: <a href="https://rifim-finance-pwa.vercel.app/" target="_blank" style="color:#c084fc">rifim-finance-pwa</a> ·
+    Saldo RAOS: <span style="color:#ff8888">Supabase raos_saldo_requests</span>
+  </footer>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// 10 Cabang (matched dengan sheet cabang)
+// ═══════════════════════════════════════════════════════════════════════
+const CABANG_LIST = [
+  { key: 'Operasional',                  label: 'Operasional Kantor Pusat', rows: 120 },
+  { key: 'ID Rifim Airport Batam',       label: 'Airport Batam',            rows: 199 },
+  { key: 'ID Rifim Airport Pekanbaru',   label: 'Airport Pekanbaru',        rows: 200 },
+  { key: 'ID Rifim Airport Manado',      label: 'Airport Manado',           rows: 201 },
+  { key: 'ID Rifim Airport Balikpapan',  label: 'Airport Balikpapan',       rows: 54  },
+  { key: 'ID Rifim Airport Jambi',       label: 'Airport Jambi',            rows: 48  },
+  { key: 'ID Rifim Airport Makassar',    label: 'Airport Makassar',         rows: 2   },
+  { key: 'ID Rifim Batam',               label: 'Rifim Batam (non-airport)',rows: 40  },
+  { key: 'ID Rifim Jambi',               label: 'Rifim Jambi (non-airport)',rows: 4   },
+  { key: 'ID Rifim Jambi Luar',          label: 'Rifim Jambi Luar',         rows: 34  },
+];
+
+// ═══════════════════════════════════════════════════════════════════════
+// AUTH GATE
+// ═══════════════════════════════════════════════════════════════════════
+function checkAuth() {
+  let sess = null;
+  try { sess = JSON.parse(localStorage.getItem('rifim_auth') || 'null'); } catch(e) {}
+  if (!sess || !sess.email) { showGate(); return null; }
+  if (sess.ts && Date.now() - sess.ts > 12 * 3600 * 1000) {
+    localStorage.removeItem('rifim_auth'); showGate(); return null;
+  }
+  // Finance = admin/management/direksi only
+  const role = (sess.role || '').toLowerCase();
+  if (!['admin','management','direksi'].includes(role)) {
+    document.getElementById('gate').innerHTML =
+      '<div class="gate-card"><h1>🚫 Akses Ditolak</h1>' +
+      '<p>Modul Finance hanya untuk role Admin, Management, atau Direksi. Role Anda: <b>' + (role || 'unknown').toUpperCase() + '</b></p>' +
+      '<a href="/portal">Kembali ke Portal</a></div>';
+    showGate(); return null;
+  }
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('hdr-name').textContent = sess.name || sess.email;
+  document.getElementById('hdr-role').textContent = role.toUpperCase();
+  return sess;
+}
+function showGate() {
+  document.getElementById('gate').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// POPULATE PICKER / SELECT
+// ═══════════════════════════════════════════════════════════════════════
+function populateCabang() {
+  const picker = document.getElementById('cab-picker');
+  picker.innerHTML = CABANG_LIST.map(c =>
+    `<div class="cab-card" data-cab="${c.key}">
+       <div class="cab-name">${c.label}</div>
+       <div class="cab-total">${c.rows} transaksi (snapshot)</div>
+     </div>`
+  ).join('');
+  picker.querySelectorAll('.cab-card').forEach(el => {
+    el.addEventListener('click', () => {
+      picker.querySelectorAll('.cab-card').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      // TODO: fetch cabang data via GAS
+    });
+  });
+  // populate dropdowns cabang
+  ['d-cabang','sr-branch'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (sel) sel.innerHTML = sel.innerHTML +
+      CABANG_LIST.map(c => `<option value="${c.key}">${c.label}</option>`).join('');
+  });
+  // populate bulan dropdown
+  const bulanSel = document.getElementById('t-bulan');
+  if (bulanSel) {
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+      bulanSel.innerHTML += `<option value="${label}">${label}</option>`;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TAB ROUTER
+// ═══════════════════════════════════════════════════════════════════════
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === btn));
+    document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.dataset.panel === target));
+    history.replaceState(null, '', '/finance#' + target);
+  });
+});
+const initTab = location.hash.replace('#', '') || 'dashboard';
+const initBtn = document.querySelector(`.tab[data-tab="${initTab}"]`);
+if (initBtn) initBtn.click();
+
+if (checkAuth()) populateCabang();
+
+// TODO next session:
+// 1. Extend GAS di spreadsheet 1AgpEqhpDU4B dengan doGet:
+//    - finance_list (paginated FINANCE ledger)
+//    - cabang_list?sheet=<name>
+//    - tagihan_list + tagihan_add + tagihan_mark_paid
+//    - rekap_harian, rekap_bulanan (parse pivot)
+//    - log_list?limit=N
+// 2. Load supabase-js CDN untuk tab saldo-raos, connect via session token portal
+// 3. Populate stats cards dengan agregat bulan berjalan
+</script>
+
+</body>
+</html>

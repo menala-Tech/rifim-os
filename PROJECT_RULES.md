@@ -327,6 +327,12 @@ Urutan setup yang harus dijalankan **sekali** dari GAS Editor setelah deploy ke 
 | 63 | Field `cabang` di semua tabel Supabase WAJIB uppercase 3 huruf — validasi di backend |
 
 ---
+## AI Integration Rules
+
+| # | Rule |
+|---|------|
+| 67 | Semua panggilan API eksternal ke Claude/LLM yang mengunggah dokumen referensi panjang perusahaan (seperti SOP atau database statis) WAJIB menggunakan fitur Prompt Caching (`"cache_control": {"type": "ephemeral"}`). |
+| 68 | Dilarang melakukan eksekusi fungsi API LLM di dalam *loop* (perulangan) tanpa cache pada *webhook* atau integrasi Apps Script harian, guna mencegah kebocoran tagihan *input* token dasar. |
 
 ---
 

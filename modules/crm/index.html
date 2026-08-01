@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1A1A1A">
+<title>RIFIM OS — CRM &amp; Config Center</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --red:#C40000;--red-dark:#3A0000;--red-mid:#8B0000;
+  --dark:#1A1A1A;--dark2:#2B2B2B;--dark3:#111;
+  --card:#fff;--border:#e0e0e0;--text:#222;--muted:#888;
+  --font:'Segoe UI',system-ui,sans-serif;
+  --ok:#16a34a;--warn:#eab308;--err:#dc2626;--info:#0ea5e9;
+}
+body{font-family:var(--font);background:var(--dark);color:#fff;min-height:100vh;display:flex;flex-direction:column}
+
+#gate{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:linear-gradient(145deg,rgba(26,26,26,.88) 0%,rgba(58,0,0,.88) 60%,rgba(43,43,43,.88) 100%)}
+.gate-card{background:#fff;color:var(--dark);border-radius:16px;padding:32px;max-width:420px;text-align:center}
+.gate-card h1{font-size:20px;margin-bottom:8px}
+.gate-card p{color:var(--muted);font-size:13px;margin-bottom:20px}
+.gate-card a{display:inline-block;padding:11px 20px;background:var(--red);color:#fff;border-radius:8px;text-decoration:none;font-weight:600}
+
+#app{flex:1;display:none;flex-direction:column;min-height:100vh;
+  background:linear-gradient(145deg,rgba(26,26,26,.88) 0%,rgba(58,0,0,.88) 60%,rgba(43,43,43,.88) 100%)}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;
+  border-bottom:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.3);backdrop-filter:blur(8px);position:sticky;top:0;z-index:50}
+.brand-name{font-size:16px;font-weight:800;letter-spacing:1px}
+.brand-sub{font-size:10px;opacity:.5;letter-spacing:.5px;text-transform:uppercase}
+.header-right{display:flex;align-items:center;gap:12px}
+.user-info{text-align:right}
+.user-name{font-size:13px;font-weight:600}
+.user-role{display:inline-block;margin-top:2px;padding:1px 8px;background:rgba(196,0,0,.3);border:1px solid rgba(196,0,0,.5);
+  border-radius:20px;font-size:10px;color:#ff9999;font-weight:600}
+.btn-back{padding:6px 14px;background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff;
+  border-radius:8px;cursor:pointer;font-size:12px;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn-back:hover{background:rgba(255,255,255,.08)}
+
+main{max-width:1280px;margin:0 auto;padding:24px;width:100%}
+.page-title{font-size:24px;font-weight:800;margin-bottom:4px}
+.page-sub{font-size:13px;opacity:.6;margin-bottom:24px}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:24px;overflow-x:auto}
+.tab{padding:11px 18px;background:transparent;border:none;color:#aaa;cursor:pointer;font-size:14px;font-weight:600;
+  border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
+.tab:hover{color:#fff}
+.tab.active{color:#fff;border-bottom-color:var(--red)}
+
+.panel{display:none;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:24px}
+.panel.active{display:block}
+.panel h2{font-size:18px;margin-bottom:6px}
+.panel .desc{color:#aaa;font-size:13px;margin-bottom:16px}
+
+.sinks{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.sink{padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600}
+.sink.sheet{background:rgba(22,163,74,.15);color:#4ade80;border:1px solid rgba(22,163,74,.3)}
+.sink.supabase{background:rgba(14,165,233,.15);color:#38bdf8;border:1px solid rgba(14,165,233,.3)}
+.sink.github{background:rgba(147,51,234,.15);color:#c084fc;border:1px solid rgba(147,51,234,.3)}
+.sink.gas{background:rgba(234,179,8,.15);color:#facc15;border:1px solid rgba(234,179,8,.3)}
+
+.roadmap{background:rgba(196,0,0,.08);border:1px dashed rgba(196,0,0,.4);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#ffb3b3;line-height:1.55}
+.roadmap strong{color:#ff6b6b}
+.roadmap code{background:rgba(0,0,0,.4);padding:1px 5px;border-radius:3px;font-size:11px}
+
+.toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.toolbar input,.toolbar select{padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+  border-radius:8px;color:#fff;font-size:13px;outline:none}
+.toolbar input:focus{border-color:var(--red)}
+.toolbar .grow{flex:1;min-width:200px}
+.btn{padding:9px 16px;background:var(--red);color:#fff;border:none;border-radius:8px;font-weight:600;
+  font-size:13px;cursor:pointer}
+.btn:hover{background:var(--red-mid)}
+.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.2)}
+.btn.ghost:hover{background:rgba(255,255,255,.06)}
+.btn.small{padding:5px 10px;font-size:11px}
+
+.cfg-table{width:100%;border-collapse:collapse;font-size:13px}
+.cfg-table th,.cfg-table td{padding:9px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:top}
+.cfg-table th{background:rgba(0,0,0,.2);color:#aaa;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;position:sticky;top:0}
+.cfg-table tr:hover td{background:rgba(255,255,255,.03)}
+.cfg-table .key{font-family:'Consolas','Menlo',monospace;color:#facc15;font-size:12px;font-weight:600;white-space:nowrap}
+.cfg-table .val{font-family:'Consolas','Menlo',monospace;color:#fff;font-size:12px;word-break:break-all;max-width:340px}
+.cfg-table .val input{width:100%;padding:5px 8px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);
+  border-radius:5px;color:#fff;font-family:inherit;font-size:12px;outline:none}
+.cfg-table .val input:focus{border-color:var(--red);background:rgba(0,0,0,.5)}
+.cfg-table .desc-cell{color:#888;font-size:12px}
+.cfg-table .cat{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.cat.company{background:rgba(196,0,0,.2);color:#ff8888}
+.cat.drive{background:rgba(22,163,74,.2);color:#66d19b}
+.cat.template{background:rgba(147,51,234,.2);color:#c084fc}
+.cat.feature{background:rgba(234,179,8,.2);color:#facc15}
+.cat.kpi{background:rgba(196,0,0,.2);color:#ff8888}
+.cat.time{background:rgba(14,165,233,.2);color:#38bdf8}
+.cat.integration{background:rgba(147,51,234,.2);color:#c084fc}
+
+.section-hdr{font-size:12px;font-weight:700;color:#facc15;text-transform:uppercase;letter-spacing:1px;margin:20px 0 8px;padding-bottom:6px;border-bottom:1px solid rgba(234,179,8,.2)}
+.section-hdr:first-child{margin-top:0}
+
+.empty{text-align:center;padding:40px;color:#666;font-size:13px}
+.empty .icon{font-size:48px;margin-bottom:12px;opacity:.3}
+
+.status-bar{position:fixed;bottom:20px;right:20px;padding:10px 16px;background:var(--dark2);
+  border:1px solid rgba(255,255,255,.15);border-radius:10px;font-size:12px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.status-bar.show{display:block}
+.status-bar.ok{border-color:var(--ok);color:#4ade80}
+.status-bar.err{border-color:var(--err);color:#f87171}
+
+footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
+.dirty-badge{display:inline-block;width:8px;height:8px;background:var(--warn);border-radius:50%;margin-left:6px}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="gate-card">
+    <h1>🔒 Akses Terbatas</h1>
+    <p>Anda harus login di Portal Rifim OS dulu untuk mengakses modul CRM.</p>
+    <a href="/portal">Buka Portal</a>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div>
+      <div class="brand-name">RIFIM OS · CRM &amp; Config Center</div>
+      <div class="brand-sub">Manajemen Terpadu Konfigurasi &amp; Data Master</div>
+    </div>
+    <div class="header-right">
+      <div class="user-info">
+        <div class="user-name" id="hdr-name">—</div>
+        <div class="user-role" id="hdr-role">—</div>
+      </div>
+      <a href="/portal" class="btn-back">← Portal</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-title">CRM &amp; Config Center</div>
+    <div class="page-sub">Single Source of Truth untuk seluruh konfigurasi &amp; data master RIFIM OS,
+      Smart Office, HRIS, dan PWA RAOS Menala. Edit sekali di sini — otomatis propagate ke Google
+      Sheets, Supabase, dan GitHub (auto-deploy Vercel).</div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="company">🏢 Company Config</button>
+      <button class="tab" data-tab="system">⚙️ System Config (RAOS)</button>
+      <button class="tab" data-tab="whitelist">📧 Whitelist Portal</button>
+      <button class="tab" data-tab="raos-users">👥 User Supabase RAOS</button>
+      <button class="tab" data-tab="contacts">📇 Kontak Eksternal</button>
+      <button class="tab" data-tab="audit">📋 Audit Log</button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 1: COMPANY CONFIG (Smart Office `company_config` sheet)     -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel active" data-panel="company">
+      <h2>Company Config — Smart Office</h2>
+      <div class="desc">Konfigurasi perusahaan yang dipakai Smart Office generator (surat, invoice, kwitansi, MOU, PKS, kontrak, dst).</div>
+      <div class="sinks">
+        <span class="sink sheet">📊 Sheet: <code>company_config</code></span>
+        <span class="sink gas">🔧 Backend: GAS Smart Office</span>
+      </div>
+      <div class="roadmap">
+        <strong>Sumber data:</strong> Sheet <code>company_config</code> di spreadsheet
+        <code>1jHeA-w1bM32S3-AU-ENN2UjiaCb4iLzRhaf4G7y4ozM</code> (RIFIM OS — Smart Office Database).<br>
+        <strong>Read path:</strong> GAS endpoint Smart Office (existing) → JSON key-value.<br>
+        <strong>Write path (TODO):</strong> extend GAS dengan <code>?action=config_set&amp;key=X&amp;value=Y</code>
+        yang admin-only + audit log ke tab <code>activity_log</code>.<br>
+        <strong>Konsumer:</strong> Smart Office document generator (setiap kali generate surat, baca
+        <code>company_name</code>, <code>director_name</code>, <code>drive_folder_*</code>, dst).
+      </div>
+
+      <div class="toolbar">
+        <input class="grow" placeholder="Cari key atau description…" id="cc-search">
+        <button class="btn ghost small" id="cc-refresh">🔄 Refresh dari Sheet</button>
+        <button class="btn" id="cc-save" disabled>💾 Simpan Perubahan</button>
+      </div>
+
+      <div class="section-hdr">🏢 Identitas Perusahaan</div>
+      <table class="cfg-table">
+        <thead><tr><th style="width:210px">Key</th><th style="width:340px">Value</th><th>Description</th><th style="width:100px">Kategori</th></tr></thead>
+        <tbody id="cc-company"></tbody>
+      </table>
+
+      <div class="section-hdr">📁 Google Drive Folder IDs</div>
+      <table class="cfg-table">
+        <thead><tr><th style="width:210px">Key</th><th style="width:340px">Value</th><th>Description</th><th style="width:100px">Kategori</th></tr></thead>
+        <tbody id="cc-drive"></tbody>
+      </table>
+
+      <div class="section-hdr">📄 Google Docs Template IDs</div>
+      <table class="cfg-table">
+        <thead><tr><th style="width:210px">Key</th><th style="width:340px">Value</th><th>Description</th><th style="width:100px">Kategori</th></tr></thead>
+        <tbody id="cc-template"></tbody>
+      </table>
+
+      <div class="section-hdr">🎚️ Feature Flags &amp; Locale</div>
+      <table class="cfg-table">
+        <thead><tr><th style="width:210px">Key</th><th style="width:340px">Value</th><th>Description</th><th style="width:100px">Kategori</th></tr></thead>
+        <tbody id="cc-feature"></tbody>
+      </table>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 2: SYSTEM CONFIG (RAOS `SISTEM CONFIG` sheet + Supabase)    -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel" data-panel="system">
+      <h2>System Config — RAOS Menala PWA</h2>
+      <div class="desc">Threshold KPI, geofence tolerance, retensi log, dan SSoT IDs. Live-config yang dibaca RAOS PWA &amp; GAS.</div>
+      <div class="sinks">
+        <span class="sink sheet">📊 Sheet: <code>SISTEM CONFIG</code></span>
+        <span class="sink supabase">🔵 Supabase: <code>system_config</code></span>
+        <span class="sink gas">🔧 Backend: GAS RAOS</span>
+      </div>
+      <div class="roadmap">
+        <strong>Sumber data:</strong> Sheet <code>SISTEM CONFIG</code> di spreadsheet
+        <code>1eYS2mM3Sy-BNAVGfp8BUHtsZuLiGDetnJeGw-AWk__8</code> (RAOS master), sekaligus mirror ke
+        tabel Supabase <code>public.system_config</code> untuk konsumsi cepat oleh PWA.<br>
+        <strong>Write path (TODO):</strong> saat user save di CRM →
+        (a) POST GAS <code>?action=sistem_config_set</code> update sheet,
+        (b) Supabase RPC <code>set_system_config(key,value)</code> SECURITY DEFINER admin-only update tabel,
+        (c) trigger <code>notification</code> ke user PWA supaya reload cache (opsional untuk key kritikal).<br>
+        <strong>Konsumer:</strong> RAOS PWA (KPI engine, geofence check, reminder cron), GAS (KPI update,
+        reminder dispatcher).
+      </div>
+
+      <div class="toolbar">
+        <input class="grow" placeholder="Cari key…" id="sc-search">
+        <button class="btn ghost small" id="sc-refresh">🔄 Refresh dari Sheet</button>
+        <button class="btn" id="sc-save" disabled>💾 Simpan &amp; Sync Supabase</button>
+      </div>
+
+      <div class="section-hdr">🎯 KPI Configuration</div>
+      <table class="cfg-table">
+        <thead><tr><th style="width:260px">Key</th><th style="width:180px">Value</th><th>Description</th><th style="width:100px">Kategori</th></tr></thead>
+        <tbody id="sc-kpi"></tbody>
+      </table>
+
+      <div class="section-hdr">⏱️ Timing &amp; Reminder</div>
+      <table class="cfg-table">
+        <thead><tr><th style="width:260px">Key</th><th style="width:180px">Value</th><th>Description</th><th style="width:100px">Kategori</th></tr></thead>
+        <tbody id="sc-time"></tbody>
+      </table>
+
+      <div class="section-hdr">🔗 Integration IDs (SSoT &amp; Supabase)</div>
+      <table class="cfg-table">
+        <thead><tr><th style="width:260px">Key</th><th style="width:340px">Value</th><th>Description</th><th style="width:100px">Kategori</th></tr></thead>
+        <tbody id="sc-integration"></tbody>
+      </table>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 3: WHITELIST PORTAL                                         -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel" data-panel="whitelist">
+      <h2>Email Login Portal Rifim OS</h2>
+      <div class="desc">Daftar email yang diizinkan login ke <code>rifim-os.vercel.app/portal</code>. Auth email-only via GAS.</div>
+      <div class="sinks">
+        <span class="sink sheet">📊 Sheet: whitelist tab di RIFIM OS backend</span>
+        <span class="sink gas">🔧 GAS action: <code>whitelist_list/add/remove</code></span>
+      </div>
+      <div class="roadmap">
+        <strong>TODO backend:</strong> extend GAS RIFIM OS dengan 4 action baru
+        (<code>whitelist_list</code>, <code>whitelist_add</code>, <code>whitelist_update</code>,
+        <code>whitelist_remove</code>), semua admin-only, semua write ke tab <code>Whitelist</code> +
+        audit log ke tab <code>activity_log</code>. Ganti email di sini → user langsung bisa/tidak
+        bisa login portal.
+      </div>
+      <div class="toolbar">
+        <input class="grow" placeholder="Cari email atau nama…" id="wl-search">
+        <button class="btn" onclick="alert('TODO: form add email — extend GAS backend dulu')">+ Tambah Email</button>
+      </div>
+      <table class="cfg-table">
+        <thead><tr><th>Email</th><th>Nama</th><th>Role</th><th>Status</th><th>Modul Akses</th><th>Aksi</th></tr></thead>
+        <tbody id="wl-body">
+          <tr><td class="key">rifiminternationalgemilang@gmail.com</td><td>Bobby Rahman M.B</td><td>DIREKSI</td><td><span class="cat feature">Aktif</span></td><td>Portal, Smart Office, HRIS, CRM</td><td><button class="btn ghost small">Edit</button></td></tr>
+          <tr><td class="key">admin@menala.co.id</td><td>(belum diset)</td><td>ADMIN</td><td><span class="cat time">Pending sync</span></td><td>Portal, HRIS, CRM</td><td><button class="btn ghost small">Edit</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 4: USER SUPABASE RAOS                                       -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel" data-panel="raos-users">
+      <h2>User Supabase RAOS</h2>
+      <div class="desc">CRUD akun <code>auth.users</code> + <code>user_profiles</code> PWA RAOS. Reset PIN, ubah email, ubah role/branch.</div>
+      <div class="sinks">
+        <span class="sink supabase">🔵 Supabase: <code>auth.users</code> + <code>user_profiles</code></span>
+        <span class="sink sheet">📊 Sheet SSOT: <code>MASTER DATA STAFF</code></span>
+      </div>
+      <div class="roadmap">
+        <strong>TODO backend:</strong> Perhatian — <code>user_profiles.source='ssot_master_staff'</code>
+        akan ter-overwrite tiap sync 1 jam kalau hanya diubah di Supabase. Perlu 2-way sync: edit di
+        CRM → (a) UPDATE Supabase langsung untuk efek immediate, (b) UPDATE row sheet SSOT MASTER
+        DATA STAFF via GAS supaya sync berikutnya tidak revert.
+      </div>
+      <div class="toolbar">
+        <input class="grow" placeholder="Cari email, nama, atau staff_id…" id="ru-search">
+        <select><option>Semua Role</option><option>direksi</option><option>admin</option><option>koordinator</option><option>staff</option></select>
+        <select><option>Semua Cabang</option><option>Soeta T1</option><option>Soeta T2</option><option>Soeta T3</option><option>Batam</option></select>
+        <button class="btn ghost small">🔄 Refresh</button>
+      </div>
+      <div class="empty"><div class="icon">🔌</div>Belum terhubung. Perlu Supabase client + service key proxy.</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 5: KONTAK EKSTERNAL                                         -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel" data-panel="contacts">
+      <h2>Kontak Eksternal</h2>
+      <div class="desc">Klien Maxim, vendor, mitra bisnis, pihak eksternal.</div>
+      <div class="sinks">
+        <span class="sink supabase">🔵 Supabase: <code>crm_contacts</code> (TODO)</span>
+      </div>
+      <div class="roadmap">
+        <strong>TODO:</strong> buat tabel <code>crm_contacts</code> di Supabase project RIFIM (bukan
+        RAOS — CRM lintas modul). Kolom: id, name, email, phone, company, category
+        (klien/vendor/mitra), tags jsonb, notes, created_at, created_by. RLS admin-only write, read
+        semua authenticated.
+      </div>
+      <div class="toolbar">
+        <input class="grow" placeholder="Cari nama, perusahaan, email…" id="ct-search">
+        <select><option>Semua Kategori</option><option>Klien Maxim</option><option>Vendor</option><option>Mitra</option></select>
+        <button class="btn">+ Tambah Kontak</button>
+      </div>
+      <div class="empty"><div class="icon">📇</div>Belum ada. Buat tabel <code>crm_contacts</code> dulu.</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 6: AUDIT LOG                                                -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel" data-panel="audit">
+      <h2>Audit Log Perubahan</h2>
+      <div class="desc">Semua perubahan config, whitelist, user Supabase, kontak. Actor + before/after + timestamp.</div>
+      <div class="sinks">
+        <span class="sink supabase">🔵 Supabase: <code>crm_audit_log</code> (TODO)</span>
+        <span class="sink github">💾 GitHub commit trail (untuk config yg di-bake)</span>
+      </div>
+      <div class="roadmap">
+        <strong>TODO:</strong> tabel <code>crm_audit_log</code> — id, actor_email, action, target_type
+        (company_config/system_config/whitelist/raos_user/contact), target_key, before jsonb, after
+        jsonb, ip, user_agent, github_commit_sha (nullable), created_at. Retensi ≥90 hari.
+      </div>
+      <div class="toolbar">
+        <input type="date" id="au-from"> — <input type="date" id="au-to">
+        <input class="grow" placeholder="Cari aktor atau target key…">
+        <select><option>Semua Aksi</option><option>Tambah</option><option>Edit</option><option>Hapus</option></select>
+        <button class="btn ghost small">Export CSV</button>
+      </div>
+      <div class="empty"><div class="icon">📋</div>Belum ada log.</div>
+    </div>
+
+  </main>
+
+  <footer>
+    RIFIM OS · CRM &copy; 2026 — Config &amp; Data Master untuk seluruh ekosistem RIFIM Group<br>
+    Integrasi 3-tier: <span style="color:#4ade80">📊 Google Sheets</span> · <span style="color:#38bdf8">🔵 Supabase</span> · <span style="color:#c084fc">💾 GitHub → Vercel</span>
+  </footer>
+
+  <div class="status-bar" id="status"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// SEED DATA — dari kedua sheet config (untuk preview UI, sebelum backend ready)
+// ═══════════════════════════════════════════════════════════════════════
+const COMPANY_CONFIG_SEED = {
+  company: [
+    ['company_name', 'PT. RIFIM Internasional Gemilang', 'Nama lengkap perusahaan (default: RIFIM)'],
+    ['company_short', 'RIFIM', 'Nama singkat untuk nomor dokumen (default)'],
+    ['company_tagline', 'Membangun Hari Ini, Menginspirasi Masa Depan', 'Tagline perusahaan'],
+    ['company_role', 'Vendor Operasional Maxim', 'Peran / bidang usaha'],
+    ['company_address', 'Fanindo Blok S No. 20, Tanjung Uncang, Batu Aji, Kota Batam', 'Alamat lengkap perusahaan'],
+    ['company_city', 'Batam', 'Kota domisili'],
+    ['company_phone', '+62 821 7010 2349', 'Nomor telepon resmi'],
+    ['company_email', 'rifiminternasionalgemilang@gmail.com', 'Email resmi perusahaan'],
+    ['company_website', 'www.rifimgroup.com', 'Website perusahaan'],
+    ['director_name', 'BOBBY RAHMAN M.B', 'Nama direktur utama'],
+    ['director_title', 'Direktur Utama', 'Jabatan direktur'],
+    ['company_npwp', '-', 'Nomor NPWP perusahaan'],
+    ['company_nib', '-', 'Nomor Induk Berusaha'],
+    ['company_siup', '-', 'Nomor SIUP'],
+  ],
+  drive: [
+    ['drive_root_folder_id', '19taBn0YXxjXTb-SxqFXGhwOPShZ4VIIt', 'ID folder root Smart Office di Google Drive'],
+    ['drive_dokumen_folder_id', '1XZDBwNNDrcLquTaKB-1cbegz7rniXdgK', 'ID folder Dokumen (hasil generate)'],
+    ['drive_folder_surat', '12xonf6PjSMJRzpcQylcuYsPzAMwlq_DO', 'ID folder Drive — Surat'],
+    ['drive_folder_invoice', '1CaihPCFzy_lRyXpJBVaP5MW0GN3NIzGW', 'ID folder Drive — Invoice'],
+    ['drive_folder_kwitansi', '15MpOYopdsJMpqz9gWspWrcX7byMTmLpU', 'ID folder Drive — Kwitansi'],
+    ['drive_folder_proposal', '1q9J3ib0LP29u5z4ZzmWvc8YsqUaO6w6V', 'ID folder Drive — Proposal'],
+    ['drive_folder_cp', '1WJevB0auuTuhmWVUHy5HaWaOZuA02Zob', 'ID folder Drive — Company Profile'],
+    ['drive_folder_mou', '1LBE86oPD9HdbHDoSMMA4M5UXojzm0i1I', 'ID folder Drive — MOU'],
+    ['drive_folder_pks', '1dXFsjTFgIWpSavXuWIKBaThmUfu3GKdP', 'ID folder Drive — Perjanjian Kerjasama'],
+    ['drive_folder_kontrak', '1fj7ccKbJQAjgcgEB23JvwBRIsII2neYU', 'ID folder Drive — Kontrak Karyawan'],
+    ['drive_folder_sp', '1M2Nch7tcV-FYpqoh1WpYOHMwLIWL34Bb', 'ID folder Drive — Surat Peringatan'],
+  ],
+  template: [
+    ['gdoc_template_surat', '1JWcGbFWiyODAaTt_2BBs_xWu2Q0xkaQYsz-KTmFi44g', 'Template Surat Resmi (fallback default)'],
+    ['gdoc_template_inv', '1pVEt4wohHQgX_X0SsKPQOQh5DF4Uk_Z3d10Ifz24j-g', 'Template Invoice (fallback default)'],
+    ['gdoc_template_pkwt', '1wE9vQKSs2VFDjMiLqrYqEEg8kGCXbwo1Cw4epDQpl_c', 'Template Kontrak PKWT (fallback default)'],
+    ['gdoc_template_sp', '1MEbbgLCiH6zUsj7Ds7JvffFfKB55YioXgI-tn2VVQC0', 'Template Surat Peringatan (fallback default)'],
+    ['gdoc_template_mou', '1h3CfgVvTvPHllw4ulyXk-p_ZLjVBhiQRhyoEQDgsGHg', 'Template MOU / PKS (fallback default)'],
+    ['gdoc_template_kwt', '1H3xjfFjUVWLYMO7-lHWBKW-JuBWhIsGdyXF8tjDRuz8', 'Template Kwitansi (fallback default)'],
+  ],
+  feature: [
+    ['timezone', 'Asia/Jakarta', 'Timezone sistem (WIB)'],
+    ['date_locale', 'id-ID', 'Locale tanggal (Indonesia)'],
+    ['pdf_export_enabled', 'TRUE', 'Aktifkan export PDF otomatis setelah generate'],
+    ['email_notify_enabled', 'FALSE', 'Kirim email notifikasi setelah generate'],
+    ['qr_enabled', 'TRUE', 'Generate QR Code link ke Google Doc'],
+    ['version', '1.1.2000', 'Versi RIFIM OS Smart Office'],
+  ],
+};
+
+const SYSTEM_CONFIG_SEED = {
+  kpi: [
+    ['KPI_PILAR_1_ORDER_MAX', '50', 'Poin max Pilar 1 mode Order (Soeta)'],
+    ['KPI_PILAR_1_SALDO_MAX', '50', 'Poin max Pilar 1 mode Saldo (cabang lain)'],
+    ['KPI_PILAR_2_DRIVER_MAX', '30', 'Poin max Pilar 2 pembinaan driver'],
+    ['KPI_PILAR_3_SOP_MAX', '20', 'Poin max Pilar 3 disiplin & SOP'],
+    ['KPI_AKTIF_TINGGI_MIN', '8', 'Threshold scan/bulan driver dianggap aktif tinggi (Pilar 2)'],
+    ['KPI_EXPECTED_WORKDAYS', '26', 'Ekspektasi hari kerja per bulan (Pilar 3)'],
+    ['KPI_BOBOT_KOORDINATOR', '1.2', 'Bobot jabatan koordinator target staff'],
+    ['KPI_BOBOT_STAFF', '1.0', 'Bobot jabatan staff'],
+  ],
+  time: [
+    ['SALDO_REMINDER_MENIT', '5', 'Menit sebelum reminder chat "Belum Diisi" dikirim'],
+    ['SALDO_SYNC_MENIT', '5', 'Interval sync raos_saldo_requests → sheet Form Isi Saldo'],
+    ['ATTENDANCE_TOLERANCE_MENIT', '15', 'Toleransi keterlambatan absensi (menit)'],
+    ['GEOFENCE_TOLERANCE_METER', '50', 'Toleransi hard-block scan/absen di luar radius (staff only)'],
+    ['AUTO_CHECKOUT_TIME', '23:59', 'Waktu auto checkout jika staff lupa absen pulang'],
+    ['DATA_RETENTION_DAYS', '30', 'Retensi log activity & sistem (hari)'],
+  ],
+  integration: [
+    ['EMAIL_ADMIN', 'rifiminternationalgemilang@gmail.com', 'Email penerima laporan harian'],
+    ['COMPANY_NAME', 'PT. Rifim Internasional Gemilang', 'Nama perusahaan'],
+    ['APP_VERSION', '2.0.0-multicabang', 'Versi aplikasi RAOS (P1-P3 multi-cabang)'],
+    ['SSOT_STAFF_SHEET_ID', '1fcraq3QHqIaD-13Ebzt6stT9aA6j_loTXeAtpNX12kw', 'Spreadsheet MASTER DATA STAFF'],
+    ['SSOT_DRIVER_SHEET_ID', '1FEZxyHPx_GCQKw92hLSf6QxxkXgZn5R1sRswOYM_Tlc', 'Spreadsheet Database Driver Airport'],
+    ['SUPABASE_URL', 'https://vlievtojpmrbsmzlqswl.supabase.co', 'URL project Supabase RAOS'],
+  ],
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// AUTH GATE
+// ═══════════════════════════════════════════════════════════════════════
+function checkAuth() {
+  let sess = null;
+  try { sess = JSON.parse(localStorage.getItem('rifim_auth') || 'null'); } catch(e) {}
+  if (!sess || !sess.email) {
+    document.getElementById('gate').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    return null;
+  }
+  if (sess.ts && Date.now() - sess.ts > 12 * 3600 * 1000) {
+    localStorage.removeItem('rifim_auth');
+    document.getElementById('gate').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    return null;
+  }
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('hdr-name').textContent = sess.name || sess.email;
+  document.getElementById('hdr-role').textContent = (sess.role || 'USER').toUpperCase();
+  return sess;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// RENDER CONFIG TABLES
+// ═══════════════════════════════════════════════════════════════════════
+const dirty = { company: new Set(), system: new Set() };
+
+function renderRow(tbody, section, cat, [key, val, desc]) {
+  const tr = document.createElement('tr');
+  tr.dataset.key = key;
+  tr.innerHTML = `
+    <td class="key">${key}</td>
+    <td class="val"><input value="${(val || '').toString().replace(/"/g,'&quot;')}" data-key="${key}" data-section="${section}"></td>
+    <td class="desc-cell">${desc || ''}</td>
+    <td><span class="cat ${cat}">${cat}</span></td>
+  `;
+  const input = tr.querySelector('input');
+  const orig = input.value;
+  input.addEventListener('input', () => {
+    const isDirty = input.value !== orig;
+    if (isDirty) dirty[section].add(key); else dirty[section].delete(key);
+    tr.style.background = isDirty ? 'rgba(234,179,8,.08)' : '';
+    document.getElementById(section === 'company' ? 'cc-save' : 'sc-save').disabled = dirty[section].size === 0;
+  });
+  tbody.appendChild(tr);
+}
+
+function renderCompanyConfig() {
+  const map = [
+    ['cc-company', 'company', COMPANY_CONFIG_SEED.company],
+    ['cc-drive', 'drive', COMPANY_CONFIG_SEED.drive],
+    ['cc-template', 'template', COMPANY_CONFIG_SEED.template],
+    ['cc-feature', 'feature', COMPANY_CONFIG_SEED.feature],
+  ];
+  for (const [id, cat, rows] of map) {
+    const tb = document.getElementById(id); tb.innerHTML = '';
+    for (const row of rows) renderRow(tb, 'company', cat, row);
+  }
+}
+
+function renderSystemConfig() {
+  const map = [
+    ['sc-kpi', 'kpi', SYSTEM_CONFIG_SEED.kpi],
+    ['sc-time', 'time', SYSTEM_CONFIG_SEED.time],
+    ['sc-integration', 'integration', SYSTEM_CONFIG_SEED.integration],
+  ];
+  for (const [id, cat, rows] of map) {
+    const tb = document.getElementById(id); tb.innerHTML = '';
+    for (const row of rows) renderRow(tb, 'system', cat, row);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SAVE HANDLERS (TODO: backend integration)
+// ═══════════════════════════════════════════════════════════════════════
+function showStatus(msg, kind) {
+  const bar = document.getElementById('status');
+  bar.textContent = msg;
+  bar.className = 'status-bar show ' + (kind || '');
+  setTimeout(() => bar.classList.remove('show'), 4000);
+}
+
+document.getElementById('cc-save').addEventListener('click', async () => {
+  const keys = [...dirty.company];
+  const payload = keys.map(k => {
+    const input = document.querySelector(`input[data-section="company"][data-key="${k}"]`);
+    return { key: k, value: input.value };
+  });
+  console.log('COMPANY_CONFIG save payload:', payload);
+  // TODO: POST ke GAS Smart Office ?action=company_config_set
+  showStatus(`TODO: kirim ${payload.length} perubahan ke GAS Smart Office`, 'ok');
+});
+
+document.getElementById('sc-save').addEventListener('click', async () => {
+  const keys = [...dirty.system];
+  const payload = keys.map(k => {
+    const input = document.querySelector(`input[data-section="system"][data-key="${k}"]`);
+    return { key: k, value: input.value };
+  });
+  console.log('SYSTEM_CONFIG save payload:', payload);
+  // TODO: (a) POST GAS RAOS, (b) Supabase RPC set_system_config
+  showStatus(`TODO: kirim ${payload.length} perubahan ke GAS RAOS + Supabase`, 'ok');
+});
+
+['cc-refresh', 'sc-refresh'].forEach(id => {
+  document.getElementById(id).addEventListener('click', () => {
+    showStatus('TODO: re-fetch dari GAS endpoint (belum implementasi)', 'err');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// TAB ROUTER
+// ═══════════════════════════════════════════════════════════════════════
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === btn));
+    document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.dataset.panel === target));
+    history.replaceState(null, '', '/crm#' + target);
+  });
+});
+
+const initTab = location.hash.replace('#', '') || 'company';
+const initBtn = document.querySelector(`.tab[data-tab="${initTab}"]`);
+if (initBtn) initBtn.click();
+
+if (checkAuth()) {
+  renderCompanyConfig();
+  renderSystemConfig();
+}
+</script>
+
+</body>
+</html>

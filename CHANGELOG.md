@@ -9,6 +9,9 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added / Fixed — Document Studio HTML→PDF Pipeline + DDS v3.0 (2026-07-19)
+### Added / Updated — AI Prompt Caching Standardization (2026-07-19)
+- `PROJECT_RULES.md` — Tambah seksi "AI Integration Rules" (Rule 67-68): wajib menggunakan Prompt Caching (Cache Otomatis) untuk efisiensi token API Claude.
+- `CLAUDE.md` — Tambah standar teknis `cache_control` ephemeral pada integrasi Google Apps Script untuk modul AI Assistant (Sprint 3+).
 
 **HTML→PDF Pipeline enhancements** (`automation/apps-script/htmlTemplateEngine.js`):
 - Signature composite via **Slides API v1 advanced service** — TTD 45mm overlay stempel 30mm (offset X:18mm Y:6mm) sesuai DOCUMENT DESIGN SYSTEM spec, disimpan sebagai PNG di Drive folder `19taBn0Y...` dan di-cache 6 jam via `CacheService` (nama file `signature-combined-{CODE}-v2.png`)

@@ -7,8 +7,14 @@
     { "source": "/smart-office/(.*)", "destination": "/modules/smart-office/$1" },
     { "source": "/hris", "destination": "/modules/hris/index.html" },
     { "source": "/hris/(.*)", "destination": "/modules/hris/$1" },
-    { "source": "/raos", "destination": "/modules/raos/index.html" },
-    { "source": "/raos/(.*)", "destination": "/modules/raos/$1" }
+    { "source": "/crm", "destination": "/modules/crm/index.html" },
+    { "source": "/crm/(.*)", "destination": "/modules/crm/$1" },
+    { "source": "/finance", "destination": "/modules/finance/index.html" },
+    { "source": "/finance/(.*)", "destination": "/modules/finance/$1" }
+  ],
+  "redirects": [
+    { "source": "/raos", "destination": "https://raos-menala.vercel.app", "permanent": false },
+    { "source": "/raos/(.*)", "destination": "https://raos-menala.vercel.app/$1", "permanent": false }
   ],
   "headers": [
     {

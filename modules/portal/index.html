@@ -233,19 +233,28 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
         <div class="mod-arrow">→</div>
       </div>
 
-      <div class="mod-card active-mod" onclick="goTo('/raos')">
+      <div class="mod-card active-mod" onclick="window.open('https://raos-menala.vercel.app','_blank','noopener')">
         <span class="mod-icon">🚗</span>
         <div class="mod-name">RAOS</div>
-        <div class="mod-desc">Armada, monitoring driver, dan operasional rideshare</div>
+        <div class="mod-desc">Armada, monitoring driver, dan operasional rideshare — PWA terpisah</div>
+        <span class="mod-tag tag-on">Buka PWA ↗</span>
+        <div class="mod-arrow">↗</div>
+      </div>
+
+      <div class="mod-card active-mod" onclick="goTo('/crm')">
+        <span class="mod-icon">📇</span>
+        <div class="mod-name">CRM</div>
+        <div class="mod-desc">Manajemen email login, user Supabase, kontak eksternal, audit log</div>
         <span class="mod-tag tag-on">Aktif</span>
         <div class="mod-arrow">→</div>
       </div>
 
-      <div class="mod-card disabled-mod">
+      <div class="mod-card active-mod" onclick="goTo('/finance')">
         <span class="mod-icon">💰</span>
         <div class="mod-name">Finance</div>
-        <div class="mod-desc">Laporan keuangan, anggaran, dan rekap transaksi</div>
-        <span class="mod-tag tag-off">Segera Hadir</span>
+        <div class="mod-desc">Lunasi Isi Saldo lintas cabang, laporan keuangan, anggaran</div>
+        <span class="mod-tag tag-on">Aktif</span>
+        <div class="mod-arrow">→</div>
       </div>
 
     </div>
