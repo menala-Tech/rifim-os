@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#1A1A1A">
 <title>RIFIM OS — CRM &amp; Config Center</title>
 <link rel="manifest" href="/manifest.json">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -540,21 +541,80 @@ document.getElementById('cc-save').addEventListener('click', async () => {
   showStatus(`TODO: kirim ${payload.length} perubahan ke GAS Smart Office`, 'ok');
 });
 
+// ═══════════════════════════════════════════════════════════════════════
+// SUPABASE CLIENT (RAOS project) — untuk RPC set_system_config
+// ═══════════════════════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co';
+// Publishable key (safe to embed — RLS enforces access, RPC checks role via get_my_role())
+const SUPABASE_ANON_KEY = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+let _sb = null;
+function getSb() {
+  if (_sb) return _sb;
+  if (typeof window.supabase === 'undefined') {
+    showStatus('Supabase SDK belum load — refresh halaman', 'err');
+    return null;
+  }
+  _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  return _sb;
+}
+
 document.getElementById('sc-save').addEventListener('click', async () => {
+  const sb = getSb();
+  if (!sb) return;
   const keys = [...dirty.system];
   const payload = keys.map(k => {
     const input = document.querySelector(`input[data-section="system"][data-key="${k}"]`);
     return { key: k, value: input.value };
   });
-  console.log('SYSTEM_CONFIG save payload:', payload);
-  // TODO: (a) POST GAS RAOS, (b) Supabase RPC set_system_config
-  showStatus(`TODO: kirim ${payload.length} perubahan ke GAS RAOS + Supabase`, 'ok');
+
+  showStatus(`Menyimpan ${payload.length} perubahan ke Supabase…`, '');
+  const btn = document.getElementById('sc-save');
+  btn.disabled = true;
+
+  const results = { ok: 0, err: 0, errors: [] };
+  for (const item of payload) {
+    const { data, error } = await sb.rpc('set_system_config', {
+      p_key: item.key, p_value: item.value,
+    });
+    if (error) { results.err++; results.errors.push(`${item.key}: ${error.message}`); }
+    else { results.ok++; }
+  }
+
+  if (results.err === 0) {
+    showStatus(`✅ ${results.ok} config tersimpan ke Supabase`, 'ok');
+    dirty.system.clear();
+    // Reset row highlight
+    document.querySelectorAll('[data-panel="system"] tr').forEach(tr => tr.style.background = '');
+  } else {
+    showStatus(`⚠️ ${results.ok} sukses, ${results.err} gagal: ${results.errors[0]}`, 'err');
+    btn.disabled = false;
+  }
+  console.log('SYSTEM_CONFIG save result:', results);
+  // NOTE: Sheet SISTEM CONFIG belum di-sync — perlu GAS extension terpisah
+  // (?action=sistem_config_set) untuk 2-way write (sheet + Supabase mirror).
 });
 
-['cc-refresh', 'sc-refresh'].forEach(id => {
-  document.getElementById(id).addEventListener('click', () => {
-    showStatus('TODO: re-fetch dari GAS endpoint (belum implementasi)', 'err');
+document.getElementById('cc-refresh').addEventListener('click', () => {
+  showStatus('TODO: GAS Smart Office endpoint company_config_get belum ada', 'err');
+});
+
+document.getElementById('sc-refresh').addEventListener('click', async () => {
+  const sb = getSb();
+  if (!sb) return;
+  showStatus('Loading dari Supabase…', '');
+  const { data, error } = await sb.rpc('list_system_config');
+  if (error) { showStatus('❌ ' + error.message, 'err'); return; }
+  if (!data || data.length === 0) { showStatus('Tabel system_config kosong', 'err'); return; }
+  // Update input values dengan data live
+  let updated = 0;
+  data.forEach(row => {
+    const input = document.querySelector(`input[data-section="system"][data-key="${row.key}"]`);
+    if (input) { input.value = row.value || ''; input.dataset.orig = input.value; updated++; }
   });
+  dirty.system.clear();
+  document.getElementById('sc-save').disabled = true;
+  document.querySelectorAll('[data-panel="system"] tr').forEach(tr => tr.style.background = '');
+  showStatus(`✅ Refresh: ${updated} field ter-update dari Supabase (${data.length} total)`, 'ok');
 });
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -242,6 +242,12 @@ function _json(obj) {
  * Handle GET — health check & info.
  */
 function doGet(e) {
+  // CRM API dispatcher (sesi 2026-08-02) — return early kalau action
+  // adalah CRM endpoint (company_config_*, whitelist_*, crm_audit_tail).
+  // File: crmApi.js
+  var crmResp = crmHandleGet(e);
+  if (crmResp) return crmResp;
+
   const action = e && e.parameter && e.parameter.action;
 
   if (action === 'staff_list') {

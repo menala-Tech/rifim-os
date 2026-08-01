@@ -115,6 +115,17 @@ function authUpsertUser(userData) {
 
 // ─── Private ────────────────────────────────────────────────────
 
+// Hardcoded admin emails yang SELALU boleh akses portal — safety net
+// supaya akun direksi utama tidak pernah ter-lockout meski sheet
+// `company_config.allowed_emails` bermasalah / kosong.
+// Sesi 2026-08-02: admin@menala.com adalah account direksi utama
+// (rename dari rifiminternationalgemilang@gmail.com). Tetap listing
+// email lama supaya session lama tidak putus.
+var _EMERGENCY_ADMIN_EMAILS = [
+  'admin@menala.com',
+  'rifiminternationalgemilang@gmail.com',
+];
+
 function _buildAllowedList(config) {
   var list = [];
   if (config.company_email) list.push(config.company_email.toLowerCase().trim());
@@ -124,6 +135,9 @@ function _buildAllowedList(config) {
       if (t) list.push(t);
     });
   }
+  _EMERGENCY_ADMIN_EMAILS.forEach(function(e) {
+    if (list.indexOf(e) === -1) list.push(e);
+  });
   return list;
 }
 
