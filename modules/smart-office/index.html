@@ -260,6 +260,10 @@
       color: var(--text); background: var(--white); transition: border-color .12s; outline: none;
     }
     .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--red); }
+    /* Dropdown popup: paksa text hitam bg putih supaya konsisten & kebaca
+       untuk semua <select> (Smart Office pakai light theme, tapi safety net) */
+    select option { color: #000; background: #fff; padding: 6px 10px; }
+    select option:checked { background: var(--red); color: #fff; }
     .field textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
     .field-hint { font-size: 9.5px; color: var(--muted); }
     .doc-num-box {

@@ -108,6 +108,10 @@ main{flex:1;padding:24px;max-width:1400px;width:100%;margin:0 auto}
   padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;
 }
 .toolbar input{flex:1;min-width:160px}
+/* Dropdown popup: paksa text hitam bg putih supaya kebaca di semua select
+   (termasuk company-selector di header yg pakai color:#fff inline) */
+select option{color:#000;background:#fff;padding:6px 10px}
+select option:checked{background:var(--red);color:#fff}
 
 /* ─── BUTTONS ─── */
 .btn{
@@ -555,14 +559,22 @@ tr:last-child td{border-bottom:none}
           <label>Cabang</label>
           <select id="emp-branch">
             <option value="">-- Pilih Cabang --</option>
-            <option>ID Rifim Airport Jambi</option>
-            <option>ID Rifim Airport Batam</option>
-            <option>ID Rifim Airport Balikpapan</option>
-            <option>ID Rifim Airport Pekanbaru</option>
-            <option>ID Rifim Airport Manado</option>
-            <option>ID Rifim Airport Makassar</option>
-            <option>ID Rifim Airport Soeta</option>
-            <option>Head Office</option>
+            <optgroup label="Airport (Vendor Maxim)">
+              <option>ID Rifim Airport Soeta</option>
+              <option>ID Rifim Airport Batam</option>
+              <option>ID Rifim Airport Jambi</option>
+              <option>ID Rifim Airport Balikpapan</option>
+              <option>ID Rifim Airport Manado</option>
+              <option>ID Rifim Airport Pekanbaru</option>
+              <option>ID Rifim Airport Makassar</option>
+            </optgroup>
+            <optgroup label="Non-Airport">
+              <option>ID Rifim Batam</option>
+              <option>ID Rifim Jambi Luar</option>
+            </optgroup>
+            <optgroup label="Support">
+              <option>Head Office</option>
+            </optgroup>
           </select>
         </div>
         <div class="form-group">
@@ -925,14 +937,22 @@ tr:last-child td{border-bottom:none}
           <label>Cabang</label>
           <select id="edit-emp-branch">
             <option value="">-- Pilih Cabang --</option>
-            <option>ID Rifim Airport Jambi</option>
-            <option>ID Rifim Airport Batam</option>
-            <option>ID Rifim Airport Balikpapan</option>
-            <option>ID Rifim Airport Pekanbaru</option>
-            <option>ID Rifim Airport Manado</option>
-            <option>ID Rifim Airport Makassar</option>
-            <option>ID Rifim Airport Soeta</option>
-            <option>Head Office</option>
+            <optgroup label="Airport (Vendor Maxim)">
+              <option>ID Rifim Airport Soeta</option>
+              <option>ID Rifim Airport Batam</option>
+              <option>ID Rifim Airport Jambi</option>
+              <option>ID Rifim Airport Balikpapan</option>
+              <option>ID Rifim Airport Manado</option>
+              <option>ID Rifim Airport Pekanbaru</option>
+              <option>ID Rifim Airport Makassar</option>
+            </optgroup>
+            <optgroup label="Non-Airport">
+              <option>ID Rifim Batam</option>
+              <option>ID Rifim Jambi Luar</option>
+            </optgroup>
+            <optgroup label="Support">
+              <option>Head Office</option>
+            </optgroup>
           </select>
         </div>
         <div class="form-group">

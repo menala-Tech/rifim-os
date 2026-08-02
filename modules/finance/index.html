@@ -79,6 +79,11 @@ main{max-width:1400px;margin:0 auto;padding:24px;width:100%}
 .toolbar input,.toolbar select{padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
   border-radius:8px;color:#fff;font-size:13px;outline:none}
 .toolbar input:focus{border-color:var(--red)}
+/* Dropdown popup: paksa text hitam bg putih supaya kebaca (default browser
+   render option di popup native — kalau parent color:#fff maka option juga
+   putih di popup putih = invisible) */
+select option{color:#000;background:#fff;padding:6px 10px}
+select option:checked{background:var(--red);color:#fff}
 .toolbar .grow{flex:1;min-width:200px}
 .btn{padding:9px 16px;background:var(--red);color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer}
 .btn:hover{background:var(--red-mid)}
