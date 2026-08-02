@@ -71,6 +71,9 @@ main{max-width:1280px;margin:0 auto;padding:24px;width:100%}
 .toolbar input,.toolbar select{padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
   border-radius:8px;color:#fff;font-size:13px;outline:none}
 .toolbar input:focus{border-color:var(--red)}
+/* Dropdown popup: browser render <option> di popup native — paksa text hitam bg putih supaya kebaca */
+.toolbar select option{color:#000;background:#fff;padding:6px 10px}
+.toolbar select option:checked{background:var(--red);color:#fff}
 .toolbar .grow{flex:1;min-width:200px}
 .btn{padding:9px 16px;background:var(--red);color:#fff;border:none;border-radius:8px;font-weight:600;
   font-size:13px;cursor:pointer}
@@ -301,8 +304,29 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
       </div>
       <div class="toolbar">
         <input class="grow" placeholder="Cari email, nama, atau staff_id…" id="ru-search">
-        <select><option>Semua Role</option><option>direksi</option><option>admin</option><option>koordinator</option><option>staff</option></select>
-        <select><option>Semua Cabang</option><option>Soeta T1</option><option>Soeta T2</option><option>Soeta T3</option><option>Batam</option></select>
+        <select id="ru-filter-role">
+          <option value="">Semua Role</option>
+          <option value="direksi">Direksi</option>
+          <option value="management">Management</option>
+          <option value="admin">Admin</option>
+          <option value="koordinator">Koordinator</option>
+          <option value="staff">Staff</option>
+          <option value="driver">Driver</option>
+        </select>
+        <select id="ru-filter-branch">
+          <option value="">Semua Cabang</option>
+          <option value="soeta-t1">ID Rifim Airport Soeta — T1</option>
+          <option value="soeta-t2">ID Rifim Airport Soeta — T2</option>
+          <option value="soeta-t3">ID Rifim Airport Soeta — T3</option>
+          <option value="batam-airport">ID Rifim Airport Batam</option>
+          <option value="jambi-airport">ID Rifim Airport Jambi</option>
+          <option value="balikpapan-airport">ID Rifim Airport Balikpapan</option>
+          <option value="manado-airport">ID Rifim Airport Manado</option>
+          <option value="pekanbaru-airport">ID Rifim Airport Pekanbaru</option>
+          <option value="makassar-airport">ID Rifim Airport Makassar</option>
+          <option value="batam-non-airport">ID Rifim Batam (non-airport)</option>
+          <option value="jambi-luar">ID Rifim Jambi Luar</option>
+        </select>
         <button class="btn ghost small">🔄 Refresh</button>
       </div>
       <div class="empty"><div class="icon">🔌</div>Belum terhubung. Perlu Supabase client + service key proxy.</div>
@@ -325,7 +349,19 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
       </div>
       <div class="toolbar">
         <input class="grow" placeholder="Cari nama, perusahaan, email…" id="ct-search">
-        <select><option>Semua Kategori</option><option>Klien Maxim</option><option>Vendor</option><option>Mitra</option></select>
+        <select id="ct-filter-category">
+          <option value="">Semua Kategori</option>
+          <option value="klien_maxim">Klien Maxim</option>
+          <option value="vendor_operasional">Vendor Operasional</option>
+          <option value="vendor_it">Vendor IT / Software</option>
+          <option value="mitra_bisnis">Mitra Bisnis</option>
+          <option value="mitra_bandara">Mitra Bandara (Otoritas / Angkasa Pura)</option>
+          <option value="pemerintah">Instansi Pemerintah</option>
+          <option value="perbankan">Perbankan / Financial</option>
+          <option value="konsultan">Konsultan (Legal / Pajak / HR)</option>
+          <option value="supplier">Supplier Aset / Kendaraan</option>
+          <option value="lainnya">Lainnya</option>
+        </select>
         <button class="btn">+ Tambah Kontak</button>
       </div>
       <div class="empty"><div class="icon">📇</div>Belum ada. Buat tabel <code>crm_contacts</code> dulu.</div>
@@ -348,11 +384,30 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
       </div>
       <div class="toolbar">
         <input type="date" id="au-from"> — <input type="date" id="au-to">
-        <input class="grow" placeholder="Cari aktor atau target key…">
-        <select><option>Semua Aksi</option><option>Tambah</option><option>Edit</option><option>Hapus</option></select>
-        <button class="btn ghost small">Export CSV</button>
+        <input class="grow" placeholder="Cari aktor atau target key…" id="au-search">
+        <select id="au-filter-action">
+          <option value="">Semua Aksi</option>
+          <option value="add">Tambah</option>
+          <option value="edit">Edit</option>
+          <option value="update">Update</option>
+          <option value="remove">Hapus</option>
+        </select>
+        <button class="btn ghost small" id="au-refresh">🔄 Refresh</button>
       </div>
-      <div class="empty"><div class="icon">📋</div>Belum ada log.</div>
+      <table class="cfg-table">
+        <thead>
+          <tr>
+            <th style="width:150px">Waktu (WIB)</th>
+            <th style="width:200px">Aktor</th>
+            <th style="width:80px">Aksi</th>
+            <th style="width:120px">Target</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody id="au-body">
+          <tr><td colspan="5" class="empty" style="padding:20px">Loading…</td></tr>
+        </tbody>
+      </table>
     </div>
 
   </main>
@@ -532,13 +587,30 @@ function showStatus(msg, kind) {
 
 document.getElementById('cc-save').addEventListener('click', async () => {
   const keys = [...dirty.company];
-  const payload = keys.map(k => {
+  if (keys.length === 0) return;
+  const btn = document.getElementById('cc-save');
+  btn.disabled = true;
+  showStatus(`Menyimpan ${keys.length} perubahan ke sheet company_config…`, '');
+  const me = _wlCurrentUserEmail();
+  const results = { ok: 0, err: 0, errors: [] };
+  for (const k of keys) {
     const input = document.querySelector(`input[data-section="company"][data-key="${k}"]`);
-    return { key: k, value: input.value };
-  });
-  console.log('COMPANY_CONFIG save payload:', payload);
-  // TODO: POST ke GAS Smart Office ?action=company_config_set
-  showStatus(`TODO: kirim ${payload.length} perubahan ke GAS Smart Office`, 'ok');
+    try {
+      const data = await _gasCall('company_config_set', { key: k, value: input.value, user: me });
+      if (!data.success) { results.err++; results.errors.push(`${k}: ${data.message}`); }
+      else { results.ok++; }
+    } catch (err) {
+      results.err++; results.errors.push(`${k}: ${err.message}`);
+    }
+  }
+  if (results.err === 0) {
+    showStatus(`✅ ${results.ok} config tersimpan ke sheet`, 'ok');
+    dirty.company.clear();
+    document.querySelectorAll('[data-panel="company"] tr').forEach(tr => tr.style.background = '');
+  } else {
+    showStatus(`⚠️ ${results.ok} sukses, ${results.err} gagal: ${results.errors[0]}`, 'err');
+    btn.disabled = false;
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -594,8 +666,25 @@ document.getElementById('sc-save').addEventListener('click', async () => {
   // (?action=sistem_config_set) untuk 2-way write (sheet + Supabase mirror).
 });
 
-document.getElementById('cc-refresh').addEventListener('click', () => {
-  showStatus('TODO: GAS Smart Office endpoint company_config_get belum ada', 'err');
+document.getElementById('cc-refresh').addEventListener('click', async () => {
+  showStatus('Loading dari sheet company_config…', '');
+  try {
+    const me = _wlCurrentUserEmail();
+    const data = await _gasCall('company_config_list', { user: me });
+    if (!data.success) throw new Error(data.message || 'Gagal load');
+    const rows = data.config || [];
+    let updated = 0;
+    rows.forEach(row => {
+      const input = document.querySelector(`input[data-section="company"][data-key="${row.key}"]`);
+      if (input) { input.value = row.value == null ? '' : String(row.value); updated++; }
+    });
+    dirty.company.clear();
+    document.getElementById('cc-save').disabled = true;
+    document.querySelectorAll('[data-panel="company"] tr').forEach(tr => tr.style.background = '');
+    showStatus(`✅ Refresh: ${updated} field ter-update dari sheet (${rows.length} total)`, 'ok');
+  } catch (err) {
+    showStatus('❌ ' + err.message, 'err');
+  }
 });
 
 document.getElementById('sc-refresh').addEventListener('click', async () => {
@@ -753,19 +842,106 @@ document.getElementById('wl-new-email').addEventListener('keydown', e => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+// AUDIT LOG — wire ke GAS endpoint crm_audit_tail (baca sheet CRM_AUDIT_LOG)
+// ═══════════════════════════════════════════════════════════════════════
+let _auCache = [];
+
+function _fmtWib(ts) {
+  if (!ts) return '';
+  try {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return String(ts);
+    return d.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', hour12: false });
+  } catch (e) { return String(ts); }
+}
+
+function _escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function renderAuditRows() {
+  const tbody = document.getElementById('au-body');
+  const actionFilter = (document.getElementById('au-filter-action').value || '').toLowerCase();
+  const search = (document.getElementById('au-search').value || '').toLowerCase();
+  const fromStr = document.getElementById('au-from').value;
+  const toStr   = document.getElementById('au-to').value;
+  const fromTs = fromStr ? new Date(fromStr + 'T00:00:00+07:00').getTime() : 0;
+  const toTs   = toStr   ? new Date(toStr   + 'T23:59:59+07:00').getTime() : Infinity;
+
+  const filtered = _auCache.filter(r => {
+    const act = String(r.action || '').toLowerCase();
+    if (actionFilter && act !== actionFilter) return false;
+    if (search) {
+      const hay = (String(r.actor_email || '') + ' ' + String(r.target_key || '') + ' ' + String(r.target_type || '')).toLowerCase();
+      if (hay.indexOf(search) === -1) return false;
+    }
+    const t = r.timestamp ? new Date(r.timestamp).getTime() : 0;
+    if (t < fromTs || t > toTs) return false;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty" style="padding:20px">Tidak ada log yang cocok filter</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(r => {
+    const before = r.before ? String(r.before).substring(0, 60) : '';
+    const after  = r.after  ? String(r.after ).substring(0, 60) : '';
+    const detail = before && after
+      ? `<span style="color:#f87171">${_escapeHtml(before)}</span> → <span style="color:#4ade80">${_escapeHtml(after)}</span>`
+      : after ? `<span style="color:#4ade80">${_escapeHtml(after)}</span>`
+      : before ? `<span style="color:#f87171">${_escapeHtml(before)}</span>` : '';
+    return `
+      <tr>
+        <td class="desc-cell" style="white-space:nowrap">${_escapeHtml(_fmtWib(r.timestamp))}</td>
+        <td class="key">${_escapeHtml(r.actor_email)}</td>
+        <td><span class="cat feature">${_escapeHtml(r.action)}</span></td>
+        <td class="desc-cell">${_escapeHtml(r.target_type)}<br><span style="font-size:11px;color:#facc15">${_escapeHtml(r.target_key)}</span></td>
+        <td class="desc-cell" style="font-size:11px;line-height:1.5">${detail}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function loadAuditLog() {
+  const tbody = document.getElementById('au-body');
+  tbody.innerHTML = '<tr><td colspan="5" class="empty" style="padding:20px">Loading…</td></tr>';
+  try {
+    const me = _wlCurrentUserEmail();
+    const data = await _gasCall('crm_audit_tail', { user: me, limit: 200 });
+    if (!data.success) throw new Error(data.message || 'Gagal load');
+    _auCache = data.logs || [];
+    if (_auCache.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty" style="padding:20px">Belum ada log — belum ada aktivitas write dari CRM</td></tr>';
+      return;
+    }
+    renderAuditRows();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty" style="padding:20px;color:#f87171">❌ ${err.message}</td></tr>`;
+  }
+}
+
+document.getElementById('au-refresh').addEventListener('click', loadAuditLog);
+document.getElementById('au-search').addEventListener('input', () => renderAuditRows());
+document.getElementById('au-filter-action').addEventListener('change', () => renderAuditRows());
+document.getElementById('au-from').addEventListener('change', () => renderAuditRows());
+document.getElementById('au-to').addEventListener('change', () => renderAuditRows());
+
+// ═══════════════════════════════════════════════════════════════════════
 // TAB ROUTER
 // ═══════════════════════════════════════════════════════════════════════
-let _wlLoaded = false;
+const _tabLoaded = { whitelist: false, audit: false };
 document.querySelectorAll('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const target = btn.dataset.tab;
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === btn));
     document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.dataset.panel === target));
     history.replaceState(null, '', '/crm#' + target);
-    if (target === 'whitelist' && !_wlLoaded) {
-      _wlLoaded = true;
-      loadWhitelist();
-    }
+    if (target === 'whitelist' && !_tabLoaded.whitelist) { _tabLoaded.whitelist = true; loadWhitelist(); }
+    if (target === 'audit'     && !_tabLoaded.audit)     { _tabLoaded.audit     = true; loadAuditLog(); }
   });
 });
 
