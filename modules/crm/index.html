@@ -258,29 +258,29 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div class="panel" data-panel="whitelist">
       <h2>Email Login Portal Rifim OS</h2>
-      <div class="desc">Daftar email yang diizinkan login ke <code>rifim-os.vercel.app/portal</code>. Auth email-only via GAS.</div>
+      <div class="desc">Daftar email yang diizinkan login ke <code>rifim-os.vercel.app/portal</code>. Auth email-only via GAS <code>authVerifyUser</code>.</div>
       <div class="sinks">
-        <span class="sink sheet">📊 Sheet: whitelist tab di RIFIM OS backend</span>
-        <span class="sink gas">🔧 GAS action: <code>whitelist_list/add/remove</code></span>
-      </div>
-      <div class="roadmap">
-        <strong>TODO backend:</strong> extend GAS RIFIM OS dengan 4 action baru
-        (<code>whitelist_list</code>, <code>whitelist_add</code>, <code>whitelist_update</code>,
-        <code>whitelist_remove</code>), semua admin-only, semua write ke tab <code>Whitelist</code> +
-        audit log ke tab <code>activity_log</code>. Ganti email di sini → user langsung bisa/tidak
-        bisa login portal.
+        <span class="sink sheet">📊 Sheet: <code>company_config.allowed_emails</code> (comma-separated)</span>
+        <span class="sink gas">🔧 GAS action: <code>whitelist_list / _add / _remove</code></span>
       </div>
       <div class="toolbar">
-        <input class="grow" placeholder="Cari email atau nama…" id="wl-search">
-        <button class="btn" onclick="alert('TODO: form add email — extend GAS backend dulu')">+ Tambah Email</button>
+        <input class="grow" placeholder="admin@example.com" id="wl-new-email" type="email">
+        <button class="btn" id="wl-add-btn">+ Tambah Email</button>
+        <button class="btn ghost small" id="wl-refresh">🔄 Refresh</button>
       </div>
       <table class="cfg-table">
-        <thead><tr><th>Email</th><th>Nama</th><th>Role</th><th>Status</th><th>Modul Akses</th><th>Aksi</th></tr></thead>
+        <thead><tr><th>Email</th><th>Sumber</th><th style="width:120px">Aksi</th></tr></thead>
         <tbody id="wl-body">
-          <tr><td class="key">rifiminternationalgemilang@gmail.com</td><td>Bobby Rahman M.B</td><td>DIREKSI</td><td><span class="cat feature">Aktif</span></td><td>Portal, Smart Office, HRIS, CRM</td><td><button class="btn ghost small">Edit</button></td></tr>
-          <tr><td class="key">admin@menala.co.id</td><td>(belum diset)</td><td>ADMIN</td><td><span class="cat time">Pending sync</span></td><td>Portal, HRIS, CRM</td><td><button class="btn ghost small">Edit</button></td></tr>
+          <tr><td colspan="3" class="empty" style="padding:20px">Loading…</td></tr>
         </tbody>
       </table>
+      <div style="margin-top:12px;font-size:11px;color:#888;line-height:1.6">
+        <strong style="color:#facc15">Catatan:</strong> Emergency admin (<code>admin@menala.com</code>,
+        <code>rifiminternationalgemilang@gmail.com</code>) di-hardcode di
+        <code>authEngine.js</code> dan selalu aktif — tidak muncul di list ini kalau belum
+        ditambah ke <code>allowed_emails</code>. Hapus dari hardcode dulu kalau mau non-aktifkan
+        via panel ini.
+      </div>
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -618,14 +618,110 @@ document.getElementById('sc-refresh').addEventListener('click', async () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+// WHITELIST PORTAL — wire ke GAS endpoint whitelist_list/add/remove
+// ═══════════════════════════════════════════════════════════════════════
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec';
+
+function _wlCurrentUserEmail() {
+  try {
+    const s = JSON.parse(localStorage.getItem('rifim_auth') || 'null');
+    return s && s.email ? s.email : '';
+  } catch (e) { return ''; }
+}
+
+async function _gasCall(action, extra) {
+  const qs = new URLSearchParams(Object.assign({ action }, extra || {}));
+  const res = await fetch(GAS_URL + '?' + qs.toString());
+  return res.json();
+}
+
+async function loadWhitelist() {
+  const tbody = document.getElementById('wl-body');
+  tbody.innerHTML = '<tr><td colspan="3" class="empty" style="padding:20px">Loading…</td></tr>';
+  try {
+    const me = _wlCurrentUserEmail();
+    if (!me) throw new Error('Session portal tidak ditemukan');
+    const data = await _gasCall('whitelist_list', { user: me });
+    if (!data.success) throw new Error(data.message || 'Gagal load');
+    const emails = data.whitelist || [];
+    if (emails.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" class="empty" style="padding:20px">Belum ada email di whitelist</td></tr>';
+      return;
+    }
+    tbody.innerHTML = emails.map(email => `
+      <tr>
+        <td class="key">${email}</td>
+        <td class="desc-cell">company_config.allowed_emails</td>
+        <td><button class="btn ghost small" data-remove="${email}">🗑️ Hapus</button></td>
+      </tr>
+    `).join('');
+    tbody.querySelectorAll('button[data-remove]').forEach(btn => {
+      btn.addEventListener('click', () => removeWhitelist(btn.dataset.remove));
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="3" class="empty" style="padding:20px;color:#f87171">❌ ${err.message}</td></tr>`;
+  }
+}
+
+async function addWhitelist() {
+  const input = document.getElementById('wl-new-email');
+  const email = String(input.value || '').trim().toLowerCase();
+  if (!email || email.indexOf('@') === -1) {
+    showStatus('Email tidak valid', 'err');
+    input.focus();
+    return;
+  }
+  const btn = document.getElementById('wl-add-btn');
+  btn.disabled = true;
+  showStatus('Menambah email…', '');
+  try {
+    const me = _wlCurrentUserEmail();
+    const data = await _gasCall('whitelist_add', { email, user: me });
+    if (!data.success) throw new Error(data.message || 'Gagal tambah');
+    input.value = '';
+    showStatus(`✅ ${email} ditambahkan ke whitelist`, 'ok');
+    await loadWhitelist();
+  } catch (err) {
+    showStatus('❌ ' + err.message, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function removeWhitelist(email) {
+  if (!confirm(`Hapus ${email} dari whitelist portal?`)) return;
+  showStatus('Menghapus…', '');
+  try {
+    const me = _wlCurrentUserEmail();
+    const data = await _gasCall('whitelist_remove', { email, user: me });
+    if (!data.success) throw new Error(data.message || 'Gagal hapus');
+    showStatus(`✅ ${email} dihapus`, 'ok');
+    await loadWhitelist();
+  } catch (err) {
+    showStatus('❌ ' + err.message, 'err');
+  }
+}
+
+document.getElementById('wl-add-btn').addEventListener('click', addWhitelist);
+document.getElementById('wl-refresh').addEventListener('click', loadWhitelist);
+document.getElementById('wl-new-email').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addWhitelist();
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 // TAB ROUTER
 // ═══════════════════════════════════════════════════════════════════════
+let _wlLoaded = false;
 document.querySelectorAll('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const target = btn.dataset.tab;
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === btn));
     document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.dataset.panel === target));
     history.replaceState(null, '', '/crm#' + target);
+    if (target === 'whitelist' && !_wlLoaded) {
+      _wlLoaded = true;
+      loadWhitelist();
+    }
   });
 });
 
