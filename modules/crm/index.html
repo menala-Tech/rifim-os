@@ -327,9 +327,69 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
           <option value="batam-non-airport">ID Rifim Batam (non-airport)</option>
           <option value="jambi-luar">ID Rifim Jambi Luar</option>
         </select>
-        <button class="btn ghost small">🔄 Refresh</button>
+        <button class="btn ghost small" id="ru-refresh">🔄 Refresh</button>
       </div>
-      <div class="empty"><div class="icon">🔌</div>Belum terhubung. Perlu Supabase client + service key proxy.</div>
+      <table class="cfg-table">
+        <thead>
+          <tr>
+            <th style="width:220px">Email</th>
+            <th>Nama · Staff ID</th>
+            <th style="width:110px">Role</th>
+            <th style="width:180px">Cabang</th>
+            <th style="width:80px">Aktif</th>
+            <th style="width:80px">Sumber</th>
+            <th style="width:170px">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="ru-body">
+          <tr><td colspan="7" class="empty" style="padding:20px">Belum di-load. Klik Refresh.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Modal edit user RAOS -->
+    <div id="ru-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;padding:20px">
+      <div style="background:var(--dark2);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:24px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto">
+        <h3 style="margin-bottom:4px" id="ru-modal-title">Edit User RAOS</h3>
+        <div class="desc-cell" id="ru-modal-sub" style="margin-bottom:16px;color:#888;font-size:12px"></div>
+        <div id="ru-modal-warn" style="display:none;background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.3);border-radius:6px;padding:10px 12px;margin-bottom:12px;color:#facc15;font-size:12px;line-height:1.5"></div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <label style="font-size:12px;color:#aaa">
+            Nama Lengkap
+            <input id="ru-edit-fullname" type="text" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;outline:none">
+          </label>
+          <label style="font-size:12px;color:#aaa">
+            Phone
+            <input id="ru-edit-phone" type="tel" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;outline:none">
+          </label>
+          <label style="font-size:12px;color:#aaa">
+            Role
+            <select id="ru-edit-role" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;outline:none">
+              <option value="direksi">Direksi</option>
+              <option value="management">Management</option>
+              <option value="admin">Admin</option>
+              <option value="koordinator">Koordinator</option>
+              <option value="staff">Staff</option>
+              <option value="driver">Driver</option>
+            </select>
+          </label>
+          <label style="font-size:12px;color:#aaa">
+            Cabang (kolom milik RAOS — aman diedit di CRM, tidak overwrite SSOT)
+            <select id="ru-edit-branch" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;outline:none">
+              <option value="">(kosong / belum ditugaskan)</option>
+            </select>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#fff;cursor:pointer">
+            <input id="ru-edit-active" type="checkbox" style="width:16px;height:16px;cursor:pointer">
+            Aktif (bisa login PWA RAOS)
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap">
+          <button class="btn" id="ru-modal-save">💾 Simpan</button>
+          <button class="btn ghost small" id="ru-modal-reset-pin" style="background:rgba(196,0,0,.15);border-color:rgba(196,0,0,.4);color:#ff9999">🔑 Reset PIN</button>
+          <button class="btn ghost small" id="ru-modal-close" style="margin-left:auto">Batal</button>
+        </div>
+      </div>
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -337,15 +397,10 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div class="panel" data-panel="contacts">
       <h2>Kontak Eksternal</h2>
-      <div class="desc">Klien Maxim, vendor, mitra bisnis, pihak eksternal.</div>
+      <div class="desc">Klien Maxim, vendor, mitra bisnis, pihak eksternal — akses via GAS proxy admin-only.</div>
       <div class="sinks">
-        <span class="sink supabase">🔵 Supabase: <code>crm_contacts</code> (TODO)</span>
-      </div>
-      <div class="roadmap">
-        <strong>TODO:</strong> buat tabel <code>crm_contacts</code> di Supabase project RIFIM (bukan
-        RAOS — CRM lintas modul). Kolom: id, name, email, phone, company, category
-        (klien/vendor/mitra), tags jsonb, notes, created_at, created_by. RLS admin-only write, read
-        semua authenticated.
+        <span class="sink supabase">🔵 Supabase: <code>crm_contacts</code></span>
+        <span class="sink gas">🔧 GAS action: <code>contacts_list / _upsert / _delete</code></span>
       </div>
       <div class="toolbar">
         <input class="grow" placeholder="Cari nama, perusahaan, email…" id="ct-search">
@@ -362,9 +417,71 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
           <option value="supplier">Supplier Aset / Kendaraan</option>
           <option value="lainnya">Lainnya</option>
         </select>
-        <button class="btn">+ Tambah Kontak</button>
+        <button class="btn" id="ct-add-btn">+ Tambah Kontak</button>
+        <button class="btn ghost small" id="ct-refresh">🔄</button>
       </div>
-      <div class="empty"><div class="icon">📇</div>Belum ada. Buat tabel <code>crm_contacts</code> dulu.</div>
+      <table class="cfg-table">
+        <thead>
+          <tr>
+            <th style="width:200px">Nama</th>
+            <th style="width:180px">Perusahaan</th>
+            <th style="width:130px">Kategori</th>
+            <th style="width:180px">Email · Telepon</th>
+            <th>Tag · Catatan</th>
+            <th style="width:130px">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="ct-body">
+          <tr><td colspan="6" class="empty" style="padding:20px">Belum di-load. Klik Refresh.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Modal add/edit contact -->
+    <div id="ct-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;padding:20px">
+      <div style="background:var(--dark2);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:24px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto">
+        <h3 style="margin-bottom:16px" id="ct-modal-title">Tambah Kontak</h3>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <label style="font-size:12px;color:#aaa">Nama *
+            <input id="ct-form-name" type="text" required style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;outline:none">
+          </label>
+          <label style="font-size:12px;color:#aaa">Perusahaan
+            <input id="ct-form-company" type="text" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;outline:none">
+          </label>
+          <label style="font-size:12px;color:#aaa">Kategori
+            <select id="ct-form-category" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;outline:none">
+              <option value="klien_maxim">Klien Maxim</option>
+              <option value="vendor_operasional">Vendor Operasional</option>
+              <option value="vendor_it">Vendor IT / Software</option>
+              <option value="mitra_bisnis">Mitra Bisnis</option>
+              <option value="mitra_bandara">Mitra Bandara (Otoritas / Angkasa Pura)</option>
+              <option value="pemerintah">Instansi Pemerintah</option>
+              <option value="perbankan">Perbankan / Financial</option>
+              <option value="konsultan">Konsultan (Legal / Pajak / HR)</option>
+              <option value="supplier">Supplier Aset / Kendaraan</option>
+              <option value="lainnya" selected>Lainnya</option>
+            </select>
+          </label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <label style="font-size:12px;color:#aaa">Email
+              <input id="ct-form-email" type="email" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;outline:none">
+            </label>
+            <label style="font-size:12px;color:#aaa">Telepon
+              <input id="ct-form-phone" type="tel" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;outline:none">
+            </label>
+          </div>
+          <label style="font-size:12px;color:#aaa">Tags (pisahkan koma)
+            <input id="ct-form-tags" type="text" placeholder="mis: prioritas, PIC-teknis, batam" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;outline:none">
+          </label>
+          <label style="font-size:12px;color:#aaa">Catatan
+            <textarea id="ct-form-notes" rows="3" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;outline:none;resize:vertical;font-family:inherit"></textarea>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:20px">
+          <button class="btn" id="ct-modal-save">💾 Simpan</button>
+          <button class="btn ghost small" id="ct-modal-close" style="margin-left:auto">Batal</button>
+        </div>
+      </div>
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -644,26 +761,27 @@ document.getElementById('sc-save').addEventListener('click', async () => {
   btn.disabled = true;
 
   const results = { ok: 0, err: 0, errors: [] };
+  const me = _wlCurrentUserEmail();
   for (const item of payload) {
     const { data, error } = await sb.rpc('set_system_config', {
       p_key: item.key, p_value: item.value,
     });
     if (error) { results.err++; results.errors.push(`${item.key}: ${error.message}`); }
     else { results.ok++; }
+    // Fire-and-forget: sync juga ke sheet SISTEM CONFIG via GAS
+    // (Supabase Row sudah tersimpan; sheet sync boleh gagal tanpa blok user)
+    _gasCall('sistem_config_set', { key: item.key, value: item.value, user: me })
+      .catch(err => console.warn('Sheet sync gagal utk ' + item.key, err));
   }
 
   if (results.err === 0) {
-    showStatus(`✅ ${results.ok} config tersimpan ke Supabase`, 'ok');
+    showStatus(`✅ ${results.ok} config tersimpan (Supabase + sync sheet fire-and-forget)`, 'ok');
     dirty.system.clear();
-    // Reset row highlight
     document.querySelectorAll('[data-panel="system"] tr').forEach(tr => tr.style.background = '');
   } else {
     showStatus(`⚠️ ${results.ok} sukses, ${results.err} gagal: ${results.errors[0]}`, 'err');
     btn.disabled = false;
   }
-  console.log('SYSTEM_CONFIG save result:', results);
-  // NOTE: Sheet SISTEM CONFIG belum di-sync — perlu GAS extension terpisah
-  // (?action=sistem_config_set) untuk 2-way write (sheet + Supabase mirror).
 });
 
 document.getElementById('cc-refresh').addEventListener('click', async () => {
@@ -931,17 +1049,338 @@ document.getElementById('au-from').addEventListener('change', () => renderAuditR
 document.getElementById('au-to').addEventListener('change', () => renderAuditRows());
 
 // ═══════════════════════════════════════════════════════════════════════
+// USER SUPABASE RAOS — wire ke GAS proxy raos_users_list/update/reset_pin
+// ═══════════════════════════════════════════════════════════════════════
+let _ruCache = [];
+let _ruBranches = [];
+let _ruEditing = null;
+
+const RAOS_BRANCH_OPTIONS = [
+  { key: 'soeta-t1',           label: 'ID Rifim Airport Soeta — T1' },
+  { key: 'soeta-t2',           label: 'ID Rifim Airport Soeta — T2' },
+  { key: 'soeta-t3',           label: 'ID Rifim Airport Soeta — T3' },
+  { key: 'batam-airport',      label: 'ID Rifim Airport Batam' },
+  { key: 'jambi-airport',      label: 'ID Rifim Airport Jambi' },
+  { key: 'balikpapan-airport', label: 'ID Rifim Airport Balikpapan' },
+  { key: 'manado-airport',     label: 'ID Rifim Airport Manado' },
+  { key: 'pekanbaru-airport',  label: 'ID Rifim Airport Pekanbaru' },
+  { key: 'makassar-airport',   label: 'ID Rifim Airport Makassar' },
+  { key: 'batam-non-airport',  label: 'ID Rifim Batam (non-airport)' },
+  { key: 'jambi-luar',         label: 'ID Rifim Jambi Luar' },
+];
+
+function renderRaosUsers() {
+  const tbody = document.getElementById('ru-body');
+  const roleFilter   = (document.getElementById('ru-filter-role').value   || '').toLowerCase();
+  const branchFilter = (document.getElementById('ru-filter-branch').value || '');
+  const search       = (document.getElementById('ru-search').value        || '').toLowerCase();
+
+  const rows = _ruCache.filter(u => {
+    if (roleFilter && String(u.role || '').toLowerCase() !== roleFilter) return false;
+    if (branchFilter && String(u.branch_slug || '') !== branchFilter) return false;
+    if (search) {
+      const hay = [u.email, u.full_name, u.staff_id, u.phone].map(v => String(v || '').toLowerCase()).join(' ');
+      if (hay.indexOf(search) === -1) return false;
+    }
+    return true;
+  });
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty" style="padding:20px">Tidak ada user yang cocok</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(u => `
+    <tr>
+      <td class="key">${_escapeHtml(u.email)}</td>
+      <td class="desc-cell">${_escapeHtml(u.full_name)}<br><span style="font-size:11px;color:#facc15">${_escapeHtml(u.staff_id)}</span></td>
+      <td><span class="cat feature">${_escapeHtml(u.role)}</span></td>
+      <td class="desc-cell" style="font-size:12px">${_escapeHtml(u.branch_name || '—')}</td>
+      <td>${u.is_active ? '<span class="cat feature" style="background:rgba(39,174,96,.2);color:#2ecc71">Aktif</span>' : '<span class="cat feature" style="background:rgba(220,38,38,.2);color:#f87171">Off</span>'}</td>
+      <td class="desc-cell" style="font-size:11px">${_escapeHtml(u.source)}</td>
+      <td><button class="btn ghost small" data-edit-user="${u.id}">✏️ Edit</button></td>
+    </tr>
+  `).join('');
+
+  tbody.querySelectorAll('button[data-edit-user]').forEach(btn => {
+    btn.addEventListener('click', () => openRaosUserModal(btn.dataset.editUser));
+  });
+}
+
+async function loadRaosUsers() {
+  const tbody = document.getElementById('ru-body');
+  tbody.innerHTML = '<tr><td colspan="7" class="empty" style="padding:20px">Loading dari Supabase…</td></tr>';
+  try {
+    const me = _wlCurrentUserEmail();
+    const data = await _gasCall('raos_users_list', { user: me });
+    if (!data.success) throw new Error(data.message || 'Gagal load');
+    _ruCache = data.users || [];
+    // Extract unique branches for edit modal dropdown
+    const seen = new Set();
+    _ruBranches = [];
+    _ruCache.forEach(u => {
+      if (u.branch_id && !seen.has(u.branch_id)) {
+        seen.add(u.branch_id);
+        _ruBranches.push({ id: u.branch_id, name: u.branch_name, slug: u.branch_slug });
+      }
+    });
+    renderRaosUsers();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty" style="padding:20px;color:#f87171">❌ ${err.message}</td></tr>`;
+  }
+}
+
+function openRaosUserModal(userId) {
+  const u = _ruCache.find(x => x.id === userId);
+  if (!u) return;
+  _ruEditing = u;
+
+  document.getElementById('ru-modal-title').textContent = 'Edit User RAOS';
+  document.getElementById('ru-modal-sub').textContent = u.email + ' · ' + u.staff_id;
+  document.getElementById('ru-edit-fullname').value = u.full_name || '';
+  document.getElementById('ru-edit-phone').value    = u.phone || '';
+  document.getElementById('ru-edit-role').value     = u.role || 'staff';
+  document.getElementById('ru-edit-active').checked = !!u.is_active;
+
+  // Populate branch dropdown from _ruBranches (join dari kolom RAOS branches)
+  const branchSelect = document.getElementById('ru-edit-branch');
+  branchSelect.innerHTML = '<option value="">(kosong / belum ditugaskan)</option>' +
+    _ruBranches.map(b => `<option value="${b.id}" ${b.id === u.branch_id ? 'selected' : ''}>${_escapeHtml(b.name)}</option>`).join('');
+
+  // Warning banner untuk source ssot_master_staff
+  const warn = document.getElementById('ru-modal-warn');
+  if (u.source === 'ssot_master_staff') {
+    warn.style.display = 'block';
+    warn.innerHTML = '<strong>⚠️ SSOT-managed:</strong> field <code>Nama</code>, <code>Role</code>, dan <code>Phone</code> akan ter-overwrite tiap sync 1 jam dari sheet MASTER DATA STAFF. Update juga di sheet supaya perubahan permanen. Field <code>Cabang</code> dan <code>Aktif</code> aman diubah di sini.';
+  } else {
+    warn.style.display = 'none';
+  }
+
+  document.getElementById('ru-modal').style.display = 'flex';
+}
+
+async function saveRaosUser() {
+  if (!_ruEditing) return;
+  const btn = document.getElementById('ru-modal-save');
+  btn.disabled = true;
+  showStatus('Menyimpan…', '');
+  try {
+    const me = _wlCurrentUserEmail();
+    const branchVal = document.getElementById('ru-edit-branch').value;
+    const data = await _gasCall('raos_users_update', {
+      id:        _ruEditing.id,
+      full_name: document.getElementById('ru-edit-fullname').value,
+      phone:     document.getElementById('ru-edit-phone').value,
+      role:      document.getElementById('ru-edit-role').value,
+      branch_id: branchVal === '' ? 'null' : branchVal,
+      is_active: document.getElementById('ru-edit-active').checked ? 'true' : 'false',
+      user:      me,
+    });
+    if (!data.success) throw new Error(data.message || 'Gagal update');
+    showStatus('✅ User ter-update' + (data.warning ? ' (warning: ' + data.warning + ')' : ''), 'ok');
+    document.getElementById('ru-modal').style.display = 'none';
+    await loadRaosUsers();
+  } catch (err) {
+    showStatus('❌ ' + err.message, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function resetRaosPin() {
+  if (!_ruEditing) return;
+  const pin = prompt(`Reset PIN untuk ${_ruEditing.email}\n\nMasukkan PIN baru (min 6 digit angka):`);
+  if (pin === null) return;
+  if (!/^\d{6,}$/.test(pin.trim())) { showStatus('PIN harus min 6 digit angka', 'err'); return; }
+  showStatus('Reset PIN…', '');
+  try {
+    const me = _wlCurrentUserEmail();
+    const data = await _gasCall('raos_users_reset_pin', { id: _ruEditing.id, pin: pin.trim(), user: me });
+    if (!data.success) throw new Error(data.message || 'Gagal reset');
+    showStatus(`✅ PIN direset untuk ${_ruEditing.email}`, 'ok');
+  } catch (err) {
+    showStatus('❌ ' + err.message, 'err');
+  }
+}
+
+document.getElementById('ru-refresh').addEventListener('click', loadRaosUsers);
+document.getElementById('ru-search').addEventListener('input', renderRaosUsers);
+document.getElementById('ru-filter-role').addEventListener('change', renderRaosUsers);
+document.getElementById('ru-filter-branch').addEventListener('change', renderRaosUsers);
+document.getElementById('ru-modal-save').addEventListener('click', saveRaosUser);
+document.getElementById('ru-modal-reset-pin').addEventListener('click', resetRaosPin);
+document.getElementById('ru-modal-close').addEventListener('click', () => {
+  document.getElementById('ru-modal').style.display = 'none';
+  _ruEditing = null;
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// KONTAK EKSTERNAL — wire ke GAS proxy contacts_list/upsert/delete
+// ═══════════════════════════════════════════════════════════════════════
+let _ctCache = [];
+let _ctEditing = null;
+
+const CT_CATEGORY_LABELS = {
+  klien_maxim:        'Klien Maxim',
+  vendor_operasional: 'Vendor Operasional',
+  vendor_it:          'Vendor IT / Software',
+  mitra_bisnis:       'Mitra Bisnis',
+  mitra_bandara:      'Mitra Bandara',
+  pemerintah:         'Instansi Pemerintah',
+  perbankan:          'Perbankan / Financial',
+  konsultan:          'Konsultan',
+  supplier:           'Supplier Aset',
+  lainnya:            'Lainnya',
+};
+
+function renderContacts() {
+  const tbody = document.getElementById('ct-body');
+  const catFilter = document.getElementById('ct-filter-category').value || '';
+  const search    = (document.getElementById('ct-search').value || '').toLowerCase();
+
+  const rows = _ctCache.filter(c => {
+    if (catFilter && c.category !== catFilter) return false;
+    if (search) {
+      const hay = [c.name, c.company, c.email, c.phone].map(v => String(v || '').toLowerCase()).join(' ');
+      if (hay.indexOf(search) === -1) return false;
+    }
+    return true;
+  });
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty" style="padding:20px">Belum ada kontak. Klik <strong>+ Tambah Kontak</strong>.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(c => {
+    const tags = (c.tags || []).map(t => `<span class="cat feature" style="margin-right:4px">${_escapeHtml(t)}</span>`).join('');
+    const catLabel = CT_CATEGORY_LABELS[c.category] || c.category || 'Lainnya';
+    return `
+      <tr>
+        <td class="desc-cell" style="color:#fff;font-weight:600">${_escapeHtml(c.name)}</td>
+        <td class="desc-cell">${_escapeHtml(c.company || '—')}</td>
+        <td><span class="cat company">${_escapeHtml(catLabel)}</span></td>
+        <td class="desc-cell" style="font-size:12px">
+          ${c.email ? _escapeHtml(c.email) + '<br>' : ''}
+          ${c.phone ? '<span style="color:#facc15">' + _escapeHtml(c.phone) + '</span>' : ''}
+        </td>
+        <td class="desc-cell" style="font-size:11px;line-height:1.5">
+          ${tags}${tags && c.notes ? '<br>' : ''}
+          ${c.notes ? _escapeHtml(String(c.notes).substring(0, 100)) + (String(c.notes).length > 100 ? '…' : '') : ''}
+        </td>
+        <td style="white-space:nowrap">
+          <button class="btn ghost small" data-edit-ct="${c.id}">✏️</button>
+          <button class="btn ghost small" data-del-ct="${c.id}" style="color:#f87171">🗑️</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  tbody.querySelectorAll('button[data-edit-ct]').forEach(btn => {
+    btn.addEventListener('click', () => openContactModal(btn.dataset.editCt));
+  });
+  tbody.querySelectorAll('button[data-del-ct]').forEach(btn => {
+    btn.addEventListener('click', () => deleteContact(btn.dataset.delCt));
+  });
+}
+
+async function loadContacts() {
+  const tbody = document.getElementById('ct-body');
+  tbody.innerHTML = '<tr><td colspan="6" class="empty" style="padding:20px">Loading…</td></tr>';
+  try {
+    const me = _wlCurrentUserEmail();
+    const data = await _gasCall('contacts_list', { user: me });
+    if (!data.success) throw new Error(data.message || 'Gagal load');
+    _ctCache = data.contacts || [];
+    renderContacts();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty" style="padding:20px;color:#f87171">❌ ${err.message}</td></tr>`;
+  }
+}
+
+function openContactModal(id) {
+  _ctEditing = id ? _ctCache.find(c => c.id === id) : null;
+  document.getElementById('ct-modal-title').textContent = _ctEditing ? 'Edit Kontak' : 'Tambah Kontak';
+  document.getElementById('ct-form-name').value     = (_ctEditing && _ctEditing.name)     || '';
+  document.getElementById('ct-form-company').value  = (_ctEditing && _ctEditing.company)  || '';
+  document.getElementById('ct-form-category').value = (_ctEditing && _ctEditing.category) || 'lainnya';
+  document.getElementById('ct-form-email').value    = (_ctEditing && _ctEditing.email)    || '';
+  document.getElementById('ct-form-phone').value    = (_ctEditing && _ctEditing.phone)    || '';
+  document.getElementById('ct-form-tags').value     = (_ctEditing && Array.isArray(_ctEditing.tags)) ? _ctEditing.tags.join(', ') : '';
+  document.getElementById('ct-form-notes').value    = (_ctEditing && _ctEditing.notes)    || '';
+  document.getElementById('ct-modal').style.display = 'flex';
+}
+
+async function saveContact() {
+  const btn = document.getElementById('ct-modal-save');
+  const name = document.getElementById('ct-form-name').value.trim();
+  if (!name) { showStatus('Nama wajib diisi', 'err'); return; }
+  btn.disabled = true;
+  showStatus('Menyimpan…', '');
+  try {
+    const me = _wlCurrentUserEmail();
+    const payload = {
+      name:     name,
+      company:  document.getElementById('ct-form-company').value,
+      category: document.getElementById('ct-form-category').value,
+      email:    document.getElementById('ct-form-email').value,
+      phone:    document.getElementById('ct-form-phone').value,
+      tags:     document.getElementById('ct-form-tags').value,
+      notes:    document.getElementById('ct-form-notes').value,
+      user:     me,
+    };
+    if (_ctEditing) payload.id = _ctEditing.id;
+    const data = await _gasCall('contacts_upsert', payload);
+    if (!data.success) throw new Error(data.message || 'Gagal simpan');
+    showStatus(`✅ Kontak ${_ctEditing ? 'ter-update' : 'ditambahkan'}`, 'ok');
+    document.getElementById('ct-modal').style.display = 'none';
+    await loadContacts();
+  } catch (err) {
+    showStatus('❌ ' + err.message, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteContact(id) {
+  const c = _ctCache.find(x => x.id === id);
+  if (!c || !confirm(`Hapus kontak "${c.name}"?`)) return;
+  showStatus('Menghapus…', '');
+  try {
+    const me = _wlCurrentUserEmail();
+    const data = await _gasCall('contacts_delete', { id, user: me });
+    if (!data.success) throw new Error(data.message || 'Gagal hapus');
+    showStatus(`✅ Kontak "${c.name}" dihapus`, 'ok');
+    await loadContacts();
+  } catch (err) {
+    showStatus('❌ ' + err.message, 'err');
+  }
+}
+
+document.getElementById('ct-add-btn').addEventListener('click', () => openContactModal(null));
+document.getElementById('ct-refresh').addEventListener('click', loadContacts);
+document.getElementById('ct-search').addEventListener('input', renderContacts);
+document.getElementById('ct-filter-category').addEventListener('change', renderContacts);
+document.getElementById('ct-modal-save').addEventListener('click', saveContact);
+document.getElementById('ct-modal-close').addEventListener('click', () => {
+  document.getElementById('ct-modal').style.display = 'none';
+  _ctEditing = null;
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 // TAB ROUTER
 // ═══════════════════════════════════════════════════════════════════════
-const _tabLoaded = { whitelist: false, audit: false };
+const _tabLoaded = { whitelist: false, audit: false, 'raos-users': false, contacts: false };
 document.querySelectorAll('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const target = btn.dataset.tab;
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === btn));
     document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.dataset.panel === target));
     history.replaceState(null, '', '/crm#' + target);
-    if (target === 'whitelist' && !_tabLoaded.whitelist) { _tabLoaded.whitelist = true; loadWhitelist(); }
-    if (target === 'audit'     && !_tabLoaded.audit)     { _tabLoaded.audit     = true; loadAuditLog(); }
+    if (target === 'whitelist'  && !_tabLoaded.whitelist)   { _tabLoaded.whitelist   = true; loadWhitelist(); }
+    if (target === 'audit'      && !_tabLoaded.audit)       { _tabLoaded.audit       = true; loadAuditLog(); }
+    if (target === 'raos-users' && !_tabLoaded['raos-users']) { _tabLoaded['raos-users'] = true; loadRaosUsers(); }
+    if (target === 'contacts'   && !_tabLoaded.contacts)    { _tabLoaded.contacts    = true; loadContacts(); }
   });
 });
 

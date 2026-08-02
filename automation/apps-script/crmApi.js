@@ -43,6 +43,19 @@ function crmHandleGet(e) {
     // ─── Audit log tail (dari SYSTEM_LOG sheet, cache 60s) ──
     if (action === 'crm_audit_tail')        return _crmJson({ success: true, logs: _crmAuditTail_(parseInt(e.parameter.limit) || 100) });
 
+    // ─── System Config RAOS: sheet sync only (Supabase mirror di frontend RPC)
+    if (action === 'sistem_config_set')     return _crmJson(_crmSistemConfigSetSheet_(e.parameter));
+
+    // ─── User Supabase RAOS proxy (bypass RLS via service_role, admin-only via GAS auth)
+    if (action === 'raos_users_list')       return _crmJson(_crmRaosUsersList_(e.parameter));
+    if (action === 'raos_users_update')     return _crmJson(_crmRaosUsersUpdate_(e.parameter));
+    if (action === 'raos_users_reset_pin')  return _crmJson(_crmRaosUsersResetPin_(e.parameter));
+
+    // ─── CRM Kontak Eksternal (tabel Supabase crm_contacts, service_role via GAS)
+    if (action === 'contacts_list')         return _crmJson(_crmContactsList_(e.parameter));
+    if (action === 'contacts_upsert')       return _crmJson(_crmContactsUpsert_(e.parameter));
+    if (action === 'contacts_delete')       return _crmJson(_crmContactsDelete_(e.parameter));
+
     return null; // bukan CRM action, delegate ke handler lain di doGet
   } catch (err) {
     return _crmJson({ success: false, message: 'CRM API error: ' + err.message });
@@ -220,4 +233,221 @@ function _crmJson(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Supabase REST helpers — pakai service_role dari Script Properties
+// (bypass RLS, jadi role check dilakukan di sisi GAS via _crmRequireAdmin_).
+// _getSupabaseConfig() ada di hrisLayer.js.
+// ═══════════════════════════════════════════════════════════════════════
+function _crmSbFetch_(method, path, body) {
+  var cfg = _getSupabaseConfig();
+  var opts = {
+    method: method,
+    headers: {
+      'apikey':        cfg.key,
+      'Authorization': 'Bearer ' + cfg.key,
+      'Content-Type':  'application/json',
+      'Prefer':        'return=representation',
+    },
+    muteHttpExceptions: true,
+  };
+  if (body !== undefined && body !== null) opts.payload = JSON.stringify(body);
+  var res = UrlFetchApp.fetch(cfg.url + path, opts);
+  var code = res.getResponseCode();
+  var txt  = res.getContentText();
+  if (code >= 400) throw new Error('Supabase ' + method + ' ' + path + ' → ' + code + ': ' + txt.substring(0, 200));
+  if (!txt) return null;
+  try { return JSON.parse(txt); } catch (e) { return txt; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// #3 System Config RAOS — sheet SISTEM CONFIG di RAOS master spreadsheet
+// (Supabase mirror ditangani frontend via RPC set_system_config)
+// ═══════════════════════════════════════════════════════════════════════
+var RAOS_MASTER_SHEET_ID = '1eYS2mM3Sy-BNAVGfp8BUHtsZuLiGDetnJeGw-AWk__8';
+
+function _crmSistemConfigSetSheet_(params) {
+  _crmRequireAdmin_(params);
+  var key   = String(params.key   || '').trim();
+  var value = params.value == null ? '' : String(params.value);
+  if (!key) return { success: false, message: 'Parameter key wajib' };
+
+  try {
+    var ss = SpreadsheetApp.openById(RAOS_MASTER_SHEET_ID);
+    var sh = ss.getSheetByName('SISTEM CONFIG');
+    if (!sh) return { success: false, message: 'Tab SISTEM CONFIG tidak ada di RAOS master' };
+    var data = sh.getDataRange().getValues();
+    var before = null;
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() === key) {
+        before = data[i][1];
+        sh.getRange(i + 1, 2).setValue(value);
+        _crmAuditWrite_(params, 'edit', 'sistem_config_sheet', key, before, value);
+        return { success: true, key: key, value: value, before: before };
+      }
+    }
+    sh.appendRow([key, value, '']);
+    _crmAuditWrite_(params, 'add', 'sistem_config_sheet', key, null, value);
+    return { success: true, key: key, value: value, appended: true };
+  } catch (err) {
+    return { success: false, message: 'Sheet write gagal: ' + err.message };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// #4 User Supabase RAOS — proxy ke Supabase (bypass RLS via service_role)
+// ═══════════════════════════════════════════════════════════════════════
+function _crmRaosUsersList_(params) {
+  _crmRequireAdmin_(params);
+  // Fetch user_profiles + email dari auth.users via paginate admin API
+  var profiles = _crmSbFetch_('GET', '/rest/v1/user_profiles?select=id,staff_id,full_name,role,branch_id,is_active,phone,source,ssot_synced_at&order=full_name.asc');
+  if (!Array.isArray(profiles)) profiles = [];
+
+  // Ambil email map dari auth admin users (paginated)
+  var emailMap = {};
+  var page = 1, perPage = 200, maxPage = 10;
+  while (page <= maxPage) {
+    var res = _crmSbFetch_('GET', '/auth/v1/admin/users?page=' + page + '&per_page=' + perPage);
+    var users = (res && res.users) || [];
+    for (var i = 0; i < users.length; i++) emailMap[users[i].id] = users[i].email || '';
+    if (users.length < perPage) break;
+    page++;
+  }
+
+  // Ambil branch mapping (id → name)
+  var branchMap = {};
+  try {
+    var branches = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug');
+    if (Array.isArray(branches)) {
+      for (var j = 0; j < branches.length; j++) branchMap[branches[j].id] = branches[j];
+    }
+  } catch (_) { /* branches optional */ }
+
+  var out = profiles.map(function(p) {
+    var b = p.branch_id ? branchMap[p.branch_id] : null;
+    return {
+      id:              p.id,
+      email:           emailMap[p.id] || '',
+      staff_id:        p.staff_id || '',
+      full_name:       p.full_name || '',
+      role:            p.role || '',
+      is_active:       p.is_active,
+      phone:           p.phone || '',
+      source:          p.source || '',
+      branch_id:       p.branch_id || null,
+      branch_name:     b ? b.name : '',
+      branch_slug:     b ? b.slug : '',
+      ssot_synced_at:  p.ssot_synced_at || null,
+    };
+  });
+  return { success: true, users: out, total: out.length };
+}
+
+function _crmRaosUsersUpdate_(params) {
+  _crmRequireAdmin_(params);
+  var id = String(params.id || '').trim();
+  if (!id) return { success: false, message: 'Parameter id wajib' };
+
+  var patch = {};
+  if (params.role       !== undefined) patch.role       = String(params.role).toLowerCase();
+  if (params.branch_id  !== undefined) patch.branch_id  = params.branch_id === 'null' || params.branch_id === '' ? null : params.branch_id;
+  if (params.is_active  !== undefined) patch.is_active  = String(params.is_active) === 'true';
+  if (params.full_name  !== undefined) patch.full_name  = String(params.full_name);
+  if (params.phone      !== undefined) patch.phone      = String(params.phone);
+  if (Object.keys(patch).length === 0) return { success: false, message: 'Tidak ada field yang di-update' };
+
+  var before = _crmSbFetch_('GET', '/rest/v1/user_profiles?id=eq.' + encodeURIComponent(id) + '&select=*');
+  if (!Array.isArray(before) || before.length === 0) return { success: false, message: 'User tidak ditemukan' };
+
+  // Warn kalau source ssot_master_staff akan ter-overwrite di sync 1 jam
+  var warn = null;
+  if (String(before[0].source || '') === 'ssot_master_staff') {
+    var protectedKeys = ['role','full_name','phone'];
+    for (var k = 0; k < protectedKeys.length; k++) {
+      if (patch[protectedKeys[k]] !== undefined) {
+        warn = 'PERHATIAN: field ' + protectedKeys[k] + ' akan ter-overwrite sync SSOT 1 jam. Update juga di sheet MASTER DATA STAFF.';
+        break;
+      }
+    }
+  }
+
+  var res = _crmSbFetch_('PATCH', '/rest/v1/user_profiles?id=eq.' + encodeURIComponent(id), patch);
+  _crmAuditWrite_(params, 'edit', 'raos_user', id, JSON.stringify(before[0]).substring(0, 200), JSON.stringify(patch));
+  var out = { success: true, user: (Array.isArray(res) && res[0]) || null };
+  if (warn) out.warning = warn;
+  return out;
+}
+
+function _crmRaosUsersResetPin_(params) {
+  _crmRequireAdmin_(params);
+  var id  = String(params.id || '').trim();
+  var pin = String(params.pin || '').trim();
+  if (!id) return { success: false, message: 'Parameter id wajib' };
+  if (!/^\d{6,}$/.test(pin)) return { success: false, message: 'PIN harus minimal 6 digit angka' };
+
+  var res = _crmSbFetch_('PUT', '/auth/v1/admin/users/' + encodeURIComponent(id), { password: pin });
+  _crmAuditWrite_(params, 'reset_pin', 'raos_user', id, '', 'PIN direset (' + pin.length + ' digit)');
+  return { success: true, id: id, email: (res && res.email) || '' };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// #5 CRM Kontak Eksternal — tabel Supabase crm_contacts
+// ═══════════════════════════════════════════════════════════════════════
+function _crmContactsList_(params) {
+  _crmRequireAdmin_(params);
+  var qs = 'select=*&order=updated_at.desc';
+  if (params.category && params.category !== '') qs += '&category=eq.' + encodeURIComponent(params.category);
+  if (params.search   && params.search   !== '') {
+    // ilike di name/company/email
+    var s = '%' + String(params.search).trim() + '%';
+    qs += '&or=(name.ilike.' + encodeURIComponent(s) + ',company.ilike.' + encodeURIComponent(s) + ',email.ilike.' + encodeURIComponent(s) + ')';
+  }
+  var rows = _crmSbFetch_('GET', '/rest/v1/crm_contacts?' + qs);
+  return { success: true, contacts: Array.isArray(rows) ? rows : [], total: Array.isArray(rows) ? rows.length : 0 };
+}
+
+function _crmContactsUpsert_(params) {
+  _crmRequireAdmin_(params);
+  var name = String(params.name || '').trim();
+  if (!name) return { success: false, message: 'Nama wajib diisi' };
+
+  var body = {
+    name:     name,
+    email:    params.email    ? String(params.email).trim().toLowerCase() : null,
+    phone:    params.phone    ? String(params.phone).trim() : null,
+    company:  params.company  ? String(params.company).trim() : null,
+    category: params.category ? String(params.category).trim() : 'lainnya',
+    notes:    params.notes    ? String(params.notes) : null,
+  };
+  // tags: comma-separated string → array
+  if (params.tags !== undefined) {
+    body.tags = String(params.tags).split(',').map(function(t) { return t.trim(); }).filter(Boolean);
+  }
+
+  var id = params.id ? String(params.id).trim() : '';
+  var res, action;
+  if (id) {
+    res = _crmSbFetch_('PATCH', '/rest/v1/crm_contacts?id=eq.' + encodeURIComponent(id), body);
+    action = 'edit';
+  } else {
+    body.created_by = String(params.user || '');
+    res = _crmSbFetch_('POST', '/rest/v1/crm_contacts', body);
+    action = 'add';
+  }
+  var row = Array.isArray(res) ? res[0] : res;
+  _crmAuditWrite_(params, action, 'contact', (row && row.id) || id || name, id ? name : '', name);
+  return { success: true, contact: row };
+}
+
+function _crmContactsDelete_(params) {
+  _crmRequireAdmin_(params);
+  var id = String(params.id || '').trim();
+  if (!id) return { success: false, message: 'Parameter id wajib' };
+
+  var before = _crmSbFetch_('GET', '/rest/v1/crm_contacts?id=eq.' + encodeURIComponent(id) + '&select=name');
+  var name = (Array.isArray(before) && before[0] && before[0].name) || '';
+  _crmSbFetch_('DELETE', '/rest/v1/crm_contacts?id=eq.' + encodeURIComponent(id));
+  _crmAuditWrite_(params, 'remove', 'contact', id, name, '');
+  return { success: true, id: id };
 }
