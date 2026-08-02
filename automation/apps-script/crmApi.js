@@ -38,6 +38,7 @@ function crmHandleGet(e) {
     if (action === 'whitelist_list')        return _crmJson({ success: true, whitelist: _crmWhitelistList_() });
     if (action === 'whitelist_add')         return _crmJson(_crmWhitelistMutate_('add',    e.parameter));
     if (action === 'whitelist_remove')      return _crmJson(_crmWhitelistMutate_('remove', e.parameter));
+    if (action === 'whitelist_update')      return _crmJson(_crmWhitelistUpdate_(e.parameter));
 
     // ─── Audit log tail (dari SYSTEM_LOG sheet, cache 60s) ──
     if (action === 'crm_audit_tail')        return _crmJson({ success: true, logs: _crmAuditTail_(parseInt(e.parameter.limit) || 100) });
@@ -126,6 +127,33 @@ function _crmWhitelistMutate_(op, params) {
   });
   _crmAuditWrite_(params, op, 'whitelist', email, before.join(','), next.join(','));
   return { success: true, op: op, email: email, whitelist: next };
+}
+
+function _crmWhitelistUpdate_(params) {
+  _crmRequireAdmin_(params);
+  var oldEmail = String(params.email     || '').trim().toLowerCase();
+  var newEmail = String(params.new_email || '').trim().toLowerCase();
+  if (!oldEmail || oldEmail.indexOf('@') === -1) return { success: false, message: 'Email lama invalid' };
+  if (!newEmail || newEmail.indexOf('@') === -1) return { success: false, message: 'Email baru invalid' };
+  if (oldEmail === newEmail) return { success: false, message: 'Email lama dan baru sama' };
+
+  var current = _crmWhitelistList_();
+  var before  = current.slice();
+  var idx     = current.indexOf(oldEmail);
+  if (idx === -1) return { success: false, message: 'Email lama tidak ada di whitelist' };
+  if (current.indexOf(newEmail) !== -1) return { success: false, message: 'Email baru sudah ada di whitelist' };
+
+  var next = current.slice();
+  next[idx] = newEmail;
+
+  _crmSetKV_('company_config', {
+    user:  params.user,
+    key:   'allowed_emails',
+    value: next.join(','),
+    description: 'Comma-separated emails yang boleh login portal',
+  });
+  _crmAuditWrite_(params, 'update', 'whitelist', oldEmail + ' → ' + newEmail, before.join(','), next.join(','));
+  return { success: true, op: 'update', email: oldEmail, new_email: newEmail, whitelist: next };
 }
 
 // ═══════════════════════════════════════════════════════════════════════

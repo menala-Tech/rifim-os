@@ -649,14 +649,20 @@ async function loadWhitelist() {
       return;
     }
     tbody.innerHTML = emails.map(email => `
-      <tr>
+      <tr data-row="${email}">
         <td class="key">${email}</td>
         <td class="desc-cell">company_config.allowed_emails</td>
-        <td><button class="btn ghost small" data-remove="${email}">🗑️ Hapus</button></td>
+        <td style="white-space:nowrap">
+          <button class="btn ghost small" data-edit="${email}">✏️ Edit</button>
+          <button class="btn ghost small" data-remove="${email}">🗑️ Hapus</button>
+        </td>
       </tr>
     `).join('');
     tbody.querySelectorAll('button[data-remove]').forEach(btn => {
       btn.addEventListener('click', () => removeWhitelist(btn.dataset.remove));
+    });
+    tbody.querySelectorAll('button[data-edit]').forEach(btn => {
+      btn.addEventListener('click', () => startEditWhitelist(btn.dataset.edit));
     });
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="3" class="empty" style="padding:20px;color:#f87171">❌ ${err.message}</td></tr>`;
@@ -686,6 +692,44 @@ async function addWhitelist() {
   } finally {
     btn.disabled = false;
   }
+}
+
+function startEditWhitelist(oldEmail) {
+  const tr = document.querySelector(`tr[data-row="${oldEmail}"]`);
+  if (!tr) return;
+  tr.innerHTML = `
+    <td><input type="email" value="${oldEmail}" style="width:100%;padding:5px 8px;background:rgba(0,0,0,.3);border:1px solid var(--red);border-radius:5px;color:#fff;font-family:'Consolas',monospace;font-size:12px;outline:none"></td>
+    <td class="desc-cell" style="color:#facc15">Enter untuk simpan · Esc batal</td>
+    <td style="white-space:nowrap">
+      <button class="btn small" data-save>💾 Simpan</button>
+      <button class="btn ghost small" data-cancel>Batal</button>
+    </td>
+  `;
+  const input = tr.querySelector('input');
+  input.focus();
+  input.select();
+  const doSave = async () => {
+    const newEmail = String(input.value || '').trim().toLowerCase();
+    if (!newEmail || newEmail.indexOf('@') === -1) { showStatus('Email tidak valid', 'err'); return; }
+    if (newEmail === oldEmail) { loadWhitelist(); return; }
+    showStatus('Menyimpan…', '');
+    try {
+      const me = _wlCurrentUserEmail();
+      const data = await _gasCall('whitelist_update', { email: oldEmail, new_email: newEmail, user: me });
+      if (!data.success) throw new Error(data.message || 'Gagal update');
+      showStatus(`✅ ${oldEmail} → ${newEmail}`, 'ok');
+      await loadWhitelist();
+    } catch (err) {
+      showStatus('❌ ' + err.message, 'err');
+      loadWhitelist();
+    }
+  };
+  tr.querySelector('[data-save]').addEventListener('click', doSave);
+  tr.querySelector('[data-cancel]').addEventListener('click', () => loadWhitelist());
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') doSave();
+    if (e.key === 'Escape') loadWhitelist();
+  });
 }
 
 async function removeWhitelist(email) {
