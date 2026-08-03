@@ -156,11 +156,11 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
     <div class="auth-logo-fallback" id="logo-fb" style="display:none">RG</div>
     <h1>RIFIM OS</h1>
     <p class="sub">Sistem Operasional Terpadu RIFIM Group</p>
-    <input type="email" id="auth-email" placeholder="Email akun Anda" autocomplete="email">
-    <input type="password" id="auth-pin" placeholder="PIN" autocomplete="current-password" inputmode="numeric">
+    <input type="text" id="auth-email" placeholder="Email atau ID Staff" autocomplete="username">
+    <input type="password" id="auth-pin" placeholder="RAOS PIN" autocomplete="current-password" inputmode="numeric">
     <button class="btn-login" id="btn-masuk" onclick="doLogin()">Masuk ke RIFIM OS</button>
     <div id="auth-err"></div>
-    <p class="auth-footer">Akses terbatas untuk pengguna yang diotorisasi.<br>PIN sama dengan RAOS PWA (dari sheet SSOT).</p>
+    <p class="auth-footer">Akses terbatas untuk admin/direksi/mgmt/koordinator.<br>RAOS PIN diisi di sheet SSOT kolom I (terpisah dari PIN existing).</p>
   </div>
 </div>
 
@@ -284,15 +284,20 @@ function _sb() {
 const ALLOWED_ROLES = ['admin', 'direksi', 'management', 'koordinator'];
 
 // ── AUTH ─────────────────────────────────────────────────────────────
-// Pipeline: email + PIN → Supabase Auth signInWithPassword. PIN = kolom H
-// sheet SSOT MASTER DATA STAFF (di-sync tiap 1 jam ke Supabase Auth password
-// via GAS 13_staff_sync.gs). Setelah sign-in, cek role di user_profiles —
-// hanya admin/direksi/management/koordinator boleh masuk portal.
+// Pipeline 2-lapis (raos_068 bridge, sesi 2026-08-04):
+//   1. Client input email/ID + RAOS_PIN (kolom I sheet SSOT, terpisah dari
+//      SSOT PIN kolom H yg dipakai PWA lain)
+//   2. RPC raos_verify_and_bridge → verify RAOS_PIN, kalau match return
+//      email + ssot_pin
+//   3. signInWithPassword(email, ssot_pin) transparent → session Auth aktif
+// Fallback: kalau bridge return not_found (admin manual yg belum di-sync
+// ke raos_credentials), coba direct signInWithPassword pakai input PIN
+// sebagai password Auth (backward compat).
 async function doLogin() {
-  const email = document.getElementById('auth-email').value.trim().toLowerCase();
-  const pin   = document.getElementById('auth-pin').value.trim();
-  if (!email) return showErr('Masukkan email Anda.');
-  if (!pin)   return showErr('Masukkan PIN Anda.');
+  const loginId = document.getElementById('auth-email').value.trim();
+  const pin     = document.getElementById('auth-pin').value.trim();
+  if (!loginId) return showErr('Masukkan email/ID Anda.');
+  if (!pin)     return showErr('Masukkan PIN Anda.');
   const btn = document.getElementById('btn-masuk');
   btn.textContent = 'Memverifikasi...';
   btn.disabled = true;
@@ -302,16 +307,37 @@ async function doLogin() {
   if (!sb) { btn.textContent = 'Masuk ke RIFIM OS'; btn.disabled = false; return showErr('Supabase SDK belum load — refresh halaman.'); }
 
   try {
-    const { data: signData, error: signErr } = await sb.auth.signInWithPassword({ email, password: pin });
-    if (signErr || !signData?.user) {
-      showErr('Email atau PIN salah. Cek ejaan email dan PIN kolom H sheet SSOT.');
+    // Tahap 1: bridge — verify RAOS_PIN
+    const { data: bridge, error: bridgeErr } = await sb.rpc('raos_verify_and_bridge', {
+      p_login_id: loginId, p_raos_pin: pin,
+    });
+    let email = loginId.toLowerCase();
+    let signInPassword = pin;
+    if (!bridgeErr && bridge && bridge.ok) {
+      email = bridge.email;
+      signInPassword = bridge.ssot_pin;
+    } else if (bridge && bridge.ok === false && bridge.reason === 'bad_pin') {
+      // Bridge ketemu tapi PIN salah — jangan fallback (biar tidak accidentally
+      // pakai raos_pin sbg Auth password yang aslinya beda)
+      showErr(bridge.message || 'RAOS PIN salah.');
       return;
     }
-    // Cek role di user_profiles
-    const { data: profile, error: profErr } = await sb.from('user_profiles')
+    // Kalau bridge return not_found / no_ssot_pin / inactive — coba direct signIn
+    // (untuk admin manual yg belum masuk raos_credentials).
+
+    const { data: signData, error: signErr } = await sb.auth.signInWithPassword({
+      email, password: signInPassword,
+    });
+    if (signErr || !signData?.user) {
+      showErr('Email/ID atau PIN salah. Admin perlu isi kolom I "RAOS PIN" di sheet SSOT lalu run "Sync RAOS Credentials".');
+      return;
+    }
+
+    // Verify role
+    const { data: profile } = await sb.from('user_profiles')
       .select('id, full_name, role, staff_id, branch_id, is_active')
       .eq('id', signData.user.id).maybeSingle();
-    if (profErr || !profile) {
+    if (!profile) {
       await sb.auth.signOut();
       showErr('Profil tidak ditemukan. Hubungi admin.');
       return;
@@ -323,7 +349,7 @@ async function doLogin() {
     }
     if (!ALLOWED_ROLES.includes(profile.role)) {
       await sb.auth.signOut();
-      showErr(`Role "${profile.role}" tidak boleh akses portal. Hanya admin/direksi/management/koordinator.`);
+      showErr(`Role "${profile.role}" tidak boleh akses portal.`);
       return;
     }
     const session = {
