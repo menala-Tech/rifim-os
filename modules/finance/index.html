@@ -481,16 +481,14 @@ function populateCabang() {
     el.addEventListener('click', () => {
       picker.querySelectorAll('.cab-card').forEach(c => c.classList.remove('active'));
       el.classList.add('active');
-      // TODO: fetch cabang data via GAS
+      loadCabangDetail(el.dataset.cab);
     });
   });
-  // populate dropdowns cabang
   ['d-cabang','sr-branch'].forEach(id => {
     const sel = document.getElementById(id);
     if (sel) sel.innerHTML = sel.innerHTML +
       CABANG_LIST.map(c => `<option value="${c.key}">${c.label}</option>`).join('');
   });
-  // populate bulan dropdown
   const bulanSel = document.getElementById('t-bulan');
   if (bulanSel) {
     const now = new Date();
@@ -503,31 +501,351 @@ function populateCabang() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// TAB ROUTER
+// GAS PROXY (via RIFIM OS crmApi.js — Finance endpoints)
 // ═══════════════════════════════════════════════════════════════════════
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec';
+
+function _finGetUserEmail() {
+  try { return (JSON.parse(localStorage.getItem('rifim_auth') || '{}').email || ''); }
+  catch (e) { return ''; }
+}
+
+async function _gasCall(action, extra) {
+  const qs = new URLSearchParams(Object.assign({ action, user: _finGetUserEmail() }, extra || {}));
+  const res = await fetch(GAS_URL + '?' + qs.toString());
+  return res.json();
+}
+
+const fmtRp = (n) => 'Rp ' + (Number(n) || 0).toLocaleString('id-ID');
+const fmtDate = (s) => {
+  if (!s) return '';
+  try { return new Date(s).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }); }
+  catch (e) { return String(s); }
+};
+const fmtDateTime = (s) => {
+  if (!s) return '';
+  try { return new Date(s).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+  catch (e) { return String(s); }
+};
+const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const showToast = (msg, kind) => {
+  const t = document.createElement('div');
+  const bg = kind === 'err' ? 'var(--err,#dc2626)' : kind === 'ok' ? 'var(--ok,#16a34a)' : 'var(--dark2,#2B2B2B)';
+  t.style.cssText = `position:fixed;bottom:20px;right:20px;padding:12px 18px;background:${bg};color:#fff;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:400px`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4500);
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// TAB 1 — DASHBOARD (LIA ledger)
+// ═══════════════════════════════════════════════════════════════════════
+async function loadDashboard() {
+  const tb = document.getElementById('d-body');
+  tb.innerHTML = '<tr><td colspan="7"><div class="empty">Loading dari sheet LIA…</div></td></tr>';
+  try {
+    const data = await _gasCall('finance_list', {
+      from:   document.getElementById('d-from').value || '',
+      to:     document.getElementById('d-to').value   || '',
+      jenis:  document.getElementById('d-jenis').value|| '',
+      cabang: document.getElementById('d-cabang').value|| '',
+      limit:  200,
+    });
+    if (!data.success) throw new Error(data.message || 'Gagal load');
+    if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="7"><div class="empty">Tidak ada transaksi cocok filter</div></td></tr>'; return; }
+    tb.innerHTML = data.rows.map(r => {
+      const isIn = r.pemasukan > 0;
+      return `
+        <tr>
+          <td>${fmtDateTime(r.timestamp)}</td>
+          <td>${esc(r.email)}</td>
+          <td>${esc(r.keterangan.substring(0, 40))}${r.keterangan.length > 40 ? '…' : ''}</td>
+          <td><span class="cat ${isIn ? 'ok' : 'err'}" style="padding:2px 8px;border-radius:10px;font-size:10px;background:${isIn ? 'rgba(22,163,74,.2);color:#4ade80' : 'rgba(220,38,38,.2);color:#f87171'}">${isIn ? 'Pemasukan' : 'Pengeluaran'}</span></td>
+          <td style="text-align:right;color:${isIn ? '#4ade80' : '#f87171'};font-weight:600">${fmtRp(isIn ? r.pemasukan : r.pengeluaran)}</td>
+          <td style="font-size:11px">${esc(r.cabang)}</td>
+          <td style="font-size:11px">${esc(r.nama_staff || '')}</td>
+        </tr>`;
+    }).join('');
+  } catch (err) {
+    tb.innerHTML = `<tr><td colspan="7"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TAB 2 — CABANG (per-cabang sheet)
+// ═══════════════════════════════════════════════════════════════════════
+async function loadCabangDetail(cabang) {
+  const tb = document.getElementById('c-body');
+  tb.innerHTML = '<tr><td colspan="6"><div class="empty">Loading sheet ' + esc(cabang) + '…</div></td></tr>';
+  try {
+    const data = await _gasCall('finance_cabang_list', {
+      sheet: cabang,
+      search: document.getElementById('c-search').value || '',
+    });
+    if (!data.success) throw new Error(data.message || 'Gagal load');
+    if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="6"><div class="empty">Tidak ada data</div></td></tr>'; return; }
+    tb.innerHTML = data.rows.map(r => `
+      <tr>
+        <td>${fmtDateTime(r.timestamp)}</td>
+        <td style="text-align:right;color:#4ade80">${r.pemasukan > 0 ? fmtRp(r.pemasukan) : '—'}</td>
+        <td style="text-align:right;color:#f87171">${r.pengeluaran > 0 ? fmtRp(r.pengeluaran) : '—'}</td>
+        <td style="text-align:right;font-weight:600">${fmtRp(r.saldo)}</td>
+        <td>${esc(r.keterangan.substring(0, 60))}${r.keterangan.length > 60 ? '…' : ''}</td>
+        <td style="font-size:11px">${esc(r.nama_staff || '')}</td>
+      </tr>`).join('');
+  } catch (err) {
+    tb.innerHTML = `<tr><td colspan="6"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TAB 3 — TAGIHAN
+// ═══════════════════════════════════════════════════════════════════════
+async function loadTagihan() {
+  const tb = document.getElementById('t-body');
+  tb.innerHTML = '<tr><td colspan="8"><div class="empty">Loading Tagihan…</div></td></tr>';
+  try {
+    const data = await _gasCall('finance_tagihan_list', {
+      status: document.getElementById('t-status').value || '',
+      bulan:  document.getElementById('t-bulan').value  || '',
+      search: document.getElementById('t-search').value || '',
+    });
+    if (!data.success) throw new Error(data.message || 'Gagal load');
+    if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="8"><div class="empty">Tidak ada tagihan cocok filter</div></td></tr>'; return; }
+    tb.innerHTML = data.rows.map(r => {
+      const isPaid = r.status === 'sudah_bayar';
+      return `
+        <tr>
+          <td class="key" style="font-family:monospace;color:#facc15">${esc(r.no_tagihan)}</td>
+          <td>${esc(r.instansi)}</td>
+          <td style="font-size:11px">${esc(r.jenis)}</td>
+          <td style="font-size:11px">${esc(r.bulan)}</td>
+          <td style="text-align:right;font-weight:600">${fmtRp(r.jumlah)}</td>
+          <td style="font-size:11px">${esc(r.no_rekening)}</td>
+          <td style="font-size:11px">${r.tgl_bayar ? fmtDate(r.tgl_bayar) : '—'}</td>
+          <td>
+            ${isPaid ? '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(22,163,74,.2);color:#4ade80">Lunas</span>'
+                    : '<button class="btn ok small" data-mark-paid="' + esc(r.no_tagihan) + '">✓ Lunas</button>'}
+          </td>
+        </tr>`;
+    }).join('');
+    tb.querySelectorAll('button[data-mark-paid]').forEach(btn => {
+      btn.addEventListener('click', () => markTagihanPaid(btn.dataset.markPaid));
+    });
+  } catch (err) {
+    tb.innerHTML = `<tr><td colspan="8"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
+  }
+}
+
+async function markTagihanPaid(noTag) {
+  const tgl = prompt(`Tandai LUNAS untuk ${noTag}\n\nTanggal bayar (YYYY-MM-DD, kosong = hari ini):`);
+  if (tgl === null) return;
+  showToast('Memproses…');
+  try {
+    const data = await _gasCall('finance_tagihan_mark_paid', { no_tagihan: noTag, tgl_bayar: tgl.trim() });
+    if (!data.success) throw new Error(data.message);
+    showToast(`✅ ${noTag} → LUNAS (${data.tgl_bayar})`, 'ok');
+    await loadTagihan();
+  } catch (err) { showToast('❌ ' + err.message, 'err'); }
+}
+
+async function addTagihan() {
+  const jenis    = prompt('Jenis tagihan (mis. Listrik, PDAM, Sewa):'); if (jenis === null) return;
+  const noTag    = prompt('No Tagihan:');                                if (noTag === null || !noTag.trim()) return;
+  const instansi = prompt('Nama Instansi:');                             if (instansi === null || !instansi.trim()) return;
+  const bulan    = prompt('Bulan (mis. Agustus 2026):');                 if (bulan === null) return;
+  const jumlahS  = prompt('Jumlah (Rp, angka saja):');                   if (jumlahS === null) return;
+  const noRek    = prompt('No Rekening tujuan:');                        if (noRek === null) return;
+  showToast('Menyimpan…');
+  try {
+    const data = await _gasCall('finance_tagihan_add', {
+      jenis: jenis.trim(), no_tagihan: noTag.trim(), instansi: instansi.trim(),
+      bulan: bulan.trim(), jumlah: jumlahS.trim(), no_rekening: noRek.trim(),
+    });
+    if (!data.success) throw new Error(data.message);
+    showToast(`✅ Tagihan ${data.no_tagihan} ditambahkan (row ${data.row})`, 'ok');
+    await loadTagihan();
+  } catch (err) { showToast('❌ ' + err.message, 'err'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TAB 4 — REKAP (harian + bulanan)
+// ═══════════════════════════════════════════════════════════════════════
+async function loadRekap() {
+  const panel = document.querySelector('[data-panel="rekap"] .empty');
+  if (!panel) return;
+  panel.innerHTML = '<div class="icon">⏳</div>Loading rekap…';
+  try {
+    const [har, bul] = await Promise.all([
+      _gasCall('finance_rekap_harian'),
+      _gasCall('finance_rekap_bulanan'),
+    ]);
+    let html = '';
+    if (har.success) {
+      html += `<div style="margin-bottom:24px"><h3 style="margin-bottom:10px">📆 Tabel Harian</h3><div style="overflow-x:auto"><table class="tbl" style="min-width:600px">${_rekapRenderRows(har)}</table></div></div>`;
+    }
+    if (bul.success) {
+      html += `<div><h3 style="margin-bottom:10px">📅 Tabel Bulanan</h3><div style="overflow-x:auto"><table class="tbl" style="min-width:600px">${_rekapRenderRows(bul)}</table></div></div>`;
+    }
+    panel.parentElement.innerHTML = html || '<div class="empty">Tidak ada data rekap</div>';
+  } catch (err) {
+    panel.innerHTML = `<div class="icon">❌</div>${err.message}`;
+  }
+}
+
+function _rekapRenderRows(res) {
+  const h = (res.headers_row_1 || []).map(esc);
+  const rows = (res.rows_from_2 || []).slice(0, 60);
+  const thead = '<thead><tr>' + h.map(c => `<th>${c}</th>`).join('') + '</tr></thead>';
+  const tbody = '<tbody>' + rows.map(r =>
+    '<tr>' + r.map((c, i) => {
+      const isNum = typeof c === 'number';
+      return `<td style="${isNum ? 'text-align:right;font-variant-numeric:tabular-nums' : ''}">${isNum ? fmtRp(c) : esc(c)}</td>`;
+    }).join('') + '</tr>'
+  ).join('') + '</tbody>';
+  return thead + tbody;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TAB 5 — SALDO RAOS
+// ═══════════════════════════════════════════════════════════════════════
+async function loadSaldoRaos() {
+  const tb = document.getElementById('sr-body');
+  tb.innerHTML = '<tr><td colspan="7"><div class="empty">Loading Supabase…</div></td></tr>';
+  try {
+    const data = await _gasCall('finance_saldo_raos_list', {
+      status: document.getElementById('sr-status').value || '',
+    });
+    if (!data.success) throw new Error(data.message || 'Gagal load');
+    if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="7"><div class="empty">Tidak ada request cocok filter</div></td></tr>'; return; }
+    tb.innerHTML = data.rows.map(r => {
+      const statusChip = r.is_processed
+        ? '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(22,163,74,.2);color:#4ade80">Lunas</span>'
+        : r.status === 'approved'
+          ? '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(14,165,233,.2);color:#38bdf8">Approved</span>'
+          : r.status === 'rejected'
+            ? '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(220,38,38,.2);color:#f87171">Rejected</span>'
+            : '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(234,179,8,.2);color:#facc15">Pending</span>';
+      return `
+        <tr>
+          <td class="key" style="font-family:monospace;font-size:11px;color:#facc15">${esc(r.id.substring(0, 8))}…</td>
+          <td style="font-size:11px">${esc(r.branch_name || '—')}</td>
+          <td>${esc(r.staff_name)}<br><span style="font-size:11px;color:#facc15">${esc(r.staff_code)}</span></td>
+          <td style="text-align:right;font-weight:600">${fmtRp(r.nominal)}</td>
+          <td>${statusChip}</td>
+          <td style="font-size:11px">${fmtDateTime(r.created_at)}</td>
+          <td>${r.is_processed ? '—' : (r.status === 'approved' ? '<button class="btn ok small" data-mark-saldo="' + esc(r.id) + '">✓ Lunas</button>' : '<span style="font-size:11px;color:#888">tunggu approve</span>')}</td>
+        </tr>`;
+    }).join('');
+    tb.querySelectorAll('button[data-mark-saldo]').forEach(btn => {
+      btn.addEventListener('click', () => markSaldoPaid(btn.dataset.markSaldo));
+    });
+  } catch (err) {
+    tb.innerHTML = `<tr><td colspan="7"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
+  }
+}
+
+async function markSaldoPaid(id) {
+  if (!confirm(`Tandai LUNAS pengajuan ${id.substring(0, 8)}…?\nAksi ini akan trigger notif ke staff & post chat RAOS.`)) return;
+  showToast('Memproses…');
+  try {
+    const data = await _gasCall('finance_saldo_raos_mark_paid', { id });
+    if (!data.success) throw new Error(data.message);
+    showToast(`✅ Saldo ${id.substring(0, 8)}… tandai lunas`, 'ok');
+    await loadSaldoRaos();
+  } catch (err) { showToast('❌ ' + err.message, 'err'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TAB 7 — SYSTEM LOG
+// ═══════════════════════════════════════════════════════════════════════
+async function loadLog() {
+  const tb = document.getElementById('l-body');
+  tb.innerHTML = '<tr><td colspan="5"><div class="empty">Loading log…</div></td></tr>';
+  try {
+    const data = await _gasCall('finance_log_list', {
+      status: document.getElementById('l-status').value || '',
+      search: document.getElementById('l-search').value || '',
+      limit:  200,
+    });
+    if (!data.success) throw new Error(data.message || 'Gagal load');
+    if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="5"><div class="empty">Tidak ada log cocok filter</div></td></tr>'; return; }
+    tb.innerHTML = data.rows.map(r => {
+      const stColor = r.status === 'ERROR' ? '#f87171' : r.status === 'WARN' ? '#facc15' : '#4ade80';
+      return `
+        <tr>
+          <td style="font-size:11px">${esc(r.tanggal)}</td>
+          <td style="font-size:11px">${esc(r.jam)}</td>
+          <td style="font-size:11px;color:#facc15">${esc(r.fungsi)}</td>
+          <td><span style="color:${stColor};font-weight:600;font-size:11px">${esc(r.status)}</span></td>
+          <td style="font-size:11px">${esc((r.pesan || '').substring(0, 200))}${(r.pesan || '').length > 200 ? '…' : ''}</td>
+        </tr>`;
+    }).join('');
+  } catch (err) {
+    tb.innerHTML = `<tr><td colspan="5"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// WIRE FILTERS + BUTTONS
+// ═══════════════════════════════════════════════════════════════════════
+function wireFinanceHandlers() {
+  document.getElementById('d-refresh').addEventListener('click', loadDashboard);
+  ['d-from','d-to','d-jenis','d-cabang'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', loadDashboard);
+  });
+  document.getElementById('c-refresh').addEventListener('click', () => {
+    const active = document.querySelector('.cab-card.active');
+    if (active) loadCabangDetail(active.dataset.cab);
+  });
+  document.getElementById('c-search').addEventListener('input', () => {
+    const active = document.querySelector('.cab-card.active');
+    if (active) loadCabangDetail(active.dataset.cab);
+  });
+  ['t-status','t-bulan'].forEach(id => document.getElementById(id).addEventListener('change', loadTagihan));
+  document.getElementById('t-search').addEventListener('input', loadTagihan);
+  // + Tagihan Baru button
+  document.querySelectorAll('[data-panel="tagihan"] .btn.ok.small').forEach(b => {
+    if (b.textContent.indexOf('Tagihan Baru') > -1) b.addEventListener('click', addTagihan);
+  });
+  document.getElementById('sr-status').addEventListener('change', loadSaldoRaos);
+  document.querySelectorAll('[data-panel="saldo-raos"] .btn.ghost.small').forEach(b => {
+    if (b.textContent.indexOf('Refresh') > -1) b.addEventListener('click', loadSaldoRaos);
+  });
+  document.getElementById('l-status').addEventListener('change', loadLog);
+  document.getElementById('l-search').addEventListener('input', loadLog);
+  document.querySelectorAll('[data-panel="log"] .btn.ghost.small').forEach(b => {
+    if (b.textContent.indexOf('Refresh') > -1) b.addEventListener('click', loadLog);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TAB ROUTER dengan lazy-load
+// ═══════════════════════════════════════════════════════════════════════
+const _finTabLoaded = { dashboard: false, tagihan: false, rekap: false, 'saldo-raos': false, log: false };
 document.querySelectorAll('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const target = btn.dataset.tab;
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === btn));
     document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.dataset.panel === target));
     history.replaceState(null, '', '/finance#' + target);
+    // Lazy load per tab
+    if (target === 'dashboard'  && !_finTabLoaded.dashboard)  { _finTabLoaded.dashboard  = true; loadDashboard(); }
+    if (target === 'tagihan'    && !_finTabLoaded.tagihan)    { _finTabLoaded.tagihan    = true; loadTagihan(); }
+    if (target === 'rekap'      && !_finTabLoaded.rekap)      { _finTabLoaded.rekap      = true; loadRekap(); }
+    if (target === 'saldo-raos' && !_finTabLoaded['saldo-raos']) { _finTabLoaded['saldo-raos'] = true; loadSaldoRaos(); }
+    if (target === 'log'        && !_finTabLoaded.log)        { _finTabLoaded.log        = true; loadLog(); }
   });
 });
 const initTab = location.hash.replace('#', '') || 'dashboard';
 const initBtn = document.querySelector(`.tab[data-tab="${initTab}"]`);
 if (initBtn) initBtn.click();
 
-if (checkAuth()) populateCabang();
-
-// TODO next session:
-// 1. Extend GAS di spreadsheet 1AgpEqhpDU4B dengan doGet:
-//    - finance_list (paginated FINANCE ledger)
-//    - cabang_list?sheet=<name>
-//    - tagihan_list + tagihan_add + tagihan_mark_paid
-//    - rekap_harian, rekap_bulanan (parse pivot)
-//    - log_list?limit=N
-// 2. Load supabase-js CDN untuk tab saldo-raos, connect via session token portal
-// 3. Populate stats cards dengan agregat bulan berjalan
+if (checkAuth()) {
+  populateCabang();
+  wireFinanceHandlers();
+}
 </script>
 
 </body>

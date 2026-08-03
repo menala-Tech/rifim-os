@@ -56,6 +56,18 @@ function crmHandleGet(e) {
     if (action === 'contacts_upsert')       return _crmJson(_crmContactsUpsert_(e.parameter));
     if (action === 'contacts_delete')       return _crmJson(_crmContactsDelete_(e.parameter));
 
+    // ─── Finance module (spreadsheet 1AgpEqhpDU4B... — LIA master + Tagihan + per-cabang)
+    if (action === 'finance_list')          return _crmJson(_finLedgerList_(e.parameter));
+    if (action === 'finance_cabang_list')   return _crmJson(_finCabangList_(e.parameter));
+    if (action === 'finance_tagihan_list')  return _crmJson(_finTagihanList_(e.parameter));
+    if (action === 'finance_tagihan_add')   return _crmJson(_finTagihanAdd_(e.parameter));
+    if (action === 'finance_tagihan_mark_paid') return _crmJson(_finTagihanMarkPaid_(e.parameter));
+    if (action === 'finance_rekap_harian')  return _crmJson(_finRekapHarian_(e.parameter));
+    if (action === 'finance_rekap_bulanan') return _crmJson(_finRekapBulanan_(e.parameter));
+    if (action === 'finance_log_list')      return _crmJson(_finLogList_(e.parameter));
+    if (action === 'finance_saldo_raos_list') return _crmJson(_finSaldoRaosList_(e.parameter));
+    if (action === 'finance_saldo_raos_mark_paid') return _crmJson(_finSaldoRaosMarkPaid_(e.parameter));
+
     return null; // bukan CRM action, delegate ke handler lain di doGet
   } catch (err) {
     return _crmJson({ success: false, message: 'CRM API error: ' + err.message });
@@ -452,4 +464,334 @@ function _crmContactsDelete_(params) {
   _crmSbFetch_('DELETE', '/rest/v1/crm_contacts?id=eq.' + encodeURIComponent(id));
   _crmAuditWrite_(params, 'remove', 'contact', id, name, '');
   return { success: true, id: id };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// FINANCE MODULE — 9 endpoint yg baca/tulis spreadsheet Finance RIFIM
+// (1AgpEqhpDU4B..., sheet LIA/Tagihan/TABEL HARIAN/TABEL BULANAN/SYSTEM LOG
+// + 10 tab per-cabang). Semua read+write pakai SpreadsheetApp.openById()
+// dengan cache 60s untuk data set besar (LIA 470+ rows).
+// ═══════════════════════════════════════════════════════════════════════
+var FINANCE_SHEET_ID = '1AgpEqhpDU4BUxcN_i_jaF8Ccw6RwptV2TOJjyTCVPSo';
+var FIN_CABANG_LIST = [
+  'Operasional','ID Rifim Airport Batam','ID Rifim Airport Pekanbaru','ID Rifim Airport Manado',
+  'ID Rifim Airport Balikpapan','ID Rifim Airport Jambi','ID Rifim Airport Makassar',
+  'ID Rifim Batam','ID Rifim Jambi','ID Rifim Jambi Luar','ID Massage Batam/Jakarta',
+];
+
+function _finOpen_() { return SpreadsheetApp.openById(FINANCE_SHEET_ID); }
+
+function _finRead_(sheetName, opts) {
+  var ss = _finOpen_();
+  var sh = ss.getSheetByName(sheetName);
+  if (!sh) throw new Error('Tab "' + sheetName + '" tidak ada di Finance sheet');
+  var last = sh.getLastRow();
+  if (last < 2) return { headers: [], rows: [] };
+  var lastCol = sh.getLastColumn();
+  var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h || '').trim(); });
+  var rows = sh.getRange(2, 1, last - 1, lastCol).getValues();
+  return { headers: headers, rows: rows };
+}
+
+function _finRowToObj_(headers, row) {
+  var o = {};
+  for (var i = 0; i < headers.length; i++) o[headers[i] || ('col' + i)] = row[i];
+  return o;
+}
+
+function _finRoleGate_(params) {
+  var email = String(params.user || '').toLowerCase().trim();
+  if (!email) throw new Error('Parameter user (email) wajib');
+  var verified = authVerifyUser(email);
+  if (!verified.success) throw new Error('Email ' + email + ' tidak diizinkan');
+  var role = String(verified.user && verified.user.role || '').toLowerCase();
+  if (['admin','management','direksi','direktur'].indexOf(role) === -1) {
+    throw new Error('Role ' + role + ' tidak boleh akses Finance (perlu admin/mgmt/direksi)');
+  }
+  return verified.user;
+}
+
+// ─── Dashboard: LIA master ledger, filter tanggal/jenis/cabang/search
+function _finLedgerList_(params) {
+  _finRoleGate_(params);
+  var data = _finRead_('LIA');
+  var from  = params.from ? new Date(params.from + 'T00:00:00+07:00').getTime() : 0;
+  var to    = params.to   ? new Date(params.to   + 'T23:59:59+07:00').getTime() : Infinity;
+  var jenis = String(params.jenis || '').toLowerCase();
+  var cabang = String(params.cabang || '');
+  var search = String(params.search || '').toLowerCase();
+
+  var out = [];
+  for (var i = 0; i < data.rows.length; i++) {
+    var o = _finRowToObj_(data.headers, data.rows[i]);
+    var ts = o.Timestamp ? new Date(o.Timestamp).getTime() : 0;
+    if (ts < from || ts > to) continue;
+    if (cabang && String(o.Cabang || '') !== cabang) continue;
+    var isPemasukan = Number(o.Pemasukan) > 0;
+    var isPengeluaran = Number(o.Pengeluaran) > 0;
+    if (jenis === 'pemasukan' && !isPemasukan) continue;
+    if (jenis === 'pengeluaran' && !isPengeluaran) continue;
+    if (search) {
+      var hay = (String(o.Keterangan || '') + ' ' + String(o['Nama Staff (Kasbon)'] || o['Nama Staff'] || '') + ' ' + String(o.Email || '')).toLowerCase();
+      if (hay.indexOf(search) === -1) continue;
+    }
+    out.push({
+      timestamp:  o.Timestamp,
+      email:      o.Email,
+      pemasukan:  Number(o.Pemasukan) || 0,
+      pengeluaran:Number(o.Pengeluaran) || 0,
+      cabang:     o.Cabang || '',
+      keterangan: o.Keterangan || '',
+      bukti_foto: o['Bukti Foto'] || '',
+      nama_staff: o['Nama Staff (Kasbon)'] || o['Nama Staff'] || '',
+    });
+  }
+  // Sort terbaru dulu
+  out.sort(function(a, b) { return new Date(b.timestamp) - new Date(a.timestamp); });
+  // Optional pagination
+  var limit  = parseInt(params.limit)  || 200;
+  var offset = parseInt(params.offset) || 0;
+  return { success: true, total: out.length, rows: out.slice(offset, offset + limit) };
+}
+
+// ─── Cabang: sheet per cabang (nama tab = nama cabang persis)
+function _finCabangList_(params) {
+  _finRoleGate_(params);
+  var sheet = String(params.sheet || '');
+  if (!sheet) return { success: false, message: 'Parameter sheet (nama cabang) wajib' };
+  var data = _finRead_(sheet);
+  var search = String(params.search || '').toLowerCase();
+  var out = [];
+  var saldo = 0;
+  for (var i = 0; i < data.rows.length; i++) {
+    var o = _finRowToObj_(data.headers, data.rows[i]);
+    var pemas = Number(o.Pemasukan) || 0;
+    var penge = Number(o.Pengeluaran) || 0;
+    saldo += pemas - penge;
+    if (search) {
+      var hay = (String(o.Keterangan || '') + ' ' + String(o['Nama Staff (Kasbon)'] || o['Nama Staff'] || '')).toLowerCase();
+      if (hay.indexOf(search) === -1) continue;
+    }
+    out.push({
+      timestamp:  o.Timestamp,
+      pemasukan:  pemas,
+      pengeluaran:penge,
+      saldo:      saldo,
+      keterangan: o.Keterangan || '',
+      nama_staff: o['Nama Staff (Kasbon)'] || o['Nama Staff'] || '',
+    });
+  }
+  out.reverse(); // terbaru dulu
+  return { success: true, cabang: sheet, total: out.length, rows: out };
+}
+
+// ─── Tagihan
+function _finTagihanList_(params) {
+  _finRoleGate_(params);
+  var data = _finRead_('Tagihan');
+  var status = String(params.status || '').toLowerCase();
+  var bulan  = String(params.bulan  || '');
+  var search = String(params.search || '').toLowerCase();
+  var out = [];
+  for (var i = 0; i < data.rows.length; i++) {
+    var o = _finRowToObj_(data.headers, data.rows[i]);
+    var noTag = String(o['No Tagihan'] || o['No.Tagihan'] || '').trim();
+    var instansi = String(o.Instansi || '').trim();
+    if (!noTag && !instansi) continue;
+    var tglBayar = o['Tanggal Bayar'] || o['Tgl Bayar'] || '';
+    var jumlah = Number(o.Jumlah) || 0;
+    var isPaid = !!tglBayar;
+    var st = isPaid ? 'sudah_bayar' : 'belum_bayar';
+    if (status === 'sudah_bayar' && !isPaid) continue;
+    if (status === 'belum_bayar' && isPaid) continue;
+    if (bulan && String(o.Bulan || '') !== bulan) continue;
+    if (search) {
+      var hay = (noTag + ' ' + instansi + ' ' + String(o.Jenis || '')).toLowerCase();
+      if (hay.indexOf(search) === -1) continue;
+    }
+    out.push({
+      row_index:  i + 2, // 1-index + header
+      no_tagihan: noTag,
+      instansi:   instansi,
+      jenis:      o.Jenis || '',
+      bulan:      o.Bulan || '',
+      jumlah:     jumlah,
+      no_rekening:o['No Rekening'] || o['No.Rekening'] || '',
+      tgl_bayar:  tglBayar,
+      status:     st,
+    });
+  }
+  return { success: true, total: out.length, rows: out };
+}
+
+function _finTagihanAdd_(params) {
+  _finRoleGate_(params);
+  var body = {
+    Jenis:        String(params.jenis || '').trim(),
+    'No Tagihan': String(params.no_tagihan || '').trim(),
+    Instansi:     String(params.instansi || '').trim(),
+    Bulan:        String(params.bulan || '').trim(),
+    Jumlah:       Number(params.jumlah) || 0,
+    'No Rekening':String(params.no_rekening || '').trim(),
+  };
+  if (!body.Instansi || !body['No Tagihan']) return { success: false, message: 'no_tagihan + instansi wajib' };
+
+  var ss = _finOpen_();
+  var sh = ss.getSheetByName('New Tagihan') || ss.getSheetByName('Tagihan');
+  if (!sh) return { success: false, message: 'Tab New Tagihan / Tagihan tidak ada' };
+  var last = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h || '').trim(); });
+  var row = headers.map(function(h) { return body[h] !== undefined ? body[h] : ''; });
+  sh.appendRow(row);
+  _crmAuditWrite_(params, 'add', 'tagihan', body['No Tagihan'], null, body.Instansi + ' · ' + body.Jumlah);
+  return { success: true, no_tagihan: body['No Tagihan'], row: last + 1 };
+}
+
+function _finTagihanMarkPaid_(params) {
+  _finRoleGate_(params);
+  var noTag = String(params.no_tagihan || '').trim();
+  if (!noTag) return { success: false, message: 'Parameter no_tagihan wajib' };
+  var tglBayar = String(params.tgl_bayar || Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd')).trim();
+
+  var ss = _finOpen_();
+  var sh = ss.getSheetByName('Tagihan');
+  if (!sh) return { success: false, message: 'Tab Tagihan tidak ada' };
+  var lastRow = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h || '').trim(); });
+  var idxNo    = headers.indexOf('No Tagihan');    if (idxNo < 0) idxNo = headers.indexOf('No.Tagihan');
+  var idxBayar = headers.indexOf('Tanggal Bayar'); if (idxBayar < 0) idxBayar = headers.indexOf('Tgl Bayar');
+  if (idxNo < 0 || idxBayar < 0) return { success: false, message: 'Kolom No Tagihan / Tanggal Bayar tidak ditemukan' };
+  var data = sh.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (String(data[i][idxNo]).trim() === noTag) {
+      sh.getRange(i + 2, idxBayar + 1).setValue(tglBayar);
+      _crmAuditWrite_(params, 'mark_paid', 'tagihan', noTag, '', tglBayar);
+      return { success: true, no_tagihan: noTag, tgl_bayar: tglBayar, row: i + 2 };
+    }
+  }
+  return { success: false, message: 'No Tagihan ' + noTag + ' tidak ditemukan' };
+}
+
+// ─── Rekap (parse pivot tabel jadi array)
+function _finRekapHarian_(params) {
+  _finRoleGate_(params);
+  var ss = _finOpen_();
+  var sh = ss.getSheetByName('TABEL HARIAN');
+  if (!sh) return { success: false, message: 'Tab TABEL HARIAN tidak ada' };
+  var last = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  var raw = sh.getRange(1, 1, last, lastCol).getValues();
+  return { success: true, headers_row_1: raw[0], rows_from_2: raw.slice(1) };
+}
+
+function _finRekapBulanan_(params) {
+  _finRoleGate_(params);
+  var ss = _finOpen_();
+  var sh = ss.getSheetByName('TABEL BULANAN');
+  if (!sh) return { success: false, message: 'Tab TABEL BULANAN tidak ada' };
+  var last = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  var raw = sh.getRange(1, 1, last, lastCol).getValues();
+  return { success: true, headers_row_1: raw[0], rows_from_2: raw.slice(1) };
+}
+
+// ─── System Log
+function _finLogList_(params) {
+  _finRoleGate_(params);
+  var data = _finRead_('SYSTEM LOG');
+  var status = String(params.status || '').toUpperCase();
+  var search = String(params.search || '').toLowerCase();
+  var limit  = parseInt(params.limit) || 200;
+
+  var out = [];
+  for (var i = data.rows.length - 1; i >= 0 && out.length < limit; i--) {
+    var o = _finRowToObj_(data.headers, data.rows[i]);
+    var st = String(o.Status || '').toUpperCase();
+    if (status && st !== status) continue;
+    if (search) {
+      var hay = (String(o.Fungsi || '') + ' ' + String(o.Pesan || '')).toLowerCase();
+      if (hay.indexOf(search) === -1) continue;
+    }
+    out.push({
+      tanggal: o.Tanggal,
+      jam:     o.Jam,
+      fungsi:  o.Fungsi || '',
+      status:  st,
+      pesan:   o.Pesan || '',
+    });
+  }
+  return { success: true, total: out.length, rows: out };
+}
+
+// ─── Saldo RAOS (proxy Supabase raos_saldo_requests, bypass RLS via service_role)
+function _finSaldoRaosList_(params) {
+  _finRoleGate_(params);
+  var qs = 'select=id,staff_id,branch_id,nominal,status,is_processed,processed_at,processed_by,created_at&order=created_at.desc&limit=200';
+  var status = String(params.status || '');
+  var branchId = String(params.branch_id || '');
+  if (status === 'pending')   qs += '&is_processed=eq.false&status=eq.pending';
+  if (status === 'approved')  qs += '&is_processed=eq.false&status=eq.approved';
+  if (status === 'paid')      qs += '&is_processed=eq.true';
+  if (status === 'rejected')  qs += '&status=eq.rejected';
+  if (branchId) qs += '&branch_id=eq.' + encodeURIComponent(branchId);
+
+  var rows = _crmSbFetch_('GET', '/rest/v1/raos_saldo_requests?' + qs);
+  if (!Array.isArray(rows)) rows = [];
+
+  // Enrich dengan nama staff & driver & cabang
+  var staffIds = {}, branchIds = {};
+  rows.forEach(function(r) {
+    if (r.staff_id)  staffIds[r.staff_id] = true;
+    if (r.branch_id) branchIds[r.branch_id] = true;
+  });
+  var staffMap = {}, branchMap = {};
+  if (Object.keys(staffIds).length) {
+    var ids = Object.keys(staffIds).map(function(x) { return encodeURIComponent(x); }).join(',');
+    try {
+      var ss = _crmSbFetch_('GET', '/rest/v1/user_profiles?select=id,full_name,staff_id&id=in.(' + ids + ')');
+      (ss || []).forEach(function(u) { staffMap[u.id] = u; });
+    } catch (_) {}
+  }
+  if (Object.keys(branchIds).length) {
+    var bids = Object.keys(branchIds).map(function(x) { return encodeURIComponent(x); }).join(',');
+    try {
+      var bb = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug&id=in.(' + bids + ')');
+      (bb || []).forEach(function(b) { branchMap[b.id] = b; });
+    } catch (_) {}
+  }
+
+  var out = rows.map(function(r) {
+    var s = r.staff_id  ? staffMap[r.staff_id]  : null;
+    var b = r.branch_id ? branchMap[r.branch_id]: null;
+    return {
+      id:            r.id,
+      staff_name:    s ? s.full_name : '',
+      staff_code:    s ? s.staff_id : '',
+      branch_name:   b ? b.name : '',
+      branch_slug:   b ? b.slug : '',
+      nominal:       Number(r.nominal) || 0,
+      status:        r.status,
+      is_processed:  r.is_processed,
+      processed_at:  r.processed_at,
+      processed_by:  r.processed_by,
+      created_at:    r.created_at,
+    };
+  });
+  return { success: true, total: out.length, rows: out };
+}
+
+function _finSaldoRaosMarkPaid_(params) {
+  _finRoleGate_(params);
+  var id = String(params.id || '').trim();
+  if (!id) return { success: false, message: 'Parameter id wajib' };
+  var body = {
+    is_processed: true,
+    processed_at: new Date().toISOString(),
+    processed_by: String(params.user || ''),
+  };
+  var res = _crmSbFetch_('PATCH', '/rest/v1/raos_saldo_requests?id=eq.' + encodeURIComponent(id), body);
+  _crmAuditWrite_(params, 'mark_paid', 'saldo_raos', id, '', 'Lunas oleh ' + params.user);
+  return { success: true, id: id, row: Array.isArray(res) ? res[0] : res };
 }
