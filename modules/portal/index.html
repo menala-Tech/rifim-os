@@ -20,15 +20,15 @@ body{font-family:var(--font);background:var(--dark);color:#fff;min-height:100vh;
 #auth-gate{
   flex:1;display:flex;align-items:center;justify-content:center;
   background:
-    linear-gradient(145deg,rgba(26,26,26,.88) 0%,rgba(58,0,0,.88) 60%,rgba(43,43,43,.88) 100%),
-    url('/branding/logo/rifim-logo-building.png') center/cover no-repeat;
+    linear-gradient(145deg,rgba(26,26,26,.75) 0%,rgba(58,0,0,.72) 60%,rgba(43,43,43,.78) 100%),
+    url('/branding/logo/Bagroun%20Maxim.png') center/cover no-repeat;
   padding:24px;min-height:100vh;
 }
 .auth-card{
-  background:#fff;border-radius:20px;padding:48px 40px;width:100%;max-width:400px;
+  background:#fff;border-radius:20px;padding:40px 36px 32px;width:100%;max-width:400px;
   box-shadow:0 24px 80px rgba(0,0,0,.6);text-align:center;
 }
-.auth-logo{max-width:220px;max-height:80px;width:auto;height:auto;margin:0 auto 12px;display:block;object-fit:contain}
+.auth-logo{max-width:180px;max-height:90px;width:auto;height:auto;margin:0 auto 14px;display:block;object-fit:contain}
 .auth-logo-fallback{
   width:72px;height:72px;background:var(--red);border-radius:16px;
   margin:0 auto 12px;display:flex;align-items:center;justify-content:center;
@@ -144,21 +144,23 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
   .brand-txt .brand-sub{display:none}
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
 <!-- AUTH GATE -->
 <div id="auth-gate">
   <div class="auth-card">
-    <img class="auth-logo" src="/branding/logo/rifim-logo.png" alt="RIFIM OS"
+    <img class="auth-logo" src="/branding/logo/Logo%20Menala.png" alt="RIFIM OS"
          onerror="this.style.display='none';document.getElementById('logo-fb').style.display='flex'">
     <div class="auth-logo-fallback" id="logo-fb" style="display:none">RG</div>
     <h1>RIFIM OS</h1>
     <p class="sub">Sistem Operasional Terpadu RIFIM Group</p>
     <input type="email" id="auth-email" placeholder="Email akun Anda" autocomplete="email">
+    <input type="password" id="auth-pin" placeholder="PIN" autocomplete="current-password" inputmode="numeric">
     <button class="btn-login" id="btn-masuk" onclick="doLogin()">Masuk ke RIFIM OS</button>
     <div id="auth-err"></div>
-    <p class="auth-footer">Akses terbatas untuk pengguna yang diotorisasi</p>
+    <p class="auth-footer">Akses terbatas untuk pengguna yang diotorisasi.<br>PIN sama dengan RAOS PWA (dari sheet SSOT).</p>
   </div>
 </div>
 
@@ -266,25 +268,76 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
 <script>
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec';
 
+// ── SUPABASE (RAOS project) — untuk auth PIN dari SSOT sheet ─────────
+const SB_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co';
+const SB_ANON = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+let _sbClient = null;
+function _sb() {
+  if (_sbClient) return _sbClient;
+  if (typeof window.supabase === 'undefined') return null;
+  _sbClient = window.supabase.createClient(SB_URL, SB_ANON, {
+    auth: { persistSession: true, storageKey: 'rifim_portal_sb', autoRefreshToken: true },
+  });
+  return _sbClient;
+}
+
+const ALLOWED_ROLES = ['admin', 'direksi', 'management', 'koordinator'];
+
 // ── AUTH ─────────────────────────────────────────────────────────────
+// Pipeline: email + PIN → Supabase Auth signInWithPassword. PIN = kolom H
+// sheet SSOT MASTER DATA STAFF (di-sync tiap 1 jam ke Supabase Auth password
+// via GAS 13_staff_sync.gs). Setelah sign-in, cek role di user_profiles —
+// hanya admin/direksi/management/koordinator boleh masuk portal.
 async function doLogin() {
-  const email = document.getElementById('auth-email').value.trim();
+  const email = document.getElementById('auth-email').value.trim().toLowerCase();
+  const pin   = document.getElementById('auth-pin').value.trim();
   if (!email) return showErr('Masukkan email Anda.');
+  if (!pin)   return showErr('Masukkan PIN Anda.');
   const btn = document.getElementById('btn-masuk');
   btn.textContent = 'Memverifikasi...';
   btn.disabled = true;
   document.getElementById('auth-err').style.display = 'none';
+
+  const sb = _sb();
+  if (!sb) { btn.textContent = 'Masuk ke RIFIM OS'; btn.disabled = false; return showErr('Supabase SDK belum load — refresh halaman.'); }
+
   try {
-    const res  = await fetch(GAS_URL + '?' + new URLSearchParams({ action: 'auth', source: 'Portal', email }));
-    const data = await res.json();
-    if (data.success) {
-      const session = { ...data.user, email, ts: Date.now() };
-      localStorage.setItem('rifim_auth', JSON.stringify(session));
-      showPortal(session);
-    } else {
-      showErr(data.message || 'Akses ditolak. Email tidak terdaftar.');
+    const { data: signData, error: signErr } = await sb.auth.signInWithPassword({ email, password: pin });
+    if (signErr || !signData?.user) {
+      showErr('Email atau PIN salah. Cek ejaan email dan PIN kolom H sheet SSOT.');
+      return;
     }
+    // Cek role di user_profiles
+    const { data: profile, error: profErr } = await sb.from('user_profiles')
+      .select('id, full_name, role, staff_id, branch_id, is_active')
+      .eq('id', signData.user.id).maybeSingle();
+    if (profErr || !profile) {
+      await sb.auth.signOut();
+      showErr('Profil tidak ditemukan. Hubungi admin.');
+      return;
+    }
+    if (!profile.is_active) {
+      await sb.auth.signOut();
+      showErr('Akun Anda nonaktif. Hubungi admin.');
+      return;
+    }
+    if (!ALLOWED_ROLES.includes(profile.role)) {
+      await sb.auth.signOut();
+      showErr(`Role "${profile.role}" tidak boleh akses portal. Hanya admin/direksi/management/koordinator.`);
+      return;
+    }
+    const session = {
+      full_name: profile.full_name,
+      email,
+      role: profile.role,
+      staff_id: profile.staff_id,
+      branch_id: profile.branch_id,
+      ts: Date.now(),
+    };
+    localStorage.setItem('rifim_auth', JSON.stringify(session));
+    showPortal(session);
   } catch (e) {
+    console.error('[portal login]', e);
     showErr('Gagal terhubung ke server. Coba lagi.');
   } finally {
     btn.textContent = 'Masuk ke RIFIM OS';
@@ -319,6 +372,8 @@ function doLogout() {
         performed_by: { name: u.full_name || u.name || '', email: u.email || '' }, detail: '' })
     }).catch(() => {});
   } catch(_) {}
+  const sb = _sb();
+  if (sb) sb.auth.signOut().catch(() => {});
   localStorage.removeItem('rifim_auth');
   localStorage.removeItem('rifim_company');
   location.reload();
@@ -336,8 +391,13 @@ function goTo(path) {
   window.location.href = path;
 }
 
-document.getElementById('auth-email').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doLogin();
+['auth-email','auth-pin'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      if (id === 'auth-email') document.getElementById('auth-pin').focus();
+      else doLogin();
+    }
+  });
 });
 
 // ── AUTO-LOGIN ────────────────────────────────────────────────────────

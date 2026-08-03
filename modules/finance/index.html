@@ -128,6 +128,7 @@ select option:checked{background:var(--red);color:#fff}
 
 footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
@@ -322,9 +323,10 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <strong>Migrasi dari RAOS PWA (sesi 2026-08-02):</strong> tab <code>/finance</code> di
         RAOS PWA sudah dihapus. Fungsionalitasnya pindah ke sini — role admin/mgmt/direksi
         cuma bisa akses via Rifim-OS.<br>
-        <strong>TODO:</strong> load <code>supabase-js</code> CDN, connect ke
-        <code>vlievtojpmrbsmzlqswl.supabase.co</code> pakai anon key + auth token yg di-link
-        dengan session portal (lihat CRM tab User Supabase RAOS untuk provisioning).
+        <strong>Realtime notifier (sesi 2026-08-04):</strong> subscribe Supabase Broadcast
+        channel <code>raos-saldo-new</code> (trigger DB migration <code>raos_067</code>).
+        Beep + toast instan begitu pengajuan baru masuk dari PWA RAOS, latency &lt;100ms.
+        Fallback poll 60s aktif sebagai safety net kalau websocket drop.
       </div>
       <div class="toolbar">
         <select id="sr-status">
@@ -756,6 +758,98 @@ async function markSaldoPaid(id) {
   } catch (err) { showToast('❌ ' + err.message, 'err'); }
 }
 
+// ─── Realtime notifier pengajuan baru Isi Saldo RAOS
+// Subscribe channel Supabase Broadcast 'raos-saldo-new' — trigger DB
+// raos_broadcast_new_saldo_request() fire event 'new' begitu row baru
+// masuk. Latency <100ms. Public topic (private=false) → anon key cukup,
+// tidak perlu Supabase Auth session di portal.
+// Fallback poll 60s untuk safety net kalau websocket drop.
+const _srSeenIds = new Set();
+let _srAudioCtx = null;
+let _srChannel = null;
+let _srFallbackTimer = null;
+let _srFallbackFirstRun = true;
+
+function _srBeep() {
+  try {
+    if (!_srAudioCtx) _srAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = _srAudioCtx;
+    [{ f: 659.25, t: 0 }, { f: 880, t: 0.14 }].forEach(({ f, t }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + t);
+      gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.13);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + 0.14);
+    });
+  } catch (_) { /* audio blocked, silent */ }
+}
+
+function _srNotify(payload) {
+  if (!payload || !payload.id) return;
+  if (_srSeenIds.has(payload.id)) return;
+  _srSeenIds.add(payload.id);
+  _srBeep();
+  const nominal = Number(payload.nominal || 0).toLocaleString('id-ID');
+  showToast(`🔔 Pengajuan baru: ${payload.staff_name || '?'} — Rp${nominal} (${payload.branch_name || '?'})`, 'ok');
+  const activeTab = document.querySelector('.tab.active');
+  if (activeTab && activeTab.dataset.tab === 'saldo-raos') loadSaldoRaos();
+}
+
+async function _srFallbackPoll() {
+  try {
+    const data = await _gasCall('finance_saldo_raos_list', { status: 'pending' });
+    if (!data.success || !Array.isArray(data.rows)) return;
+    if (_srFallbackFirstRun) {
+      data.rows.forEach(r => _srSeenIds.add(r.id));
+      _srFallbackFirstRun = false;
+      return;
+    }
+    data.rows.forEach(r => {
+      if (!_srSeenIds.has(r.id)) _srNotify({ id: r.id, staff_name: r.staff_name, branch_name: r.branch_name, nominal: r.nominal });
+    });
+  } catch (_) { /* silent */ }
+}
+
+function startSaldoRaosNotifier() {
+  // Unlock AudioContext on first user gesture (autoplay policy)
+  const unlock = () => {
+    if (_srAudioCtx && _srAudioCtx.state === 'suspended') _srAudioCtx.resume();
+    document.removeEventListener('click', unlock);
+    document.removeEventListener('keydown', unlock);
+  };
+  document.addEventListener('click', unlock);
+  document.addEventListener('keydown', unlock);
+
+  // Realtime broadcast subscribe — reuse client dari CRM kalau ada, jika
+  // tidak buat sendiri (Finance modul bisa dibuka standalone tanpa CRM).
+  const SB_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co';
+  const SB_ANON = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+  if (typeof window.supabase === 'undefined') {
+    console.warn('[finance] supabase-js belum load — realtime skip, fallback poll aktif');
+  } else {
+    try {
+      const sb = window.supabase.createClient(SB_URL, SB_ANON);
+      _srChannel = sb.channel('raos-saldo-new')
+        .on('broadcast', { event: 'new' }, ({ payload }) => _srNotify(payload))
+        .subscribe(status => {
+          if (status === 'SUBSCRIBED') console.log('[finance] realtime saldo channel ready');
+          else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.warn('[finance] realtime status:', status);
+        });
+    } catch (err) {
+      console.warn('[finance] realtime subscribe gagal:', err);
+    }
+  }
+
+  // Fallback poll 60s (safety net kalau websocket drop / broadcast lost)
+  _srFallbackPoll();
+  _srFallbackTimer = setInterval(_srFallbackPoll, 60000);
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // TAB 7 — SYSTEM LOG
 // ═══════════════════════════════════════════════════════════════════════
@@ -845,6 +939,7 @@ if (initBtn) initBtn.click();
 if (checkAuth()) {
   populateCabang();
   wireFinanceHandlers();
+  startSaldoRaosNotifier();
 }
 </script>
 
