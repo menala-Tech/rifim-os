@@ -431,7 +431,10 @@ function _crmContactsUpsert_(params) {
     res = _crmSbFetch_('PATCH', '/rest/v1/crm_contacts?id=eq.' + encodeURIComponent(id), body);
     action = 'edit';
   } else {
-    body.created_by = String(params.user || '');
+    // Note: kolom created_by di crm_contacts ternyata uuid FK ke user_profiles
+    // (dari migration crm_066 sebelum sesi ini). GAS proxy pakai service_role
+    // tidak punya lookup aktor-email → user_profiles.id, jadi biarkan NULL.
+    // Aktor tetap tercatat lengkap di CRM_AUDIT_LOG (sheet + audit table).
     res = _crmSbFetch_('POST', '/rest/v1/crm_contacts', body);
     action = 'add';
   }
