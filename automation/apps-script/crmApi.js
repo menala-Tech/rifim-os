@@ -409,32 +409,31 @@ function _crmContactsList_(params) {
 
 function _crmContactsUpsert_(params) {
   _crmRequireAdmin_(params);
-  var name = String(params.name || '').trim();
-  if (!name) return { success: false, message: 'Nama wajib diisi' };
-
-  var body = {
-    name:     name,
-    email:    params.email    ? String(params.email).trim().toLowerCase() : null,
-    phone:    params.phone    ? String(params.phone).trim() : null,
-    company:  params.company  ? String(params.company).trim() : null,
-    category: params.category ? String(params.category).trim() : 'lainnya',
-    notes:    params.notes    ? String(params.notes) : null,
-  };
-  // tags: comma-separated string → array
-  if (params.tags !== undefined) {
-    body.tags = String(params.tags).split(',').map(function(t) { return t.trim(); }).filter(Boolean);
-  }
-
   var id = params.id ? String(params.id).trim() : '';
+
+  // Sparse body — hanya include field yg explicit di params (mirror pattern
+  // raos_users_update). Cegah PATCH tidak sengaja meng-nullify field yang
+  // user tidak sentuh saat edit via API (mis. curl kirim id+name+notes saja).
+  var body = {};
+  if (params.name     !== undefined) body.name     = String(params.name).trim();
+  if (params.email    !== undefined) body.email    = params.email    ? String(params.email).trim().toLowerCase() : null;
+  if (params.phone    !== undefined) body.phone    = params.phone    ? String(params.phone).trim() : null;
+  if (params.company  !== undefined) body.company  = params.company  ? String(params.company).trim() : null;
+  if (params.category !== undefined) body.category = params.category ? String(params.category).trim() : 'lainnya';
+  if (params.notes    !== undefined) body.notes    = params.notes    ? String(params.notes) : null;
+  if (params.tags     !== undefined) body.tags     = String(params.tags).split(',').map(function(t) { return t.trim(); }).filter(Boolean);
+
   var res, action;
   if (id) {
+    if (Object.keys(body).length === 0) return { success: false, message: 'Tidak ada field yang di-update' };
     res = _crmSbFetch_('PATCH', '/rest/v1/crm_contacts?id=eq.' + encodeURIComponent(id), body);
     action = 'edit';
   } else {
-    // Note: kolom created_by di crm_contacts ternyata uuid FK ke user_profiles
-    // (dari migration crm_066 sebelum sesi ini). GAS proxy pakai service_role
-    // tidak punya lookup aktor-email → user_profiles.id, jadi biarkan NULL.
-    // Aktor tetap tercatat lengkap di CRM_AUDIT_LOG (sheet + audit table).
+    // CREATE — nama wajib. created_by biarkan NULL (kolom uuid FK ke
+    // user_profiles dari migration crm_066; GAS proxy pakai service_role
+    // tidak punya lookup aktor-email → user_profiles.id). Aktor tetap
+    // tercatat lengkap di CRM_AUDIT_LOG (sheet + audit table).
+    if (!body.name) return { success: false, message: 'Nama wajib diisi' };
     res = _crmSbFetch_('POST', '/rest/v1/crm_contacts', body);
     action = 'add';
   }
