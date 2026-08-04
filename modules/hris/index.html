@@ -299,8 +299,10 @@ tr:last-child td{border-bottom:none}
       <div class="card">
         <div class="card-header">
           <h3>Data Karyawan</h3>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-secondary" onclick="exportEmployeesCSV()">⬇ Export CSV</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-secondary" onclick="exportEmployeesCSV()">⬇ CSV</button>
+            <button class="btn btn-secondary" onclick="exportEmployeesXLSX()">⬇ XLSX</button>
+            <button class="btn btn-secondary" onclick="exportEmployeesPDF()">📄 PDF</button>
             <button class="btn btn-primary" onclick="openAddEmployeeModal()">+ Tambah Karyawan</button>
           </div>
         </div>
@@ -324,12 +326,13 @@ tr:last-child td{border-bottom:none}
             <table id="table-employees">
               <thead>
                 <tr>
-                  <th>ID</th><th>Nama</th><th>Jabatan</th><th>Departemen</th>
+                  <th>ID</th><th>Nama</th><th>Jabatan</th><th>Cabang</th>
+                  <th style="text-align:right">Gaji Pokok</th>
                   <th>Perusahaan</th><th>Tipe</th><th>Status</th><th>Bergabung</th><th>Aksi</th>
                 </tr>
               </thead>
               <tbody id="tbody-employees">
-                <tr><td colspan="9" class="loading">Memuat data…</td></tr>
+                <tr><td colspan="10" class="loading">Memuat data…</td></tr>
               </tbody>
             </table>
           </div>
@@ -540,13 +543,30 @@ tr:last-child td{border-bottom:none}
           <label>Jabatan</label>
           <select id="emp-position">
             <option value="">-- Pilih Jabatan --</option>
-            <option>STAFF KONTER</option>
-            <option>PICKUP POINT</option>
-            <option>KOORDINATOR</option>
-            <option>STAFF ADMIN</option>
-            <option>MANAGER OPERASIONAL</option>
-            <option>MANAGER KEUANGAN</option>
-            <option>MANAGER ADMINISTRASI</option>
+            <optgroup label="Direksi & Management">
+              <option>DIREKSI</option>
+              <option>DIREKTUR UTAMA</option>
+              <option>DIREKTUR OPERASIONAL</option>
+              <option>DIREKTUR KEUANGAN</option>
+              <option>MANAGER OPERASIONAL</option>
+              <option>MANAGER KEUANGAN</option>
+              <option>MANAGER ADMINISTRASI</option>
+              <option>MANAGER HRD</option>
+            </optgroup>
+            <optgroup label="Staff Kantor">
+              <option>STAFF ADMIN</option>
+              <option>STAFF FINANCE</option>
+              <option>STAFF HRIS</option>
+              <option>STAFF CRM</option>
+              <option>STAFF GA</option>
+              <option>STAFF IT</option>
+            </optgroup>
+            <optgroup label="Operasional Lapangan">
+              <option>KOORDINATOR</option>
+              <option>STAFF KONTER</option>
+              <option>PICKUP POINT</option>
+              <option>DRIVER</option>
+            </optgroup>
           </select>
         </div>
         <div class="form-group">
@@ -1233,7 +1253,7 @@ async function loadEmployees() {
 function renderEmployees(rows) {
   const tbody = document.getElementById('tbody-employees');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><p>Belum ada karyawan.</p></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><p>Belum ada karyawan.</p></td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(r => `
@@ -1241,7 +1261,8 @@ function renderEmployees(rows) {
       <td><strong>${r.employee_id}</strong></td>
       <td>${r.full_name}</td>
       <td>${r.position || '–'}</td>
-      <td>${r.department || '–'}</td>
+      <td style="font-size:12px">${r.branch || '–'}</td>
+      <td style="text-align:right;font-family:monospace">Rp ${fmtNum(r.salary_base || 0)}</td>
       <td><span class="badge badge-aktif">${r.company_code}</span></td>
       <td><span class="badge badge-${r.employment_type.toLowerCase()}">${r.employment_type}</span></td>
       <td><span class="badge badge-${r.status.toLowerCase()}">${r.status}</span></td>
@@ -1262,7 +1283,8 @@ function filterEmployees() {
     (type   === 'ALL' || r.employment_type === type) &&
     (!q || r.full_name.toLowerCase().includes(q) ||
            r.employee_id.toLowerCase().includes(q) ||
-           (r.position || '').toLowerCase().includes(q))
+           (r.position || '').toLowerCase().includes(q) ||
+           (r.branch   || '').toLowerCase().includes(q))
   );
   renderEmployees(rows);
 }
@@ -1295,6 +1317,135 @@ function exportEmployeesCSV() {
   a.href = url; a.download = 'karyawan_' + selectedCompany + '_' + new Date().toISOString().slice(0,10) + '.csv';
   a.click(); URL.revokeObjectURL(url);
   showToast('CSV berhasil diunduh (' + rows.length + ' karyawan).', 'success');
+}
+
+// XLSX export via SpreadsheetML XML (Excel 2003+ native format, no library needed)
+// Excel bisa open .xls file dengan XML SpreadsheetML content — support formula, format, multi-column
+function exportEmployeesXLSX() {
+  const q      = document.getElementById('search-emp').value.toLowerCase();
+  const status = document.getElementById('filter-status').value;
+  const type   = document.getElementById('filter-type').value;
+  const rows   = allEmployees.filter(r =>
+    (status === 'ALL' || r.status === status) &&
+    (type   === 'ALL' || r.employment_type === type) &&
+    (!q || r.full_name.toLowerCase().includes(q) ||
+           r.employee_id.toLowerCase().includes(q) ||
+           (r.position || '').toLowerCase().includes(q) ||
+           (r.branch || '').toLowerCase().includes(q))
+  );
+  if (!rows.length) { showToast('Tidak ada data untuk diekspor.', 'error'); return; }
+
+  const escXml = (v) => String(v == null ? '' : v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+  const headers = ['ID Karyawan','Nama','Jabatan','Cabang','Gaji Pokok','Perusahaan','Tipe','Status','Tgl Bergabung','Email','No HP','NIK','Bank','No Rekening'];
+
+  const headerRow = '<Row>' + headers.map(h => `<Cell ss:StyleID="hdr"><Data ss:Type="String">${escXml(h)}</Data></Cell>`).join('') + '</Row>';
+  const dataRows = rows.map(r => {
+    const cells = [
+      `<Cell><Data ss:Type="String">${escXml(r.employee_id)}</Data></Cell>`,
+      `<Cell><Data ss:Type="String">${escXml(r.full_name)}</Data></Cell>`,
+      `<Cell><Data ss:Type="String">${escXml(r.position || '')}</Data></Cell>`,
+      `<Cell><Data ss:Type="String">${escXml(r.branch || '')}</Data></Cell>`,
+      `<Cell ss:StyleID="num"><Data ss:Type="Number">${Number(r.salary_base) || 0}</Data></Cell>`,
+      `<Cell><Data ss:Type="String">${escXml(r.company_code)}</Data></Cell>`,
+      `<Cell><Data ss:Type="String">${escXml(r.employment_type)}</Data></Cell>`,
+      `<Cell><Data ss:Type="String">${escXml(r.status)}</Data></Cell>`,
+      `<Cell><Data ss:Type="String">${escXml(r.join_date ? r.join_date.slice(0,10) : '')}</Data></Cell>`,
+      `<Cell><Data ss:Type="String">${escXml(r.email || '')}</Data></Cell>`,
+      `<Cell><Data ss:Type="String">${escXml(r.phone || '')}</Data></Cell>`,
+      `<Cell><Data ss:Type="String">${escXml(r.nik || '')}</Data></Cell>`,
+      `<Cell><Data ss:Type="String">${escXml(r.bank_name || '')}</Data></Cell>`,
+      `<Cell><Data ss:Type="String">${escXml(r.bank_account || '')}</Data></Cell>`,
+    ];
+    return '<Row>' + cells.join('') + '</Row>';
+  }).join('');
+
+  const xml = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Styles>
+  <Style ss:ID="hdr"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#C40000" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="num"><NumberFormat ss:Format="&quot;Rp &quot;#,##0"/></Style>
+</Styles>
+<Worksheet ss:Name="Karyawan ${escXml(selectedCompany)}">
+  <Table>${headerRow}${dataRows}</Table>
+</Worksheet>
+</Workbook>`;
+
+  const blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'karyawan_' + selectedCompany + '_' + new Date().toISOString().slice(0,10) + '.xls';
+  a.click(); URL.revokeObjectURL(url);
+  showToast('XLSX berhasil diunduh (' + rows.length + ' karyawan).', 'success');
+}
+
+// PDF export via window.print() — user pilih "Save as PDF" di print dialog
+function exportEmployeesPDF() {
+  const q      = document.getElementById('search-emp').value.toLowerCase();
+  const status = document.getElementById('filter-status').value;
+  const type   = document.getElementById('filter-type').value;
+  const rows   = allEmployees.filter(r =>
+    (status === 'ALL' || r.status === status) &&
+    (type   === 'ALL' || r.employment_type === type) &&
+    (!q || r.full_name.toLowerCase().includes(q) ||
+           r.employee_id.toLowerCase().includes(q) ||
+           (r.position || '').toLowerCase().includes(q) ||
+           (r.branch || '').toLowerCase().includes(q))
+  );
+  if (!rows.length) { showToast('Tidak ada data untuk diekspor.', 'error'); return; }
+
+  const now = new Date();
+  const stamp = now.toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' });
+  const escHtml = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const tblRows = rows.map((r, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><b>${escHtml(r.employee_id)}</b></td>
+      <td>${escHtml(r.full_name)}</td>
+      <td>${escHtml(r.position || '–')}</td>
+      <td>${escHtml(r.branch || '–')}</td>
+      <td class="num">Rp ${fmtNum(r.salary_base || 0)}</td>
+      <td>${escHtml(r.employment_type)}</td>
+      <td>${escHtml(r.status)}</td>
+      <td>${r.join_date ? escHtml(r.join_date.slice(0,10)) : '–'}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Data Karyawan — ${escHtml(selectedCompany)}</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; color: #111; padding: 20px 24px; font-size: 11px; }
+h1 { font-size: 18px; color: #C40000; margin-bottom: 4px; }
+.meta { font-size: 10px; color: #666; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #ddd; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 6px 8px; border: 1px solid #ddd; text-align: left; vertical-align: top; }
+th { background: #C40000; color: #fff; font-size: 10px; text-transform: uppercase; }
+tr:nth-child(even) td { background: #fafafa; }
+td.num { text-align: right; font-family: 'Consolas', monospace; }
+.footer { margin-top: 20px; font-size: 9px; color: #888; text-align: right; }
+@media print {
+  body { padding: 10px; }
+  th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style></head><body>
+<h1>Data Karyawan — ${escHtml(selectedCompany)}</h1>
+<div class="meta">Total: <b>${rows.length}</b> karyawan · Filter: ${status === 'ALL' ? 'Semua Status' : status} / ${type === 'ALL' ? 'Semua Tipe' : type} · Dibuat: ${escHtml(stamp)}</div>
+<table>
+  <thead><tr><th>#</th><th>ID</th><th>Nama</th><th>Jabatan</th><th>Cabang</th><th>Gaji Pokok</th><th>Tipe</th><th>Status</th><th>Bergabung</th></tr></thead>
+  <tbody>${tblRows}</tbody>
+</table>
+<div class="footer">RIFIM OS · HRIS · Rifim Group</div>
+<script>window.onload = function() { setTimeout(function() { window.print(); }, 300); }</${''}script>
+</body></html>`;
+
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) { showToast('Popup diblokir browser. Izinkan popup untuk export PDF.', 'error'); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+  showToast('PDF preview terbuka. Pilih "Save as PDF" di print dialog.', 'success');
 }
 
 function updateEmpStats(rows) {
@@ -1429,6 +1580,26 @@ async function confirmResign() {
   }
 }
 
+// Upload foto ke Google Drive via GAS Web App POST
+async function _hrisUploadPhotoToDrive(employeeId, fullName, photoType, dataUrl) {
+  if (!dataUrl || !dataUrl.startsWith('data:')) return null;
+  const body = {
+    action: 'hris_upload_employee_photo',
+    user: (JSON.parse(localStorage.getItem('rifim_auth') || '{}').email || ''),
+    employee_id: employeeId,
+    full_name: fullName,
+    photo_type: photoType,
+    data_url: dataUrl,
+  };
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },  // avoid CORS preflight
+    body: JSON.stringify(body),
+  }).then(r => r.json()).catch(err => ({ success: false, message: err.message }));
+  if (!res.success) throw new Error('Upload ' + photoType + ' ke Drive gagal: ' + res.message);
+  return res.url;
+}
+
 async function submitAddEmployee() {
   const btn = document.getElementById('btn-save-employee');
   if (btn.disabled) return;
@@ -1436,9 +1607,30 @@ async function submitAddEmployee() {
   const salaryEl  = document.getElementById('emp-salary');
   const salaryRaw = parseInt(salaryEl.dataset.raw || salaryEl.value.replace(/\D/g,'')) || 0;
 
+  const employeeId = document.getElementById('emp-id').value.trim().toUpperCase();
+  const fullName   = document.getElementById('emp-name').value.trim();
+  const ktpDataUrl    = document.getElementById('emp-ktp-data').value || null;
+  const photo23DataUrl = document.getElementById('emp-photo23-data').value || null;
+
+  // Upload foto ke Drive DULU (kalau ada), baru simpan URL ke row employees
+  let photoKtpUrl = null, photo23Url = null;
+  if (ktpDataUrl || photo23DataUrl) {
+    if (!employeeId || !fullName) {
+      return showToast('ID + Nama wajib diisi sebelum upload foto.', 'error');
+    }
+    btn.disabled = true; btn.textContent = 'Upload foto ke Drive…';
+    try {
+      if (ktpDataUrl)    photoKtpUrl = await _hrisUploadPhotoToDrive(employeeId, fullName, 'ktp',    ktpDataUrl);
+      if (photo23DataUrl) photo23Url = await _hrisUploadPhotoToDrive(employeeId, fullName, '2x3',    photo23DataUrl);
+    } catch (err) {
+      btn.disabled = false; btn.textContent = 'Simpan Karyawan';
+      return showToast(err.message, 'error');
+    }
+  }
+
   const data = {
-    employee_id:     document.getElementById('emp-id').value.trim().toUpperCase(),
-    full_name:       document.getElementById('emp-name').value.trim(),
+    employee_id:     employeeId,
+    full_name:       fullName,
     email:           document.getElementById('emp-email').value.trim(),
     phone:           document.getElementById('emp-phone').value.trim(),
     company_code:    document.getElementById('emp-company').value,
@@ -1449,8 +1641,8 @@ async function submitAddEmployee() {
     join_date:       document.getElementById('emp-join').value,
     end_date:        document.getElementById('emp-end').value || null,
     salary_base:     salaryRaw,
-    photo_ktp:       document.getElementById('emp-ktp-data').value || null,
-    photo_2x3:       document.getElementById('emp-photo23-data').value || null,
+    photo_ktp:       photoKtpUrl,   // Drive URL (bukan base64)
+    photo_2x3:       photo23Url,
     bank_name:       document.getElementById('emp-bank').value,
     bank_account:    document.getElementById('emp-account').value.trim(),
     address:         document.getElementById('emp-address').value.trim(),

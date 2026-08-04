@@ -92,6 +92,9 @@ function crmHandleGet(e) {
     // ─── HRIS Payroll bridge — read-only bonus dari Finance
     if (action === 'hris_payroll_bonus_list')          return _crmJson(_hrisPayrollBonusList_(e.parameter));
 
+    // ─── HRIS foto karyawan upload ke Google Drive
+    if (action === 'hris_upload_employee_photo')       return _crmJson(_hrisUploadEmployeePhoto_(e.parameter));
+
     return null; // bukan CRM action, delegate ke handler lain di doGet
   } catch (err) {
     return _crmJson({ success: false, message: 'CRM API error: ' + err.message });
@@ -1313,6 +1316,88 @@ function _finDriverAssignRandom_(params) {
   var res = _crmSbFetch_('POST', '/rest/v1/rpc/raos_random_assign_drivers', { p_branch_id: branchId, p_force: force });
   _crmAuditWrite_(params, 'random_assign', 'driver_staff_assignment', branchId, '', 'force=' + force + ' → ' + String(res));
   return { success: true, branch_id: branchId, force: force, assigned: Number(res) || 0 };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// HRIS Foto Karyawan → Google Drive (folder RIFIM OS terpusat)
+// Folder root: 19taBn0YXxjXTb-SxqFXGhwOPShZ4VlIt
+// Struktur: root/Foto Staff/<Nama Staff (RIF****)>/{ktp,2x3}.jpg
+// ═══════════════════════════════════════════════════════════════════════
+var HRIS_PHOTO_ROOT_FOLDER_ID = '19taBn0YXxjXTb-SxqFXGhwOPShZ4VlIt';
+var HRIS_PHOTO_SUBFOLDER = 'Foto Staff';
+
+function _hrisFolderGetOrCreate_(parent, name) {
+  var it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+
+function _hrisSlugStaffFolder_(fullName, employeeId) {
+  // Format: "Nama Staff (RIF0032)" — konsisten dengan struktur user
+  var clean = String(fullName || '').trim().replace(/[<>:"\/\\|?*]/g, ' ').replace(/\s+/g, ' ');
+  var id = String(employeeId || '').trim().toUpperCase();
+  if (!clean) clean = 'UNKNOWN';
+  return id ? (clean + ' (' + id + ')') : clean;
+}
+
+function _hrisUploadEmployeePhoto_(params) {
+  // Auth check — admin/mgmt/direksi (sama pattern _finRoleGate_ tapi HRIS scope)
+  var email = String(params.user || '').toLowerCase().trim();
+  if (!email) return { success: false, message: 'Parameter user (email) wajib' };
+  var verified = authVerifyUser(email);
+  if (!verified.success) return { success: false, message: 'Email ' + email + ' tidak diizinkan' };
+  var role = String(verified.user && verified.user.role || '').toLowerCase();
+  if (['admin','management','direksi','direktur','hrd'].indexOf(role) === -1) {
+    return { success: false, message: 'Role ' + role + ' tidak boleh upload foto karyawan' };
+  }
+
+  var employeeId = String(params.employee_id || '').trim().toUpperCase();
+  var fullName   = String(params.full_name   || '').trim();
+  var photoType  = String(params.photo_type  || '').toLowerCase();
+  var dataUrl    = String(params.data_url    || '');
+
+  if (!employeeId) return { success: false, message: 'employee_id wajib' };
+  if (!fullName)   return { success: false, message: 'full_name wajib' };
+  if (photoType !== 'ktp' && photoType !== '2x3') return { success: false, message: 'photo_type harus ktp atau 2x3' };
+  if (!dataUrl.startsWith('data:')) return { success: false, message: 'data_url harus base64 data URL (data:image/...)' };
+
+  // Parse data URL
+  var match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return { success: false, message: 'data_url format invalid — harus data:<mime>;base64,<data>' };
+  var mimeType = match[1];
+  var base64   = match[2];
+  var ext = (mimeType === 'image/png') ? 'png' : (mimeType === 'image/webp' ? 'webp' : 'jpg');
+  var fileName = photoType + '.' + ext;
+
+  try {
+    var root = DriveApp.getFolderById(HRIS_PHOTO_ROOT_FOLDER_ID);
+    var staffRoot = _hrisFolderGetOrCreate_(root, HRIS_PHOTO_SUBFOLDER);
+    var staffFolder = _hrisFolderGetOrCreate_(staffRoot, _hrisSlugStaffFolder_(fullName, employeeId));
+
+    // Kalau file exist, hapus dulu (overwrite)
+    var existing = staffFolder.getFilesByName(fileName);
+    while (existing.hasNext()) existing.next().setTrashed(true);
+
+    var blob = Utilities.newBlob(Utilities.base64Decode(base64), mimeType, fileName);
+    var file = staffFolder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    var fileId = file.getId();
+    var publicUrl = 'https://drive.google.com/uc?export=view&id=' + fileId;
+
+    _crmAuditWrite_(params, 'upload_photo', 'hris_employee_photo',
+      employeeId + '/' + photoType, '', publicUrl);
+
+    return {
+      success: true,
+      file_id: fileId,
+      url: publicUrl,
+      folder_id: staffFolder.getId(),
+      folder_name: staffFolder.getName(),
+      file_name: fileName,
+    };
+  } catch (err) {
+    return { success: false, message: 'Drive upload gagal: ' + err.message };
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════

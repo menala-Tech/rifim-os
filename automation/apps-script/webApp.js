@@ -109,6 +109,17 @@ function doPost(e) {
       }
     }
 
+    // ── CRM/HRIS POST endpoints (foto upload butuh POST body, tidak muat di URL query)
+    if (input.action === 'hris_upload_employee_photo') {
+      try {
+        return _json(_hrisUploadEmployeePhoto_(input));
+      } catch (err) {
+        _gasLogError('doPost', 'hris_upload_employee_photo', err,
+          { employee_id: input.employee_id, photo_type: input.photo_type });
+        return _json({ success: false, message: err.message });
+      }
+    }
+
     // ── Staff App PWA actions (staffLogin, staffSaldoSubmit, dll.) ─
     if (input.action && input.action !== 'log_activity') {
       var staffResult = routeStaffApp(input.action, input);
