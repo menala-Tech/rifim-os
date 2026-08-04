@@ -141,6 +141,27 @@ h1{font-size:22px;font-weight:800;margin-bottom:4px}
     </div>
   </div>
 
+  <!-- AUTH FORCE REFRESH -->
+  <div class="section">
+    <h2>🔑 Auth Force Refresh (opsional)</h2>
+    <div class="grid">
+      <div class="card" data-action="force_refresh_staff_auth">
+        <div class="icon">👤</div>
+        <div class="title">Force Refresh Staff Auth</div>
+        <div class="desc">Pakai kalau habis update PIN staff massal di sheet SSOT kolom H, mau langsung propagate ke Supabase Auth password. Skip staff PIN kosong/invalid. <strong style="color:#facc15">Butuh ~10 detik</strong>.</div>
+        <button onclick="runAction('force_refresh_staff_auth', this)">Jalankan</button>
+        <div class="result hidden"></div>
+      </div>
+      <div class="card" data-action="force_refresh_driver_auth">
+        <div class="icon">🚕</div>
+        <div class="title">Force Refresh Driver Airport Auth</div>
+        <div class="desc">Password driver = driver_id itu sendiri. Pakai kalau rotasi driver_id di SSOT. <strong style="color:#facc15">Butuh ~30-60 detik</strong> (200+ driver).</div>
+        <button onclick="runAction('force_refresh_driver_auth', this)">Jalankan</button>
+        <div class="result hidden"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- KPI & LAPORAN -->
   <div class="section">
     <h2>📊 KPI & Laporan</h2>
