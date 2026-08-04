@@ -95,6 +95,11 @@ function crmHandleGet(e) {
     // ─── HRIS foto karyawan upload ke Google Drive
     if (action === 'hris_upload_employee_photo')       return _crmJson(_hrisUploadEmployeePhoto_(e.parameter));
 
+    // ─── HRIS Absensi (raos_attendance SSOT, bukan tabel attendance lama)
+    if (action === 'hris_attendance_raos_list')        return _crmJson(_hrisAttendanceRaosList_(e.parameter));
+    if (action === 'hris_attendance_summary_month')    return _crmJson(_hrisAttendanceSummaryMonth_(e.parameter));
+    if (action === 'hris_attendance_edit')             return _crmJson(_hrisAttendanceEdit_(e.parameter));
+
     return null; // bukan CRM action, delegate ke handler lain di doGet
   } catch (err) {
     return _crmJson({ success: false, message: 'CRM API error: ' + err.message });
@@ -1316,6 +1321,144 @@ function _finDriverAssignRandom_(params) {
   var res = _crmSbFetch_('POST', '/rest/v1/rpc/raos_random_assign_drivers', { p_branch_id: branchId, p_force: force });
   _crmAuditWrite_(params, 'random_assign', 'driver_staff_assignment', branchId, '', 'force=' + force + ' → ' + String(res));
   return { success: true, branch_id: branchId, force: force, assigned: Number(res) || 0 };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// HRIS Absensi — source raos_attendance (SSOT dari PWA RAOS)
+// ═══════════════════════════════════════════════════════════════════════
+
+// List raos_attendance dalam range tanggal + filter branch/staff, join user_profiles+branches+shifts
+function _hrisAttendanceRaosList_(params) {
+  _finRoleGate_(params);
+  var dateFrom = String(params.date_from || '').trim();
+  var dateTo   = String(params.date_to   || '').trim();
+  var branchId = String(params.branch_id || '').trim();
+  var staffId  = String(params.staff_id  || '').trim();
+  var search   = String(params.search    || '').toLowerCase();
+
+  if (!dateFrom || !dateTo) return { success: false, message: 'date_from + date_to wajib (YYYY-MM-DD)' };
+
+  var qs = 'select=id,staff_id,branch_id,shift_id,date,check_in_at,check_out_at,check_in_lat,check_in_lng,check_out_lat,check_out_lng,selfie_in_url,selfie_out_url,status,is_location_valid,auto_checkout&order=date.desc,check_in_at.desc';
+  qs += '&date=gte.' + encodeURIComponent(dateFrom);
+  qs += '&date=lte.' + encodeURIComponent(dateTo);
+  if (branchId) qs += '&branch_id=eq.' + encodeURIComponent(branchId);
+  if (staffId)  qs += '&staff_id=eq.'  + encodeURIComponent(staffId);
+  qs += '&limit=500';
+
+  var rows = _crmSbFetch_('GET', '/rest/v1/raos_attendance?' + qs);
+  if (!Array.isArray(rows)) rows = [];
+
+  if (!rows.length) return { success: true, count: 0, rows: [] };
+
+  // Enrich: staff, branch, shift
+  var staffIds = {}, branchIds = {}, shiftIds = {};
+  rows.forEach(function(r) {
+    if (r.staff_id)  staffIds[r.staff_id]  = true;
+    if (r.branch_id) branchIds[r.branch_id] = true;
+    if (r.shift_id)  shiftIds[r.shift_id]  = true;
+  });
+
+  var staffMap = {}, branchMap = {}, shiftMap = {};
+  var sIds = Object.keys(staffIds).map(encodeURIComponent).join(',');
+  if (sIds) {
+    var ss = _crmSbFetch_('GET', '/rest/v1/user_profiles?select=id,full_name,staff_id&id=in.(' + sIds + ')');
+    (ss || []).forEach(function(u) { staffMap[u.id] = u; });
+  }
+  var bIds = Object.keys(branchIds).map(encodeURIComponent).join(',');
+  if (bIds) {
+    var bb = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug&id=in.(' + bIds + ')');
+    (bb || []).forEach(function(b) { branchMap[b.id] = b; });
+  }
+  var shIds = Object.keys(shiftIds).map(encodeURIComponent).join(',');
+  if (shIds) {
+    var sh = _crmSbFetch_('GET', '/rest/v1/shifts?select=id,name,start_time,end_time,tolerance_minutes&id=in.(' + shIds + ')');
+    (sh || []).forEach(function(x) { shiftMap[x.id] = x; });
+  }
+
+  // Post-process: hitung late minutes per row (client-side agar tidak beban SQL heavy)
+  var out = rows.map(function(r) {
+    var s = r.staff_id  ? staffMap[r.staff_id]  : null;
+    var b = r.branch_id ? branchMap[r.branch_id]: null;
+    var sh = r.shift_id ? shiftMap[r.shift_id]  : null;
+    var lateMinutes = 0;
+    if (sh && sh.start_time && r.check_in_at) {
+      var expected = new Date(r.date + 'T' + sh.start_time + '+07:00').getTime();
+      var actual   = new Date(r.check_in_at).getTime();
+      var tolMs    = (sh.tolerance_minutes || 0) * 60 * 1000;
+      var diffMin  = Math.floor((actual - expected - tolMs) / 60000);
+      if (diffMin > 0) lateMinutes = diffMin;
+    }
+    var lateDeduction = Math.floor(lateMinutes / 30) * 10000;
+    var loc = (r.check_in_lat && r.check_in_lng)
+      ? (Number(r.check_in_lat).toFixed(5) + ',' + Number(r.check_in_lng).toFixed(5))
+      : '';
+    return {
+      id: r.id,
+      staff_id: r.staff_id,
+      staff_code: s ? s.staff_id : '',
+      staff_name: s ? s.full_name : '',
+      branch_id: r.branch_id,
+      branch_name: b ? b.name : '',
+      branch_slug: b ? b.slug : '',
+      shift_name: sh ? sh.name : '',
+      date: r.date,
+      check_in_at: r.check_in_at,
+      check_out_at: r.check_out_at,
+      selfie_in_url: r.selfie_in_url,
+      selfie_out_url: r.selfie_out_url,
+      status: r.status,
+      is_location_valid: r.is_location_valid,
+      auto_checkout: r.auto_checkout,
+      late_minutes: lateMinutes,
+      late_deduction: lateDeduction,
+      location: loc,
+      maps_link: loc ? ('https://www.google.com/maps?q=' + loc) : '',
+    };
+  });
+
+  // Filter search di JS (setelah enrichment)
+  if (search) {
+    out = out.filter(function(r) {
+      return (r.staff_name + ' ' + r.staff_code + ' ' + r.branch_name).toLowerCase().indexOf(search) !== -1;
+    });
+  }
+
+  return { success: true, count: out.length, rows: out };
+}
+
+// Summary bulanan via RPC raos_absensi_summary_month
+function _hrisAttendanceSummaryMonth_(params) {
+  _finRoleGate_(params);
+  var monthISO = _finMonthNorm_(params.month);
+  var staffId = String(params.staff_id || '').trim() || null;
+  var body = { p_month: monthISO, p_staff_id: staffId };
+  var res = _crmSbFetch_('POST', '/rest/v1/rpc/raos_absensi_summary_month', body);
+  return { success: true, month: monthISO, staff_id: staffId, rows: Array.isArray(res) ? res : [] };
+}
+
+// Edit raos_attendance row (jam masuk, jam pulang, status) — admin/mgmt/direksi only
+// PATCH via Supabase; kolom check_in_at/check_out_at/status
+function _hrisAttendanceEdit_(params) {
+  _finRoleGate_(params);
+  var id = String(params.id || '').trim();
+  if (!id) return { success: false, message: 'id (raos_attendance.id) wajib' };
+
+  // Build sparse body (hanya kolom yang ada di params)
+  var body = {};
+  if (params.check_in_at !== undefined)  body.check_in_at  = String(params.check_in_at)  || null;
+  if (params.check_out_at !== undefined) body.check_out_at = String(params.check_out_at) || null;
+  if (params.status !== undefined)       body.status       = String(params.status)       || null;
+
+  if (Object.keys(body).length === 0) return { success: false, message: 'Tidak ada field yang diubah' };
+
+  // Fetch existing untuk audit before
+  var before = _crmSbFetch_('GET', '/rest/v1/raos_attendance?select=check_in_at,check_out_at,status&id=eq.' + encodeURIComponent(id));
+  var beforeStr = (before && before[0]) ? JSON.stringify(before[0]) : '(none)';
+
+  var res = _crmSbFetch_('PATCH', '/rest/v1/raos_attendance?id=eq.' + encodeURIComponent(id), body);
+  _crmAuditWrite_(params, 'edit', 'raos_attendance', id, beforeStr, JSON.stringify(body));
+
+  return { success: true, id: id, row: Array.isArray(res) ? res[0] : res };
 }
 
 // ═══════════════════════════════════════════════════════════════════════

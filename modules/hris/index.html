@@ -378,34 +378,39 @@ tr:last-child td{border-bottom:none}
     <div id="tab-absensi" class="tab-content">
       <div class="card">
         <div class="card-header">
-          <h3>Rekap Absensi</h3>
-          <button class="btn btn-primary" onclick="openModal('modal-add-attendance')">+ Catat Absensi</button>
+          <h3>Rekap Absensi <span style="font-size:11px;color:#888;font-weight:400">— source: PWA RAOS (<code>raos_attendance</code>)</span></h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-secondary" onclick="exportAttendancePDF()">📄 Save PDF</button>
+            <button class="btn btn-secondary" onclick="showAttendanceSummaryModal()">📊 Summary Bulan</button>
+            <button class="btn btn-primary" onclick="openModal('modal-add-attendance')">+ Catat Manual</button>
+          </div>
         </div>
         <div class="card-body">
           <div class="toolbar">
-            <input type="text" id="search-att-emp" placeholder="ID / Nama Karyawan…" style="max-width:200px">
-            <select id="filter-att-dept">
-              <option value="ALL">Semua Departemen</option>
-              <option value="Operasional">Operasional</option>
-              <option value="Administrasi">Administrasi</option>
-              <option value="Keuangan">Keuangan</option>
-              <option value="HRD">HRD</option>
-              <option value="IT">IT</option>
-              <option value="Marketing">Marketing</option>
+            <input type="text" id="search-att-emp" placeholder="ID / Nama Karyawan…" style="max-width:200px" oninput="loadAttendance()">
+            <select id="filter-att-branch" onchange="loadAttendance()">
+              <option value="ALL">Semua Cabang</option>
             </select>
-            <input type="date" id="att-date-from">
-            <input type="date" id="att-date-to">
+            <input type="date" id="att-date-from" onchange="loadAttendance()">
+            <input type="date" id="att-date-to" onchange="loadAttendance()">
             <button class="btn btn-secondary" onclick="loadAttendance()">Tampilkan</button>
           </div>
           <div class="table-wrap">
-            <table>
+            <table style="font-size:12px">
               <thead>
                 <tr>
-                  <th>ID Karyawan</th><th>Nama</th><th>Departemen</th><th>Tanggal</th><th>Masuk</th><th>Keluar</th><th>Status</th><th>Keterangan</th>
+                  <th>ID</th><th>Nama</th><th>Cabang</th><th>Tanggal</th>
+                  <th>Masuk</th><th>Keluar</th>
+                  <th title="Menit terlambat setelah tolerance shift">Terlambat</th>
+                  <th title="Rp 10.000 per 30 menit setelah tolerance">Potongan</th>
+                  <th>Lokasi</th>
+                  <th>Foto</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
                 </tr>
               </thead>
               <tbody id="tbody-attendance">
-                <tr><td colspan="8" class="empty-state"><p>Pilih karyawan dan rentang tanggal lalu klik Tampilkan.</p></td></tr>
+                <tr><td colspan="12" class="empty-state"><p>Pilih rentang tanggal lalu klik Tampilkan.</p></td></tr>
               </tbody>
             </table>
           </div>
@@ -864,7 +869,7 @@ tr:last-child td{border-bottom:none}
           <input id="pay-allowance" type="number" placeholder="0" min="0" value="0">
         </div>
         <div class="form-group">
-          <label>Potongan (Rp)</label>
+          <label>Potongan (Rp) <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px;margin-left:6px" onclick="autofillPotonganFromAbsensi()">🔄 Auto-fill dari Absensi RAOS</button></label>
           <input id="pay-deduction" type="number" placeholder="0" min="0" value="0">
         </div>
       </div>
@@ -1797,49 +1802,250 @@ async function submitAddContract() {
 // ════════════════════════════════════════════════════════════
 // ABSENSI
 // ════════════════════════════════════════════════════════════
+// Cache: raos_attendance rows dari GAS
+let allAttendanceRaos = [];
+
+async function _populateAttBranchDropdown() {
+  const sel = document.getElementById('filter-att-branch');
+  if (!sel || sel.dataset.populated === '1') return;
+  try {
+    const res = await gasGet({ action: 'finance_kpi_target_branch_list', month: new Date().toISOString().slice(0,7) + '-01' });
+    if (res && res.success && res.rows) {
+      sel.innerHTML = '<option value="ALL">Semua Cabang</option>' +
+        res.rows.map(b => `<option value="${b.branch_id}">${b.branch_name}</option>`).join('');
+      sel.dataset.populated = '1';
+    }
+  } catch (_) {}
+}
+
 async function loadAttendance() {
   const tbody    = document.getElementById('tbody-attendance');
-  const query    = document.getElementById('search-att-emp').value.trim().toUpperCase();
-  const dept     = document.getElementById('filter-att-dept').value;
+  const query    = document.getElementById('search-att-emp').value.trim();
+  const branchId = document.getElementById('filter-att-branch').value;
   const dateFrom = document.getElementById('att-date-from').value;
   const dateTo   = document.getElementById('att-date-to').value;
 
-  const empId = allEmployees.find(e =>
-    e.employee_id === query || e.full_name.toUpperCase().includes(query)
-  )?.employee_id || query;
+  // Default rentang: awal bulan sd hari ini kalau kosong
+  const df = dateFrom || (new Date(new Date().getFullYear(), new Date().getMonth(), 1)).toISOString().slice(0,10);
+  const dt = dateTo   || new Date().toISOString().slice(0,10);
 
-  tbody.innerHTML = '<tr><td colspan="8" class="loading">Memuat absensi…</td></tr>';
-  const res = await gasGet({ action: 'hris_attendance', employee_id: empId, date_from: dateFrom, date_to: dateTo });
+  _populateAttBranchDropdown();
+
+  tbody.innerHTML = '<tr><td colspan="12" class="loading">Memuat absensi dari PWA RAOS…</td></tr>';
+  const res = await gasGet({
+    action: 'hris_attendance_raos_list',
+    date_from: df,
+    date_to: dt,
+    branch_id: branchId === 'ALL' ? '' : branchId,
+    search: query,
+  });
   if (!res.success) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><p>' + res.message + '</p></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="empty-state"><p style="color:#dc2626">❌ ' + (res.message || 'Gagal load') + '</p></td></tr>';
     return;
   }
-  let rows = res.attendance || [];
-
-  if (dept !== 'ALL') {
-    const deptEmpIds = new Set(allEmployees.filter(e => e.department === dept).map(e => e.employee_id));
-    rows = rows.filter(r => deptEmpIds.has(r.employee_id));
-  }
-
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><p>Tidak ada data absensi pada filter ini.</p></td></tr>';
+  allAttendanceRaos = res.rows || [];
+  if (!allAttendanceRaos.length) {
+    tbody.innerHTML = '<tr><td colspan="12" class="empty-state"><p>Tidak ada data absensi pada filter ini.</p></td></tr>';
     return;
   }
-  const empMap = Object.fromEntries(allEmployees.map(e => [e.employee_id, e]));
-  const statusColor = { HADIR:'aktif', IZIN:'pending', SAKIT:'warning', ALPHA:'ditolak', CUTI:'pkwt', DINAS:'disetujui' };
-  tbody.innerHTML = rows.map(r => {
-    const emp = empMap[r.employee_id] || {};
+
+  const fmtTime = (iso) => {
+    if (!iso) return '<span style="color:#888">–</span>';
+    try { return new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }); }
+    catch (_) { return iso; }
+  };
+  const statusColor = { HADIR:'aktif', hadir:'aktif', IZIN:'pending', SAKIT:'warning', ALPHA:'ditolak', CUTI:'pkwt' };
+
+  tbody.innerHTML = allAttendanceRaos.map(r => {
+    const lateBadge = r.late_minutes > 0
+      ? `<span style="color:#dc2626;font-weight:700">${r.late_minutes}m</span>`
+      : `<span style="color:#16a34a">0m</span>`;
+    const potBadge = r.late_deduction > 0
+      ? `<span style="color:#dc2626;font-family:monospace">Rp ${fmtNum(r.late_deduction)}</span>`
+      : `<span style="color:#888">–</span>`;
+    const foto = [
+      r.selfie_in_url  ? `<a href="${r.selfie_in_url}"  target="_blank" title="Foto masuk" style="text-decoration:none">📸in</a>` : '',
+      r.selfie_out_url ? `<a href="${r.selfie_out_url}" target="_blank" title="Foto pulang" style="text-decoration:none">📸out</a>` : '',
+    ].filter(Boolean).join(' ') || '<span style="color:#888">–</span>';
+    const lokasi = r.location
+      ? `<a href="${r.maps_link}" target="_blank" title="${r.location}" style="text-decoration:none">📍${r.is_location_valid ? '✓' : '⚠'}</a>`
+      : '<span style="color:#888">–</span>';
+    const stKey = (r.status || 'HADIR').toString();
     return `<tr>
-      <td>${r.employee_id}</td>
-      <td>${emp.full_name || '–'}</td>
-      <td>${emp.department || '–'}</td>
-      <td>${fmtDate(r.attendance_date)}</td>
-      <td>${r.check_in || '–'}</td>
-      <td>${r.check_out || '–'}</td>
-      <td><span class="badge badge-${statusColor[r.status] || 'pkwt'}">${r.status}</span></td>
-      <td>${r.notes || '–'}</td>
+      <td><strong style="font-size:11px">${r.staff_code || '–'}</strong></td>
+      <td>${r.staff_name || '–'}</td>
+      <td style="font-size:10px">${r.branch_name || '–'}</td>
+      <td>${fmtDate(r.date)}</td>
+      <td>${fmtTime(r.check_in_at)}</td>
+      <td>${fmtTime(r.check_out_at)}</td>
+      <td style="text-align:right">${lateBadge}</td>
+      <td style="text-align:right">${potBadge}</td>
+      <td style="text-align:center">${lokasi}</td>
+      <td style="text-align:center">${foto}</td>
+      <td><span class="badge badge-${statusColor[stKey] || 'pkwt'}">${stKey}</span></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="editAttendanceRaos('${r.id}','${(r.staff_name || '').replace(/'/g,"\\'")}','${r.check_in_at || ''}','${r.check_out_at || ''}','${stKey}')">✏️</button></td>
     </tr>`;
   }).join('');
+}
+
+// Modal edit — jam masuk/pulang/status
+function editAttendanceRaos(id, staffName, checkIn, checkOut, status) {
+  const toLocalDT = (iso) => {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      // Format YYYY-MM-DDTHH:MM (datetime-local input)
+      const p = (n) => String(n).padStart(2,'0');
+      return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+    } catch (_) { return ''; }
+  };
+  const inVal = prompt('Jam Masuk (YYYY-MM-DDTHH:MM, kosongkan = clear):\n\nStaff: ' + staffName, toLocalDT(checkIn));
+  if (inVal === null) return;
+  const outVal = prompt('Jam Pulang (YYYY-MM-DDTHH:MM, kosongkan = clear):', toLocalDT(checkOut));
+  if (outVal === null) return;
+  const stVal = prompt('Status (HADIR/IZIN/SAKIT/ALPHA/CUTI):', status || 'HADIR');
+  if (stVal === null) return;
+
+  const toISO = (local) => {
+    if (!local) return '';
+    try {
+      // Assume WIB +07:00
+      return new Date(local + '+07:00').toISOString();
+    } catch (_) { return local; }
+  };
+
+  gasGet({
+    action: 'hris_attendance_edit',
+    id: id,
+    check_in_at:  toISO(inVal),
+    check_out_at: toISO(outVal),
+    status:       stVal.toUpperCase(),
+  }).then(res => {
+    if (res.success) {
+      showToast('✅ Absensi ' + staffName + ' diperbarui', 'success');
+      loadAttendance();
+    } else {
+      showToast('❌ ' + (res.message || 'Gagal'), 'error');
+    }
+  }).catch(err => showToast('❌ ' + err.message, 'error'));
+}
+
+// Save PDF absensi
+function exportAttendancePDF() {
+  if (!allAttendanceRaos.length) return showToast('Tidak ada data untuk export.', 'error');
+  const now = new Date();
+  const df = document.getElementById('att-date-from').value || '—';
+  const dt = document.getElementById('att-date-to').value || '—';
+  const stamp = now.toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' });
+  const escHtml = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const fmtT = (iso) => { try { return new Date(iso).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}); } catch(_) { return iso || '–'; } };
+
+  const rows = allAttendanceRaos.map((r, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${escHtml(r.staff_code || '–')}</td>
+      <td>${escHtml(r.staff_name || '–')}</td>
+      <td>${escHtml(r.branch_name || '–')}</td>
+      <td>${escHtml(r.date)}</td>
+      <td>${escHtml(fmtT(r.check_in_at))}</td>
+      <td>${escHtml(fmtT(r.check_out_at))}</td>
+      <td class="num">${r.late_minutes || 0}m</td>
+      <td class="num">Rp ${fmtNum(r.late_deduction || 0)}</td>
+      <td>${escHtml(r.status || 'HADIR')}</td>
+    </tr>`).join('');
+  const totalLate = allAttendanceRaos.reduce((a, r) => a + (r.late_deduction || 0), 0);
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rekap Absensi ${escHtml(df)} - ${escHtml(dt)}</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; color: #111; padding: 20px; font-size: 11px; }
+h1 { font-size: 18px; color: #C40000; margin-bottom: 4px; }
+.meta { font-size: 10px; color: #666; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #ddd; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 5px 7px; border: 1px solid #ddd; text-align: left; }
+th { background: #C40000; color: #fff; font-size: 10px; text-transform: uppercase; }
+tr:nth-child(even) td { background: #fafafa; }
+td.num { text-align: right; font-family: monospace; }
+.footer { margin-top: 16px; font-size: 10px; color: #444; }
+.summary { margin-top: 12px; padding: 10px 12px; background: #fff3f3; border-left: 3px solid #C40000; font-weight: 600; }
+@media print { th { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style></head><body>
+<h1>Rekap Absensi Karyawan</h1>
+<div class="meta">Periode: <b>${escHtml(df)}</b> s.d <b>${escHtml(dt)}</b> · Total: <b>${allAttendanceRaos.length}</b> record · Dibuat: ${escHtml(stamp)}</div>
+<table>
+  <thead><tr><th>#</th><th>ID</th><th>Nama</th><th>Cabang</th><th>Tanggal</th><th>Masuk</th><th>Keluar</th><th>Telat</th><th>Potongan</th><th>Status</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="summary">Total Potongan Terlambat: Rp ${fmtNum(totalLate)}</div>
+<div class="footer">RIFIM OS · HRIS · Rifim Group · Source: PWA RAOS raos_attendance</div>
+<script>window.onload = function() { setTimeout(function() { window.print(); }, 300); }</${''}script>
+</body></html>`;
+
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) return showToast('Popup diblokir. Izinkan popup untuk save PDF.', 'error');
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
+// Summary bulanan modal
+async function showAttendanceSummaryModal() {
+  const monthStr = prompt('Tampilkan summary bulan apa? (format YYYY-MM):', new Date().toISOString().slice(0,7));
+  if (!monthStr) return;
+  showToast('Menghitung summary bulan ' + monthStr + '…', 'info');
+  const res = await gasGet({ action: 'hris_attendance_summary_month', month: monthStr });
+  if (!res.success) return showToast('❌ ' + (res.message || 'Gagal'), 'error');
+  const rows = res.rows || [];
+  if (!rows.length) return showToast('Tidak ada data staff aktif.', 'error');
+
+  // Render modal HTML
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px';
+  const escH = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const trs = rows.map((r, i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td>${escH(r.staff_code)}</td>
+      <td>${escH(r.full_name)}</td>
+      <td style="font-size:10px">${escH(r.branch_name || '–')}</td>
+      <td style="text-align:right;font-family:monospace">Rp ${fmtNum(r.gaji)}</td>
+      <td style="text-align:center">${r.working_days}</td>
+      <td style="text-align:center;color:${r.days_present >= r.working_days ? '#16a34a' : '#eab308'};font-weight:600">${r.days_present}</td>
+      <td style="text-align:center;color:${r.days_absent > 0 ? '#dc2626' : '#888'}">${r.days_absent}</td>
+      <td style="text-align:right;color:${r.total_late_minutes > 0 ? '#dc2626' : '#888'}">${r.total_late_minutes}m</td>
+      <td style="text-align:right;font-family:monospace;color:${r.late_deduction > 0 ? '#dc2626' : '#888'}">Rp ${fmtNum(r.late_deduction)}</td>
+      <td style="text-align:right;font-family:monospace;color:${r.absent_deduction > 0 ? '#dc2626' : '#888'}">Rp ${fmtNum(r.absent_deduction)}</td>
+      <td style="text-align:right;font-family:monospace;font-weight:700;color:#16a34a">Rp ${fmtNum(r.net_gapok)}</td>
+    </tr>`).join('');
+
+  overlay.innerHTML = `<div style="background:#fff;color:#111;border-radius:12px;max-width:1200px;width:100%;max-height:90vh;overflow-y:auto;padding:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #eee">
+      <div>
+        <h3 style="font-size:17px;margin:0">📊 Summary Absensi Bulan ${escH(monthStr)}</h3>
+        <div style="font-size:11px;color:#666;margin-top:2px">Working days ${rows[0]?.working_days || '?'} hari (total ${rows[0]?.total_days || '?'} - 4 libur) · Late Rp10rb/30menit setelah tolerance shift</div>
+      </div>
+      <button onclick="this.closest('div[style*=\\'position:fixed\\']').remove()" style="background:transparent;border:none;color:#666;font-size:22px;cursor:pointer;padding:0;line-height:1">×</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead style="background:#f5f5f5">
+          <tr>
+            <th style="padding:6px;text-align:left">#</th><th>ID</th><th>Nama</th><th>Cabang</th>
+            <th style="text-align:right">Gapok</th>
+            <th style="text-align:center">Hari Kerja</th>
+            <th style="text-align:center">Hadir</th>
+            <th style="text-align:center">Absen</th>
+            <th style="text-align:right">Total Telat</th>
+            <th style="text-align:right">Potongan Telat</th>
+            <th style="text-align:right">Potongan Absen</th>
+            <th style="text-align:right">Gapok Bersih</th>
+          </tr>
+        </thead>
+        <tbody>${trs}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:14px;font-size:11px;color:#666">Total staff: ${rows.length}. Data auto-hitung dari raos_attendance + user_profiles.gaji.</div>
+  </div>`;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
 }
 
 async function submitAddAttendance() {
@@ -2036,6 +2242,28 @@ async function loadPayroll() {
       <td>${r.status === 'DRAFT' ? `<button class="btn btn-success btn-sm" onclick="finalizePayroll('${r.id}','${r.employee_id}','${r.period_month}','${r.period_year}')">Finalisasi</button>` : '–'}</td>
     </tr>`;
   }).join('');
+}
+
+// Auto-fill Potongan dari raos_absensi_summary_month (late + absent deduction)
+async function autofillPotanganFromAbsensi() {
+  const empId = (document.getElementById('pay-emp-id').value || '').trim().toUpperCase();
+  const month = document.getElementById('pay-month').value;
+  const year = document.getElementById('pay-year').value;
+  if (!empId) return showToast('Isi ID Karyawan dulu', 'error');
+  const monthISO = year + '-' + String(month).padStart(2,'0') + '-01';
+
+  showToast('Menghitung potongan dari raos_attendance…', 'info');
+  const res = await gasGet({ action: 'hris_attendance_summary_month', month: monthISO });
+  if (!res.success) return showToast('❌ ' + (res.message || 'Gagal'), 'error');
+  const rows = res.rows || [];
+
+  // Match by staff_code (RIF****). employee_id di HRIS sudah di-resync ke SSOT staff_id.
+  const row = rows.find(r => String(r.staff_code || '').toUpperCase() === empId);
+  if (!row) return showToast('❌ Tidak ada data absensi untuk ' + empId + ' bulan ' + monthISO + '. Pastikan employee_id sudah match SSOT + ada absensi RAOS.', 'error');
+
+  const totalPotongan = (row.late_deduction || 0) + (row.absent_deduction || 0);
+  document.getElementById('pay-deduction').value = totalPotongan;
+  showToast(`✅ Potongan diisi Rp ${fmtNum(totalPotongan)} (Telat ${fmtNum(row.late_deduction)} + Absen ${row.days_absent}hr = ${fmtNum(row.absent_deduction)})`, 'success');
 }
 
 // Auto-fill Tunjangan dari Bonus RAOS saat buat payroll baru
