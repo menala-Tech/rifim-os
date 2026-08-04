@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+> **⚠️ Setiap butuh deploy GAS**, baca dulu [../GAS_PROJECTS_MAP.md](../GAS_PROJECTS_MAP.md).
+> Ada 2 GAS project (RAOS + Rifim-OS) — kalau salah folder, salah deploy.
+> Helper otomatis: `..\gas-push.ps1 rifim-os` (dari repo ini).
+
 > RIFIM OS — Claude Code Operating Manual
 
 Version: 1.4
