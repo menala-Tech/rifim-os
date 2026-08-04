@@ -51,6 +51,14 @@ function crmHandleGet(e) {
     if (action === 'raos_users_update')     return _crmJson(_crmRaosUsersUpdate_(e.parameter));
     if (action === 'raos_users_reset_pin')  return _crmJson(_crmRaosUsersResetPin_(e.parameter));
 
+    // ─── Portal PIN (raos_credentials): admin-only. `list` return map
+    // {user_id: {has_pin, staff_code, updated_at}} untuk merge di UI.
+    if (action === 'raos_credentials_list')       return _crmJson(_crmRaosCredentialsList_(e.parameter));
+    if (action === 'raos_credentials_reset_pin')  return _crmJson(_crmRaosCredentialsResetPin_(e.parameter));
+    // ─── SSOT PIN (kolom H sheet MASTER DATA STAFF) — edit langsung tanpa
+    // buka spreadsheet. Sync harian propagate ke Supabase Auth password.
+    if (action === 'raos_ssot_pin_update')        return _crmJson(_crmRaosSsotPinUpdate_(e.parameter));
+
     // ─── CRM Kontak Eksternal (tabel Supabase crm_contacts, service_role via GAS)
     if (action === 'contacts_list')         return _crmJson(_crmContactsList_(e.parameter));
     if (action === 'contacts_upsert')       return _crmJson(_crmContactsUpsert_(e.parameter));
@@ -401,6 +409,118 @@ function _crmRaosUsersResetPin_(params) {
   var res = _crmSbFetch_('PUT', '/auth/v1/admin/users/' + encodeURIComponent(id), { password: pin });
   _crmAuditWrite_(params, 'reset_pin', 'raos_user', id, '', 'PIN direset (' + pin.length + ' digit)');
   return { success: true, id: id, email: (res && res.email) || '' };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Portal PIN — tabel raos_credentials (PIN untuk login Portal Rifim OS,
+// beda dari SSOT PIN yang jadi Supabase Auth password PWA RAOS).
+// PIN plaintext untuk MVP; migrate ke bcrypt kalau sudah stabil.
+// ═══════════════════════════════════════════════════════════════════════
+function _crmRaosCredentialsList_(params) {
+  _crmRequireAdmin_(params);
+  var rows = _crmSbFetch_('GET', '/rest/v1/raos_credentials?select=user_id,raos_staff_code,updated_at,ssot_pin');
+  if (!Array.isArray(rows)) rows = [];
+  var out = {};
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    out[r.user_id] = {
+      has_portal_pin:  true,          // NOT NULL di skema — kalau row ada, pasti punya PIN
+      staff_code:      r.raos_staff_code || '',
+      updated_at:      r.updated_at || null,
+      has_ssot_pin:    !!r.ssot_pin,
+    };
+  }
+  return { success: true, credentials: out, total: rows.length };
+}
+
+function _crmRaosCredentialsResetPin_(params) {
+  _crmRequireAdmin_(params);
+  var id  = String(params.id || '').trim();      // user_profiles.id (uuid)
+  var pin = String(params.pin || '').trim();
+  if (!id) return { success: false, message: 'Parameter id wajib' };
+  if (!/^\d{6,}$/.test(pin)) return { success: false, message: 'PIN Portal harus minimal 6 digit angka' };
+
+  // Upsert via PATCH kalau row ada, INSERT kalau tidak
+  var existing = _crmSbFetch_('GET', '/rest/v1/raos_credentials?user_id=eq.' + encodeURIComponent(id) + '&select=user_id');
+  var body = { raos_pin: pin, updated_at: new Date().toISOString() };
+  if (Array.isArray(existing) && existing.length > 0) {
+    _crmSbFetch_('PATCH', '/rest/v1/raos_credentials?user_id=eq.' + encodeURIComponent(id), body);
+  } else {
+    body.user_id = id;
+    _crmSbFetch_('POST', '/rest/v1/raos_credentials', body);
+  }
+  _crmAuditWrite_(params, 'reset_portal_pin', 'raos_credentials', id, '', 'PIN Portal direset (' + pin.length + ' digit)');
+  return { success: true, id: id };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SSOT PIN update — edit kolom H (Pin) sheet MASTER DATA STAFF untuk staff
+// tertentu (by ID Staff / RIF****). Sinkron ke Supabase Auth password
+// terjadi di sync cycle berikutnya (max 6 jam) atau via Force Refresh
+// Staff Auth di /sistem.
+// Kolom sheet (0-based): E(4)=ID Staff · H(7)=Pin
+// ═══════════════════════════════════════════════════════════════════════
+var MASTER_STAFF_SHEET_ID = '1fcraq3QHqIaD-13Ebzt6stT9aA6j_loTXeAtpNX12kw';
+var MASTER_STAFF_TAB_NAME = 'MASTER DATA STAFF';
+
+function _crmRaosSsotPinUpdate_(params) {
+  _crmRequireAdmin_(params);
+  var staffCode = String(params.staff_id || '').trim();  // RIF****
+  var pin       = String(params.pin || '').trim();
+  if (!staffCode) return { success: false, message: 'Parameter staff_id wajib' };
+  if (!/^\d{6,}$/.test(pin)) return { success: false, message: 'PIN SSOT harus minimal 6 digit angka' };
+
+  try {
+    var ss = SpreadsheetApp.openById(MASTER_STAFF_SHEET_ID);
+    var sh = ss.getSheetByName(MASTER_STAFF_TAB_NAME);
+    if (!sh) return { success: false, message: 'Tab "' + MASTER_STAFF_TAB_NAME + '" tidak ada' };
+
+    var lastRow = sh.getLastRow();
+    if (lastRow < 2) return { success: false, message: 'Sheet kosong' };
+
+    // Cari row by kolom E (index 4 = kolom 5 di 1-based)
+    var idCol = sh.getRange(2, 5, lastRow - 1, 1).getValues();
+    var rowIndex = -1;
+    for (var i = 0; i < idCol.length; i++) {
+      if (String(idCol[i][0] || '').trim().toUpperCase() === staffCode.toUpperCase()) {
+        rowIndex = i + 2;  // 1-based + skip header
+        break;
+      }
+    }
+    if (rowIndex === -1) return { success: false, message: 'ID Staff ' + staffCode + ' tidak ditemukan di sheet SSOT' };
+
+    // Set kolom H (8 di 1-based)
+    var pinCell = sh.getRange(rowIndex, 8);
+    var before = pinCell.getValue();
+    pinCell.setValue(pin);
+
+    // Sync juga ke raos_credentials.ssot_pin supaya bridge login Portal langsung akurat
+    // (raos_verify_and_bridge return message "sync ulang dari GAS" kalau ssot_pin NULL).
+    // Optional: skip kalau raos_credentials row belum ada.
+    try {
+      // Lookup user_id dari user_profiles by staff_id
+      var profiles = _crmSbFetch_('GET', '/rest/v1/user_profiles?staff_id=eq.' + encodeURIComponent(staffCode) + '&select=id');
+      if (Array.isArray(profiles) && profiles.length > 0) {
+        var uid = profiles[0].id;
+        var existing = _crmSbFetch_('GET', '/rest/v1/raos_credentials?user_id=eq.' + encodeURIComponent(uid) + '&select=user_id');
+        if (Array.isArray(existing) && existing.length > 0) {
+          _crmSbFetch_('PATCH', '/rest/v1/raos_credentials?user_id=eq.' + encodeURIComponent(uid),
+            { ssot_pin: pin, updated_at: new Date().toISOString() });
+        }
+      }
+    } catch (_) { /* best effort, non-fatal */ }
+
+    _crmAuditWrite_(params, 'update_ssot_pin', 'sheet_master_staff', staffCode,
+      before ? '(hidden)' : '(empty)', 'PIN diupdate (' + pin.length + ' digit) row ' + rowIndex);
+    return {
+      success: true,
+      staff_id: staffCode,
+      row: rowIndex,
+      note: 'PIN sheet SSOT diupdate. Supabase Auth password akan sync di cycle berikutnya (max 6 jam) atau klik "Force Refresh Staff Auth" di /sistem untuk propagate segera.'
+    };
+  } catch (err) {
+    return { success: false, message: 'Sheet write gagal: ' + err.message };
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
