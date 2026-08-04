@@ -324,16 +324,15 @@ function _crmRaosUsersList_(params) {
   var profiles = _crmSbFetch_('GET', '/rest/v1/user_profiles?select=id,staff_id,full_name,role,branch_id,is_active,phone,source,ssot_synced_at&order=full_name.asc');
   if (!Array.isArray(profiles)) profiles = [];
 
-  // Ambil email map dari auth admin users (paginated)
+  // Ambil email map dari auth admin users. Single fetch per_page=1000
+  // (cukup untuk skala RIFIM saat ini, ~50-100 user). Pagination
+  // sebelumnya (10 × 200) bikin GAS UrlFetchApp throttled → HTML error.
   var emailMap = {};
-  var page = 1, perPage = 200, maxPage = 10;
-  while (page <= maxPage) {
-    var res = _crmSbFetch_('GET', '/auth/v1/admin/users?page=' + page + '&per_page=' + perPage);
+  try {
+    var res = _crmSbFetch_('GET', '/auth/v1/admin/users?page=1&per_page=1000');
     var users = (res && res.users) || [];
     for (var i = 0; i < users.length; i++) emailMap[users[i].id] = users[i].email || '';
-    if (users.length < perPage) break;
-    page++;
-  }
+  } catch (_) { /* email optional — fallback kosong kalau admin API throttled */ }
 
   // Ambil branch mapping (id → name)
   var branchMap = {};
