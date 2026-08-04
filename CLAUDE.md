@@ -2,9 +2,34 @@
 
 > RIFIM OS — Claude Code Operating Manual
 
-Version: 1.4
+Version: 1.5
 Status: Active
-Last updated: 2026-07-19 (Document Studio — DDS v3.0 applied: kop+footer banner PNG, signature composite via Slides API, spec presisi mm; docs/09-UI-UX/document-design-system/ + docs/10-AI/AI_RULES.md reorganized)
+Last updated: 2026-08-04 (Portal + CRM + Sistem Admin Console + Finance modules wired live; PIN bridge via RAOS `raos_credentials`; RAOS Web API integration for cross-project admin actions)
+
+## What This Repo Is (Read First)
+
+RIFIM OS is a **multi-module enterprise system** for PT. RIFIM Internasional Gemilang.
+The repository is a **static-hosted PWA** (deployed to Vercel) whose modules are
+individual HTML files under `modules/`, plus a **single Google Apps Script (GAS)
+backend** in `automation/apps-script/` that serves all modules over one Web App URL.
+
+- **Frontend:** vanilla HTML/CSS/JS modules under `modules/<name>/index.html`
+  routed by `vercel.json` rewrites (`/portal`, `/smart-office`, `/hris`, `/crm`,
+  `/finance`, `/sistem`). `/raos` redirects to the separate `raos-menala` repo.
+- **Backend:** GAS entry point `automation/apps-script/webApp.js` (`doGet` + `doPost`)
+  routes every action from every module. CRM/Finance actions are dispatched to
+  `crmApi.js` before the main handler (`crmHandleGet(e)` returns early if the
+  action belongs to CRM).
+- **Database:** Google Spreadsheet `1jHeA-w1bM32S3-AU-ENN2UjiaCb4iLzRhaf4G7y4ozM`
+  is the primary store; Supabase (shared with RAOS at `vlievtojpmrbsmzlqswl`) is
+  read/written via service-role from GAS for user/PIN bridging.
+- **Deploy:** GitHub Actions push commits on `main` — `deploy-gas.yml` runs
+  `clasp push --force` on any change under `automation/apps-script/**`;
+  `deploy-pwa.yml` deploys the 3 Monitor PWAs to Vercel when their folders change.
+  **Web App itself must be redeployed manually** in the GAS Editor (Deploy →
+  Manage → New version) — `clasp push` only updates source, not the `/exec` URL.
+- **Session branches:** all development is on `claude/*` branches, never commit
+  directly to `main`; PR-based flow.
 
 ### Referensi Sistem Dokumen (WAJIB baca sebelum ubah engine dokumen)
 
@@ -297,6 +322,28 @@ Semua kode cabang UPPERCASE 3 huruf. Jangan hardcode nama panjang, gunakan kode.
 
 ---
 
+## Vercel Routes & Modules (per `vercel.json`)
+
+Semua route di-serve dari repo statis; setiap route mengarah ke satu file
+`modules/<name>/index.html`. Setiap modul adalah SPA satu file (HTML + inline
+CSS/JS) — mereka call `GAS_WEB_APP_URL` untuk data.
+
+| Route | Modul | File | Fungsi utama | Status |
+|---|---|---|---|---|
+| `/` | Landing | `index.html` | Card grid semua modul | ✅ live |
+| `/portal` | Portal login | `modules/portal/index.html` | Login RAOS PIN via RPC `raos_verify_and_bridge` → gateway ke modul lain | ✅ live |
+| `/smart-office` | Smart Office | `modules/smart-office/index.html` | Document Studio (20 tipe × 3 perusahaan), Arsip, preview + generate | ✅ live |
+| `/hris` | HRIS | `modules/hris/index.html` | Employee CRUD, contracts, attendance, leave, payroll | ✅ live |
+| `/crm` | CRM | `modules/crm/index.html` | Company Config, Whitelist Portal, System Config, User Supabase RAOS, Kontak Eksternal, PIN management, Audit Log | ✅ live (2026-08-02) |
+| `/finance` | Finance | `modules/finance/index.html` | 6 tab live: Ledger, Cabang, Tagihan, Rekap harian/bulanan, Log, Saldo RAOS | ✅ live (2026-08-02) |
+| `/sistem` | Sistem — Admin Console | `modules/sistem/index.html` | Trigger semua action RAOS (sync SSOT staff/driver, KPI, backup, force refresh auth) dari Portal | ✅ live (2026-08-03) |
+| `/raos` | RAOS PWA | (redirect ke `raos-menala.vercel.app`) | Airport ops PWA — repo terpisah `menala-tech/raos-menala` | ✅ live |
+
+**Landing (`index.html`) sudah tidak lagi hanya statis** — sekarang render card
+grid untuk semua route di atas, ambil user role dari Portal session (localStorage).
+
+---
+
 ## Auth — RCP 4-Level Model
 
 Setiap session login HARUS mengembalikan 4 level akses (bukan hanya role):
@@ -354,6 +401,92 @@ Driver dengan status `OFF_DUTY`, `CUTI`, atau `SAKIT` tidak boleh masuk antrian.
 | Revision Engine | Versioning dokumen + change log | ⬜ Backlog |
 | Audit Engine (immutable) | Seluruh aktivitas dokumen tercatat permanen | ⬜ Backlog |
 | Mode Kerja Engine | Work status management, impact routing | ⬜ Sprint 3B |
+| CRM API Layer | KV config, whitelist, contacts, Supabase RAOS user proxy, PIN reset | ✅ Sesi 2026-08-02 (`crmApi.js`) |
+| Finance API Layer | 6 endpoint LIA + Tagihan + Rekap + Saldo RAOS | ✅ Sesi 2026-08-02 (`crmApi.js` `_fin*_`) |
+| Portal PIN Bridge | Login satu-satu email/RAOS_ID + PIN via Supabase RPC | ✅ Sesi 2026-08-03 |
+| Admin Console | 9 tombol trigger action RAOS dari Portal | ✅ Sesi 2026-08-03 (`modules/sistem`) |
+
+---
+
+## CRM API — Endpoint Registry (`automation/apps-script/crmApi.js`)
+
+CRM API di-dispatch dari `webApp.js doGet(e)` via `crmHandleGet(e)` yang return
+early. Auth: query param `?user=<email>` di-cocokkan ke `company_config.allowed_emails`
++ role check via `configLoader`; write actions gate ke `CRM_WRITE_ROLES` =
+`['admin','management','direksi','direktur']`.
+
+| Action | Fungsi | Guard | Payload |
+|---|---|---|---|
+| `company_config_list` / `_set` | `_crmReadKV_` / `_crmSetKV_` | read: any authed; write: admin | KV pair sheet `company_config` |
+| `whitelist_list` / `_add` / `_remove` / `_update` | `_crmWhitelistList_` / `_Mutate_` / `_Update_` | admin | email + role, sheet `whitelist_portal` |
+| `crm_audit_tail` | `_crmAuditTail_` (cache 60s) | any authed | Ambil dari SYSTEM_LOG sheet |
+| `sistem_config_set` | `_crmSistemConfigSetSheet_` | admin | Sync sheet SISTEM CONFIG (mirror Supabase via frontend RPC) |
+| `raos_users_list` / `_update` / `_reset_pin` | `_crmRaosUsers*_` | admin | Proxy ke Supabase `user_profiles` via service_role — bypass RLS |
+| `raos_credentials_list` / `_reset_pin` | `_crmRaosCredentials*_` | admin | RAOS Portal PIN table (`raos_credentials`) |
+| `raos_ssot_pin_update` | `_crmRaosSsotPinUpdate_` | admin | Edit kolom H sheet SSOT MASTER DATA STAFF (SSOT PIN) tanpa buka Spreadsheet |
+| `contacts_list` / `_upsert` / `_delete` | `_crmContacts*_` | admin | Tabel Supabase `crm_contacts` via service_role |
+| `finance_list` / `_cabang_list` / `_tagihan_list` / `_tagihan_add` / `_tagihan_mark_paid` / `_rekap_harian` / `_rekap_bulanan` / `_log_list` / `_saldo_raos_list` / `_saldo_raos_mark_paid` | `_fin*_` | `_finRoleGate_` (admin/mgmt/direksi) | Spreadsheet `1AgpEqhpDU4B…` = LIA master + Tagihan + per-cabang |
+
+**Sparse-body upsert:** `contacts_upsert` (dan tabel Supabase apapun yang di-write
+via CRM API) **HARUS pakai body sparse** — jangan kirim field NULL untuk kolom yang
+tidak berubah (nullify tak sengaja). Lihat commit `3565b35` untuk contoh.
+
+**Return convention:** semua CRM endpoint return `{success:bool, ...payload/message}`.
+
+---
+
+## Portal — PIN Login Bridge (Sesi 2026-08-03)
+
+Portal (`modules/portal/index.html`) login pakai **RAOS_PIN** (kolom I sheet SSOT),
+BUKAN PIN kolom H yang dipakai PWA lain (isi-saldo, radms-driver). Isolasi ini
+mencegah rotasi PIN Portal mengganggu PWA lain.
+
+**Flow:**
+1. User input `email` atau `raos_staff_code` + `raos_pin`
+2. Frontend call Supabase RPC `raos_verify_and_bridge(p_login_id, p_raos_pin)` →
+   return `{email, ssot_pin}` kalau match, else `{error}`
+3. Frontend call `supabase.auth.signInWithPassword({email, password: ssot_pin})`
+   secara transparent — session Supabase terbentuk seperti biasa
+4. Redirect ke `/` (landing) dengan role dari `user_profiles.role`
+
+**Tabel & migration:** `raos_credentials` di Supabase RAOS (`raos_068`).
+Kolom `ssot_pin` (kolom H, mirror) + `raos_pin` (kolom I, primary login).
+Sync GAS RAOS `gas/19_raos_credentials_sync.gs` refresh dari sheet SSOT tiap 1 jam.
+
+**Admin reset:**
+- **Reset RAOS_PIN** (kolom I): CRM API `raos_credentials_reset_pin` → update `raos_credentials.raos_pin` langsung. Tidak sentuh sheet SSOT.
+- **Reset SSOT PIN** (kolom H — dipakai auth Supabase langsung): CRM API `raos_ssot_pin_update` → tulis ke sheet SSOT kolom H, sync jam berikutnya propagate ke Supabase Auth password.
+
+---
+
+## Sistem — Admin Console (Sesi 2026-08-03)
+
+`modules/sistem/index.html` = tombol trigger untuk 9 action RAOS + panel Log
+Sistem realtime. Pattern: klik card → POST ke **RAOS Web App URL** (bukan RIFIM OS
+Web App), pass `{action, token}` di body. Token = Supabase Auth JWT dari session
+Portal user.
+
+**9 Action Tersedia** (definisi di `raos-menala/gas/21_web_api.gs`
+`_WEB_API_ALLOWED_ACTIONS`):
+
+| Action | Fungsi RAOS | ETA | Kategori |
+|---|---|---|---|
+| `sync_staff` | `syncStaffFromSSOT` | ~10 detik | Sync SSOT |
+| `sync_driver_airport` | `syncDriverAirportFromSSOT` | ~30-40 detik | Sync SSOT |
+| `sync_driver_external` | `syncDriverExternalFromSSOT` | ~10-15 detik | Sync SSOT |
+| `sync_raos_credentials` | `syncRaosCredentials` | ~5 detik | Sync SSOT |
+| `run_backup` | `backupHarian` | ~30 detik | Maintenance |
+| `sync_selfie_drive` | `syncSelfiePhotosToGDrive` | ~1-2 menit | Maintenance |
+| `run_kpi` | `updateAllKpiRAOS` | ~1 menit | KPI |
+| `force_refresh_staff_auth` | `forceRefreshStaffAuth` | on-demand | Auth |
+| `force_refresh_driver_auth` | `forceRefreshDriverAirportAuth` | on-demand | Auth |
+
+**Auth check** (`_webVerifyCaller_` di RAOS GAS): verify JWT via
+`/auth/v1/user` + role check di `user_profiles`. Hanya admin/direksi/management.
+CORS: request body pakai `Content-Type: text/plain` untuk hindari OPTIONS preflight.
+
+**Log panel** (`system_log_recent` action): read tab `LOG SISTEM` sheet RAOS,
+filter by level (INFO/WARN/ERROR) + search, auto-refresh 30 detik.
 
 ---
 
@@ -445,6 +578,45 @@ clasp push
 
 > `.clasprc.json` (OAuth token) harus ada di `~/.clasprc.json` sebelum bisa push.
 > Token didapat dari `clasp login` di komputer lokal, lalu paste isinya ke remote session.
+
+---
+
+## CI/CD — GitHub Actions (`.github/workflows/`)
+
+Ada 2 workflow otomatis di repo ini:
+
+| Workflow | Trigger | Kerja |
+|---|---|---|
+| `deploy-gas.yml` | push `main` yang menyentuh `automation/apps-script/**` | `clasp push --force` ke RIFIM OS Main script (`1IK8-2a…`). Butuh secret `CLASPRC_JSON`. **TIDAK auto-redeploy Web App** — harus manual di GAS Editor. |
+| `deploy-pwa.yml` | push `main` yang menyentuh `apps/pwa/monitor-{saldo,order,koordinator}/**` | `vercel deploy --prod` ke 3 project Vercel terpisah. Butuh secret `VERCEL_TOKEN`. |
+
+**Modules under `modules/*` deploy otomatis** via Vercel git integration di
+project `rifim-os` (production). Push ke `main` → Vercel build → live di
+`rifim-os.vercel.app` dalam 1-2 menit.
+
+---
+
+## GAS Web App — Route Surface (`webApp.js`)
+
+`doGet(e)` dan `doPost(e)` adalah entry point tunggal untuk seluruh module.
+Dispatch order:
+
+**`doGet(e)`** — Query param `?action=<name>`:
+1. `crmHandleGet(e)` — return early kalau action CRM/Finance (lihat tabel di atas)
+2. `staff_list`, `companies`, `peek`, `auth`
+3. HRIS: `hris_employees`, `hris_employee`, `hris_contracts`, `hris_attendance`, `hris_leave_requests`, `hris_leave_balance`, `hris_payroll`
+4. Smart Office: `arsip`, `get_document`
+5. Default: health check `{success:true, app:'RIFIM OS Smart Office', version:'1.0.0'}`
+
+**`doPost(e)`** — JSON body dengan `input.hrisAction` atau `input.action`:
+1. `hrisAction: '*'` → `_handleHrisPost(input)` (HRIS write endpoints)
+2. `action: 'previewDocument'` — Smart Office HTML preview
+3. `action: 'generateDocumentHtml'` — HTML → PDF pipeline
+4. `action: 'update_status'` — dokumen DRAFT → FINAL → SENT → ARCHIVED
+5. `action: 'log_activity'` — write ke sheet SYSTEM_LOG
+
+**Content-Type:** frontend HARUS pakai `text/plain` untuk skip CORS preflight
+(GAS Web App tidak set CORS header untuk OPTIONS).
 
 ---
 
