@@ -552,3 +552,147 @@ Misi ini bukan membangun aplikasi.
 Misi ini adalah membangun Enterprise Operating System yang bisa mendukung PT. RIFIM Internasional Gemilang selama bertahun-tahun ke depan.
 
 Setiap keputusan harus mendukung misi ini.
+
+---
+
+## Sesi 2026-08-04 sore — Finance KPI Targets V2 + HRIS Payroll Bonus + AIST Bookmarklet v2
+
+Cross-repo delivery: backend (Supabase + PWA admin) di repo RAOS,
+frontend UI di repo ini. Alur end-to-end:
+**Room Chat Pengisian Saldo (PWA RAOS) → Riwayat → Finance tab
+Target/DB Driver → KPI Payroll → HRIS Payroll (auto-fill Bonus)**.
+
+### Endpoint baru di `crmApi.js` (10 total)
+
+Semua admin-gated via `_finRoleGate_(params)` (admin/mgmt/direksi/direktur).
+
+**KPI Targets V2 (Fase 2)**:
+- `finance_kpi_target_branch_list?month=YYYY-MM` — list target per cabang +
+  join branches (auto-flag `is_excluded_saldo` untuk Soeta/Makassar)
+- `finance_kpi_target_branch_upsert&branch_id=&month=&target_cabang=&target_staff_default=&mode=`
+- `finance_kpi_target_staff_list?month=&branch_id=` — join staff +
+  target override + realisasi view + payroll
+- `finance_kpi_target_staff_upsert&staff_id=&month=&target_saldo=&member_parkir_amount=`
+- `finance_payroll_compute&month=` — trigger RPC `raos_compute_payroll_month`
+- `finance_payroll_list?month=&branch_id=` — hasil compute untuk display
+
+**DB Driver + Assignment (Fase 5)**:
+- `finance_drivers_list?branch_id=` — join assignment + staff nama
+- `finance_driver_assignment_list?branch_id=` — grouped per staff
+- `finance_driver_assign_random&branch_id=&force=true|false` — trigger RPC
+  `raos_random_assign_drivers`. **Management/direksi only** (hard-check di
+  endpoint sebelum call RPC)
+
+**HRIS bridge**:
+- `hris_payroll_bonus_list?month=` — return map by staff_code untuk consumed
+  UI HRIS Payroll (bonus_saldo + bonus_kpi + member_parkir + total_bonus)
+
+### UI Finance — 3 tab baru di `modules/finance/index.html`
+
+Tab bar sekarang: Dashboard · Per Cabang · Tagihan · Rekap · Isi Saldo (RAOS)
+· **🎯 Target Cabang** · **👤 Target Staff** · **🚗 DB Driver** · Input Baru
+· System Log.
+
+- **Target Cabang** — tabel per cabang bulan berjalan, edit inline via
+  modal (target_cabang, target_staff_default, mode saldo/order). Tombol
+  "⚙️ Recompute Payroll Bulan Ini" panggil RPC + refresh.
+- **Target Staff** — 14 kolom (Staff/Cabang/Gapok/Target/Realisasi/%/Bonus/
+  BPJS/Paket/Parkir/BonusKPI/THP/Status/Aksi). Filter month + cabang.
+  Edit modal untuk override target + member parkir manual.
+- **DB Driver** — filter cabang + search. Tombol "🎲 Random Assign"
+  (incremental) + "♻️ Rebalance Force" (reset semua lalu redistribute).
+  Endpoint pisah check role management/direksi sebelum call RPC.
+
+### Konvensi baru: `openEditModal({...})` helper reusable
+
+Reusable modal generator dinamis untuk semua CRUD Finance/HRIS berikutnya.
+Ganti pattern `prompt()`/`confirm()` yang jelek UX.
+
+```js
+openEditModal({
+  title: '✏️ Edit ...',
+  subtitle: 'Deskripsi opsional',
+  fields: [
+    { name: 'target_cabang', label: '...', type: 'number', value: 0, required: true, hint: '...' },
+    { name: 'mode', label: 'Mode', type: 'select', value: 'saldo',
+      options: [{ value: 'saldo', label: '...' }, { value: 'order', label: '...' }] },
+  ],
+  onSave: async (payload) => { /* panggil endpoint, throw kalau gagal */ },
+  onDelete: async () => { /* opsional — tombol Hapus muncul kalau ada */ },
+});
+```
+
+Field type: `text` (default) · `number` · `select` (dengan options array). Support
+`required` + `hint` + `placeholder` + `nullable` (untuk number kosongan → null).
+
+Lokasi definisi: `modules/finance/index.html` — dipakai `editTargetCabang()`
++ `editTargetStaff()`. Untuk fitur CRUD berikutnya, panggil helper ini
+alih-alih bikin modal manual.
+
+### UI HRIS — 2 kolom baru di `modules/hris/index.html`
+
+Tabel Payroll extend jadi 12 kolom (dari 10):
+- **Bonus Saldo RAOS** (auto-fetch dari `hris_payroll_bonus_list`)
+- **Bonus KPI RAOS** (idem)
+
+Data indexed by `employee_id` (uppercased) → cross-check ke
+`user_profiles.staff_id` di RAOS. Kalau tidak match, kolom tampil 0.
+
+Modal Buat Payroll: tombol "🔄 Auto-fill dari Bonus RAOS" di sebelah
+label Tunjangan — populate field allowances dengan
+(bonus_saldo + bonus_kpi + member_parkir) bulan sesuai filter.
+
+### Bookmarklet AIST v2 — folder baru `automation/aist-bookmarklet/`
+
+- `aist-fill-v2.source.js` — full commented source (300+ lines)
+- `install.html` — drag-to-bookmarks page, auto-minify di client via fetch
+  + regex strip comments/whitespace → `javascript:encodeURIComponent(min)`
+
+**Beda dari bookmarklet lama** (yang baca sheet Pengisian Saldo):
+- Source: `raos_saldo_requests` via `finance_saldo_raos_list` endpoint yang
+  sudah ada (bukan sheet Google)
+- Mark: PATCH `is_processed=true` via `finance_saldo_raos_mark_paid`
+  endpoint yang sudah ada (bukan centang checkbox kolom G sheet)
+- Auto-refresh 30 detik (pengajuan baru dari PWA RAOS langsung masuk)
+- Filter status `approved` default (koord/admin sudah setujui, tinggal
+  admin isi di AIST)
+- Selector heuristic: `findInputByLabel(['Amount','Jumlah','Nominal'])` +
+  `['Driver login','Login ID','Driver ID','Login']`. Kalau AIST DOM ganti
+  label, edit array di source.
+
+### Backend RAOS (repo terpisah `C:\Projects\menala\RAOS`)
+
+- Migration `raos_070a/b/c/d` applied ke Supabase — 4 tabel + 2 view + 2 RPC.
+  Detail schema di CLAUDE.md RAOS section "Sesi 2026-08-04 sore".
+- Tombol random-assign di PWA RAOS `/admin` (PR #48 merged, commit `bbc25b1`).
+
+### Debt sesi ini
+
+- **UI Payroll HRIS finalize belum sync ke Bonus RAOS** — tombol Auto-fill
+  hanya isi field Tunjangan sebelum save. Kalau bonus RAOS updated setelah
+  payroll finalized, tidak auto-refresh. Solusi: manual re-buat payroll
+  atau extend `hris_payroll` endpoint dengan update-mode
+- **Selector AIST bookmarklet belum ter-test empiris** — heuristic label
+  Amount/Login mungkin tidak match DOM AIST asli. User perlu test + adjust
+  array keywords kalau tidak jalan
+- **Modal `openEditModal` scope terbatas ke Finance** — kalau CRM/HRIS
+  butuh, pattern ini bisa di-extract ke shared util JS (belum dilakukan
+  supaya minimize risk sesi ini)
+
+### GAS deploy (post-clasp-push)
+
+Setiap edit `crmApi.js` (10 endpoint baru sesi ini) butuh:
+1. `cd C:/Projects/menala/rifim-os/automation/apps-script && clasp push --force`
+2. Manual redeploy: [GAS editor](https://script.google.com/home/projects/1IK8-2anrxahce1X1MG7Bi3aGe6e-_4e3obanTRprT6brYSdla9rEYOxp/edit)
+   → Terapkan → Kelola deployment → ✏️ Edit deployment aktif → Versi baru
+   → Terapkan. **URL `/exec` tetap** (sudah confirm user 2026-08-04 sore).
+
+### File touched sesi ini
+
+- `automation/apps-script/crmApi.js` — +10 endpoint + register dispatcher
+- `modules/finance/index.html` — +3 tab + modal helper (+1279 line total)
+- `modules/hris/index.html` — 2 kolom + autofill button
+- `automation/aist-bookmarklet/aist-fill-v2.source.js` — new file
+- `automation/aist-bookmarklet/install.html` — new file
+
+Semua landed di commit main `7d77252` (auto-deploy Vercel confirmed live).
