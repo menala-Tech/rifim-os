@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1A1A1A">
+<title>RIFIM OS — Sistem (Admin Console)</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --red:#C40000;--red-dark:#3A0000;--red-mid:#8B0000;
+  --dark:#1A1A1A;--dark2:#2B2B2B;--dark3:#111;
+  --font:'Segoe UI',system-ui,sans-serif;
+  --ok:#16a34a;--warn:#eab308;--err:#dc2626;--info:#0ea5e9;
+}
+body{font-family:var(--font);background:var(--dark);color:#fff;min-height:100vh;display:flex;flex-direction:column}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;
+  border-bottom:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.3);position:sticky;top:0;z-index:50}
+header .brand{display:flex;align-items:center;gap:10px;font-weight:800}
+header .brand .icon{font-size:22px}
+header .right{display:flex;align-items:center;gap:12px;font-size:12px;color:#aaa}
+header .btn-back{background:none;border:1px solid rgba(255,255,255,.2);color:#fff;
+  padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer}
+header .btn-back:hover{background:rgba(255,255,255,.05)}
+
+main{padding:24px 28px;flex:1;max-width:1400px;margin:0 auto;width:100%}
+h1{font-size:22px;font-weight:800;margin-bottom:4px}
+.sub{color:#888;font-size:13px;margin-bottom:24px}
+
+.section{margin-bottom:32px}
+.section h2{font-size:14px;font-weight:700;color:#facc15;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+
+.card{background:var(--dark2);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;
+  display:flex;flex-direction:column;gap:8px;transition:border-color .2s,transform .1s}
+.card:hover{border-color:rgba(196,0,0,.5)}
+.card .icon{font-size:22px}
+.card .title{font-weight:700;font-size:14px}
+.card .desc{font-size:11px;color:#888;line-height:1.4;flex:1}
+.card button{background:var(--red);color:#fff;border:none;padding:8px 12px;
+  border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:background .2s}
+.card button:hover:not(:disabled){background:var(--red-mid)}
+.card button:disabled{opacity:.5;cursor:default}
+.card .result{font-size:11px;padding:6px 8px;border-radius:4px;background:rgba(0,0,0,.3);
+  border-left:3px solid #444;font-family:monospace;white-space:pre-wrap;word-break:break-word;max-height:120px;overflow-y:auto}
+.card .result.ok{border-left-color:var(--ok);color:#a7f3d0}
+.card .result.err{border-left-color:var(--err);color:#fca5a5}
+
+.log-panel{background:var(--dark2);border:1px solid rgba(255,255,255,.08);border-radius:10px;
+  padding:16px;max-height:400px;overflow-y:auto}
+.log-panel .toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.log-panel .toolbar select,.log-panel .toolbar input{background:var(--dark3);border:1px solid rgba(255,255,255,.1);
+  color:#fff;padding:6px 10px;border-radius:6px;font-size:12px}
+.log-panel .toolbar button{background:var(--info);color:#fff;border:none;padding:6px 12px;
+  border-radius:6px;font-size:12px;font-weight:600;cursor:pointer}
+.log-panel table{width:100%;border-collapse:collapse;font-size:12px}
+.log-panel th{text-align:left;padding:6px 8px;color:#888;font-weight:600;border-bottom:1px solid rgba(255,255,255,.1);
+  position:sticky;top:0;background:var(--dark2)}
+.log-panel td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top}
+.log-panel td.wib{color:#facc15;font-family:monospace;white-space:nowrap;font-size:11px}
+.log-panel td.status-success{color:#4ade80}
+.log-panel td.status-error{color:#f87171}
+.log-panel td.status-warning{color:#facc15}
+.log-panel .empty{padding:24px;text-align:center;color:#666}
+
+.gate{flex:1;display:flex;align-items:center;justify-content:center;padding:32px;text-align:center}
+.gate .box{max-width:400px}
+.gate h1{font-size:20px;margin-bottom:12px}
+.gate p{color:#888;margin-bottom:20px}
+.gate .role-tag{display:inline-block;padding:4px 10px;background:rgba(196,0,0,.2);border:1px solid var(--red);
+  border-radius:20px;font-size:11px;color:#ff9999;margin-bottom:16px}
+.gate a{color:var(--info);text-decoration:none}
+
+.toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;
+  background:var(--dark2);border:1px solid rgba(255,255,255,.1);color:#fff;font-size:13px;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:100;transition:opacity .3s;max-width:400px}
+.toast.hidden{opacity:0;pointer-events:none}
+.toast.ok{border-left:4px solid var(--ok)}
+.toast.err{border-left:4px solid var(--err)}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+
+<div id="gate" class="gate hidden" style="display:none">
+  <div class="box">
+    <h1>⛔ Akses ditolak</h1>
+    <p>Halaman ini hanya untuk role <strong>admin</strong>, <strong>direksi</strong>, atau <strong>management</strong>.</p>
+    <div class="role-tag" id="role-display">Role: —</div>
+    <p><a href="/portal">← Kembali ke Portal</a></p>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+<header>
+  <div class="brand"><span class="icon">⚙️</span> RIFIM OS — Sistem</div>
+  <div class="right">
+    <span id="user-info">—</span>
+    <button class="btn-back" onclick="location.href='/portal'">← Portal</button>
+  </div>
+</header>
+
+<main>
+  <h1>Admin Console</h1>
+  <p class="sub">Trigger semua fungsi maintenance/sync RAOS dari sini. RAOS Web App endpoint: <code id="raos-url" style="color:#facc15;font-size:11px">—</code></p>
+
+  <!-- SINKRONISASI DATA -->
+  <div class="section">
+    <h2>🔄 Sinkronisasi Data (SSOT → Supabase)</h2>
+    <div class="grid">
+      <div class="card" data-action="sync_staff">
+        <div class="icon">👥</div>
+        <div class="title">Sync Staff dari SSOT</div>
+        <div class="desc">Tarik semua staff dari sheet MASTER DATA STAFF ke user_profiles Supabase + auth.users.</div>
+        <button onclick="runAction('sync_staff', this)">Jalankan</button>
+        <div class="result hidden"></div>
+      </div>
+      <div class="card" data-action="sync_driver_airport">
+        <div class="icon">✈️</div>
+        <div class="title">Sync Driver Airport</div>
+        <div class="desc">Loop 7 tab airport SSOT → raos_drivers Supabase.</div>
+        <button onclick="runAction('sync_driver_airport', this)">Jalankan</button>
+        <div class="result hidden"></div>
+      </div>
+      <div class="card" data-action="sync_driver_external">
+        <div class="icon">🚗</div>
+        <div class="title">Sync Driver External</div>
+        <div class="desc">Batam + Jambi Luar dari SSOT external → raos_drivers.</div>
+        <button onclick="runAction('sync_driver_external', this)">Jalankan</button>
+        <div class="result hidden"></div>
+      </div>
+      <div class="card" data-action="sync_raos_credentials">
+        <div class="icon">🔐</div>
+        <div class="title">Sync RAOS Credentials</div>
+        <div class="desc">Baca kolom I (RAOS PIN) + J (RAOS ID) sheet SSOT → raos_credentials.</div>
+        <button onclick="runAction('sync_raos_credentials', this)">Jalankan</button>
+        <div class="result hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI & LAPORAN -->
+  <div class="section">
+    <h2>📊 KPI & Laporan</h2>
+    <div class="grid">
+      <div class="card" data-action="run_kpi">
+        <div class="icon">📈</div>
+        <div class="title">Update KPI Bulan Ini</div>
+        <div class="desc">Hitung ulang KPI semua staff bulan berjalan → kpi_targets Supabase + DASHBOARD STAFF sheet.</div>
+        <button onclick="runAction('run_kpi', this)">Jalankan</button>
+        <div class="result hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAINTENANCE -->
+  <div class="section">
+    <h2>🧹 Maintenance</h2>
+    <div class="grid">
+      <div class="card" data-action="run_backup">
+        <div class="icon">💾</div>
+        <div class="title">Backup Spreadsheet Harian</div>
+        <div class="desc">Export sheet RAOS jadi XLSX + upload ke Google Drive Backup Spreadsheet/{bulan}.</div>
+        <button onclick="runAction('run_backup', this)">Jalankan</button>
+        <div class="result hidden"></div>
+      </div>
+      <div class="card" data-action="sync_selfie_drive">
+        <div class="icon">📸</div>
+        <div class="title">Sync Foto Selfie ke Drive</div>
+        <div class="desc">Pindahkan foto absensi dari Supabase Storage ke Drive folder Pickup Point/Bulan.</div>
+        <button onclick="runAction('sync_selfie_drive', this)">Jalankan</button>
+        <div class="result hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MONITORING -->
+  <div class="section">
+    <h2>📋 Monitoring — System Log Supabase</h2>
+    <div class="log-panel">
+      <div class="toolbar">
+        <select id="log-status">
+          <option value="">Semua status</option>
+          <option value="success">Success</option>
+          <option value="warning">Warning</option>
+          <option value="error">Error</option>
+        </select>
+        <input id="log-search" placeholder="Filter process…" style="flex:1;min-width:160px">
+        <select id="log-limit">
+          <option value="50">50 baris</option>
+          <option value="100">100 baris</option>
+          <option value="200">200 baris</option>
+        </select>
+        <button onclick="loadLog()">🔄 Refresh</button>
+        <label style="font-size:12px;display:flex;align-items:center;gap:4px">
+          <input type="checkbox" id="log-autoref"> Auto 30s
+        </label>
+      </div>
+      <table>
+        <thead><tr><th>Waktu WIB</th><th>Type</th><th>Process</th><th>Status</th><th>Detail</th></tr></thead>
+        <tbody id="log-body">
+          <tr><td colspan="5" class="empty">Klik Refresh untuk load</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════════════
+const SB_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co';
+const SB_ANON = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+const RAOS_URL = 'https://script.google.com/macros/s/AKfycbxrgQ_MWvsdA_bsbNF4deIALWATDCspYvY47fakpuXMZeAtGAd4baeVVe1dPGDAi1tZJA/exec';
+const ALLOWED_ROLES = ['admin', 'direksi', 'management'];
+
+let _sb = null;
+let _session = null;
+let _autorefTimer = null;
+
+function sb() {
+  if (_sb) return _sb;
+  _sb = window.supabase.createClient(SB_URL, SB_ANON, {
+    auth: { persistSession: true, storageKey: 'rifim_portal_sb', autoRefreshToken: true }
+  });
+  return _sb;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// AUTH BOOTSTRAP
+// ═══════════════════════════════════════════════════════════════════════
+async function bootstrap() {
+  document.getElementById('raos-url').textContent = RAOS_URL.replace(/^.+\/macros\/s\/([^/]+).*$/, '…/$1/exec');
+  const client = sb();
+  const { data: { session } } = await client.auth.getSession();
+  if (!session) { showGate('Belum login. Buka /portal dulu.'); return; }
+  _session = session;
+  const { data: profile } = await client.from('user_profiles')
+    .select('id, full_name, role, is_active').eq('id', session.user.id).maybeSingle();
+  if (!profile || !profile.is_active) { showGate('Profil tidak ditemukan / nonaktif.'); return; }
+  if (!ALLOWED_ROLES.includes(profile.role)) {
+    document.getElementById('role-display').textContent = 'Role Anda: ' + profile.role;
+    showGate();
+    return;
+  }
+  document.getElementById('user-info').textContent = `${profile.full_name} · ${profile.role}`;
+  document.getElementById('app').style.display = 'block';
+  // Load log initial
+  loadLog();
+}
+
+function showGate(msg) {
+  document.getElementById('gate').style.display = 'flex';
+  if (msg) document.querySelector('#gate p').textContent = msg;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// RAOS API CALL
+// ═══════════════════════════════════════════════════════════════════════
+async function callRaos(action, extra) {
+  if (!_session) throw new Error('Session hilang. Refresh halaman.');
+  // Refresh token kalau expired
+  const { data: { session } } = await sb().auth.getSession();
+  if (!session) throw new Error('Session expired. Login ulang.');
+  const body = Object.assign({ action, token: session.access_token }, extra || {});
+  const res = await fetch(RAOS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoid CORS preflight
+    body: JSON.stringify(body),
+    redirect: 'follow',
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); }
+  catch (e) { throw new Error('Response bukan JSON valid. Cek deployment Web App RAOS. Raw: ' + text.substring(0, 200)); }
+  return data;
+}
+
+async function runAction(action, btn) {
+  const card = btn.closest('.card');
+  const resultBox = card.querySelector('.result');
+  btn.disabled = true; btn.textContent = 'Menjalankan…';
+  resultBox.className = 'result';
+  resultBox.textContent = 'Waiting…';
+  resultBox.classList.remove('hidden');
+  try {
+    const data = await callRaos(action);
+    if (data.ok) {
+      resultBox.classList.add('ok');
+      const summary = typeof data.result === 'string' ? data.result :
+        (data.result && (data.result.summary || JSON.stringify(data.result, null, 2))) || 'OK';
+      resultBox.textContent = `✓ ${data.elapsed_ms || 0}ms · by ${data.by || '?'}\n${summary}`;
+      toast('✅ ' + (data.label || action) + ' selesai', 'ok');
+      // Refresh log setelah action selesai
+      setTimeout(loadLog, 1500);
+    } else {
+      resultBox.classList.add('err');
+      resultBox.textContent = '✗ ' + (data.error || 'unknown') + (data.detail ? '\n' + data.detail : '');
+      toast('❌ ' + (data.error || 'Gagal'), 'err');
+    }
+  } catch (err) {
+    resultBox.classList.add('err');
+    resultBox.textContent = '✗ ' + err.message;
+    toast('❌ ' + err.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Jalankan';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SYSTEM LOG
+// ═══════════════════════════════════════════════════════════════════════
+async function loadLog() {
+  const tbody = document.getElementById('log-body');
+  tbody.innerHTML = '<tr><td colspan="5" class="empty">Loading…</td></tr>';
+  const statusFilter = document.getElementById('log-status').value;
+  const searchTerm = document.getElementById('log-search').value.toLowerCase().trim();
+  const limit = parseInt(document.getElementById('log-limit').value || 50, 10);
+  try {
+    const data = await callRaos('system_log_recent', { limit });
+    if (!data.ok) throw new Error(data.error || 'Gagal load log');
+    let rows = data.rows || [];
+    if (statusFilter) rows = rows.filter(r => (r.status || '').toLowerCase() === statusFilter);
+    if (searchTerm) rows = rows.filter(r =>
+      (r.process || '').toLowerCase().includes(searchTerm) ||
+      (r.detail || '').toLowerCase().includes(searchTerm));
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">Tidak ada log cocok filter</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const wib = new Date(r.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta',
+        year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+      const st = (r.status || '').toLowerCase();
+      return `<tr>
+        <td class="wib">${wib}</td>
+        <td>${esc(r.type)}</td>
+        <td style="color:#facc15;font-family:monospace">${esc(r.process)}</td>
+        <td class="status-${st}">${esc(r.status)}</td>
+        <td style="color:#ddd">${esc(r.detail || '').substring(0, 300)}</td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty" style="color:#f87171">❌ ${err.message}</td></tr>`;
+  }
+}
+
+document.getElementById('log-status').addEventListener('change', loadLog);
+document.getElementById('log-search').addEventListener('input', debounce(loadLog, 400));
+document.getElementById('log-limit').addEventListener('change', loadLog);
+document.getElementById('log-autoref').addEventListener('change', function() {
+  if (this.checked) {
+    _autorefTimer = setInterval(loadLog, 30000);
+    toast('Auto-refresh 30s aktif', 'ok');
+  } else {
+    clearInterval(_autorefTimer); _autorefTimer = null;
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════════════
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function debounce(fn, wait) {
+  let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), wait); };
+}
+let _toastTimer = null;
+function toast(msg, kind) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast ' + (kind || '');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.add('hidden'), 4000);
+}
+
+bootstrap();
+</script>
+</body>
+</html>

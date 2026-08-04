@@ -10,7 +10,9 @@
     { "source": "/crm", "destination": "/modules/crm/index.html" },
     { "source": "/crm/(.*)", "destination": "/modules/crm/$1" },
     { "source": "/finance", "destination": "/modules/finance/index.html" },
-    { "source": "/finance/(.*)", "destination": "/modules/finance/$1" }
+    { "source": "/finance/(.*)", "destination": "/modules/finance/$1" },
+    { "source": "/sistem", "destination": "/modules/sistem/index.html" },
+    { "source": "/sistem/(.*)", "destination": "/modules/sistem/$1" }
   ],
   "redirects": [
     { "source": "/raos", "destination": "https://raos-menala.vercel.app", "permanent": false },
