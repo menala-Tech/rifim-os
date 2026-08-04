@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Install AIST Fill v2 Bookmarklet</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1A1A1A; color: #fff; min-height: 100vh; padding: 40px 20px; }
+.container { max-width: 780px; margin: 0 auto; }
+h1 { font-size: 24px; margin-bottom: 8px; }
+.sub { color: #aaa; margin-bottom: 30px; font-size: 14px; }
+.card { background: #2B2B2B; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+h2 { font-size: 16px; color: #C40000; margin-bottom: 12px; }
+.step { padding: 12px 16px; background: rgba(255,255,255,.03); border-left: 3px solid #C40000; margin-bottom: 8px; border-radius: 6px; font-size: 13px; line-height: 1.6; }
+.step b { color: #ff9999; }
+.bookmark-btn { display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #C40000, #8B0000); color: #fff !important; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; margin: 20px 0; cursor: grab; box-shadow: 0 4px 16px rgba(196,0,0,.3); }
+.bookmark-btn:active { cursor: grabbing; }
+.note { padding: 12px; background: rgba(234,179,8,.1); border: 1px solid rgba(234,179,8,.3); border-radius: 6px; font-size: 12px; color: #facc15; }
+code { background: rgba(0,0,0,.4); padding: 2px 6px; border-radius: 3px; font-size: 12px; color: #4ade80; }
+.diff { background: rgba(14,165,233,.08); border: 1px solid rgba(14,165,233,.3); border-radius: 6px; padding: 12px; margin-top: 12px; font-size: 12px; color: #93c5fd; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>AIST Fill v2 — Bookmarklet Install</h1>
+  <p class="sub">Auto-fill Amount + Driver login di modal AIST Balance replenishment, langsung dari raos_saldo_requests Supabase (bukan sheet lama).</p>
+
+  <div class="card">
+    <h2>1. Drag tombol ini ke bookmark bar</h2>
+    <a class="bookmark-btn" id="bookmark-link" href="#" onclick="return false">🔴 AIST Fill v2</a>
+    <p style="font-size:12px;color:#888">Tarik ke Bookmarks Bar Chrome/Edge/Brave. Kalau bookmark bar tidak muncul: tekan <code>Ctrl+Shift+B</code>.</p>
+  </div>
+
+  <div class="card">
+    <h2>2. Cara pakai</h2>
+    <div class="step"><b>[Sekali]</b> Login <a href="https://rifim-os.vercel.app/portal" target="_blank" style="color:#4ade80">rifim-os.vercel.app/portal</a> pakai email admin. Auth token disimpan di localStorage.</div>
+    <div class="step"><b>[Setiap sesi]</b> Buka AIST → <b>Documents</b> → <b>Add</b> → <b>Balance replenishment</b>. Pilih Subdivision + Currency manual.</div>
+    <div class="step"><b>Klik bookmark "AIST Fill v2"</b> → picker floating muncul di kanan atas.</div>
+    <div class="step">Klik salah satu row driver → input <b>Amount</b> + <b>Driver login</b> di modal AIST otomatis terisi. Row auto-hilang dari picker + <code>is_processed=true</code> di Supabase.</div>
+    <div class="step">Klik <b>OK di modal AIST</b> untuk kirim ke AIST.</div>
+  </div>
+
+  <div class="card">
+    <h2>3. Bedanya dari bookmarklet lama</h2>
+    <div class="diff">
+      <b>Lama</b> (spreadsheet Pengisian Saldo, sheet Jawaban Formulir 1):<br>
+      &bull; Baca dari sheet Google, filter row tanpa checkbox G<br>
+      &bull; Mark isi = centang checkbox G di sheet<br><br>
+      <b>Baru v2</b>:<br>
+      &bull; Baca langsung dari Supabase <code>raos_saldo_requests</code> (via GAS Web App)<br>
+      &bull; Mark isi = PATCH <code>is_processed=true</code> di DB → auto-trigger notif ke staff PWA<br>
+      &bull; Filter <code>status=approved</code> (koord/admin sudah setujui)<br>
+      &bull; Auto-refresh 30 detik (pengajuan baru dari PWA RAOS langsung muncul)
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>4. Troubleshooting</h2>
+    <div class="step">🔴 <b>"Belum login Rifim-OS"</b> → buka portal, login dulu.</div>
+    <div class="step">🔴 <b>"Tidak nemu input Amount/Login"</b> → pastikan modal AIST sudah terbuka + input visible.</div>
+    <div class="step">🔴 <b>Picker tidak muncul</b> → cek console browser (F12). Kemungkinan AIST punya CSP block script. Coba akses AIST via HTTP (bukan HTTPS strict).</div>
+    <div class="step">🔴 <b>Row tidak refresh</b> → klik tombol 🔄 di picker header, atau reload picker (klik bookmark lagi).</div>
+  </div>
+
+  <p class="note">⚠️ Source code lengkap: <code>automation/aist-bookmarklet/aist-fill-v2.source.js</code>. Kalau AIST DOM berubah, selector di <code>findInputByLabel()</code> perlu di-update.</p>
+</div>
+
+<script>
+// Fetch source, minify (strip comments + whitespace), URL-encode, jadi javascript: bookmark
+fetch('aist-fill-v2.source.js')
+  .then(r => r.text())
+  .then(src => {
+    // Simple minify: strip block comments + line comments + multiple spaces
+    const min = src
+      .replace(/\/\*[\s\S]*?\*\//g, '')      // block comments
+      .replace(/^\s*\/\/.*$/gm, '')           // line comments
+      .replace(/\n\s*/g, ' ')                 // newlines
+      .replace(/\s{2,}/g, ' ');              // multiple spaces
+    const href = 'javascript:' + encodeURIComponent(min);
+    document.getElementById('bookmark-link').href = href;
+  })
+  .catch(err => {
+    document.getElementById('bookmark-link').textContent = '⚠️ Source tidak bisa di-load: ' + err.message;
+    document.getElementById('bookmark-link').style.background = '#f87171';
+  });
+</script>
+</body>
+</html>

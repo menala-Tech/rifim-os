@@ -474,12 +474,15 @@ tr:last-child td{border-bottom:none}
               <thead>
                 <tr>
                   <th>ID Karyawan</th><th>Nama</th><th>Periode</th>
-                  <th>Gaji Pokok</th><th>Tunjangan</th><th>Potongan</th><th>Total</th>
+                  <th>Gaji Pokok</th><th>Tunjangan</th>
+                  <th title="Bonus Saldo RAOS (auto dari tab Finance)">Bonus Saldo RAOS</th>
+                  <th title="Bonus KPI RAOS (auto dari tab Finance)">Bonus KPI RAOS</th>
+                  <th>Potongan</th><th>Total</th>
                   <th>No. Dokumen</th><th>Status</th><th>Aksi</th>
                 </tr>
               </thead>
               <tbody id="tbody-payroll">
-                <tr><td colspan="10" class="loading">Memuat data…</td></tr>
+                <tr><td colspan="12" class="loading">Memuat data…</td></tr>
               </tbody>
             </table>
           </div>
@@ -837,7 +840,7 @@ tr:last-child td{border-bottom:none}
           <input id="pay-base" type="number" placeholder="0" min="0">
         </div>
         <div class="form-group">
-          <label>Tunjangan (Rp)</label>
+          <label>Tunjangan (Rp) <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px;margin-left:6px" onclick="autofillBonusFromRaos()">🔄 Auto-fill dari Bonus RAOS</button></label>
           <input id="pay-allowance" type="number" placeholder="0" min="0" value="0">
         </div>
         <div class="form-group">
@@ -1773,34 +1776,64 @@ async function submitApplyLeave() {
 // ════════════════════════════════════════════════════════════
 // PAYROLL
 // ════════════════════════════════════════════════════════════
+// Cache bonus map dari Finance (raos_payroll) — indexed by staff_code
+let raosBonusMap = {};
+async function _loadRaosBonusMap(monthYYYY_MM) {
+  try {
+    const url = GAS_URL + '?' + new URLSearchParams({
+      action: 'hris_payroll_bonus_list',
+      month: monthYYYY_MM,
+      user: (JSON.parse(localStorage.getItem('rifim_auth') || '{}').email || ''),
+    }).toString();
+    const res = await fetch(url).then(r => r.json());
+    if (res && res.success && Array.isArray(res.rows)) {
+      const map = {};
+      res.rows.forEach(r => {
+        if (r.staff_code) map[String(r.staff_code).toUpperCase()] = r;
+      });
+      raosBonusMap = map;
+    } else {
+      raosBonusMap = {};
+    }
+  } catch (_) { raosBonusMap = {}; }
+}
+
 async function loadPayroll() {
   const tbody = document.getElementById('tbody-payroll');
-  tbody.innerHTML = '<tr><td colspan="10" class="loading">Memuat payroll…</td></tr>';
-  const opts = {
-    action:       'hris_payroll',
-    period_month: document.getElementById('filter-payroll-month').value,
-    period_year:  document.getElementById('filter-payroll-year').value,
-  };
-  const res = await gasGet(opts);
+  tbody.innerHTML = '<tr><td colspan="12" class="loading">Memuat payroll…</td></tr>';
+  const month = document.getElementById('filter-payroll-month').value;
+  const year = document.getElementById('filter-payroll-year').value;
+  const opts = { action: 'hris_payroll', period_month: month, period_year: year };
+  // Fetch payroll + bonus RAOS paralel
+  const monthISO = year + '-' + String(month).padStart(2,'0');
+  const [res] = await Promise.all([
+    gasGet(opts),
+    _loadRaosBonusMap(monthISO),
+  ]);
   if (!res.success) {
-    tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><p>' + res.message + '</p></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="empty-state"><p>' + res.message + '</p></td></tr>';
     return;
   }
   allPayroll = res.payroll || [];
   if (!allPayroll.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><p>Belum ada data payroll.</p></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="empty-state"><p>Belum ada data payroll.</p></td></tr>';
     return;
   }
   const MONTHS = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
   tbody.innerHTML = allPayroll.map(r => {
     const emp = allEmployees.find(e => e.employee_id === r.employee_id);
     const empName = emp ? emp.full_name : r.employee_id;
+    const bonus = raosBonusMap[String(r.employee_id).toUpperCase()] || null;
+    const bonusSaldo = bonus ? bonus.bonus_saldo : 0;
+    const bonusKpi = bonus ? bonus.bonus_kpi : 0;
     return `<tr>
       <td>${r.employee_id}</td>
       <td>${empName}</td>
       <td>${MONTHS[r.period_month]} ${r.period_year}</td>
       <td>Rp ${fmtNum(r.salary_base)}</td>
       <td>Rp ${fmtNum(r.allowances)}</td>
+      <td style="color:${bonusSaldo>0?'#16a34a':'#888'};font-weight:${bonusSaldo>0?'700':'400'}">Rp ${fmtNum(bonusSaldo)}</td>
+      <td style="color:${bonusKpi>0?'#16a34a':'#888'};font-weight:${bonusKpi>0?'700':'400'}">Rp ${fmtNum(bonusKpi)}</td>
       <td>Rp ${fmtNum(r.deductions)}</td>
       <td><strong>Rp ${fmtNum(r.total_salary)}</strong></td>
       <td>${r.document_number || '–'}
@@ -1811,6 +1844,21 @@ async function loadPayroll() {
       <td>${r.status === 'DRAFT' ? `<button class="btn btn-success btn-sm" onclick="finalizePayroll('${r.id}','${r.employee_id}','${r.period_month}','${r.period_year}')">Finalisasi</button>` : '–'}</td>
     </tr>`;
   }).join('');
+}
+
+// Auto-fill Tunjangan dari Bonus RAOS saat buat payroll baru
+async function autofillBonusFromRaos() {
+  const empId = (document.getElementById('pay-emp-id').value || '').trim().toUpperCase();
+  const month = document.getElementById('pay-month').value;
+  const year = document.getElementById('pay-year').value;
+  if (!empId) return showToast('Isi ID Karyawan dulu', 'error');
+  const monthISO = year + '-' + String(month).padStart(2,'0');
+  await _loadRaosBonusMap(monthISO);
+  const bonus = raosBonusMap[empId];
+  if (!bonus) return showToast('❌ Tidak ada bonus RAOS untuk ' + empId + ' bulan ' + monthISO, 'error');
+  const total = (bonus.bonus_saldo || 0) + (bonus.bonus_kpi || 0) + (bonus.member_parkir || 0);
+  document.getElementById('pay-allowance').value = total;
+  showToast('✅ Tunjangan diisi dari Bonus RAOS: Rp ' + fmtNum(total) + ' (Saldo ' + fmtNum(bonus.bonus_saldo) + ' + KPI ' + fmtNum(bonus.bonus_kpi) + ' + Parkir ' + fmtNum(bonus.member_parkir) + ')', 'success');
 }
 
 async function submitAddPayroll() {

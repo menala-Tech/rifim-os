@@ -179,6 +179,9 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
       <button class="tab" data-tab="tagihan">📄 Tagihan</button>
       <button class="tab" data-tab="rekap">📆 Rekap Harian/Bulanan</button>
       <button class="tab" data-tab="saldo-raos">💳 Isi Saldo (RAOS)</button>
+      <button class="tab" data-tab="target-cabang">🎯 Target Cabang</button>
+      <button class="tab" data-tab="target-staff">👤 Target Staff</button>
+      <button class="tab" data-tab="db-driver">🚗 DB Driver</button>
       <button class="tab" data-tab="input">📝 Input Baru</button>
       <button class="tab" data-tab="log">📋 System Log</button>
     </div>
@@ -347,6 +350,124 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         </tr></thead>
         <tbody id="sr-body">
           <tr><td colspan="7"><div class="empty"><div class="icon">💳</div>Belum terhubung ke Supabase.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB TARGET CABANG (raos_kpi_targets_branch) — sesi 2026-08-04    -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel" data-panel="target-cabang">
+      <h2>Target Cabang — Isi Saldo Bulanan</h2>
+      <div class="desc">Target nominal saldo per cabang per bulan. Auto-prorate ke Target Staff kalau tidak di-override.</div>
+      <div class="sinks">
+        <span class="sink supabase">🗄️ Supabase: <code>raos_kpi_targets_branch</code></span>
+        <span class="sink raos">👑 Owner logic: RAOS</span>
+      </div>
+      <div class="roadmap">
+        <strong>Aturan:</strong> Soeta &amp; Makassar pakai <code>mode=order</code> (target scan valid),
+        cabang lain <code>mode=saldo</code> (target nominal Rp). Bonus Saldo hanya berlaku untuk cabang
+        <code>mode=saldo</code>. Bonus KPI tetap dihitung untuk semua cabang berbasis driver assignment.
+      </div>
+
+      <div class="toolbar">
+        <label style="font-size:12px;color:#aaa">Bulan:</label>
+        <input type="month" id="tc-month" style="max-width:160px">
+        <button class="btn ghost small" id="tc-refresh">🔄 Refresh</button>
+        <button class="btn small" id="tc-recompute">⚙️ Recompute Payroll Bulan Ini</button>
+      </div>
+
+      <table class="tbl">
+        <thead><tr>
+          <th>Cabang</th><th>Mode</th>
+          <th style="text-align:right">Target Cabang</th>
+          <th style="text-align:right">Target Staff Default</th>
+          <th>Update</th><th>Aksi</th>
+        </tr></thead>
+        <tbody id="tc-body">
+          <tr><td colspan="6"><div class="empty">Loading target cabang…</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB TARGET STAFF (raos_kpi_targets_staff + view + raos_payroll)  -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel" data-panel="target-staff">
+      <h2>Target Staff + Tier Bonus + THP</h2>
+      <div class="desc">Target saldo per staff + realisasi + tier Bonus Saldo/KPI + THP. Data langsung dari <code>raos_payroll</code> + <code>raos_target_tercapai_bulan</code>.</div>
+      <div class="sinks">
+        <span class="sink supabase">🗄️ Supabase: <code>raos_payroll</code> + <code>raos_kpi_targets_staff</code></span>
+        <span class="sink raos">👑 Tier hardcoded di RPC <code>raos_compute_payroll_month</code></span>
+      </div>
+      <div class="roadmap">
+        <strong>Tier Bonus Saldo</strong> (max 1.5jt staff / 2jt koord, syarat ≥80% staff cabang capai + individual):
+        &lt;80% → 0 · 80-89% → 60% · 90-99% → 80% · ≥100% → 100%.
+        <strong>Tier Bonus KPI</strong> (max 300rb, syarat ≥80% driver assigned aktif ≥25 hari):
+        &lt;80% → 0 · 80-89% → 180rb · 90-99% → 240rb · ≥100% → 300rb.
+        <strong>Soeta &amp; Makassar</strong>: Bonus Saldo N/A, Bonus KPI tetap dihitung.
+      </div>
+
+      <div class="toolbar">
+        <label style="font-size:12px;color:#aaa">Bulan:</label>
+        <input type="month" id="ts-month" style="max-width:160px">
+        <select id="ts-cabang" class="grow"><option value="">Semua Cabang</option></select>
+        <button class="btn ghost small" id="ts-refresh">🔄 Refresh</button>
+      </div>
+
+      <table class="tbl" style="font-size:11px">
+        <thead><tr>
+          <th>Staff</th><th>Cabang</th>
+          <th style="text-align:right">Gapok</th>
+          <th style="text-align:right">Target</th>
+          <th style="text-align:right">Realisasi</th>
+          <th style="text-align:right">%</th>
+          <th style="text-align:right">Bonus</th>
+          <th style="text-align:right">BPJS</th>
+          <th style="text-align:right">Paket</th>
+          <th style="text-align:right">Parkir</th>
+          <th style="text-align:right">Bonus KPI</th>
+          <th style="text-align:right">THP</th>
+          <th>Status</th>
+          <th>Aksi</th>
+        </tr></thead>
+        <tbody id="ts-body">
+          <tr><td colspan="14"><div class="empty">Loading target staff…</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB DB DRIVER (raos_drivers + raos_driver_staff_assignment)      -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="panel" data-panel="db-driver">
+      <h2>DB Driver + Assignment ke Staff</h2>
+      <div class="desc">Daftar driver per cabang + assignment random ke staff (management-only edit).</div>
+      <div class="sinks">
+        <span class="sink supabase">🗄️ Supabase: <code>raos_drivers</code> + <code>raos_driver_staff_assignment</code></span>
+        <span class="sink raos">👑 Random assign: RPC <code>raos_random_assign_drivers</code></span>
+      </div>
+      <div class="roadmap">
+        <strong>Aturan:</strong> Assignment driver → staff dilakukan random oleh management/direksi.
+        Admin &amp; koordinator hanya bisa lihat (read-only). Rebalance (p_force=true) akan reset
+        semua assignment cabang lalu re-distribute round-robin.
+      </div>
+
+      <div class="toolbar">
+        <select id="dd-cabang" class="grow"><option value="">Pilih cabang…</option></select>
+        <input class="grow" placeholder="Cari nama/ID driver/staff…" id="dd-search">
+        <button class="btn ghost small" id="dd-refresh">🔄 Refresh</button>
+        <button class="btn small" id="dd-assign">🎲 Random Assign (management only)</button>
+        <button class="btn info small" id="dd-rebalance">♻️ Rebalance Force</button>
+      </div>
+
+      <table class="tbl">
+        <thead><tr>
+          <th>ID Driver</th><th>Nama</th><th>HP</th><th>Kendaraan</th>
+          <th>Cabang</th><th>Aktif</th><th>Staff Assigned</th>
+        </tr></thead>
+        <tbody id="dd-body">
+          <tr><td colspan="7"><div class="empty">Pilih cabang untuk load driver</div></td></tr>
         </tbody>
       </table>
     </div>
@@ -881,6 +1002,346 @@ async function loadLog() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// TAB TARGET CABANG (sesi 2026-08-04)
+// ═══════════════════════════════════════════════════════════════════════
+function _currentMonthISO() {
+  const el = document.getElementById('tc-month');
+  const m = (el && el.value) || (() => {
+    const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  })();
+  return m + '-01';
+}
+async function loadTargetCabang() {
+  const tb = document.getElementById('tc-body');
+  const monthEl = document.getElementById('tc-month');
+  if (monthEl && !monthEl.value) {
+    const d = new Date(); monthEl.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  }
+  tb.innerHTML = '<tr><td colspan="6"><div class="empty">Loading target cabang…</div></td></tr>';
+  try {
+    const data = await _gasCall('finance_kpi_target_branch_list', { month: monthEl.value });
+    if (!data.success) throw new Error(data.message || 'Gagal load');
+    if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="6"><div class="empty">Tidak ada cabang</div></td></tr>'; return; }
+    tb.innerHTML = data.rows.map(r => `
+      <tr data-branch="${esc(r.branch_id)}">
+        <td>${esc(r.branch_name)}${r.is_excluded_saldo ? ' <span style="font-size:9px;color:#facc15">(order)</span>' : ''}</td>
+        <td><span style="padding:2px 8px;border-radius:8px;background:${r.mode==='order'?'rgba(234,179,8,.2);color:#facc15':'rgba(14,165,233,.2);color:#38bdf8'};font-size:10px;font-weight:600">${esc(r.mode)}</span></td>
+        <td style="text-align:right;font-family:monospace">${fmtRp(r.target_cabang)}</td>
+        <td style="text-align:right;font-family:monospace">${r.target_staff_default != null ? fmtRp(r.target_staff_default) : '—'}</td>
+        <td style="font-size:10px;color:#888">${fmtDateTime(r.updated_at)}</td>
+        <td><button class="btn small" onclick="editTargetCabang('${esc(r.branch_id)}','${esc(r.branch_name)}',${r.target_cabang},${r.target_staff_default},'${esc(r.mode)}')">✏️ Edit</button></td>
+      </tr>`).join('');
+  } catch (err) {
+    tb.innerHTML = `<tr><td colspan="6"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
+  }
+}
+// Generic editable modal — dinamis, terima array field config
+function openEditModal(config) {
+  // Cleanup existing
+  const old = document.getElementById('__edit_modal_overlay__');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = '__edit_modal_overlay__';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px';
+
+  const box = document.createElement('div');
+  box.style.cssText = 'background:var(--dark2,#2B2B2B);color:#fff;border-radius:12px;padding:20px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;border:1px solid rgba(255,255,255,.1);box-shadow:0 8px 32px rgba(0,0,0,.5)';
+
+  const fieldsHtml = config.fields.map((f, i) => {
+    const val = f.value == null ? '' : f.value;
+    if (f.type === 'select') {
+      const opts = f.options.map(o => `<option value="${esc(o.value)}"${o.value === val ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
+      return `<div style="margin-bottom:14px"><label style="display:block;font-size:12px;color:#aaa;margin-bottom:4px">${esc(f.label)}${f.required ? ' <span style="color:#f87171">*</span>' : ''}</label><select id="__edit_field_${i}" style="width:100%;padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;font-size:13px">${opts}</select>${f.hint ? `<div style="font-size:10px;color:#666;margin-top:4px">${esc(f.hint)}</div>` : ''}</div>`;
+    }
+    const inputType = f.type || 'text';
+    return `<div style="margin-bottom:14px"><label style="display:block;font-size:12px;color:#aaa;margin-bottom:4px">${esc(f.label)}${f.required ? ' <span style="color:#f87171">*</span>' : ''}</label><input id="__edit_field_${i}" type="${inputType}" value="${esc(val)}" placeholder="${esc(f.placeholder || '')}" style="width:100%;padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;font-size:13px;font-family:${inputType==='number'?'monospace':'inherit'}">${f.hint ? `<div style="font-size:10px;color:#666;margin-top:4px">${esc(f.hint)}</div>` : ''}</div>`;
+  }).join('');
+
+  box.innerHTML = [
+    `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.1)">`,
+    `  <h3 style="font-size:16px;margin:0">${esc(config.title)}</h3>`,
+    `  <button id="__edit_close" style="background:transparent;border:none;color:#aaa;font-size:22px;cursor:pointer;padding:0;line-height:1">×</button>`,
+    `</div>`,
+    config.subtitle ? `<div style="font-size:12px;color:#aaa;margin-bottom:16px;line-height:1.5">${config.subtitle}</div>` : '',
+    fieldsHtml,
+    `<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,.1)">`,
+    config.onDelete ? `<button id="__edit_delete" class="btn small" style="background:var(--err,#dc2626);margin-right:auto">🗑️ Hapus</button>` : '',
+    `  <button id="__edit_cancel" class="btn ghost small">Batal</button>`,
+    `  <button id="__edit_save" class="btn small">💾 Simpan</button>`,
+    `</div>`,
+  ].join('');
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  function close() { overlay.remove(); }
+
+  document.getElementById('__edit_close').addEventListener('click', close);
+  document.getElementById('__edit_cancel').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  document.getElementById('__edit_save').addEventListener('click', async () => {
+    const payload = {};
+    for (let i = 0; i < config.fields.length; i++) {
+      const el = document.getElementById('__edit_field_' + i);
+      let val = el.value;
+      if (config.fields[i].type === 'number') {
+        val = val === '' ? (config.fields[i].nullable ? null : 0) : Number(val);
+      }
+      payload[config.fields[i].name] = val;
+    }
+    // Validasi required
+    for (let i = 0; i < config.fields.length; i++) {
+      const f = config.fields[i];
+      if (f.required && (payload[f.name] === '' || payload[f.name] == null)) {
+        return showToast('❌ Field "' + f.label + '" wajib diisi', 'err');
+      }
+    }
+    try {
+      await config.onSave(payload);
+      close();
+    } catch (err) {
+      showToast('❌ ' + err.message, 'err');
+    }
+  });
+
+  if (config.onDelete) {
+    document.getElementById('__edit_delete').addEventListener('click', async () => {
+      if (!confirm('Yakin hapus row ini?')) return;
+      try {
+        await config.onDelete();
+        close();
+      } catch (err) {
+        showToast('❌ ' + err.message, 'err');
+      }
+    });
+  }
+}
+
+async function editTargetCabang(branchId, branchName, currTarget, currStaffDefault, currMode) {
+  const monthEl = document.getElementById('tc-month');
+  const isExcluded = /soeta|makassar/i.test(branchName);
+  openEditModal({
+    title: '✏️ Edit Target Cabang — ' + branchName,
+    subtitle: 'Bulan efektif: <b>' + monthEl.value + '</b>. Soeta &amp; Makassar sebaiknya pakai mode=order (target scan valid).',
+    fields: [
+      {
+        name: 'target_cabang',
+        label: 'Target Cabang (Rp bulan ini)',
+        type: 'number',
+        value: currTarget || 0,
+        required: true,
+        hint: 'Total target agregat cabang untuk bulan ini',
+      },
+      {
+        name: 'target_staff_default',
+        label: 'Target Staff Default (Rp per staff)',
+        type: 'number',
+        value: currStaffDefault != null ? currStaffDefault : '',
+        nullable: true,
+        placeholder: 'Kosongkan = auto-prorate dari Target Cabang / jumlah staff',
+        hint: 'Kalau kosong, sistem akan bagi rata Target Cabang ke jumlah staff aktif',
+      },
+      {
+        name: 'mode',
+        label: 'Mode Pengukuran',
+        type: 'select',
+        value: currMode || (isExcluded ? 'order' : 'saldo'),
+        options: [
+          { value: 'saldo', label: 'Saldo (nominal Rp) — cabang non-Soeta/Makassar' },
+          { value: 'order', label: 'Order (scan valid) — Soeta & Makassar' },
+        ],
+        required: true,
+      },
+    ],
+    onSave: async (payload) => {
+      const data = await _gasCall('finance_kpi_target_branch_upsert', {
+        branch_id: branchId, month: monthEl.value,
+        target_cabang: payload.target_cabang,
+        target_staff_default: payload.target_staff_default == null ? '' : payload.target_staff_default,
+        mode: payload.mode,
+      });
+      if (!data.success) throw new Error(data.message);
+      showToast('✅ Target ' + branchName + ' tersimpan', 'ok');
+      loadTargetCabang();
+    },
+    onDelete: async () => {
+      const data = await _gasCall('finance_kpi_target_branch_upsert', {
+        branch_id: branchId, month: monthEl.value,
+        target_cabang: 0, target_staff_default: '', mode: currMode || 'saldo',
+      });
+      if (!data.success) throw new Error(data.message);
+      showToast('✅ Target ' + branchName + ' di-reset ke 0', 'ok');
+      loadTargetCabang();
+    },
+  });
+}
+async function computePayrollForMonth() {
+  const monthEl = document.getElementById('tc-month');
+  if (!confirm('Recompute payroll bulan ' + monthEl.value + ' untuk SEMUA staff aktif?\nIni akan overwrite raos_payroll bulan ini.')) return;
+  try {
+    const data = await _gasCall('finance_payroll_compute', { month: monthEl.value });
+    if (!data.success) throw new Error(data.message);
+    showToast('✅ Payroll dihitung ulang untuk ' + data.processed + ' staff', 'ok');
+  } catch (err) { showToast('❌ ' + err.message, 'err'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TAB TARGET STAFF
+// ═══════════════════════════════════════════════════════════════════════
+async function loadTargetStaff() {
+  const tb = document.getElementById('ts-body');
+  const monthEl = document.getElementById('ts-month');
+  const cabangEl = document.getElementById('ts-cabang');
+  if (monthEl && !monthEl.value) {
+    const d = new Date(); monthEl.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  }
+  tb.innerHTML = '<tr><td colspan="14"><div class="empty">Loading target staff…</div></td></tr>';
+  try {
+    const data = await _gasCall('finance_kpi_target_staff_list', {
+      month: monthEl.value,
+      branch_id: cabangEl.value || '',
+    });
+    if (!data.success) throw new Error(data.message || 'Gagal load');
+    if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="14"><div class="empty">Tidak ada staff cocok filter</div></td></tr>'; return; }
+    tb.innerHTML = data.rows.map(r => {
+      const stColor = r.status_target === 'ok' ? '#4ade80' :
+                      r.status_target === 'warning' ? '#facc15' :
+                      r.status_target === 'na' ? '#888' : '#f87171';
+      const stLabel = { ok:'Capai', warning:'Warning', cut_off:'Cut Off', na:'N/A' }[r.status_target] || r.status_target;
+      return `
+        <tr>
+          <td>${esc(r.staff_name)}<br><span style="font-size:9px;color:#888">${esc(r.staff_code)} · ${esc(r.role)}</span></td>
+          <td style="font-size:10px">${esc(r.branch_name)}${r.is_excluded_saldo ? ' <span style="color:#facc15">(order)</span>' : ''}</td>
+          <td style="text-align:right;font-family:monospace">${fmtRp(r.gapok)}</td>
+          <td style="text-align:right;font-family:monospace">${r.is_excluded_saldo ? '—' : fmtRp(r.target_saldo)}</td>
+          <td style="text-align:right;font-family:monospace">${r.is_excluded_saldo ? '—' : fmtRp(r.realisasi_saldo)}</td>
+          <td style="text-align:right;color:${stColor};font-weight:600">${r.is_excluded_saldo ? '—' : (Number(r.pct).toFixed(1) + '%')}</td>
+          <td style="text-align:right;font-family:monospace;color:${r.bonus_saldo>0?'#4ade80':'#666'}">${fmtRp(r.bonus_saldo)}</td>
+          <td style="text-align:right;font-family:monospace">${fmtRp(r.bpjs)}</td>
+          <td style="text-align:right;font-family:monospace">${fmtRp(r.paket_data)}</td>
+          <td style="text-align:right;font-family:monospace">${fmtRp(r.member_parkir)}</td>
+          <td style="text-align:right;font-family:monospace;color:${r.bonus_kpi>0?'#4ade80':'#666'}">${fmtRp(r.bonus_kpi)}</td>
+          <td style="text-align:right;font-family:monospace;font-weight:700;color:#38bdf8">${fmtRp(r.thp)}</td>
+          <td><span style="padding:2px 8px;border-radius:8px;background:${stColor};color:#111;font-size:10px;font-weight:700">${stLabel}</span></td>
+          <td><button class="btn small ghost" onclick="editTargetStaff('${esc(r.staff_id)}','${esc(r.staff_name)}',${r.target_saldo_override != null ? r.target_saldo_override : 'null'},${r.member_parkir})">✏️</button></td>
+        </tr>`;
+    }).join('');
+  } catch (err) {
+    tb.innerHTML = `<tr><td colspan="14"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
+  }
+}
+async function editTargetStaff(staffId, staffName, currOverride, currParkir) {
+  const monthEl = document.getElementById('ts-month');
+  openEditModal({
+    title: '✏️ Edit Target Staff — ' + staffName,
+    subtitle: 'Bulan efektif: <b>' + monthEl.value + '</b>. Override target &amp; input member parkir manual. Setelah simpan, klik "⚙️ Recompute Payroll" di tab Target Cabang untuk update Bonus.',
+    fields: [
+      {
+        name: 'target_saldo',
+        label: 'Override Target Saldo (Rp)',
+        type: 'number',
+        value: currOverride != null ? currOverride : '',
+        nullable: true,
+        placeholder: 'Kosongkan = pakai default cabang',
+        hint: 'Kalau diisi, override Target Staff Default cabang untuk staff ini saja',
+      },
+      {
+        name: 'member_parkir_amount',
+        label: 'Member Parkir (Rp)',
+        type: 'number',
+        value: currParkir || 0,
+        placeholder: '0',
+        hint: 'Optional — nominal parkir yang di-cover perusahaan bulan ini',
+      },
+    ],
+    onSave: async (payload) => {
+      const data = await _gasCall('finance_kpi_target_staff_upsert', {
+        staff_id: staffId, month: monthEl.value,
+        target_saldo: payload.target_saldo == null ? '' : payload.target_saldo,
+        member_parkir_amount: payload.member_parkir_amount || 0,
+      });
+      if (!data.success) throw new Error(data.message);
+      showToast('✅ Target ' + staffName + ' tersimpan. Klik Recompute Payroll untuk update bonus.', 'ok');
+      loadTargetStaff();
+    },
+    onDelete: async () => {
+      const data = await _gasCall('finance_kpi_target_staff_upsert', {
+        staff_id: staffId, month: monthEl.value,
+        target_saldo: '', member_parkir_amount: 0,
+      });
+      if (!data.success) throw new Error(data.message);
+      showToast('✅ Override target ' + staffName + ' dihapus (pakai default cabang)', 'ok');
+      loadTargetStaff();
+    },
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TAB DB DRIVER + RANDOM ASSIGN
+// ═══════════════════════════════════════════════════════════════════════
+async function loadDBDriver() {
+  const tb = document.getElementById('dd-body');
+  const cabangEl = document.getElementById('dd-cabang');
+  const search = (document.getElementById('dd-search').value || '').toLowerCase();
+  if (!cabangEl.value) { tb.innerHTML = '<tr><td colspan="7"><div class="empty">Pilih cabang untuk load driver</div></td></tr>'; return; }
+  tb.innerHTML = '<tr><td colspan="7"><div class="empty">Loading driver…</div></td></tr>';
+  try {
+    const data = await _gasCall('finance_drivers_list', { branch_id: cabangEl.value });
+    if (!data.success) throw new Error(data.message || 'Gagal load');
+    let rows = data.rows || [];
+    if (search) {
+      rows = rows.filter(r => (r.name+' '+r.driver_id+' '+r.assigned_staff_name).toLowerCase().includes(search));
+    }
+    if (!rows.length) { tb.innerHTML = '<tr><td colspan="7"><div class="empty">Tidak ada driver cocok filter</div></td></tr>'; return; }
+    tb.innerHTML = rows.map(r => `
+      <tr>
+        <td style="font-family:monospace;font-size:11px">${esc(r.driver_id)}</td>
+        <td>${esc(r.name)}</td>
+        <td style="font-size:11px">${esc(r.phone || '—')}</td>
+        <td style="font-size:11px">${esc(r.vehicle_type || '')} ${esc(r.vehicle_plate || '')}</td>
+        <td style="font-size:11px">${esc(r.branch_name)}</td>
+        <td>${r.is_active ? '<span style="color:#4ade80">✓</span>' : '<span style="color:#f87171">✗</span>'}</td>
+        <td style="font-size:11px">${r.assigned_staff_name ? `<b>${esc(r.assigned_staff_name)}</b> <span style="color:#888">${esc(r.assigned_staff_code)}</span>` : '<span style="color:#888">—</span>'}</td>
+      </tr>`).join('');
+  } catch (err) {
+    tb.innerHTML = `<tr><td colspan="7"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
+  }
+}
+async function randomAssignDriver(force) {
+  const cabangEl = document.getElementById('dd-cabang');
+  if (!cabangEl.value) return showToast('❌ Pilih cabang dulu', 'err');
+  const cabangName = cabangEl.options[cabangEl.selectedIndex].text;
+  const msg = force
+    ? '⚠️ REBALANCE: Semua assignment cabang ' + cabangName + ' akan DIHAPUS + di-redistribute random. Yakin?'
+    : 'Random assign driver yang BELUM ada assignment di cabang ' + cabangName + '. Lanjut?';
+  if (!confirm(msg)) return;
+  try {
+    const data = await _gasCall('finance_driver_assign_random', {
+      branch_id: cabangEl.value,
+      force: force ? 'true' : 'false',
+    });
+    if (!data.success) throw new Error(data.message);
+    showToast('✅ ' + data.assigned + ' driver ter-assign', 'ok');
+    loadDBDriver();
+  } catch (err) { showToast('❌ ' + err.message, 'err'); }
+}
+async function populateBranchDropdowns() {
+  try {
+    // Reuse dropdown existing d-cabang (sudah di-populate populateCabang)
+    // Untuk ts-cabang + dd-cabang, fetch dari branches Supabase via endpoint yg ada
+    const data = await _gasCall('finance_kpi_target_branch_list', { month: _currentMonthISO() });
+    if (!data.success) return;
+    const opts = data.rows.map(b => `<option value="${esc(b.branch_id)}">${esc(b.branch_name)}</option>`).join('');
+    const ts = document.getElementById('ts-cabang');
+    const dd = document.getElementById('dd-cabang');
+    if (ts) ts.innerHTML = '<option value="">Semua Cabang</option>' + opts;
+    if (dd) dd.innerHTML = '<option value="">Pilih cabang…</option>' + opts;
+  } catch (_) {}
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // WIRE FILTERS + BUTTONS
 // ═══════════════════════════════════════════════════════════════════════
 function wireFinanceHandlers() {
@@ -912,12 +1373,26 @@ function wireFinanceHandlers() {
   document.querySelectorAll('[data-panel="log"] .btn.ghost.small').forEach(b => {
     if (b.textContent.indexOf('Refresh') > -1) b.addEventListener('click', loadLog);
   });
+  // Target Cabang
+  document.getElementById('tc-refresh').addEventListener('click', loadTargetCabang);
+  document.getElementById('tc-month').addEventListener('change', loadTargetCabang);
+  document.getElementById('tc-recompute').addEventListener('click', computePayrollForMonth);
+  // Target Staff
+  document.getElementById('ts-refresh').addEventListener('click', loadTargetStaff);
+  document.getElementById('ts-month').addEventListener('change', loadTargetStaff);
+  document.getElementById('ts-cabang').addEventListener('change', loadTargetStaff);
+  // DB Driver
+  document.getElementById('dd-refresh').addEventListener('click', loadDBDriver);
+  document.getElementById('dd-cabang').addEventListener('change', loadDBDriver);
+  document.getElementById('dd-search').addEventListener('input', loadDBDriver);
+  document.getElementById('dd-assign').addEventListener('click', () => randomAssignDriver(false));
+  document.getElementById('dd-rebalance').addEventListener('click', () => randomAssignDriver(true));
 }
 
 // ═══════════════════════════════════════════════════════════════════════
 // TAB ROUTER dengan lazy-load
 // ═══════════════════════════════════════════════════════════════════════
-const _finTabLoaded = { dashboard: false, tagihan: false, rekap: false, 'saldo-raos': false, log: false };
+const _finTabLoaded = { dashboard: false, tagihan: false, rekap: false, 'saldo-raos': false, log: false, 'target-cabang': false, 'target-staff': false, 'db-driver': false };
 document.querySelectorAll('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const target = btn.dataset.tab;
@@ -930,6 +1405,9 @@ document.querySelectorAll('.tab').forEach(btn => {
     if (target === 'rekap'      && !_finTabLoaded.rekap)      { _finTabLoaded.rekap      = true; loadRekap(); }
     if (target === 'saldo-raos' && !_finTabLoaded['saldo-raos']) { _finTabLoaded['saldo-raos'] = true; loadSaldoRaos(); }
     if (target === 'log'        && !_finTabLoaded.log)        { _finTabLoaded.log        = true; loadLog(); }
+    if (target === 'target-cabang' && !_finTabLoaded['target-cabang']) { _finTabLoaded['target-cabang'] = true; loadTargetCabang(); }
+    if (target === 'target-staff'  && !_finTabLoaded['target-staff'])  { _finTabLoaded['target-staff']  = true; loadTargetStaff(); }
+    if (target === 'db-driver'     && !_finTabLoaded['db-driver'])     { _finTabLoaded['db-driver']     = true; loadDBDriver(); }
   });
 });
 const initTab = location.hash.replace('#', '') || 'dashboard';
@@ -938,6 +1416,7 @@ if (initBtn) initBtn.click();
 
 if (checkAuth()) {
   populateCabang();
+  populateBranchDropdowns();
   wireFinanceHandlers();
   startSaldoRaosNotifier();
 }

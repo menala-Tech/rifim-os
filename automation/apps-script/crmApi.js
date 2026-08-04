@@ -76,6 +76,22 @@ function crmHandleGet(e) {
     if (action === 'finance_saldo_raos_list') return _crmJson(_finSaldoRaosList_(e.parameter));
     if (action === 'finance_saldo_raos_mark_paid') return _crmJson(_finSaldoRaosMarkPaid_(e.parameter));
 
+    // ─── KPI Targets V2 (raos_070) — Target Cabang + Target Staff + Payroll
+    if (action === 'finance_kpi_target_branch_list')   return _crmJson(_finKpiTargetBranchList_(e.parameter));
+    if (action === 'finance_kpi_target_branch_upsert') return _crmJson(_finKpiTargetBranchUpsert_(e.parameter));
+    if (action === 'finance_kpi_target_staff_list')    return _crmJson(_finKpiTargetStaffList_(e.parameter));
+    if (action === 'finance_kpi_target_staff_upsert')  return _crmJson(_finKpiTargetStaffUpsert_(e.parameter));
+    if (action === 'finance_payroll_compute')          return _crmJson(_finPayrollCompute_(e.parameter));
+    if (action === 'finance_payroll_list')             return _crmJson(_finPayrollList_(e.parameter));
+
+    // ─── DB Driver + Random Assignment (raos_070) — Fase 5
+    if (action === 'finance_drivers_list')             return _crmJson(_finDriversList_(e.parameter));
+    if (action === 'finance_driver_assignment_list')   return _crmJson(_finDriverAssignmentList_(e.parameter));
+    if (action === 'finance_driver_assign_random')     return _crmJson(_finDriverAssignRandom_(e.parameter));
+
+    // ─── HRIS Payroll bridge — read-only bonus dari Finance
+    if (action === 'hris_payroll_bonus_list')          return _crmJson(_hrisPayrollBonusList_(e.parameter));
+
     return null; // bukan CRM action, delegate ke handler lain di doGet
   } catch (err) {
     return _crmJson({ success: false, message: 'CRM API error: ' + err.message });
@@ -913,4 +929,422 @@ function _finSaldoRaosMarkPaid_(params) {
   var res = _crmSbFetch_('PATCH', '/rest/v1/raos_saldo_requests?id=eq.' + encodeURIComponent(id), body);
   _crmAuditWrite_(params, 'mark_paid', 'saldo_raos', id, '', 'Lunas oleh ' + params.user);
   return { success: true, id: id, row: Array.isArray(res) ? res[0] : res };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// KPI Targets V2 + Payroll (raos_070, sesi 2026-08-04 lanjutan)
+// Data source: Supabase raos_kpi_targets_branch/staff, raos_payroll,
+// view raos_target_tercapai_bulan, RPC raos_compute_payroll_month
+// ═══════════════════════════════════════════════════════════════════════
+
+// Helper: normalize p_month = 'YYYY-MM' or 'YYYY-MM-01' → 'YYYY-MM-01'
+function _finMonthNorm_(m) {
+  var s = String(m || '').trim();
+  if (!s) {
+    var now = new Date();
+    return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
+  }
+  if (/^\d{4}-\d{2}$/.test(s)) return s + '-01';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s.substring(0, 7) + '-01';
+  throw new Error('Format bulan invalid: ' + s + ' (harus YYYY-MM atau YYYY-MM-01)');
+}
+
+// ─── Target Cabang: list per bulan (join branches)
+function _finKpiTargetBranchList_(params) {
+  _finRoleGate_(params);
+  var month = _finMonthNorm_(params.month);
+
+  var branches = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug&order=name.asc');
+  if (!Array.isArray(branches)) branches = [];
+
+  var rows = _crmSbFetch_('GET', '/rest/v1/raos_kpi_targets_branch?select=id,branch_id,target_cabang,target_staff_default,mode,updated_at&effective_month=eq.' + encodeURIComponent(month));
+  if (!Array.isArray(rows)) rows = [];
+
+  var byBranch = {};
+  rows.forEach(function(r) { byBranch[r.branch_id] = r; });
+
+  var out = branches.map(function(b) {
+    var t = byBranch[b.id] || {};
+    var slugLower = String(b.slug || '').toLowerCase();
+    var isExcluded = /soeta|makassar/.test(slugLower);
+    return {
+      branch_id: b.id,
+      branch_name: b.name,
+      branch_slug: b.slug,
+      is_excluded_saldo: isExcluded,
+      target_cabang: Number(t.target_cabang) || 0,
+      target_staff_default: t.target_staff_default != null ? Number(t.target_staff_default) : null,
+      mode: t.mode || (isExcluded ? 'order' : 'saldo'),
+      target_id: t.id || null,
+      updated_at: t.updated_at || null,
+    };
+  });
+
+  return { success: true, month: month, rows: out };
+}
+
+// ─── Target Cabang: upsert
+function _finKpiTargetBranchUpsert_(params) {
+  _finRoleGate_(params);
+  var branchId = String(params.branch_id || '').trim();
+  if (!branchId) return { success: false, message: 'branch_id wajib' };
+  var month = _finMonthNorm_(params.month);
+  var targetCabang = Number(params.target_cabang) || 0;
+  var targetStaffDefault = params.target_staff_default != null && params.target_staff_default !== ''
+    ? Number(params.target_staff_default) : null;
+  var mode = String(params.mode || 'saldo');
+  if (mode !== 'saldo' && mode !== 'order') return { success: false, message: 'mode harus saldo/order' };
+
+  // Cek existing
+  var existing = _crmSbFetch_('GET', '/rest/v1/raos_kpi_targets_branch?select=id,target_cabang,target_staff_default,mode&branch_id=eq.' + encodeURIComponent(branchId) + '&effective_month=eq.' + encodeURIComponent(month));
+  var beforeStr = (existing && existing[0]) ? JSON.stringify(existing[0]) : '(baru)';
+
+  var body = {
+    branch_id: branchId,
+    effective_month: month,
+    target_cabang: targetCabang,
+    target_staff_default: targetStaffDefault,
+    mode: mode,
+    updated_at: new Date().toISOString(),
+  };
+
+  var res;
+  if (existing && existing[0]) {
+    res = _crmSbFetch_('PATCH', '/rest/v1/raos_kpi_targets_branch?id=eq.' + encodeURIComponent(existing[0].id), body);
+  } else {
+    res = _crmSbFetch_('POST', '/rest/v1/raos_kpi_targets_branch', body);
+  }
+
+  _crmAuditWrite_(params, 'upsert', 'kpi_target_branch', branchId + '@' + month, beforeStr, JSON.stringify(body));
+  return { success: true, row: Array.isArray(res) ? res[0] : res };
+}
+
+// ─── Target Staff: list per bulan (join staff + realisasi + payroll)
+function _finKpiTargetStaffList_(params) {
+  _finRoleGate_(params);
+  var month = _finMonthNorm_(params.month);
+  var branchId = String(params.branch_id || '').trim();
+
+  // Ambil semua staff aktif dengan branch_id
+  var staffQs = 'select=id,full_name,staff_id,role,branch_id,gaji&is_active=eq.true&role=in.(staff,koordinator)&order=full_name.asc';
+  if (branchId) staffQs += '&branch_id=eq.' + encodeURIComponent(branchId);
+  var staffs = _crmSbFetch_('GET', '/rest/v1/user_profiles?' + staffQs);
+  if (!Array.isArray(staffs)) staffs = [];
+
+  // Ambil target_staff overrides
+  var targetOverrides = _crmSbFetch_('GET', '/rest/v1/raos_kpi_targets_staff?select=staff_id,target_saldo,member_parkir_amount&effective_month=eq.' + encodeURIComponent(month));
+  var overrideMap = {};
+  (targetOverrides || []).forEach(function(t) { overrideMap[t.staff_id] = t; });
+
+  // Ambil realisasi dari view
+  var realisasi = _crmSbFetch_('GET', '/rest/v1/raos_target_tercapai_bulan?select=staff_id,realisasi_saldo,request_count&effective_month=eq.' + encodeURIComponent(month));
+  var realisasiMap = {};
+  (realisasi || []).forEach(function(r) { realisasiMap[r.staff_id] = r; });
+
+  // Ambil default per cabang
+  var branchTargets = _crmSbFetch_('GET', '/rest/v1/raos_kpi_targets_branch?select=branch_id,target_staff_default,mode&effective_month=eq.' + encodeURIComponent(month));
+  var branchTargetMap = {};
+  (branchTargets || []).forEach(function(b) { branchTargetMap[b.branch_id] = b; });
+
+  // Ambil branch info
+  var branches = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug');
+  var branchMap = {};
+  (branches || []).forEach(function(b) { branchMap[b.id] = b; });
+
+  // Ambil payroll bulan ini
+  var payroll = _crmSbFetch_('GET', '/rest/v1/raos_payroll?select=staff_id,gapok,bonus_saldo,bpjs,paket_data,member_parkir,bonus_kpi,thp,target_pct,driver_active_pct,status_target,computed_at&effective_month=eq.' + encodeURIComponent(month));
+  var payrollMap = {};
+  (payroll || []).forEach(function(p) { payrollMap[p.staff_id] = p; });
+
+  var out = staffs.map(function(s) {
+    var override = overrideMap[s.id] || {};
+    var r = realisasiMap[s.id] || {};
+    var bt = branchTargetMap[s.branch_id] || {};
+    var b = branchMap[s.branch_id] || {};
+    var p = payrollMap[s.id] || {};
+    var target = override.target_saldo != null ? Number(override.target_saldo) : Number(bt.target_staff_default || 0);
+    var real = Number(r.realisasi_saldo || 0);
+    var pct = target > 0 ? Math.round((real / target) * 10000) / 100 : 0;
+    var slugLower = String(b.slug || '').toLowerCase();
+    var isExcluded = /soeta|makassar/.test(slugLower);
+
+    return {
+      staff_id: s.id,
+      staff_code: s.staff_id,
+      staff_name: s.full_name,
+      role: s.role,
+      branch_id: s.branch_id,
+      branch_name: b.name || '',
+      branch_slug: b.slug || '',
+      is_excluded_saldo: isExcluded,
+      gapok: Number(s.gaji || 0),
+      target_saldo: target,
+      target_saldo_override: override.target_saldo != null ? Number(override.target_saldo) : null,
+      realisasi_saldo: real,
+      request_count: Number(r.request_count || 0),
+      pct: pct,
+      member_parkir: Number(override.member_parkir_amount || p.member_parkir || 0),
+      bonus_saldo: Number(p.bonus_saldo || 0),
+      bpjs: Number(p.bpjs || 55000),
+      paket_data: Number(p.paket_data || 100000),
+      bonus_kpi: Number(p.bonus_kpi || 0),
+      thp: Number(p.thp || 0),
+      target_pct: Number(p.target_pct || pct),
+      driver_active_pct: Number(p.driver_active_pct || 0),
+      status_target: p.status_target || (isExcluded ? 'na' : (pct >= 100 ? 'ok' : (pct >= 80 ? 'warning' : 'cut_off'))),
+      computed_at: p.computed_at || null,
+    };
+  });
+
+  return { success: true, month: month, branch_id: branchId, rows: out };
+}
+
+// ─── Target Staff: upsert override target_saldo + member_parkir
+function _finKpiTargetStaffUpsert_(params) {
+  _finRoleGate_(params);
+  var staffId = String(params.staff_id || '').trim();
+  if (!staffId) return { success: false, message: 'staff_id wajib' };
+  var month = _finMonthNorm_(params.month);
+  var targetSaldo = params.target_saldo != null && params.target_saldo !== ''
+    ? Number(params.target_saldo) : null;
+  var memberParkir = Number(params.member_parkir_amount) || 0;
+
+  var existing = _crmSbFetch_('GET', '/rest/v1/raos_kpi_targets_staff?select=id,target_saldo,member_parkir_amount&staff_id=eq.' + encodeURIComponent(staffId) + '&effective_month=eq.' + encodeURIComponent(month));
+  var beforeStr = (existing && existing[0]) ? JSON.stringify(existing[0]) : '(baru)';
+
+  var body = {
+    staff_id: staffId,
+    effective_month: month,
+    target_saldo: targetSaldo,
+    member_parkir_amount: memberParkir,
+    updated_at: new Date().toISOString(),
+  };
+
+  var res;
+  if (existing && existing[0]) {
+    res = _crmSbFetch_('PATCH', '/rest/v1/raos_kpi_targets_staff?id=eq.' + encodeURIComponent(existing[0].id), body);
+  } else {
+    res = _crmSbFetch_('POST', '/rest/v1/raos_kpi_targets_staff', body);
+  }
+
+  _crmAuditWrite_(params, 'upsert', 'kpi_target_staff', staffId + '@' + month, beforeStr, JSON.stringify(body));
+  return { success: true, row: Array.isArray(res) ? res[0] : res };
+}
+
+// ─── Payroll: trigger RPC compute_payroll_month
+function _finPayrollCompute_(params) {
+  _finRoleGate_(params);
+  var month = _finMonthNorm_(params.month);
+  var res = _crmSbFetch_('POST', '/rest/v1/rpc/raos_compute_payroll_month', { p_month: month });
+  _crmAuditWrite_(params, 'compute', 'payroll', month, '', String(res));
+  return { success: true, month: month, processed: Number(res) || 0 };
+}
+
+// ─── Payroll: list raos_payroll bulan tertentu (join staff + branch)
+function _finPayrollList_(params) {
+  _finRoleGate_(params);
+  var month = _finMonthNorm_(params.month);
+  var branchId = String(params.branch_id || '').trim();
+
+  var rows = _crmSbFetch_('GET', '/rest/v1/raos_payroll?select=id,staff_id,gapok,bonus_saldo,bpjs,paket_data,member_parkir,bonus_kpi,thp,target_pct,driver_active_pct,status_target,computed_at&effective_month=eq.' + encodeURIComponent(month));
+  if (!Array.isArray(rows)) rows = [];
+
+  if (rows.length === 0) return { success: true, month: month, rows: [] };
+
+  var staffIds = rows.map(function(r) { return encodeURIComponent(r.staff_id); }).join(',');
+  var staffs = _crmSbFetch_('GET', '/rest/v1/user_profiles?select=id,staff_id,full_name,role,branch_id&id=in.(' + staffIds + ')');
+  var staffMap = {};
+  (staffs || []).forEach(function(s) { staffMap[s.id] = s; });
+
+  var branchIds = {};
+  (staffs || []).forEach(function(s) { if (s.branch_id) branchIds[s.branch_id] = true; });
+  var branchIdList = Object.keys(branchIds).map(function(x) { return encodeURIComponent(x); }).join(',');
+  var branchMap = {};
+  if (branchIdList) {
+    var branches = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug&id=in.(' + branchIdList + ')');
+    (branches || []).forEach(function(b) { branchMap[b.id] = b; });
+  }
+
+  var out = rows.map(function(r) {
+    var s = staffMap[r.staff_id] || {};
+    var b = branchMap[s.branch_id] || {};
+    return {
+      id: r.id,
+      staff_id: r.staff_id,
+      staff_code: s.staff_id || '',
+      staff_name: s.full_name || '',
+      role: s.role || '',
+      branch_id: s.branch_id || null,
+      branch_name: b.name || '',
+      branch_slug: b.slug || '',
+      gapok: Number(r.gapok || 0),
+      bonus_saldo: Number(r.bonus_saldo || 0),
+      bpjs: Number(r.bpjs || 0),
+      paket_data: Number(r.paket_data || 0),
+      member_parkir: Number(r.member_parkir || 0),
+      bonus_kpi: Number(r.bonus_kpi || 0),
+      thp: Number(r.thp || 0),
+      target_pct: Number(r.target_pct || 0),
+      driver_active_pct: Number(r.driver_active_pct || 0),
+      status_target: r.status_target,
+      computed_at: r.computed_at,
+    };
+  });
+
+  if (branchId) {
+    out = out.filter(function(r) { return r.branch_id === branchId; });
+  }
+
+  return { success: true, month: month, branch_id: branchId, rows: out };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// DB Driver + Random Assignment (raos_070) — Fase 5
+// ═══════════════════════════════════════════════════════════════════════
+
+function _finDriversList_(params) {
+  _finRoleGate_(params);
+  var branchId = String(params.branch_id || '').trim();
+  var qs = 'select=id,driver_id,name,phone,vehicle_type,vehicle_plate,is_active,source,branch_id,created_at&order=name.asc';
+  if (branchId) qs += '&branch_id=eq.' + encodeURIComponent(branchId);
+  var rows = _crmSbFetch_('GET', '/rest/v1/raos_drivers?' + qs);
+  if (!Array.isArray(rows)) rows = [];
+
+  // Enrich: assignment + branch
+  var branches = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug');
+  var branchMap = {};
+  (branches || []).forEach(function(b) { branchMap[b.id] = b; });
+
+  var driverIds = rows.map(function(r) { return encodeURIComponent(r.id); });
+  var assignmentMap = {};
+  if (driverIds.length) {
+    // Chunk 100 IDs untuk hindari URL length limit
+    for (var i = 0; i < driverIds.length; i += 100) {
+      var chunk = driverIds.slice(i, i + 100).join(',');
+      var assignments = _crmSbFetch_('GET', '/rest/v1/raos_driver_staff_assignment?select=driver_id,staff_id,assigned_at&driver_id=in.(' + chunk + ')');
+      (assignments || []).forEach(function(a) { assignmentMap[a.driver_id] = a; });
+    }
+  }
+
+  var staffIds = {};
+  Object.keys(assignmentMap).forEach(function(k) { staffIds[assignmentMap[k].staff_id] = true; });
+  var staffMap = {};
+  var staffIdList = Object.keys(staffIds).map(function(x) { return encodeURIComponent(x); }).join(',');
+  if (staffIdList) {
+    var staffs = _crmSbFetch_('GET', '/rest/v1/user_profiles?select=id,full_name,staff_id&id=in.(' + staffIdList + ')');
+    (staffs || []).forEach(function(s) { staffMap[s.id] = s; });
+  }
+
+  var out = rows.map(function(r) {
+    var b = branchMap[r.branch_id] || {};
+    var a = assignmentMap[r.id] || null;
+    var s = a ? (staffMap[a.staff_id] || null) : null;
+    return {
+      id: r.id,
+      driver_id: r.driver_id,
+      name: r.name,
+      phone: r.phone,
+      vehicle_type: r.vehicle_type,
+      vehicle_plate: r.vehicle_plate,
+      is_active: r.is_active,
+      source: r.source,
+      branch_id: r.branch_id,
+      branch_name: b.name || '',
+      branch_slug: b.slug || '',
+      assigned_staff_id: a ? a.staff_id : null,
+      assigned_staff_name: s ? s.full_name : '',
+      assigned_staff_code: s ? s.staff_id : '',
+      assigned_at: a ? a.assigned_at : null,
+      created_at: r.created_at,
+    };
+  });
+
+  return { success: true, total: out.length, rows: out };
+}
+
+function _finDriverAssignmentList_(params) {
+  _finRoleGate_(params);
+  var branchId = String(params.branch_id || '').trim();
+  if (!branchId) return { success: false, message: 'branch_id wajib' };
+
+  var rows = _crmSbFetch_('GET', '/rest/v1/raos_driver_staff_assignment?select=id,driver_id,staff_id,assigned_at,assigned_by&branch_id=eq.' + encodeURIComponent(branchId));
+  if (!Array.isArray(rows)) rows = [];
+
+  // Group by staff_id
+  var byStaff = {};
+  rows.forEach(function(r) {
+    if (!byStaff[r.staff_id]) byStaff[r.staff_id] = { staff_id: r.staff_id, drivers: [] };
+    byStaff[r.staff_id].drivers.push({ driver_id: r.driver_id, assigned_at: r.assigned_at });
+  });
+
+  var staffIds = Object.keys(byStaff).map(function(x) { return encodeURIComponent(x); }).join(',');
+  if (staffIds) {
+    var staffs = _crmSbFetch_('GET', '/rest/v1/user_profiles?select=id,full_name,staff_id,role&id=in.(' + staffIds + ')');
+    (staffs || []).forEach(function(s) {
+      if (byStaff[s.id]) {
+        byStaff[s.id].staff_name = s.full_name;
+        byStaff[s.id].staff_code = s.staff_id;
+        byStaff[s.id].role = s.role;
+      }
+    });
+  }
+
+  var out = Object.values(byStaff);
+  out.sort(function(a, b) { return (b.drivers ? b.drivers.length : 0) - (a.drivers ? a.drivers.length : 0); });
+
+  return { success: true, branch_id: branchId, total_assignments: rows.length, staff_groups: out };
+}
+
+function _finDriverAssignRandom_(params) {
+  // Restrict management/direksi hanya
+  var email = String(params.user || '').toLowerCase().trim();
+  if (!email) return { success: false, message: 'Parameter user wajib' };
+  var verified = authVerifyUser(email);
+  if (!verified.success) return { success: false, message: 'Email tidak diizinkan' };
+  var role = String(verified.user && verified.user.role || '').toLowerCase();
+  if (role !== 'management' && role !== 'direksi' && role !== 'direktur') {
+    return { success: false, message: 'Hanya management/direksi yang boleh random-assign driver' };
+  }
+
+  var branchId = String(params.branch_id || '').trim();
+  if (!branchId) return { success: false, message: 'branch_id wajib' };
+  var force = String(params.force || 'false') === 'true';
+
+  var res = _crmSbFetch_('POST', '/rest/v1/rpc/raos_random_assign_drivers', { p_branch_id: branchId, p_force: force });
+  _crmAuditWrite_(params, 'random_assign', 'driver_staff_assignment', branchId, '', 'force=' + force + ' → ' + String(res));
+  return { success: true, branch_id: branchId, force: force, assigned: Number(res) || 0 };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// HRIS Payroll bridge — return bonus per staff untuk consumed HRIS UI
+// ═══════════════════════════════════════════════════════════════════════
+function _hrisPayrollBonusList_(params) {
+  _finRoleGate_(params);
+  var month = _finMonthNorm_(params.month);
+  var rows = _crmSbFetch_('GET', '/rest/v1/raos_payroll?select=staff_id,bonus_saldo,bonus_kpi,member_parkir,target_pct,status_target&effective_month=eq.' + encodeURIComponent(month));
+  if (!Array.isArray(rows)) rows = [];
+
+  var staffIds = rows.map(function(r) { return encodeURIComponent(r.staff_id); }).join(',');
+  var staffMap = {};
+  if (staffIds) {
+    var staffs = _crmSbFetch_('GET', '/rest/v1/user_profiles?select=id,staff_id,full_name&id=in.(' + staffIds + ')');
+    (staffs || []).forEach(function(s) { staffMap[s.id] = s; });
+  }
+
+  var out = rows.map(function(r) {
+    var s = staffMap[r.staff_id] || {};
+    return {
+      staff_id: r.staff_id,
+      staff_code: s.staff_id || '',
+      staff_name: s.full_name || '',
+      bonus_saldo: Number(r.bonus_saldo || 0),
+      bonus_kpi: Number(r.bonus_kpi || 0),
+      member_parkir: Number(r.member_parkir || 0),
+      total_bonus: Number(r.bonus_saldo || 0) + Number(r.bonus_kpi || 0) + Number(r.member_parkir || 0),
+      target_pct: Number(r.target_pct || 0),
+      status_target: r.status_target,
+    };
+  });
+
+  return { success: true, month: month, rows: out };
 }
