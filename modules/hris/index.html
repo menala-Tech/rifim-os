@@ -304,10 +304,13 @@ tr:last-child td{border-bottom:none}
             <button class="btn btn-secondary" onclick="exportEmployeesCSV()">⬇ CSV</button>
             <button class="btn btn-secondary" onclick="exportEmployeesXLSX()">⬇ XLSX</button>
             <button class="btn btn-secondary" onclick="exportEmployeesPDF()">📄 PDF</button>
-            <button class="btn btn-primary" onclick="openAddEmployeeModal()">+ Tambah Karyawan</button>
+            <button class="btn btn-primary" onclick="alertSsotOnly()" title="Tambah karyawan lewat sheet MASTER DATA STAFF (SSOT). Sinkron otomatis ke HRIS tiap 1 jam." style="opacity:.55;cursor:not-allowed">+ Tambah Karyawan</button>
           </div>
         </div>
         <div class="card-body">
+          <div style="padding:10px 14px;margin-bottom:12px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;font-size:13px;color:#78350f">
+            ℹ️ <strong>Mode SSOT sementara:</strong> Tambah / ubah karyawan lewat sheet <a href="https://docs.google.com/spreadsheets/d/1fcraq3QHqIaD-13Ebzt6stT9aA6j_loTXeAtpNX12kw/edit" target="_blank" style="color:#78350f;text-decoration:underline"><strong>MASTER DATA STAFF</strong></a>. Sinkron otomatis ke HRIS + PWA RAOS tiap 1 jam. Kolom <em>Perusahaan · Tipe Kontrak · Tanggal Masuk · Department</em> tetap diedit di HRIS via tombol Detail.
+          </div>
           <div class="toolbar">
             <input type="text" id="search-emp" placeholder="Cari nama / ID / jabatan…" oninput="filterEmployees()">
             <select id="filter-status" onchange="filterEmployees()">
@@ -1180,6 +1183,11 @@ function generateEmployeeId(companyCode) {
     if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
   });
   return prefix + String(maxNum + 1).padStart(4, '0');
+}
+
+function alertSsotOnly() {
+  showToast('Tambah karyawan lewat sheet MASTER DATA STAFF (SSOT). Sinkron otomatis tiap 1 jam.', 'warn');
+  window.open('https://docs.google.com/spreadsheets/d/1fcraq3QHqIaD-13Ebzt6stT9aA6j_loTXeAtpNX12kw/edit', '_blank');
 }
 
 function openAddEmployeeModal() {
