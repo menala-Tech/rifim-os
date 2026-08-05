@@ -2,7 +2,38 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-07-19 (Document Studio v3 — DDS presisi mm applied, kop+footer banner PNG per 3 perusahaan, signature composite via Slides API v1, DDS docs reorganized ke docs/09-UI-UX/document-design-system/, path refs semua di-relative-link)
+> Last updated: 2026-08-05 (HRIS Karyawan sinkron SSOT — sync satu arah sheet MASTER DATA STAFF → employees + tombol "🔄 Sync Sekarang" di /hris, interval cron 10 menit paralel dengan RAOS user_profiles sync)
+
+## Sesi 2026-08-05 — HRIS Karyawan ↔ SSOT MASTER DATA STAFF
+
+### Latar belakang
+User laporan HRIS `/hris` out-of-sync dengan sheet SSOT: semua gaji default `Rp 2.700.000`, beberapa cabang keliru (mis. Audra Agung di sheet = Jambi, di HRIS = Makassar). Root cause: sync sheet SSOT → `employees` (HRIS) belum pernah dibuat. Yang existing cuma sheet SSOT → `user_profiles` (RAOS).
+
+### Selesai (PR rifim-os#11 + raos-menala#52, semua merged + deployed)
+- ✅ Rifim-OS GAS `hrisMasterStaffSync.js` — sync satu arah, refresh `full_name/email/phone/branch/position/salary_base/pin`, preserve `company_code/employment_type/join_date/department` (admin-managed via HRIS Detail), staff hilang dari sheet → `status='NONAKTIF'`
+- ✅ Rifim-OS GAS `webApp.js` — endpoint on-demand `action=hris_sync_master_staff_now`
+- ✅ Rifim-OS GAS `raosMenuEngine.js` — 2 menu item baru di 👤 HRIS — Staff: Sync manual + Setup trigger 10 menit
+- ✅ RAOS GAS `09_trigger.gs` — `syncStaffFromSSOT` trigger dari `everyHours(6)` → `everyMinutes(10)` (paralel dengan HRIS sync)
+- ✅ HRIS UI `/hris` — banner kuning "Mode SSOT sementara" + tombol `+ Tambah Karyawan` di-dim + tombol `🔄 Sync Sekarang` yang fetch paralel 2 endpoint (Rifim-OS + RAOS Web API pakai Supabase session token)
+- ✅ Deploy: Vercel prod READY (commit `cff85f3`), GAS Rifim-OS redeploy versi baru + trigger 10 menit terpasang (user manual)
+
+### Opsi A (SSOT sementara) — keputusan user
+Sampai HRIS jadi SSOT 100% (nanti), semua tambah/ubah staff wajib lewat sheet MASTER DATA STAFF. Kolom HRIS-only tetap diedit via tombol Detail. Alur:
+
+| Skenario | Delay |
+|---|---|
+| Edit sheet SSOT + tunggu cron | ≤10 menit ke HRIS + PWA RAOS |
+| Edit sheet SSOT + klik "🔄 Sync Sekarang" | ≤10 detik ke keduanya |
+
+### Debt / Pending user
+- ⏳ Regen RAOS trigger via Apps Script Editor RAOS (`setupAllTriggers`) — user belum konfirmasi. Selama belum di-regen, trigger `syncStaffFromSSOT` masih di interval 6 jam lama. Kode branch main sudah update, tapi trigger existing di GAS project belum otomatis pakai config baru.
+- ⏳ Verifikasi hasil sync — user perlu buka `/hris` hard-refresh, klik "🔄 Sync Sekarang", pastikan Audra Agung tampil Jambi + Rp 1.700.000 (bukan Makassar + Rp 2.700.000).
+- 🔜 Nanti kalau HRIS jadi SSOT 100% — balik flow: hapus banner kuning, un-dim tombol Tambah Karyawan, bikin sync `employees` HRIS → sheet MASTER DATA STAFF (atau langsung ke `user_profiles`).
+
+### Deployment
+- Vercel: auto-deploy dari main (commit `cff85f3`) — production READY
+- GAS Rifim-OS: user redeploy manual versi baru + trigger 10 menit terpasang
+- GAS RAOS: kode branch main sudah update (`0d110df`), trigger interval baru butuh `setupAllTriggers` manual di GAS Editor RAOS
 
 ## Sesi 2026-07-19 — Document Studio v3 (Complete)
 
