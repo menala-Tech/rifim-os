@@ -126,6 +126,20 @@ function onOpen() {
     .addItem('PDF → Kirim WA Grup',       'pdfKirimKeWAGrup')
     .addItem('PDF → Kirim Email',         'pdfKirimViaEmail')
     .addToUi();
+
+  // ─────────────────────────────────────────────────────────────
+  // Menu 4: Document Engine (Workflow / Approval / Revision / Audit)
+  // File: setupDocEngineSheets.js + workflowEngine/approvalEngine/etc
+  // ─────────────────────────────────────────────────────────────
+  ui.createMenu('🏢 Document Engine')
+    .addItem('⚙️ Setup 3 Sheets (init)',           'initDocEngineSheets')
+    .addSeparator()
+    .addItem('📤 Sync Approval Rules → Supabase',  'syncDocApprovalRulesToSupabase')
+    .addItem('🔄 Refresh Audit Mirror',            'syncDocAuditFromSupabase')
+    .addItem('🔄 Refresh Pending Approvals',       'syncDocPendingApprovals')
+    .addSeparator()
+    .addItem('⏰ Install 30-min Triggers',         'installDocEngineTriggers')
+    .addToUi();
 }
 
 // ══════════════════════════════════════════════════════════════════
