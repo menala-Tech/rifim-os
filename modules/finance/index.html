@@ -129,6 +129,7 @@ select option:checked{background:var(--red);color:#fff}
 footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/shared/api-cache.js"></script>
 </head>
 <body>
 
@@ -634,6 +635,12 @@ function _finGetUserEmail() {
 }
 
 async function _gasCall(action, extra) {
+  // Sesi 2026-08-05: delegate ke RifimAPI shared (auto-inject user + retry HTML throttled).
+  // Backward-compat — semua call site _gasCall(action, extra) masih bekerja.
+  if (window.RifimAPI) {
+    return RifimAPI.get(action, Object.assign({ user: _finGetUserEmail() }, extra || {}));
+  }
+  // Fallback (shared belum ter-load — seharusnya tidak terjadi kalau /shared/api-cache.js include)
   const qs = new URLSearchParams(Object.assign({ action, user: _finGetUserEmail() }, extra || {}));
   const res = await fetch(GAS_URL + '?' + qs.toString());
   return res.json();
