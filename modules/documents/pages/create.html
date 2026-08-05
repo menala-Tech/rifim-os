@@ -1,0 +1,17 @@
+﻿<section class="page-head">
+  <div>
+    <h2>Buat Dokumen</h2>
+    <p>Isi metadata dasar dan payload JSON untuk membuat draft revisi pertama.</p>
+  </div>
+  <a class="btn ghost" href="#/list">← Kembali</a>
+</section>
+<form id="doc-create-form" class="form-card">
+  <label>Company Slug<input name="companySlug" required value="rifim" placeholder="rifim"></label>
+  <label>Doc Type<input name="docType" required placeholder="invoice"></label>
+  <label>Title<input name="title" required placeholder="Judul dokumen"></label>
+  <label class="full">Payload JSON<textarea name="payload" rows="10" spellcheck="false">{
+  "title": "Dokumen baru"
+}</textarea></label>
+  <div id="payload-status" class="hint">Payload harus JSON valid.</div>
+  <button class="btn primary" type="submit">Buat Draft</button>
+</form>

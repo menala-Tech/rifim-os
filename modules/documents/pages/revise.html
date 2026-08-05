@@ -1,0 +1,13 @@
+﻿<section class="page-head">
+  <div>
+    <h2>Revisi Dokumen</h2>
+    <p>Buat revisi baru dari payload dokumen existing.</p>
+  </div>
+  <a class="btn ghost" id="revise-back" href="#/list">← Kembali</a>
+</section>
+<form id="doc-revise-form" class="form-card">
+  <input name="documentId" type="hidden">
+  <label class="full">Payload JSON<textarea name="payload" rows="14" spellcheck="false">{}</textarea></label>
+  <div id="revise-payload-status" class="hint">Payload harus JSON valid.</div>
+  <button class="btn primary" type="submit">Simpan Revisi</button>
+</form>
