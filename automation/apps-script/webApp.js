@@ -36,6 +36,10 @@ function doPost(e) {
   }
 
   try {
+    if (_docIsAction_(input.action)) {
+      return docHandlePost(e);
+    }
+
     // ── HRIS actions ───────────────────────────────────────────────
     if (input.hrisAction) {
       return _json(_handleHrisPost(input));
@@ -249,17 +253,218 @@ function _json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
+function docHandleGet(e) {
+  try {
+    var params = (e && e.parameter) || {};
+    var ctx = _docAuthContext_(params.user);
+    var action = String(params.action || '');
+    var data;
+
+    if (action === 'doc_audit' || action === 'doc_verify_chain') {
+      _docRequireRole_(ctx, _docAdminRoles_());
+    }
+
+    switch (action) {
+      case 'doc_list':
+        data = searchDocuments({
+          query: params.query,
+          companySlug: params.companySlug,
+          docType: params.docType,
+          status: params.status,
+          from: params.from,
+          to: params.to,
+          limit: params.limit,
+          offset: params.offset,
+        });
+        break;
+      case 'doc_get':
+        data = _docGetWithCurrentRevision_(params.id || params.documentId);
+        break;
+      case 'doc_revisions':
+        data = listRevisions(params.documentId || params.id);
+        break;
+      case 'doc_revision_diff':
+        data = getRevisionDiff(params.revIdA || params.revisionIdA, params.revIdB || params.revisionIdB);
+        break;
+      case 'doc_audit':
+        data = queryEvents({ entityType: params.entityType, entityId: params.entityId, since: params.since, limit: params.limit });
+        break;
+      case 'doc_pending':
+        data = getPendingForApprover(ctx.userId);
+        break;
+      case 'doc_verify_chain':
+        data = verifyChain({ fromId: params.fromId, toId: params.toId });
+        break;
+      default:
+        throw new Error('doc GET action tidak dikenal: ' + action);
+    }
+
+    return _docJsonOk_(data);
+  } catch (err) {
+    return _docJsonError_(err);
+  }
+}
+
+function docHandlePost(e) {
+  var input;
+  try {
+    input = JSON.parse(e.postData.contents || '{}');
+  } catch (err) {
+    return _docJsonError_(new Error('Payload JSON tidak valid.'));
+  }
+
+  try {
+    var postParams = (e && e.parameter) || {};
+    var ctx = _docAuthContext_(postParams.user || input.user);
+    var action = String(input.action || '');
+    _docRequireRole_(ctx, _docWriteRoles_());
+
+    var data;
+    switch (action) {
+      case 'doc_create':
+        data = _docCreateDraft_(input, ctx);
+        break;
+      case 'doc_transition':
+        data = transitionDocument({ documentId: input.documentId, action: input.workflowAction || input.transitionAction || input.documentAction || (input.payload && input.payload.action), actor: ctx.userId, payload: input.payload || {} });
+        break;
+      case 'doc_decide':
+        data = decideApproval({ approvalId: input.approvalId, approverId: ctx.userId, decision: input.decision, comment: input.comment });
+        break;
+      case 'doc_revise':
+        data = createRevision({ documentId: input.documentId, payload: input.payload || {}, actor: ctx.userId });
+        _sbPatch('doc_documents', 'id=eq.' + encodeURIComponent(input.documentId), {
+          current_revision_id: data.revisionId,
+          status: 'draft',
+          updated_at: new Date().toISOString(),
+        });
+        break;
+      case 'doc_restore':
+        data = restoreRevision({ documentId: input.documentId, revisionId: input.revisionId, actor: ctx.userId });
+        break;
+      default:
+        throw new Error('doc POST action tidak dikenal: ' + action);
+    }
+
+    return _docJsonOk_(data);
+  } catch (err) {
+    return _docJsonError_(err);
+  }
+}
+
+function _docCreateDraft_(input, ctx) {
+  var documentId = input.documentId || Utilities.getUuid();
+  var now = new Date().toISOString();
+  var title = input.title || (input.payload && input.payload.title) || '';
+  var payload = input.payload || {};
+
+  _sbPost('doc_documents', {
+    id: documentId,
+    title: title,
+    doc_number: input.docNumber || input.doc_number || ('DOC-' + now.replace(/[-:.TZ]/g, '')),
+    company_slug: input.companySlug || input.company_slug || '',
+    doc_type: input.docType || input.doc_type || '',
+    status: 'draft',
+    created_by: ctx.userId,
+    created_at: now,
+    updated_at: now,
+  });
+
+  var revision = createRevision({ documentId: documentId, payload: payload, actor: ctx.userId, pdfDriveId: input.pdfDriveId });
+  _sbPatch('doc_documents', 'id=eq.' + encodeURIComponent(documentId), {
+    current_revision_id: revision.revisionId,
+    updated_at: new Date().toISOString(),
+  });
+
+  return { documentId: documentId, revisionId: revision.revisionId, revisionNumber: revision.revisionNumber };
+}
+
+function _docGetWithCurrentRevision_(documentId) {
+  if (!documentId) throw new Error('documentId diperlukan.');
+  var docs = _sbGet(_docRestUrl_('doc_documents', [
+    'id=eq.' + encodeURIComponent(documentId),
+    'select=id,title,doc_number,company_slug,doc_type,status,current_revision_id,created_at,updated_at',
+    'limit=1',
+  ]));
+  if (!docs.length) throw new Error('Dokumen tidak ditemukan.');
+
+  var doc = docs[0];
+  var revision = null;
+  if (doc.current_revision_id) {
+    var revisions = _sbGet(_docRestUrl_('doc_revisions', [
+      'id=eq.' + encodeURIComponent(doc.current_revision_id),
+      'select=id,revision_number,payload,created_by,created_at,pdf_url',
+      'limit=1',
+    ]));
+    revision = revisions.length ? revisions[0] : null;
+  }
+  return { document: doc, revision: revision };
+}
+
+function _docAuthContext_(userEmail) {
+  userEmail = String(userEmail || '').toLowerCase().trim();
+  if (!userEmail) throw new Error('unauthorized');
+
+  var rows = _sbGet(_docRestUrl_('user_profiles', [
+    'email=eq.' + encodeURIComponent(userEmail),
+    'select=id,email,role,is_active',
+    'limit=1',
+  ]));
+  if (!rows.length) {
+    rows = _sbGet(_docRestUrl_('users', [
+      'email=eq.' + encodeURIComponent(userEmail),
+      'select=id,email,role,is_active',
+      'limit=1',
+    ]));
+  }
+  if (!rows.length || rows[0].is_active === false) throw new Error('unauthorized');
+
+  return { userId: rows[0].id, email: rows[0].email || userEmail, role: String(rows[0].role || '').toLowerCase() };
+}
+
+function _docRequireRole_(ctx, roles) {
+  if (roles.indexOf(ctx.role) === -1) throw new Error('forbidden: role ' + ctx.role + ' tidak diizinkan');
+}
+
+function _docWriteRoles_() {
+  return ['koordinator', 'admin', 'management', 'direksi', 'direktur'];
+}
+
+function _docAdminRoles_() {
+  return ['admin', 'management', 'direksi', 'direktur'];
+}
+
+function _docIsAction_(action) {
+  return String(action || '').indexOf('doc_') === 0;
+}
+
+function _docJsonOk_(data) {
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, data: data })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function _docJsonError_(err) {
+  return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err && err.message ? err.message : String(err) })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function _docRestUrl_(table, params) {
+  var cfg = _getSupabaseConfig();
+  return cfg.url + '/rest/v1/' + table + (params && params.length ? '?' + params.join('&') : '');
+}
+
+
 /**
  * Handle GET — health check & info.
  */
 function doGet(e) {
+  var action = e && e.parameter && e.parameter.action;
+  if (_docIsAction_(action)) {
+    return docHandleGet(e);
+  }
+
   // CRM API dispatcher (sesi 2026-08-02) — return early kalau action
   // adalah CRM endpoint (company_config_*, whitelist_*, crm_audit_tail).
   // File: crmApi.js
   var crmResp = crmHandleGet(e);
   if (crmResp) return crmResp;
-
-  const action = e && e.parameter && e.parameter.action;
 
   if (action === 'staff_list') {
     try {
