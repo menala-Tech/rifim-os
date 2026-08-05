@@ -495,7 +495,7 @@
 ════════════════════════════════════════════ -->
 <div id="loginScreen" style="display:none">
   <div class="login-card">
-    <img src="/branding/logo/logo-rifim.png" class="login-logo-img" alt="RIFIM"
+    <img src="/branding/logo/logo-rifim-transparent.png" class="login-logo-img" alt="RIFIM"
       onerror="this.style.display='none';document.getElementById('loginLogoMark').style.display='flex'">
     <div class="login-logo-mark" id="loginLogoMark">
       <svg width="44" height="44" viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg">
@@ -533,7 +533,7 @@
     </button>
     <a class="nav-brand" href="#">
       <div class="logo-mark-nav">
-        <img src="/branding/logo/logo-rifim.png" alt="RIFIM"
+        <img src="/branding/logo/logo-rifim-transparent.png" alt="RIFIM"
           onerror="this.outerHTML='<svg width=\'34\' height=\'34\' viewBox=\'0 0 34 34\' xmlns=\'http://www.w3.org/2000/svg\'><rect width=\'34\' height=\'34\' rx=\'7\' fill=\'%23C40000\'/><text x=\'17\' y=\'25\' text-anchor=\'middle\' fill=\'white\' font-family=\'Arial Black,Arial\' font-weight=\'900\' font-size=\'18\'>R</text></svg>'">
       </div>
       <div>
@@ -543,6 +543,7 @@
     </a>
   </div>
   <div class="nav-right">
+    <button class="btn-logout" onclick="goPortal()">&larr; Portal</button>
     <span id="navUser" class="nav-user"></span>
     <button class="btn-logout" onclick="doLogout()">↩ Keluar</button>
   </div>
@@ -597,6 +598,9 @@
     </a>
 
     <div class="sb-label">Sistem</div>
+    <a class="sb-item" href="/portal">
+      <span class="sb-icon">&larr;</span><span class="sb-text">Portal</span>
+    </a>
     <a class="sb-item" id="sbItemSettings" href="#"
       onclick="switchTab('settings');closeSidebar();return false">
       <span class="sb-icon">⚙️</span><span class="sb-text">Pengaturan</span>
@@ -1057,13 +1061,33 @@
     try {
       const raw = localStorage.getItem('rifim_auth');
       if (raw) {
-        const a = JSON.parse(raw);
+        const a = normalizeAuth(JSON.parse(raw));
         if (a && a.email && (Date.now() - a.ts) < 7 * 86400000) {
           applyAuth(a); return;
         }
       }
     } catch(_) {}
-    showLoginScreen();
+    window.location.href = '/portal';
+  }
+
+  function normalizeAuth(auth) {
+    if (!auth) return null;
+    const fullName = auth.full_name || auth.name || auth.email || 'Admin';
+    return Object.assign({}, auth, {
+      full_name: fullName,
+      name: fullName,
+      role: auth.role || 'admin',
+      ts: auth.ts || Date.now(),
+    });
+  }
+
+  function getPortalAuth() {
+    try { return normalizeAuth(JSON.parse(localStorage.getItem('rifim_auth') || '{}')) || {}; }
+    catch (_) { return {}; }
+  }
+
+  function goPortal() {
+    window.location.href = '/portal';
   }
 
   function showLoginScreen() {
@@ -1109,7 +1133,7 @@
   }
 
   function storeAuth(user) {
-    const a = { ...user, ts: Date.now() };
+    const a = normalizeAuth({ ...user, ts: Date.now() });
     localStorage.setItem('rifim_auth', JSON.stringify(a));
     applyAuth(a);
   }
@@ -1121,20 +1145,21 @@
   }
 
   function applyAuth(auth) {
+    auth = normalizeAuth(auth);
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display         = 'block';
-    document.getElementById('navUser').textContent       = auth.name + ' · ' + auth.role;
+    document.getElementById('navUser').textContent       = auth.full_name + ' - ' + auth.role;
     initApp();
   }
 
   function doLogout() {
     if (!confirm('Keluar dari Smart Office?')) return;
     try {
-      const auth = JSON.parse(localStorage.getItem('rifim_auth') || '{}');
+      const auth = getPortalAuth();
       fetch(GAS_WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'log_activity', module: 'Smart Office',
           action_type: 'LOGOUT', target_id: '', target_name: '',
-          performed_by: { name: auth.name || '', email: auth.email || '' }, detail: '' })
+          performed_by: { name: auth.full_name || '', email: auth.email || '' }, detail: '' })
       }).catch(() => {});
     } catch(_) {}
     sessionStorage.removeItem('so_user');
@@ -1507,7 +1532,7 @@
       const el = document.getElementById(f.id);
       if (el) extra[f.id] = el.value;
     });
-    const _soAuth = JSON.parse(localStorage.getItem('rifim_auth') || '{}');
+    const _soAuth = getPortalAuth();
     return {
       documentType:  currentCode,
       company_code:  _activeCompany ? _activeCompany.code : 'RIFIM',
@@ -1517,7 +1542,7 @@
       directorName:  document.getElementById('signerName').value.trim(),
       directorTitle: document.getElementById('signerTitle').value.trim(),
       extra,
-      performed_by:  { name: _soAuth.name || '', email: _soAuth.email || '' },
+      performed_by:  { name: _soAuth.full_name || '', email: _soAuth.email || '' },
     };
   }
 
@@ -1839,11 +1864,11 @@
     const sessEl = document.getElementById('sessionInfo');
     if (sessEl) {
       try {
-        const auth      = JSON.parse(localStorage.getItem('rifim_auth') || '{}');
+        const auth      = getPortalAuth();
         const loginDate = auth.ts ? new Date(auth.ts).toLocaleString('id-ID') : '—';
         const expDate   = auth.ts ? new Date(auth.ts + 7*86400000).toLocaleDateString('id-ID') : '—';
         sessEl.innerHTML = `
-          <div><b>Pengguna:</b> ${auth.name  || '—'}</div>
+          <div><b>Pengguna:</b> ${auth.full_name  || '—'}</div>
           <div><b>Jabatan:</b>  ${auth.role  || '—'}</div>
           <div><b>Email:</b>    ${auth.email || '—'}</div>
           <div><b>Login:</b>    ${loginDate}</div>
@@ -1976,12 +2001,12 @@
   }
 
   async function updateDocStatus(id, newStatus) {
-    const _soAuth = JSON.parse(localStorage.getItem('rifim_auth') || '{}');
+    const _soAuth = getPortalAuth();
     try {
       const res  = await fetch(GAS_WEB_APP_URL, {
         method: 'POST', headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'update_status', id, status: newStatus,
-          performed_by: { name: _soAuth.name || '', email: _soAuth.email || '' } }),
+          performed_by: { name: _soAuth.full_name || '', email: _soAuth.email || '' } }),
       });
       const data = await res.json();
       if (data.success) {

@@ -23,7 +23,7 @@ a{color:var(--accent2);text-decoration:none}
 /* ─── AUTH GATE ─── */
 #auth-gate{
   position:fixed;inset:0;background:var(--primary);
-  display:flex;align-items:center;justify-content:center;z-index:9999;
+  display:none;align-items:center;justify-content:center;z-index:9999;
 }
 .auth-box{
   background:#fff;border-radius:16px;padding:40px;width:360px;
@@ -261,7 +261,7 @@ tr:last-child td{border-bottom:none}
 <div id="app">
   <header>
     <div class="header-left">
-      <img src="/branding/logo/rifim-logo.png" alt="RIFIM" style="height:30px;object-fit:contain;filter:brightness(0) invert(1)" onerror="this.style.display='none'">
+      <img src="/branding/logo/logo-rifim-transparent.png" alt="RIFIM" style="height:30px;object-fit:contain" onerror="this.style.display='none'">
       <span class="header-logo">RIFIM OS</span>
       <span class="header-module">HRIS</span>
     </div>
@@ -1077,6 +1077,25 @@ function showAuthError(msg) {
   el.style.display = 'block';
 }
 
+function normalizeHrisUser(user) {
+  if (!user) return null;
+  return Object.assign({}, user, {
+    full_name: user.full_name || user.name || user.email || 'User',
+    role: String(user.role || '').toUpperCase(),
+  });
+}
+
+function enterHris(user) {
+  currentUser = normalizeHrisUser(user);
+  if (!currentUser || !currentUser.email) return false;
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display       = 'flex';
+  document.getElementById('user-badge').textContent  = currentUser.full_name + ' (' + currentUser.role + ')';
+  sessionStorage.setItem('hris_user', JSON.stringify(currentUser));
+  initApp();
+  return true;
+}
+
 function doLogout() {
   try {
     const u = currentUser || {};
@@ -1092,19 +1111,25 @@ document.getElementById('auth-email').addEventListener('keydown', e => {
   if (e.key === 'Enter') doLogin();
 });
 
-// Auto-login: cek session HRIS di tab ini saja (bukan SSO portal)
+// Auto-login: HRIS ikut session Portal. Kalau belum login Portal, balik ke /portal.
 (function checkSession() {
-  const saved = sessionStorage.getItem('hris_user');
-  if (saved) {
-    try {
-      currentUser = JSON.parse(saved);
-      document.getElementById('auth-gate').style.display = 'none';
-      document.getElementById('app').style.display       = 'flex';
-      document.getElementById('user-badge').textContent  = currentUser.full_name + ' (' + currentUser.role + ')';
-      initApp();
-    } catch(e) { sessionStorage.removeItem('hris_user'); }
+  const saved = sessionStorage.getItem('hris_user') || localStorage.getItem('rifim_auth');
+  if (!saved) {
+    window.location.href = '/portal';
+    return;
   }
-  // Masuk ke HRIS selalu perlu login email tersendiri
+
+  try {
+    if (!enterHris(JSON.parse(saved))) {
+      sessionStorage.removeItem('hris_user');
+      window.location.href = '/portal';
+    }
+  } catch(e) {
+    sessionStorage.removeItem('hris_user');
+    localStorage.removeItem('rifim_auth');
+    window.location.href = '/portal';
+  }
+
 })();
 
 // ════════════════════════════════════════════════════════════
@@ -1196,25 +1221,49 @@ function alertSsotOnly() {
 // Force sync SSOT → HRIS + RAOS user_profiles secara paralel.
 // Pakai session token Supabase untuk auth ke RAOS Web API.
 const RAOS_GAS_URL = 'https://script.google.com/macros/s/AKfycbxrgQ_MWvsdA_bsbNF4deIALWATDCspYvY47fakpuXMZeAtGAd4baeVVe1dPGDAi1tZJA/exec';
+
+function _findAccessTokenInObject(value, depth) {
+  if (!value || depth > 4) return '';
+  if (typeof value === 'string') return '';
+  if (value.access_token) return String(value.access_token);
+  for (const key of Object.keys(value)) {
+    const found = _findAccessTokenInObject(value[key], depth + 1);
+    if (found) return found;
+  }
+  return '';
+}
+
+function getRaosSyncToken() {
+  const storageKeys = [
+    'rifim_portal_sb',
+    ...Object.keys(localStorage).filter(k => k.startsWith('sb-') && k.endsWith('-auth-token')),
+    ...Object.keys(localStorage).filter(k => k.includes('supabase') || k.includes('_sb')),
+  ];
+  const seen = new Set();
+  for (const key of storageKeys) {
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const token = _findAccessTokenInObject(JSON.parse(raw), 0);
+      if (token) return token;
+    } catch (e) {
+      console.warn('[HRIS] skip token key:', key, e);
+    }
+  }
+  return '';
+}
+
 async function syncSsotNow() {
   const btn = document.getElementById('btn-sync-ssot-now');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Sinkron...'; }
 
-  // Ambil Supabase access_token dari localStorage (dipakai auth ke RAOS Web API)
-  let raosToken = '';
-  try {
-    const keys = Object.keys(localStorage).filter(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-    for (const k of keys) {
-      const raw = localStorage.getItem(k);
-      if (!raw) continue;
-      const obj = JSON.parse(raw);
-      if (obj && obj.access_token) { raosToken = obj.access_token; break; }
-    }
-  } catch (e) { console.warn('[HRIS] token lookup gagal:', e); }
+  const raosToken = getRaosSyncToken();
 
   const tasks = [
     // 1. Sync SSOT → employees (HRIS) — via Rifim-OS GAS Web App
-    gasPost({ action: 'hris_sync_master_staff_now' })
+    gasGet({ action: 'hris_sync_master_staff_now' })
       .then(r => ({ target: 'HRIS employees', ok: !!r.success, detail: r.result || r.message }))
       .catch(e => ({ target: 'HRIS employees', ok: false, detail: e.message })),
 

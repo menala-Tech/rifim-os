@@ -30,6 +30,8 @@ body{font-family:var(--font);background:var(--dark);color:#fff;min-height:100vh;
 
 header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;
   border-bottom:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.3);backdrop-filter:blur(8px);position:sticky;top:0;z-index:50}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-logo{height:34px;width:auto;object-fit:contain}
 .brand-name{font-size:16px;font-weight:800;letter-spacing:1px}
 .brand-sub{font-size:10px;opacity:.5;letter-spacing:.5px;text-transform:uppercase}
 .header-right{display:flex;align-items:center;gap:12px}
@@ -122,6 +124,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
 
 <div id="gate">
   <div class="gate-card">
+    <img src="/branding/logo/logo-rifim-transparent.png" alt="RIFIM OS" style="height:64px;object-fit:contain;margin-bottom:10px">
     <h1>🔒 Akses Terbatas</h1>
     <p>Anda harus login di Portal Rifim OS dulu untuk mengakses modul CRM.</p>
     <a href="/portal">Buka Portal</a>
@@ -130,9 +133,12 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
 
 <div id="app">
   <header>
-    <div>
+    <div class="brand">
+      <img class="brand-logo" src="/branding/logo/logo-rifim-transparent.png" alt="RIFIM OS" onerror="this.style.display='none'">
+      <div>
       <div class="brand-name">RIFIM OS · CRM &amp; Config Center</div>
       <div class="brand-sub">Manajemen Terpadu Konfigurasi &amp; Data Master</div>
+      </div>
     </div>
     <div class="header-right">
       <div class="user-info">
