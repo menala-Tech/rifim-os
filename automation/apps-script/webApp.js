@@ -334,6 +334,14 @@ function doGet(e) {
     }
   }
 
+  // ─── HRIS SYNC — SSOT MASTER DATA STAFF → employees (on-demand) ───
+  if (action === 'hris_sync_master_staff_now') {
+    try {
+      var r = syncEmployeesFromMasterStaff();
+      return _json({ success: true, result: r });
+    } catch (err) { return _json({ success: false, message: err.message }); }
+  }
+
   // ─── HRIS GET Actions ─────────────────────────────────────────────
   if (action === 'hris_employees') {
     try {

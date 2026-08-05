@@ -201,17 +201,17 @@ function syncEmployeesFromMasterStaff_MENU() {
 }
 
 /**
- * Trigger auto-sync tiap 1 jam.
+ * Trigger auto-sync tiap 10 menit.
  * Hapus trigger lama dulu (idempotent).
  */
 function setupEmployeesFromMasterStaffTrigger() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
     if (t.getHandlerFunction() === 'syncEmployeesFromMasterStaff') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('syncEmployeesFromMasterStaff').timeBased().everyHours(1).create();
-  Logger.log('✅ Trigger syncEmployeesFromMasterStaff tiap 1 jam terpasang.');
+  ScriptApp.newTrigger('syncEmployeesFromMasterStaff').timeBased().everyMinutes(10).create();
+  Logger.log('✅ Trigger syncEmployeesFromMasterStaff tiap 10 menit terpasang.');
   try {
-    SpreadsheetApp.getUi().alert('✅ Auto-sync HRIS Karyawan dari SSOT MASTER DATA STAFF aktif (tiap 1 jam).');
+    SpreadsheetApp.getUi().alert('✅ Auto-sync HRIS Karyawan dari SSOT MASTER DATA STAFF aktif (tiap 10 menit).');
   } catch (e) {}
 }
 
