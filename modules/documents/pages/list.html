@@ -1,0 +1,27 @@
+﻿<section class="page-head">
+  <div>
+    <h2>My Docs</h2>
+    <p>Daftar dokumen dengan filter company, tipe, status, tanggal, dan pencarian.</p>
+  </div>
+  <a class="btn primary" href="#/create">+ Buat</a>
+</section>
+<form id="doc-list-filter" class="filter-grid">
+  <input name="query" type="search" placeholder="Cari title atau doc number">
+  <input name="companySlug" placeholder="company: rifim">
+  <input name="docType" placeholder="type: invoice">
+  <select name="status">
+    <option value="">Semua status</option>
+    <option value="draft">Draft</option>
+    <option value="pending_approval">Pending Approval</option>
+    <option value="approved">Approved</option>
+    <option value="rejected">Rejected</option>
+    <option value="signed">Signed</option>
+  </select>
+  <input name="from" type="date" aria-label="Dari tanggal">
+  <input name="to" type="date" aria-label="Sampai tanggal">
+  <button class="btn" type="submit">Cari</button>
+</form>
+<div id="doc-list-result" class="table-shell skeleton-wrap">
+  <div class="skeleton line wide"></div>
+  <div class="skeleton block"></div>
+</div>

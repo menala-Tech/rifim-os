@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1A1A1A">
+  <title>RIFIM OS — Document Engine</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/modules/documents/styles/docs.css">
+  <script src="/shared/api-cache.js"></script>
+  <script src="/automation/apps-script/crmApi.js"></script>
+</head>
+<body>
+  <div id="gate" class="gate">
+    <div class="gate-card">
+      <h1>🔒 Akses Terbatas</h1>
+      <p>Anda harus login di Portal Rifim OS dulu untuk mengakses Document Engine.</p>
+      <a href="/modules/portal/">Buka Portal</a>
+    </div>
+  </div>
+
+  <div id="app" class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="brand-name">RIFIM OS · Document Engine</div>
+        <div class="brand-sub">Workflow dokumen, revisi, approval, dan audit trail</div>
+      </div>
+      <div class="topbar-right">
+        <div class="user-chip" id="doc-user-email">—</div>
+        <a class="btn-back" href="/modules/portal/">← Portal</a>
+      </div>
+    </header>
+
+    <main class="doc-main">
+      <section class="hero-card">
+        <div>
+          <h1>Document Engine</h1>
+          <p>Kelola draft, revisi, approval, pencarian, dan audit chain dari satu modul PWA.</p>
+        </div>
+        <a class="btn primary" href="#/create">+ Buat Dokumen</a>
+      </section>
+
+      <nav class="doc-tabs" aria-label="Document navigation">
+        <a href="#/list" data-route="list">My Docs</a>
+        <a href="#/inbox" data-route="inbox">Inbox Approval</a>
+        <a href="#/create" data-route="create">Create</a>
+        <a href="#/search" data-route="search">Search</a>
+      </nav>
+
+      <section id="doc-page" class="page-card skeleton-wrap">
+        <div class="skeleton line wide"></div>
+        <div class="skeleton line"></div>
+        <div class="skeleton block"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="doc-toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="doc-modal" class="modal-backdrop" hidden></div>
+
+  <script src="/modules/documents/engines/docs-renderer.js"></script>
+  <script src="/modules/documents/engines/docs-router.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async function () {
+      var email = localStorage.getItem('rifim_user_email') || '';
+      if (!email) {
+        try {
+          email = (JSON.parse(localStorage.getItem('rifim_auth') || '{}').email || '').toString();
+          if (email) localStorage.setItem('rifim_user_email', email);
+        } catch (err) {}
+      }
+      if (!email) {
+        document.getElementById('gate').style.display = 'flex';
+        document.getElementById('app').style.display = 'none';
+        window.location.replace('/modules/portal/');
+        return;
+      }
+
+      window.CRM_API = window.CRM_API || {};
+      window.CRM_API.userEmail = email;
+      window._crmGetUserEmail = window._crmGetUserEmail || function () { return localStorage.getItem('rifim_user_email') || email; };
+      window.CrmApi = window.CrmApi || {};
+      window.CrmApi.init = window.CrmApi.init || function () { return Promise.resolve(); };
+
+      document.getElementById('gate').style.display = 'none';
+      document.getElementById('app').style.display = 'flex';
+      document.getElementById('doc-user-email').textContent = email;
+
+      try {
+        await window.CrmApi.init();
+        window.DocsRouter.init({ root: document.getElementById('doc-page') });
+      } catch (err) {
+        window.DocsRenderer.toast(err.message || 'Gagal memuat Document Engine', 'err');
+      }
+    });
+  </script>
+</body>
+</html>
