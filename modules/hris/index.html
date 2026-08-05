@@ -304,10 +304,16 @@ tr:last-child td{border-bottom:none}
             <button class="btn btn-secondary" onclick="exportEmployeesCSV()">⬇ CSV</button>
             <button class="btn btn-secondary" onclick="exportEmployeesXLSX()">⬇ XLSX</button>
             <button class="btn btn-secondary" onclick="exportEmployeesPDF()">📄 PDF</button>
-            <button class="btn btn-primary" onclick="openAddEmployeeModal()">+ Tambah Karyawan</button>
+            <button class="btn btn-primary" onclick="alertSsotOnly()" title="Tambah karyawan lewat sheet MASTER DATA STAFF (SSOT). Sinkron otomatis ke HRIS tiap 1 jam." style="opacity:.55;cursor:not-allowed">+ Tambah Karyawan</button>
           </div>
         </div>
         <div class="card-body">
+          <div style="padding:10px 14px;margin-bottom:12px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;font-size:13px;color:#78350f;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div style="flex:1;min-width:280px">
+              ℹ️ <strong>Mode SSOT sementara:</strong> Tambah / ubah karyawan lewat sheet <a href="https://docs.google.com/spreadsheets/d/1fcraq3QHqIaD-13Ebzt6stT9aA6j_loTXeAtpNX12kw/edit" target="_blank" style="color:#78350f;text-decoration:underline"><strong>MASTER DATA STAFF</strong></a>. Sinkron otomatis ke HRIS + PWA RAOS tiap 10 menit. Kolom <em>Perusahaan · Tipe Kontrak · Tanggal Masuk · Department</em> tetap diedit di HRIS via tombol Detail.
+            </div>
+            <button class="btn btn-primary" id="btn-sync-ssot-now" onclick="syncSsotNow()" style="background:#f59e0b;border-color:#f59e0b;color:#fff;font-size:12px;padding:6px 12px;white-space:nowrap">🔄 Sync Sekarang</button>
+          </div>
           <div class="toolbar">
             <input type="text" id="search-emp" placeholder="Cari nama / ID / jabatan…" oninput="filterEmployees()">
             <select id="filter-status" onchange="filterEmployees()">
@@ -1180,6 +1186,58 @@ function generateEmployeeId(companyCode) {
     if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
   });
   return prefix + String(maxNum + 1).padStart(4, '0');
+}
+
+function alertSsotOnly() {
+  showToast('Tambah karyawan lewat sheet MASTER DATA STAFF (SSOT). Sinkron otomatis tiap 10 menit.', 'warn');
+  window.open('https://docs.google.com/spreadsheets/d/1fcraq3QHqIaD-13Ebzt6stT9aA6j_loTXeAtpNX12kw/edit', '_blank');
+}
+
+// Force sync SSOT → HRIS + RAOS user_profiles secara paralel.
+// Pakai session token Supabase untuk auth ke RAOS Web API.
+const RAOS_GAS_URL = 'https://script.google.com/macros/s/AKfycbxrgQ_MWvsdA_bsbNF4deIALWATDCspYvY47fakpuXMZeAtGAd4baeVVe1dPGDAi1tZJA/exec';
+async function syncSsotNow() {
+  const btn = document.getElementById('btn-sync-ssot-now');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Sinkron...'; }
+
+  // Ambil Supabase access_token dari localStorage (dipakai auth ke RAOS Web API)
+  let raosToken = '';
+  try {
+    const keys = Object.keys(localStorage).filter(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+    for (const k of keys) {
+      const raw = localStorage.getItem(k);
+      if (!raw) continue;
+      const obj = JSON.parse(raw);
+      if (obj && obj.access_token) { raosToken = obj.access_token; break; }
+    }
+  } catch (e) { console.warn('[HRIS] token lookup gagal:', e); }
+
+  const tasks = [
+    // 1. Sync SSOT → employees (HRIS) — via Rifim-OS GAS Web App
+    gasPost({ action: 'hris_sync_master_staff_now' })
+      .then(r => ({ target: 'HRIS employees', ok: !!r.success, detail: r.result || r.message }))
+      .catch(e => ({ target: 'HRIS employees', ok: false, detail: e.message })),
+
+    // 2. Sync SSOT → user_profiles (RAOS) — via RAOS Web API
+    raosToken
+      ? fetch(RAOS_GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'sync_staff', token: raosToken }),
+        }).then(r => r.json())
+          .then(j => ({ target: 'PWA RAOS user_profiles', ok: !!j.ok, detail: j.result || j.error || j }))
+          .catch(e => ({ target: 'PWA RAOS user_profiles', ok: false, detail: e.message }))
+      : Promise.resolve({ target: 'PWA RAOS user_profiles', ok: false, detail: 'session token tidak ditemukan — login ulang' }),
+  ];
+
+  const results = await Promise.all(tasks);
+  const summary = results.map(r => `${r.ok ? '✅' : '❌'} ${r.target}`).join('  ·  ');
+  showToast('Sync selesai — ' + summary, results.every(r => r.ok) ? 'success' : 'warn');
+  console.log('[HRIS] syncSsotNow results:', results);
+
+  if (btn) { btn.disabled = false; btn.textContent = '🔄 Sync Sekarang'; }
+  // Refresh tabel Karyawan
+  loadEmployees({ forceRefresh: true });
 }
 
 function openAddEmployeeModal() {
