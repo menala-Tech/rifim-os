@@ -1576,3 +1576,217 @@ function _hrisPayrollBonusList_(params) {
 
   return { success: true, month: month, rows: out };
 }
+
+
+// Document Engine browser client helpers
+// Safe no-op in Google Apps Script runtime; active only when loaded by the PWA.
+(function(root) {
+  if (!root || !root.window) return;
+
+  var windowObj = root.window;
+  var CrmApi = windowObj.CrmApi = windowObj.CrmApi || {};
+  var internalCache = {};
+  var CACHE_TTL_MS = 60 * 1000;
+
+  function _docsGasUrl() {
+    var cfg = windowObj.CRM_API || {};
+    var url = cfg.gasUrl || windowObj.CRM_GAS_URL || windowObj.GAS_WEB_APP_URL || windowObj.GAS_URL;
+    if (!url) throw new Error('CRM_GAS_URL belum dikonfigurasi');
+    return String(url);
+  }
+
+  function _docsUserEmail() {
+    if (typeof windowObj._crmGetUserEmail === 'function') return windowObj._crmGetUserEmail();
+    var cfg = windowObj.CRM_API || {};
+    if (cfg.userEmail) return cfg.userEmail;
+    if (windowObj.currentUser && windowObj.currentUser.email) return windowObj.currentUser.email;
+    if (!windowObj.localStorage) return '';
+
+    var direct = windowObj.localStorage.getItem('rifim_user_email') || windowObj.localStorage.getItem('crm_user_email');
+    if (direct) return direct;
+
+    var keys = ['rifim_user', 'crm_user', 'currentUser', 'user'];
+    for (var index = 0; index < keys.length; index++) {
+      try {
+        var raw = windowObj.localStorage.getItem(keys[index]);
+        if (!raw) continue;
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.email) return parsed.email;
+      } catch (err) {}
+    }
+    return '';
+  }
+
+  function _docsCleanParams(params) {
+    var out = {};
+    Object.keys(params || {}).forEach(function(key) {
+      var value = params[key];
+      if (value === undefined || value === null || value === '') return;
+      out[key] = value;
+    });
+    return out;
+  }
+
+  function _docsQuery(params) {
+    var query = new URLSearchParams();
+    Object.keys(_docsCleanParams(params)).forEach(function(key) {
+      query.set(key, params[key]);
+    });
+    return query.toString();
+  }
+
+  function _docsCacheKey(action, params) {
+    return 'docs:' + action + ':' + _docsQuery(params);
+  }
+
+  function _docsCacheGet(key) {
+    if (windowObj.apiCache && typeof windowObj.apiCache.get === 'function') return windowObj.apiCache.get(key);
+    var hit = internalCache[key];
+    if (!hit || hit.expiresAt <= Date.now()) {
+      delete internalCache[key];
+      return undefined;
+    }
+    return hit.value;
+  }
+
+  function _docsCacheSet(key, value) {
+    if (windowObj.apiCache && typeof windowObj.apiCache.set === 'function') {
+      windowObj.apiCache.set(key, value, CACHE_TTL_MS);
+      return value;
+    }
+    internalCache[key] = { value: value, expiresAt: Date.now() + CACHE_TTL_MS };
+    return value;
+  }
+
+  function _docsInvalidateCache() {
+    if (windowObj.apiCache && typeof windowObj.apiCache.invalidatePrefix === 'function') {
+      windowObj.apiCache.invalidatePrefix('docs:');
+      return;
+    }
+    Object.keys(internalCache).forEach(function(key) {
+      if (key.indexOf('docs:') === 0) delete internalCache[key];
+    });
+  }
+
+  function _docsUpdated(action, data) {
+    if (typeof windowObj.CustomEvent === 'function') {
+      windowObj.dispatchEvent(new windowObj.CustomEvent('docs-updated', { detail: { action: action, data: data } }));
+      return;
+    }
+    if (windowObj.document && typeof windowObj.document.createEvent === 'function') {
+      var event = windowObj.document.createEvent('CustomEvent');
+      event.initCustomEvent('docs-updated', false, false, { action: action, data: data });
+      windowObj.dispatchEvent(event);
+    }
+  }
+
+  function _docsNormalizeCreate(result) {
+    if (result && result.documentId && !result.id) result.id = result.documentId;
+    return result;
+  }
+
+  function _docsHandleResponse(response) {
+    return response.text().then(function(text) {
+      var payload;
+      try {
+        payload = text ? JSON.parse(text) : {};
+      } catch (err) {
+        throw new Error('Response GAS bukan JSON valid');
+      }
+      if (!response.ok) throw new Error(payload.error || payload.message || ('HTTP ' + response.status));
+      if (payload.ok === false || payload.success === false) throw new Error(payload.error || payload.message || 'Request gagal');
+      return payload.ok === true && Object.prototype.hasOwnProperty.call(payload, 'data') ? payload.data : payload;
+    });
+  }
+
+  function _docsFetchGet(action, params) {
+    var requestParams = _docsCleanParams(params || {});
+    requestParams.action = action;
+    requestParams.user = _docsUserEmail();
+    if (!requestParams.user) return Promise.reject(new Error('unauthorized'));
+
+    var separator = _docsGasUrl().indexOf('?') === -1 ? '?' : '&';
+    return windowObj.fetch(_docsGasUrl() + separator + _docsQuery(requestParams), {
+      method: 'GET',
+      credentials: 'include'
+    }).then(_docsHandleResponse);
+  }
+
+  function _docsFetchPost(action, payload) {
+    var body = _docsCleanParams(payload || {});
+    body.action = action;
+    body.user = _docsUserEmail();
+    if (!body.user) return Promise.reject(new Error('unauthorized'));
+
+    return windowObj.fetch(_docsGasUrl(), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(body)
+    }).then(_docsHandleResponse);
+  }
+
+  function _docsCachedGet(action, params) {
+    var requestParams = _docsCleanParams(params || {});
+    requestParams.user = _docsUserEmail();
+    var key = _docsCacheKey(action, requestParams);
+    var cached = _docsCacheGet(key);
+    if (cached !== undefined) return Promise.resolve(cached);
+    return _docsFetchGet(action, params).then(function(data) {
+      return _docsCacheSet(key, data);
+    });
+  }
+
+  function _docsMutate(action, payload, normalize) {
+    return _docsFetchPost(action, payload).then(function(data) {
+      var result = normalize ? normalize(data) : data;
+      _docsInvalidateCache();
+      _docsUpdated(action, result);
+      return result;
+    });
+  }
+
+  CrmApi.docs = {
+    list: function(params) {
+      return _docsCachedGet('doc_list', params || {});
+    },
+    get: function(id) {
+      return _docsFetchGet('doc_get', { id: id });
+    },
+    revisions: function(documentId) {
+      return _docsFetchGet('doc_revisions', { documentId: documentId });
+    },
+    revisionDiff: function(revIdA, revIdB) {
+      return _docsFetchGet('doc_revision_diff', { revIdA: revIdA, revIdB: revIdB });
+    },
+    audit: function(params) {
+      return _docsFetchGet('doc_audit', params || {});
+    },
+    pending: function() {
+      return _docsCachedGet('doc_pending', {});
+    },
+    verifyChain: function(params) {
+      return _docsFetchGet('doc_verify_chain', params || {});
+    },
+    create: function(params) {
+      return _docsMutate('doc_create', params || {}, _docsNormalizeCreate);
+    },
+    transition: function(params) {
+      var body = Object.assign({}, params || {});
+      if (body.action) {
+        body.workflowAction = body.action;
+        delete body.action;
+      }
+      return _docsMutate('doc_transition', body);
+    },
+    decide: function(params) {
+      return _docsMutate('doc_decide', params || {});
+    },
+    revise: function(params) {
+      return _docsMutate('doc_revise', params || {});
+    },
+    restore: function(params) {
+      return _docsMutate('doc_restore', params || {});
+    }
+  };
+})(typeof globalThis !== 'undefined' ? globalThis : this);
