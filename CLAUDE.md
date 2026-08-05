@@ -255,27 +255,12 @@ Setiap keputusan harus mendukung misi ini.
 
 ---
 
-## Sesi Terakhir — 2026-08-05 sore (Skill Extraction)
+## Sesi Terakhir — 2026-08-05 malam (Document Engine)
 
-Refactor CLAUDE.md dari 702 baris → ~200 baris core. Detail teknis (700+ baris konten) pindah ke 8 skill files di `.claude/skills/` untuk hemat token per sesi baru (target ~60-75% penghematan).
+Landed Document Engine lengkap: workflow + approval + revision + audit + search sub-engine + webApp dispatch + CrmApi.docs client + testDocEngineE2E suite + PWA modules/documents scaffold. Detail teknis ada di skill baru `.claude/skills/rifim-os-document-engine-workflow/SKILL.md` — invoke sesuai konteks.
 
-### File yang dibuat
+Supabase 5 migration: docengine_001 (5 tabel + RLS), 002 (RPC hash chain), 003 (normalize hash algo), 004 (rename param), 005 (user_profiles.email sync).
 
-- `.claude/skills/rifim-os-supabase-rules/SKILL.md` — vault, RLS, RPC, edge, publication
-- `.claude/skills/rifim-os-gas-rules/SKILL.md` — _gas* util, redeploy, project registry, PWA endpoint map
-- `.claude/skills/rifim-os-design-tokens/SKILL.md` — color, font, queue, cabang, work mode
-- `.claude/skills/rifim-os-integration-rules/SKILL.md` — Rule 40-47 SSoT contract
-- `.claude/skills/rifim-os-logo-branding/SKILL.md` — logo per perusahaan, stempel
-- `.claude/skills/rifim-os-document-engine/SKILL.md` — DDS refs, engine registry
-- `.claude/skills/rifim-os-external-resources/SKILL.md` — Drive, Sheet, GAS URL, working dir
-- `.claude/skills/rifim-os-vercel-pwa-map/SKILL.md` — Vercel PWA + trigger nonaktif + WA duplikat
+10 PR merged: #13 workflow, #14 scaffold, #15 audit, #16 revision, #18 approval, #21 search, #22 test E2E, #23 webApp dispatch, #24 CrmApi.docs, #25 PWA scaffold. Follow-up: PR #26 (path-fix api-cache) sudah cherry-pick ke main sebagai ad1c839.
 
-### Cross-repo companion
-
-Sama struktur di `raos-menala/.claude/skills/` — 12 skill (mirror shared + RAOS-specific).
-
-### Session terakhir sebelum ini — 2026-08-04 sore
-
-Finance KPI Targets V2 + HRIS Payroll Bonus + AIST Bookmarklet v2. Cross-repo delivery landed di commit main `7d77252`.
-
-Detail sesi lama sekarang ada di skill files terkait — invoke sesuai konteks.
+Sesi sebelumnya (Skill Extraction 2026-08-05 sore) tetap di skill files — invoke on-demand.
