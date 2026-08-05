@@ -2,7 +2,40 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-08-05 (HRIS Karyawan sinkron SSOT — sync satu arah sheet MASTER DATA STAFF → employees + tombol "🔄 Sync Sekarang" di /hris, interval cron 10 menit paralel dengan RAOS user_profiles sync)
+> Last updated: 2026-08-05 sore (Task Division CC vs Codex — dokumen `docs/TASK_DIVISION_CC_CODEX.md` di kedua repo untuk sinkron kerja 2 agent + kolom tabel kontrak lintas repo)
+
+## Sesi 2026-08-05 sore — Task Division Claude Code Desktop vs Codex Desktop
+
+### Konteks
+User butuh pembagian tugas eksplisit antara 2 agent AI (Claude Code Desktop = CC, Codex Desktop = CX) untuk semua fungsi halaman + kolom tabel PWA RAOS dan PWA RIFIM OS supaya sinkron dan terkoneksi. Cakupan 15 aspek: pengembangan, perubahan, perbaikan, pembangunan, rule projek, STATUS.md, infrastruktur, local folder, GitHub, Vercel, Supabase, GAS Script, Spreadsheet, Google Drive, Automation.
+
+### Deliverable
+- ✅ `docs/TASK_DIVISION_CC_CODEX.md` (identik di rifim-os + raos-menala repo)
+  - Filosofi: CC = otak (kontrak/DB/RLS/RPC/docs), CX = tangan (UI/refactor/styling)
+  - Matriks 15 kategori × owner utama/pendamping
+  - Pembagian per 17 halaman PWA RAOS + 9 modul PWA Rifim-OS
+  - Kolom tabel kritis: `user_profiles`, `raos_saldo_requests`, `raos_payroll`, `raos_kpi_targets_*`, `raos_driver_staff_assignment`, `chat_messages`, sheet SSoT
+  - Protokol sinkronisasi cross-repo (branch identik, commit sequence 8 langkah, contract change rules)
+  - Handoff template CC→CX dan CX→CC
+  - Zona owner per infra: Supabase, Vercel, GAS, Sheet, Drive, GitHub
+  - DoD cross-repo checklist 13 point
+
+### Aturan baru yang jadi rule permanen
+1. **Kontrak berubah → CC dulu, CX menyusul** — perubahan kolom/enum/endpoint/RPC signature ekslusif CC
+2. **Branch identik lintas repo** — `claude/<slug>-<hash>` di kedua repo, merge ≤24 jam
+3. **CX DILARANG** apply_migration, execute_sql non-read, deploy_edge_function, edit CLAUDE.md/PROJECT_RULES.md
+4. **Sheet schema = kontrak** — sama pentingnya dengan DB, ubah harus 4 sisi bersamaan
+5. **Handoff PR body wajib** — kalau CC handoff ke CX, tulis endpoint spec + component yang perlu dibuat + konvensi yang harus diikuti
+
+### File touched
+- `docs/TASK_DIVISION_CC_CODEX.md` (new)
+- `docs/STATUS.md` (append entry ini)
+
+### Cross-repo companion
+Dokumen identik juga di `raos-menala/docs/TASK_DIVISION_CC_CODEX.md` (single source of truth via mirror). PR paralel di kedua repo, branch `claude/pwa-raos-rifim-task-division-730bij`.
+
+---
+
 
 ## Sesi 2026-08-05 — HRIS Karyawan ↔ SSOT MASTER DATA STAFF
 
