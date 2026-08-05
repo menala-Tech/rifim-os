@@ -18,6 +18,9 @@ function onOpen() {
     // ─ HRIS Staff ────────────────────────────────────────────────
     .addSubMenu(
       ui.createMenu('👤 HRIS — Staff')
+        .addItem('🔄 Sync SSOT MASTER DATA STAFF → HRIS (Supabase)', 'syncEmployeesFromMasterStaff_MENU')
+        .addItem('⏰ Setup Auto-Sync SSOT → HRIS (tiap 1 jam)',       'setupEmployeesFromMasterStaffTrigger')
+        .addSeparator()
         .addItem('Proses Input Staff → Supabase',    'prosesInputStaff')
         .addSeparator()
         .addItem('Sync Staff dari Supabase → Sheet', 'syncStaffKeDatabaseStaff')
