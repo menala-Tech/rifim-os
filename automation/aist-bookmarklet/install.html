@@ -36,8 +36,8 @@ code { background: rgba(0,0,0,.4); padding: 2px 6px; border-radius: 3px; font-si
     <div class="step"><b>[Sekali]</b> Login <a href="https://rifim-os.vercel.app/portal" target="_blank" style="color:#4ade80">rifim-os.vercel.app/portal</a> pakai email admin. Auth token disimpan di localStorage.</div>
     <div class="step"><b>[Setiap sesi]</b> Buka AIST → <b>Documents</b> → <b>Add</b> → <b>Balance replenishment</b>. Pilih Subdivision + Currency manual.</div>
     <div class="step"><b>Klik bookmark "AIST Fill v2"</b> → picker floating muncul di kanan atas.</div>
-    <div class="step">Klik salah satu row driver → input <b>Amount</b> + <b>Driver login</b> di modal AIST otomatis terisi. Row auto-hilang dari picker + <code>is_processed=true</code> di Supabase.</div>
-    <div class="step">Klik <b>OK di modal AIST</b> untuk kirim ke AIST.</div>
+    <div class="step">Klik salah satu row driver → input <b>Amount</b> + <b>Driver login</b> di modal AIST otomatis terisi dan row dikunci sementara.</div>
+    <div class="step">Klik <b>OK di modal AIST</b>. Row baru ditandai lunas setelah toast sukses AIST terdeteksi; gagal/batal/timeout tetap berstatus approved dan bisa di-retry.</div>
   </div>
 
   <div class="card">
@@ -48,7 +48,7 @@ code { background: rgba(0,0,0,.4); padding: 2px 6px; border-radius: 3px; font-si
       &bull; Mark isi = centang checkbox G di sheet<br><br>
       <b>Baru v2</b>:<br>
       &bull; Baca langsung dari Supabase <code>raos_saldo_requests</code> (via GAS Web App)<br>
-      &bull; Mark isi = PATCH <code>is_processed=true</code> di DB → auto-trigger notif ke staff PWA<br>
+      &bull; Mark isi = RPC guarded setelah acknowledgement sukses AIST → auto-trigger notif ke staff PWA<br>
       &bull; Filter <code>status=approved</code> (koord/admin sudah setujui)<br>
       &bull; Auto-refresh 30 detik (pengajuan baru dari PWA RAOS langsung muncul)
     </div>

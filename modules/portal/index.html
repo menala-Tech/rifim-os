@@ -362,6 +362,9 @@ async function doLogin() {
       role: profile.role,
       staff_id: profile.staff_id,
       branch_id: profile.branch_id,
+      access_token: signData.session?.access_token || '',
+      refresh_token: signData.session?.refresh_token || '',
+      expires_at: signData.session?.expires_at || 0,
       ts: Date.now(),
     };
     localStorage.setItem('rifim_auth', JSON.stringify(session));
@@ -436,7 +439,7 @@ function goTo(path) {
   if (raw) {
     try {
       const user = JSON.parse(raw);
-      if (Date.now() - (user.ts || 0) < 8 * 60 * 60 * 1000) {
+      if (user.access_token && user.refresh_token && Date.now() - (user.ts || 0) < 8 * 60 * 60 * 1000) {
         showPortal(user);
         return;
       }
