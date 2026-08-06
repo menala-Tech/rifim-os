@@ -427,3 +427,15 @@ authentication trust boundary yang lemah, dan ordering yang dapat menyatakan lun
 Sheet SSoT yang disebut dalam checklist bukan lagi SSoT operasional untuk saldo request; actual SSoT adalah
 `public.raos_saldo_requests`, sedangkan Sheet hanya archive/manual mirror yang saat ini tidak terjadwal.
 Tidak ada fix diimplementasikan dalam audit ini.
+
+## Remediation Log — 2026-08-07
+
+- [x] **F-01** — saldo Finance tidak lagi mempercayai parameter email. Client mengirim access token melalui body POST; GAS memvalidasi token ke Supabase Auth, lalu mengambil UUID dan role dari `user_profiles`. Fallback ADMIN di `authVerifyUser()` dihapus dan auth gagal secara tertutup.
+- [x] **F-02** — `processed_by` berasal dari UUID profil actor yang diturunkan dari token, bukan email.
+- [x] **F-03** — Bookmarklet mengunci row dan menunggu acknowledgement sukses AIST. Error/cancel/timeout 30 detik mempertahankan row `approved` serta menampilkan retry state.
+- [x] **F-04** — migration prod `raos_074_saldo_mark_paid_rpc.sql` aktif. GAS memakai `POST /rest/v1/rpc/raos_saldo_mark_paid`; outcome `updated`, `already_processed`, `not_approved`, dan `not_found` ditangani eksplisit.
+- [x] **F-05** — migration prod `raos_075_saldo_client_id_idempotency.sql` aktif. PWA memakai UUID client yang sama untuk submit/retry offline dan memanggil RPC transactional `raos_saldo_submit`.
+- [x] **F-10 (ikut terselesaikan)** — pembuatan request, bubble chat, dan link `chat_message_id` kini berada dalam satu transaksi RPC.
+- [x] **F-11 (kontrak response)** — Finance list meneruskan `driver_id`, `driver_login_id`, dan `driver_name` untuk Bookmarklet.
+
+Evidence implementasi rifim-os: commit `3903d67`. Evidence migration/client RAOS: commits `d5a8e59` dan `2bc9f38`. Validasi lokal: syntax GAS/Bookmarklet, inline script Finance/Portal, RAOS typecheck, lint (0 error), dan production build lulus. Eksekusi GAS deployed dan happy-path AIST manual dicatat terpisah setelah redeploy aktif.
