@@ -2,7 +2,34 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-08-06 (Document Engine v1 complete + HRIS Absensi Overhaul 5 phase — 12 PR merged, 8 migration Supabase)
+> Last updated: 2026-08-06 malam (PR #10 audit closed — 5 decision approved, Fonnte deprecation roadmap Sesi 2 KPI + Sesi 3 chat migration comprehensive)
+
+## Sesi 2026-08-06 malam — PR #10 Decision + Fonnte Deprecation Roadmap
+
+### Konteks
+User review PR #10 audit Opsi D discovery. Approve 5 poin dengan revised
+architecture: instead of konsolidasi WA config, TOTAL deprecate Fonnte
+migrate ke chat room PWA RAOS (internal + eksternal + direksi).
+
+### 5 Decision Approved
+1. Cache `driver_name` snapshot — KEEP (intentional)
+2. KPI V1→V2 strategy — MIGRATE + rename setelah 3 minggu dual-write
+3. KPI V1 data 29 row — MIGRATE ke V2 (idempotent INSERT)
+4. WA config duplicate — 🔥 DEPRECATE Fonnte 100%, migrate ke chat room
+5. Timeline — Sesi 3 diperbesar all-in-one (5-7 jam)
+
+### Roadmap
+- **Sesi 2** (~3-5 jam): KPI V1→V2 migration + dual-write transisi
+- **Sesi 3** (~5-7 jam): Chat migration full (4 use case notif redirect +
+  driver eksternal onboarding + deprecate 2 WA config + test 9 cabang)
+- **Postmortem**: cancel Fonnte contract akhir Agustus
+
+### Cost saving expected
+~Rp 500rb-1jt/bulan (100% Fonnte cost eliminated).
+
+---
+
+## Sesi 2026-08-06 — Document Engine v1 + HRIS Absensi Overhaul
 
 ## Sesi 2026-08-06 — Document Engine v1 + HRIS Absensi Overhaul
 
