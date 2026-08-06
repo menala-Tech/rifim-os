@@ -29,7 +29,8 @@ body{font-family:var(--font);background:var(--dark);color:#fff;min-height:100vh;
 header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;
   border-bottom:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.3);backdrop-filter:blur(8px);position:sticky;top:0;z-index:50}
 .brand{display:flex;align-items:center;gap:10px}
-.brand-logo{height:34px;width:auto;object-fit:contain}
+.module-badge{font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:6px 12px;white-space:nowrap}
+.brand-logo{height:60px;width:auto;object-fit:contain}
 .brand-name{font-size:16px;font-weight:800;letter-spacing:1px}
 .brand-sub{font-size:10px;opacity:.5;letter-spacing:.5px;text-transform:uppercase}
 .header-right{display:flex;align-items:center;gap:12px}
@@ -148,10 +149,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
   <header>
     <div class="brand">
       <img class="brand-logo" src="/branding/logo/logo-rifim-transparent.png" alt="RIFIM OS" onerror="this.style.display='none'">
-      <div>
-      <div class="brand-name">RIFIM OS · FINANCE</div>
-      <div class="brand-sub">Keuangan Terpadu — Pemasukan · Pengeluaran · Tagihan</div>
-      </div>
+      <span class="module-badge">FINANCE</span>
     </div>
     <div class="header-right">
       <div>

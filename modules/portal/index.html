@@ -28,7 +28,7 @@ body{font-family:var(--font);background:var(--dark);color:#fff;min-height:100vh;
   background:#fff;border-radius:20px;padding:40px 36px 32px;width:100%;max-width:400px;
   box-shadow:0 24px 80px rgba(0,0,0,.6);text-align:center;
 }
-.auth-logo{max-width:180px;max-height:90px;width:auto;height:auto;margin:0 auto 14px;display:block;object-fit:contain}
+.auth-logo{width:110px;max-width:110px;height:auto;max-height:none;margin:0 auto 18px;display:block;object-fit:contain}
 .auth-logo-fallback{
   width:72px;height:72px;background:var(--red);border-radius:16px;
   margin:0 auto 12px;display:flex;align-items:center;justify-content:center;
@@ -66,7 +66,8 @@ header{
   position:sticky;top:0;z-index:50;
 }
 .brand{display:flex;align-items:center;gap:10px}
-.brand img{width:36px;height:36px;object-fit:contain;border-radius:8px}
+.module-badge{font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:6px 12px;white-space:nowrap}
+.brand img{width:auto;height:60px;object-fit:contain}
 .brand-txt .brand-name{font-size:17px;font-weight:800;letter-spacing:1px}
 .brand-txt .brand-sub{font-size:10px;opacity:.5;letter-spacing:.5px;text-transform:uppercase}
 .header-right{display:flex;align-items:center;gap:12px}
@@ -154,8 +155,6 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
     <img class="auth-logo" src="/branding/logo/logo-rifim-transparent.png" alt="RIFIM OS"
          onerror="this.style.display='none';document.getElementById('logo-fb').style.display='flex'">
     <div class="auth-logo-fallback" id="logo-fb" style="display:none">RG</div>
-    <h1>RIFIM OS</h1>
-    <p class="sub">Sistem Operasional Terpadu RIFIM Group</p>
     <input type="text" id="auth-email" placeholder="Email atau ID Staff" autocomplete="username">
     <input type="password" id="auth-pin" placeholder="RAOS PIN" autocomplete="current-password" inputmode="numeric">
     <button class="btn-login" id="btn-masuk" onclick="doLogin()">Masuk ke RIFIM OS</button>
@@ -169,10 +168,7 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
   <header>
     <div class="brand">
       <img src="/branding/logo/logo-rifim-transparent.png" alt="RIFIM" onerror="this.style.display='none'">
-      <div class="brand-txt">
-        <div class="brand-name">RIFIM OS</div>
-        <div class="brand-sub">Smart Enterprise System</div>
-      </div>
+      <span class="module-badge">Portal</span>
     </div>
     <div class="header-right">
       <div class="user-info">
