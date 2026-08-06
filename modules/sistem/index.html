@@ -19,7 +19,8 @@ body{font-family:var(--font);background:var(--dark);color:#fff;min-height:100vh;
 header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;
   border-bottom:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.3);position:sticky;top:0;z-index:50}
 header .brand{display:flex;align-items:center;gap:10px;font-weight:800}
-header .brand img{height:34px;width:auto;object-fit:contain}
+.module-badge{font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:6px 12px;white-space:nowrap}
+header .brand img{height:60px;width:auto;object-fit:contain}
 header .brand .icon{font-size:22px}
 header .right{display:flex;align-items:center;gap:12px;font-size:12px;color:#aaa}
 header .btn-back{background:none;border:1px solid rgba(255,255,255,.2);color:#fff;
@@ -98,7 +99,7 @@ h1{font-size:22px;font-weight:800;margin-bottom:4px}
 
 <div id="app" style="display:none">
 <header>
-  <div class="brand"><img src="/branding/logo/logo-rifim-transparent.png" alt="RIFIM OS" onerror="this.style.display='none'"> RIFIM OS - Sistem</div>
+  <div class="brand"><img src="/branding/logo/logo-rifim-transparent.png" alt="RIFIM OS" onerror="this.style.display='none'"><span class="module-badge">Sistem</span></div>
   <div class="right">
     <span id="user-info">—</span>
     <button class="btn-back" onclick="location.href='/portal'">← Portal</button>

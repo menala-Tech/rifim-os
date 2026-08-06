@@ -260,8 +260,7 @@ tr:last-child td{border-bottom:none}
 <!-- ─── AUTH GATE ─── -->
 <div id="auth-gate">
   <div class="auth-box">
-    <h1>RIFIM OS</h1>
-    <p>Human Resource Information System</p>
+    <img src="/branding/logo/logo-rifim-transparent.png" alt="RIFIM" style="height:110px;object-fit:contain;margin:0 auto 18px;display:block" onerror="this.style.display='none'">
     <input type="email" id="auth-email" placeholder="Email perusahaan Anda" autocomplete="email">
     <button onclick="doLogin()">Masuk ke HRIS</button>
     <div id="auth-error"></div>
@@ -272,8 +271,7 @@ tr:last-child td{border-bottom:none}
 <div id="app">
   <header>
     <div class="header-left">
-      <img src="/branding/logo/logo-rifim-transparent.png" alt="RIFIM" style="height:30px;object-fit:contain" onerror="this.style.display='none'">
-      <span class="header-logo">RIFIM OS</span>
+      <img src="/branding/logo/logo-rifim-transparent.png" alt="RIFIM" style="height:60px;object-fit:contain" onerror="this.style.display='none'">
       <span class="header-module">HRIS</span>
     </div>
     <div class="header-right">
@@ -366,14 +364,8 @@ tr:last-child td{border-bottom:none}
           <button class="btn btn-primary" onclick="openModal('modal-add-contract')">+ Kontrak Baru</button>
         </div>
         <div class="card-body">
-          <div class="attendance-subtabs">
-            <button class="active" id="att-subtab-rekap-btn" onclick="switchAttendanceSubtab('rekap')">Rekap Absensi</button>
-            <button id="att-subtab-gapok-btn" onclick="switchAttendanceSubtab('gapok')">Gapok Proporsional</button>
-          </div>
-
-          <div id="att-panel-rekap" class="attendance-panel active">
           <div class="toolbar">
-            <input type="text" id="search-contract" placeholder="Cari ID karyawan…" oninput="filterContracts()">
+            <input type="text" id="search-contract" placeholder="Cari ID karyawan..." oninput="filterContracts()">
             <select id="filter-contract-status" onchange="filterContracts()">
               <option value="ALL">Semua Status</option>
               <option value="AKTIF">Aktif</option>
@@ -390,7 +382,7 @@ tr:last-child td{border-bottom:none}
                 </tr>
               </thead>
               <tbody id="tbody-contracts">
-                <tr><td colspan="8" class="loading">Memuat data…</td></tr>
+                <tr><td colspan="8" class="loading">Memuat data...</td></tr>
               </tbody>
             </table>
           </div>
@@ -398,45 +390,55 @@ tr:last-child td{border-bottom:none}
       </div>
     </div>
 
-    <!-- ═══ TAB: ABSENSI ═══ -->
+    <!-- TAB: ABSENSI -->
     <div id="tab-absensi" class="tab-content">
       <div class="card">
         <div class="card-header">
-          <h3>Rekap Absensi <span style="font-size:11px;color:#888;font-weight:400">— source: PWA RAOS (<code>raos_attendance</code>)</span></h3>
+          <h3>Rekap Absensi <span style="font-size:11px;color:#888;font-weight:400">- Source: PWA RAOS (<code>raos_attendance</code> realtime)</span></h3>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-secondary" onclick="showAttendanceSummaryModal()">📊 Summary Bulan</button>
+            <button class="btn btn-secondary" onclick="showAttendanceSummaryModal()">Summary Bulan</button>
             <button class="btn btn-primary" onclick="openModal('modal-add-attendance')">+ Catat Manual</button>
           </div>
         </div>
         <div class="card-body">
-          <div class="toolbar">
-            <input type="text" id="search-att-emp" placeholder="ID / Nama Karyawan…" style="max-width:200px" oninput="loadAttendance()">
-            <select id="filter-att-branch" onchange="loadAttendance()">
-              <option value="ALL">Semua Cabang</option>
-            </select>
-            <input type="date" id="att-date-from" onchange="loadAttendance()">
-            <input type="date" id="att-date-to" onchange="loadAttendance()">
-            <button class="btn btn-secondary" onclick="loadAttendance()">Tampilkan</button>
-            <button class="btn btn-secondary" onclick="exportAttendancePDF()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> Export PDF</button>
+          <div class="attendance-source-hint">
+            Source: PWA RAOS (<code>raos_attendance</code> realtime). Belum ada absensi tercatat? Staff harus absen via PWA RAOS (<b>rifim-os.vercel.app/absensi</b>) - data auto-sync ke sini.
           </div>
-          <div class="table-wrap">
-            <table style="font-size:12px">
-              <thead>
-                <tr>
-                  <th>ID</th><th>Nama</th><th>Cabang</th><th>Tanggal</th>
-                  <th>Masuk</th><th>Keluar</th>
-                  <th title="Menit terlambat setelah tolerance shift">Terlambat</th>
-                  <th title="Rp 10.000 per 30 menit setelah tolerance">Potongan</th>
-                  <th>Lokasi</th>
-                  <th>Foto</th>
-                  <th>Status</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="tbody-attendance">
-                <tr><td colspan="12" class="empty-state"><p>Pilih rentang tanggal lalu klik Tampilkan.</p></td></tr>
-              </tbody>
-            </table>
+          <div class="attendance-subtabs">
+            <button class="active" id="att-subtab-rekap-btn" onclick="switchAttendanceSubtab('rekap')">Rekap Absensi</button>
+            <button id="att-subtab-gapok-btn" onclick="switchAttendanceSubtab('gapok')">Gapok Proporsional</button>
+          </div>
+
+          <div id="att-panel-rekap" class="attendance-panel active">
+            <div class="toolbar">
+              <input type="text" id="search-att-emp" placeholder="ID / Nama Karyawan..." style="max-width:200px" oninput="loadAttendance()">
+              <select id="filter-att-branch" onchange="loadAttendance()">
+                <option value="ALL">Semua Cabang</option>
+              </select>
+              <input type="date" id="att-date-from" onchange="loadAttendance()">
+              <input type="date" id="att-date-to" onchange="loadAttendance()">
+              <button class="btn btn-secondary" onclick="loadAttendance()">Tampilkan</button>
+              <button class="btn btn-secondary" onclick="exportAttendancePDF()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> Export PDF</button>
+            </div>
+            <div class="table-wrap">
+              <table style="font-size:12px">
+                <thead>
+                  <tr>
+                    <th>ID</th><th>Nama</th><th>Cabang</th><th>Tanggal</th>
+                    <th>Masuk</th><th>Keluar</th>
+                    <th title="Menit terlambat setelah tolerance shift">Terlambat</th>
+                    <th title="Rp 10.000 per 30 menit setelah tolerance">Potongan</th>
+                    <th>Lokasi</th>
+                    <th>Foto</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-attendance">
+                  <tr><td colspan="12" class="empty-state"><p>Tidak ada data absensi untuk periode ini. Klik <b>Tampilkan</b> setelah pilih tanggal, atau tunggu data dari PWA RAOS.</p></td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div id="att-panel-gapok" class="attendance-panel">
@@ -1278,7 +1280,10 @@ function switchTab(tab, btn) {
   btn.classList.add('active');
 
   if (tab === 'kontrak')  loadContracts();
-  if (tab === 'absensi')  { if (document.getElementById('att-panel-gapok')?.classList.contains('active')) loadGapokProporsional(); }
+  if (tab === 'absensi')  {
+    if (document.getElementById('att-panel-gapok')?.classList.contains('active')) loadGapokProporsional();
+    else if (!allAttendanceRaos.length) loadAttendance();
+  }
   if (tab === 'cuti')     loadLeave();
   if (tab === 'payroll')  loadPayroll();
 }
@@ -2109,50 +2114,58 @@ async function _populateAttBranchDropdown() {
 
 async function loadAttendance(opts) {
   opts = opts || {};
-  const tbody    = document.getElementById('tbody-attendance');
-  const query    = document.getElementById('search-att-emp').value.trim();
-  const branchId = document.getElementById('filter-att-branch').value;
-  const dateFrom = document.getElementById('att-date-from').value;
-  const dateTo   = document.getElementById('att-date-to').value;
+  const tbody = document.getElementById('tbody-attendance');
+  const emptyMsg = 'Tidak ada data absensi untuk periode ini. Klik <b>Tampilkan</b> setelah pilih tanggal, atau tunggu data dari PWA RAOS.';
+  if (!tbody) return;
 
-  // Default rentang: awal bulan sd hari ini kalau kosong
-  const df = dateFrom || (new Date(new Date().getFullYear(), new Date().getMonth(), 1)).toISOString().slice(0,10);
-  const dt = dateTo   || new Date().toISOString().slice(0,10);
+  try {
+    const query    = document.getElementById('search-att-emp')?.value.trim() || '';
+    const branchId = document.getElementById('filter-att-branch')?.value || 'ALL';
+    const dateFrom = document.getElementById('att-date-from')?.value || '';
+    const dateTo   = document.getElementById('att-date-to')?.value || '';
 
-  _populateAttBranchDropdown();
+    // Default rentang: awal bulan sd hari ini kalau kosong
+    const df = dateFrom || (new Date(new Date().getFullYear(), new Date().getMonth(), 1)).toISOString().slice(0,10);
+    const dt = dateTo   || new Date().toISOString().slice(0,10);
 
-  // Cache key komposit — beda filter = beda cache
-  const cacheKey = 'attendance_' + df + '_' + dt + '_' + (branchId || 'ALL') + '_' + (query || '');
-  if (!opts.forceRefresh) {
-    const cached = _hrisCacheGet(cacheKey);
-    if (cached && cached.rows) {
-      allAttendanceRaos = cached.rows;
-      _renderAttendanceRows(allAttendanceRaos);
-      _backgroundRefreshAttendance(cacheKey, df, dt, branchId, query);
+    _populateAttBranchDropdown();
+
+    // Cache key komposit - beda filter = beda cache
+    const cacheKey = 'attendance_' + df + '_' + dt + '_' + (branchId || 'ALL') + '_' + (query || '');
+    if (!opts.forceRefresh) {
+      const cached = _hrisCacheGet(cacheKey);
+      if (cached && cached.rows) {
+        allAttendanceRaos = cached.rows;
+        if (!allAttendanceRaos.length) tbody.innerHTML = '<tr><td colspan="12" class="empty-state"><p>' + emptyMsg + '</p></td></tr>';
+        else _renderAttendanceRows(allAttendanceRaos);
+        _backgroundRefreshAttendance(cacheKey, df, dt, branchId, query);
+        return;
+      }
+    }
+
+    tbody.innerHTML = '<tr><td colspan="12" class="loading">Memuat absensi dari PWA RAOS...</td></tr>';
+    const res = await gasGet({
+      action: 'hris_attendance_raos_list',
+      date_from: df,
+      date_to: dt,
+      branch_id: branchId === 'ALL' ? '' : branchId,
+      search: query,
+    });
+    if (!res || res.success === false) {
+      tbody.innerHTML = '<tr><td colspan="12" class="empty-state"><p style="color:#dc2626">Error: ' + escH((res && (res.message || res.error)) || 'Gagal memuat absensi dari PWA RAOS.') + '</p><p>' + emptyMsg + '</p></td></tr>';
       return;
     }
+    allAttendanceRaos = res.rows || [];
+    _hrisCacheSet(cacheKey, res);
+    if (!allAttendanceRaos.length) {
+      tbody.innerHTML = '<tr><td colspan="12" class="empty-state"><p>' + emptyMsg + '</p></td></tr>';
+      return;
+    }
+    _renderAttendanceRows(allAttendanceRaos);
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="12" class="empty-state"><p style="color:#dc2626">Error: ' + escH(err && err.message ? err.message : 'Gagal memuat absensi.') + '</p><p>' + emptyMsg + '</p></td></tr>';
   }
-
-  tbody.innerHTML = '<tr><td colspan="12" class="loading">Memuat absensi dari PWA RAOS…</td></tr>';
-  const res = await gasGet({
-    action: 'hris_attendance_raos_list',
-    date_from: df,
-    date_to: dt,
-    branch_id: branchId === 'ALL' ? '' : branchId,
-    search: query,
-  });
-  if (!res.success) {
-    tbody.innerHTML = '<tr><td colspan="12" class="empty-state"><p style="color:#dc2626">❌ ' + (res.message || 'Gagal load') + '</p></td></tr>';
-    return;
-  }
-  allAttendanceRaos = res.rows || [];
-  _hrisCacheSet(cacheKey, res);
-  if (!allAttendanceRaos.length) {
-    tbody.innerHTML = '<tr><td colspan="12" class="empty-state"><p>Tidak ada data absensi pada filter ini.</p></td></tr>';
-    return;
-  }
-  _renderAttendanceRows(allAttendanceRaos);
-  return; // Deprecated inline render di bawah — direfactor ke _renderAttendanceRows
+  return; // Deprecated inline render di bawah - direfactor ke _renderAttendanceRows
 }
 
 async function _backgroundRefreshAttendance(cacheKey, df, dt, branchId, query) {
