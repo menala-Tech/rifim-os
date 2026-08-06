@@ -112,15 +112,15 @@ function verifyChain(input) {
       var row = rows[i] || {};
       checkedRows++;
 
-      var payloadText = _auditCanonicalJson(
-        Object.prototype.hasOwnProperty.call(row, 'payload') ? row.payload : {}
-      );
+      // Hash algo v4 (migration docengine_006): SKIP payload dari chain.
+      // Payload tetap tersimpan; tampering di-guard oleh immutability trigger
+      // BEFORE UPDATE OR DELETE di doc_audit_log. Chain guard: ordering +
+      // entity_type + entity_id + action + prev_hash link.
       var hashInput = [
         _auditHashPart(row.prev_hash),
         _auditHashPart(row.entity_type),
         _auditHashPart(row.entity_id),
         _auditHashPart(row.action),
-        payloadText,
       ].join('|');
       var expectedHash = _auditSha256Hex(hashInput);
       var storedHash = _auditHashPart(row.row_hash).toLowerCase();
