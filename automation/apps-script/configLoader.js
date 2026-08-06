@@ -105,16 +105,3 @@ var RIFIM_BRANCHES = [
 
 /** Cabang yang bebas denda keterlambatan (Payroll). */
 var CABANG_BEBAS_DENDA = ['ID Rifim Airport Jambi', 'ID Rifim Airport Manado'];
-
-// ─── WhatsApp / Fonnte Setup ──────────────────────────────────
-//
-// FONNTE_TOKEN dan WA_GROUP_ID disimpan di PropertiesService (BUKAN hardcode di sini).
-// Jalankan fungsi berikut SEKALI dari GAS Editor untuk mendaftarkan nilainya:
-//
-//   setupWaEngine('4QpkJarRsMd848m8Snye', '120363428871368682@g.us');
-//
-// Untuk mengambil nilai dari kode lain, gunakan fungsi di waEngine.js:
-//   _getFonnteToken()  → FONNTE_TOKEN
-//   _getWaGroupId()    → WA_GROUP_ID
-//
-// ─────────────────────────────────────────────────────────────

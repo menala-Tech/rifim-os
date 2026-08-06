@@ -1,12 +1,12 @@
 /**
  * RIFIM OS — Notification Engine
- * Phase 2 Engine: Email & WhatsApp Notifications
+ * Phase 2 Engine: Email & RAOS Chat Notifications
  *
  * Email  → GmailApp (langsung, tanpa token eksternal)
- * WA     → waEngine.js (Fonnte API)
+ * Chat   → chatBridge.js (Supabase RPC)
  *
- * Setiap fungsi notifXxx() kirim dua kanal sekaligus: email + WA.
- * WA selalu try/catch non-fatal agar kegagalan WA tidak block email.
+ * Setiap fungsi notifXxx() kirim dua kanal sekaligus: email + RAOS Chat.
+ * Chat selalu try/catch non-fatal agar kegagalan chat tidak block email.
  */
 
 /**
@@ -56,14 +56,21 @@ function notifDocumentCreated(params) {
     Logger.log('notifDocumentCreated email gagal (non-fatal): ' + err.message);
   }
   try {
-    waSendToGroup(waBuildPesanDokumenBaru({
+    _chatPostAnnouncement(_buildDokumenBaruMessage({
       nomorDokumen: params.documentNumber,
       jenisDokumen: params.documentType,
       perihal:      params.subject,
       createdBy:    params.createdBy,
-    }));
-  } catch (errWa) {
-    Logger.log('notifDocumentCreated WA gagal (non-fatal): ' + errWa.message);
+    }), 'doc_created', {
+      document_number: params.documentNumber,
+      document_type: params.documentType,
+      created_by: params.createdBy || null,
+      gdoc_url: params.gdocUrl || null,
+      pdf_url: params.pdfUrl || null,
+      deep_link: params.gdocUrl || params.pdfUrl || null,
+    });
+  } catch (errChat) {
+    _gasLogError('Smart Office', 'notifDocumentCreated_chat', errChat, { document_number: params.documentNumber });
   }
 }
 
@@ -104,14 +111,19 @@ function notifCheckExpiringContracts() {
     });
     notifSendEmail('rifiminternationalgemilang@gmail.com', subject, html);
     try {
-      waSendToGroup(waBuildPesanKontrakHampirBerakhir({
+      _chatPostAnnouncement(_buildKontrakHampirBerakhirMessage({
         namaKaryawan:  emp.full_name,
         idKaryawan:    emp.employee_id,
         tanggalBerakhir: c.end_date,
         sisaHari:      daysLeft,
-      }));
-    } catch (errWa) {
-      Logger.log('notifCheckExpiringContracts WA gagal (non-fatal): ' + errWa.message);
+      }), 'hris_kontrak', {
+        employee_id: emp.employee_id,
+        end_date: c.end_date,
+        days_left: daysLeft,
+      });
+    } catch (errChat) {
+      _gasLogError('HRIS', 'notifCheckExpiringContracts_chat', errChat,
+        { employee_id: emp.employee_id, end_date: c.end_date });
     }
     } catch (errC) {
       // Satu kontrak gagal → catat, lanjut ke kontrak berikutnya
@@ -143,16 +155,18 @@ function notifLeaveStatusChanged(employee, leave) {
   });
   if (employee.email) notifSendEmail(employee.email, subject, html);
   notifSendEmail('rifiminternationalgemilang@gmail.com', subject, html, { name: 'RIFIM OS HRIS' });
-  // WA ke grup — khusus yang DISETUJUI agar tidak spam
+  // Chat Pengumuman — khusus yang DISETUJUI agar tidak spam
   if (leave.status === 'DISETUJUI') {
     try {
-      waSendToGroup(
-        '📋 *Cuti Disetujui*\n' + employee.full_name + '\n' +
+      _chatPostAnnouncement(
+        '📋 Cuti Disetujui\n' + employee.full_name + '\n' +
         leave.leave_type + ' — ' + leave.start_date + ' s/d ' + leave.end_date +
-        ' (' + leave.total_days + ' hari)\n_RIFIM OS — HRIS_'
+        ' (' + leave.total_days + ' hari)\nRIFIM OS — HRIS',
+        'hris_cuti',
+        { employee_id: employee.employee_id, status: leave.status, start_date: leave.start_date, end_date: leave.end_date }
       );
-    } catch (errWa) {
-      Logger.log('notifLeaveStatusChanged WA gagal (non-fatal): ' + errWa.message);
+    } catch (errChat) {
+      _gasLogError('HRIS', 'notifLeaveStatusChanged_chat', errChat, { employee_id: employee.employee_id });
     }
   }
 }
@@ -174,16 +188,24 @@ function notifPayslipReady(employee, payroll) {
       (payroll.pdf_url  ? '<p><a href="' + payroll.pdf_url  + '" style="color:#1a1a2e">📥 Download PDF</a></p>'   : ''),
   });
   if (employee.email) notifSendEmail(employee.email, subject, html);
-  // WA ke nomor individu (jika nomor HP tersedia)
-  if (employee.phone) {
-    try {
-      waSendToNumber(
-        waNormalisasiNomor(employee.phone),
-        waBuildPesanSlipGaji(employee.full_name, period, payroll.pdf_url || payroll.gdoc_url || '-')
-      );
-    } catch (errWa) {
-      Logger.log('notifPayslipReady WA gagal (non-fatal): ' + errWa.message);
-    }
+  try {
+    var userId = employee.user_id || employee.profile_id || null;
+    var roomId = userId ? _supaRpc('raos_resolve_private_room', { p_user_id: userId }) : null;
+    var privateRoomFound = !!roomId;
+    if (!roomId) roomId = _supaRpc('raos_resolve_announcement_room', {});
+    _chatPostSystem(roomId,
+      _buildSlipGajiMessage(employee.full_name, period, payroll.pdf_url || payroll.gdoc_url || '-'),
+      'payroll',
+      {
+        user_id: userId,
+        period_month: payroll.period_month,
+        period_year: payroll.period_year,
+        private_room_found: privateRoomFound,
+        deep_link: payroll.pdf_url || payroll.gdoc_url || null,
+      }
+    );
+  } catch (errChat) {
+    _gasLogError('HRIS', 'notifPayslipReady_chat', errChat, { user_id: employee.user_id || employee.profile_id || null });
   }
 }
 
@@ -195,7 +217,7 @@ function notifPayslipReady(employee, payroll) {
  */
 function notifPayrollSiapDiproses(params) {
   params = params || {};
-  var period = params.periode || waFormatPeriode(new Date());
+  var period = params.periode || _chatFormatPeriode(new Date());
   var subject = '[RIFIM OS] Payroll Siap Diproses — ' + period;
   var html = _emailTemplate({
     title: 'Payroll Siap Diproses',
@@ -216,20 +238,24 @@ function notifPayrollSiapDiproses(params) {
     Logger.log('notifPayrollSiapDiproses email gagal (non-fatal): ' + err.message);
   }
   try {
-    waSendToGroup(waBuildPesanPayrollSiap({
+    _chatPostAnnouncement(_buildPayrollSiapMessage({
       periode:       period,
       jumlahStaff:   params.jumlahStaff   || 0,
       jumlahCabang:  params.jumlahCabang  || 0,
       estimasiTotal: params.estimasiTotal || 0,
-    }));
-  } catch (errWa) {
-    Logger.log('notifPayrollSiapDiproses WA gagal (non-fatal): ' + errWa.message);
+    }), 'payroll', {
+      period: period,
+      staff_count: params.jumlahStaff || 0,
+      branch_count: params.jumlahCabang || 0,
+    });
+  } catch (errChat) {
+    _gasLogError('HRIS', 'notifPayrollSiapDiproses_chat', errChat, { period: period });
   }
 }
 
 /**
  * Buat trigger harian untuk notifCheckExpiringContracts (setiap hari jam 08:00 WIB).
- * Cek kontrak yang berakhir ≤30 hari → email + WA ke tim HRD.
+ * Cek kontrak yang berakhir ≤30 hari → email + chat Pengumuman.
  * Jalankan SEKALI dari GAS Editor. Idempotent — trigger lama dihapus dulu.
  */
 function setupTriggerExpiringContracts() {
@@ -255,7 +281,7 @@ function setupTriggerPayrollSiap() {
 }
 
 /**
- * Notifikasi rekap keuangan harian ke grup WA + email admin.
+ * Notifikasi rekap keuangan harian ke chat Pengumuman.
  * Dipanggil dari Finance module.
  *
  * @param {Array<{nama, pemasukan, pengeluaran, net, status}>} cabangList
@@ -263,14 +289,15 @@ function setupTriggerPayrollSiap() {
  */
 function notifRekapFinanceHarian(cabangList, tanggal) {
   try {
-    waSendToGroup(waBuildRingkasanHarian(cabangList, tanggal));
-  } catch (errWa) {
-    Logger.log('notifRekapFinanceHarian WA gagal (non-fatal): ' + errWa.message);
+    _chatPostAnnouncement(_buildRingkasanHarianMessage(cabangList, tanggal), 'finance_rekap',
+      { period: 'daily', date: tanggal, branch_count: (cabangList || []).length });
+  } catch (errChat) {
+    _gasLogError('Finance', 'notifRekapFinanceHarian_chat', errChat, { date: tanggal });
   }
 }
 
 /**
- * Notifikasi rekap keuangan bulanan ke grup WA + email admin.
+ * Notifikasi rekap keuangan bulanan ke chat Pengumuman.
  * Dipanggil dari Finance module.
  *
  * @param {Array<{nama, pemasukan, pengeluaran, net, margin, status}>} cabangList
@@ -278,9 +305,10 @@ function notifRekapFinanceHarian(cabangList, tanggal) {
  */
 function notifRekapFinanceBulanan(cabangList, bulan) {
   try {
-    waSendToGroup(waBuildRingkasanBulanan(cabangList, bulan));
-  } catch (errWa) {
-    Logger.log('notifRekapFinanceBulanan WA gagal (non-fatal): ' + errWa.message);
+    _chatPostAnnouncement(_buildRingkasanBulananMessage(cabangList, bulan), 'finance_rekap',
+      { period: 'monthly', month: bulan, branch_count: (cabangList || []).length });
+  } catch (errChat) {
+    _gasLogError('Finance', 'notifRekapFinanceBulanan_chat', errChat, { month: bulan });
   }
 }
 
@@ -290,22 +318,15 @@ function notifRekapFinanceBulanan(cabangList, bulan) {
  * @param {{ namaDriver, idDriver, saldo, cabang, noWA? }} params
  */
 function notifSaldoDriverRendah(params) {
-  // Kirim ke grup manajemen
   try {
-    waSendToGroup(waBuildPesanSaldoRendah(params));
-  } catch (errWa) {
-    Logger.log('notifSaldoDriverRendah grup WA gagal (non-fatal): ' + errWa.message);
-  }
-  // Kirim ke driver langsung (jika ada nomor WA)
-  if (params.noWA) {
-    try {
-      waSendToNumber(
-        waNormalisasiNomor(params.noWA),
-        waBuildPesanSaldoRendah(params)
-      );
-    } catch (errWa2) {
-      Logger.log('notifSaldoDriverRendah driver WA gagal (non-fatal): ' + errWa2.message);
-    }
+    _chatPostSaldoRoom(params.cabang, _buildSaldoRendahMessage(params), 'saldo_rendah', {
+      driver_id: params.idDriver || null,
+      driver_name: params.namaDriver || null,
+      balance: Number(params.saldo) || 0,
+    });
+  } catch (errChat) {
+    _gasLogError('RAOS', 'notifSaldoDriverRendah_chat', errChat,
+      { branch_name: params.cabang, driver_id: params.idDriver || null });
   }
 }
 

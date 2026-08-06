@@ -2,16 +2,13 @@
  * RIFIM OS — Laporan Cabang Engine
  *
  * Generate "INVOICE TAGIHAN INTERN CABANG" per-cabang dari Database AIST,
- * export ke PDF, simpan ke Drive subfolder, kirim WA Grup, kirim Email.
+ * export ke PDF, simpan ke Drive subfolder, kirim RAOS Chat, kirim Email.
  *
  * Setup wajib (sekali jalan dari GAS Editor / menu Setup):
  *   1. setupLaporanFolder()      → buat subfolder Drive, simpan ID ke PropertiesService
  *   2. setupLaporanCabangSheet() → buat sheet template LAPORAN_CABANG
  *
- * Untuk WA: set Script Properties di GAS Editor → Project Settings:
- *   WA_API_URL  = endpoint provider WA (mis. https://api.fonnte.com/send)
- *   WA_API_KEY  = token/key dari provider
- *   WA_GROUP_ID = nomor/ID grup WA tujuan
+ * Notifikasi laporan dikirim ke room Pengumuman melalui chatBridge.js.
  */
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -168,7 +165,7 @@ function setupLaporanCabangSheet() {
     'Langkah selanjutnya:\n' +
     '1. Pilih Cabang di sel B4\n' +
     '2. Pilih Tanggal di sel B5\n' +
-    '3. Klik PDF & WA → Generate Laporan Cabang');
+    '3. Klik PDF & Chat → Generate Laporan Cabang');
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -285,7 +282,7 @@ function generateLaporanCabang() {
     'Tanggal : ' + tglStr + '\n' +
     'Driver  : ' + rows.length + ' orang\n' +
     'Total   : Rp ' + totalTagihan.toLocaleString('id-ID') + '\n\n' +
-    'Selanjutnya: PDF & WA → Simpan Drive / Kirim WA / Kirim Email');
+    'Selanjutnya: PDF & Chat → Simpan Drive / Kirim Chat / Kirim Email');
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -403,16 +400,13 @@ function pdfKirimViaEmail() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 6. PDF → KIRIM WA GRUP
+// 6. PDF → KIRIM RAOS CHAT
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Upload PDF ke Drive (public link) lalu kirim ke WA Grup via waEngine.js.
- *
- * Prasyarat: jalankan setupWaEngine(token, groupId) sekali dari GAS Editor.
- * Token & group ID tersimpan di PropertiesService (FONNTE_TOKEN, WA_GROUP_ID).
+ * Upload PDF ke Drive (public link) lalu kirim ke room Pengumuman RAOS.
  */
-function pdfKirimKeWAGrup() {
+function pdfKirimKeChat() {
   var ss     = SpreadsheetApp.openById(RAOS_SS_ID);
   var sheet  = ss.getSheetByName(_LAPORAN_SHEET_NAME);
   var cabang = sheet ? sheet.getRange('B' + _LAPORAN_CABANG_ROW).getValue().toString().trim() : '';
@@ -424,7 +418,7 @@ function pdfKirimKeWAGrup() {
   }
 
   try {
-    // Upload PDF ke Drive → buat link publik agar bisa dibuka dari WA
+    // Upload PDF ke Drive → buat link publik agar bisa dibuka dari chat
     var blob     = _getLaporanBlob();
     var folderId = PropertiesService.getScriptProperties().getProperty(_LAPORAN_FOLDER_KEY);
     var folder   = folderId ? DriveApp.getFolderById(folderId) : DriveApp.getRootFolder();
@@ -434,24 +428,26 @@ function pdfKirimKeWAGrup() {
 
     var tanggal = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
     var message =
-      '📋 *INVOICE TAGIHAN INTERN CABANG*\n' +
-      '🏢 Cabang: *' + cabang + '*\n' +
+      '📋 INVOICE TAGIHAN INTERN CABANG\n' +
+      '🏢 Cabang: ' + cabang + '\n' +
       '📅 ' + tanggal + '\n\n' +
       '🔗 ' + fileUrl;
 
-    // Kirim via waEngine.js — routing ke FONNTE_TOKEN + WA_GROUP_ID
-    waSendToGroup(message);
+    _chatPostAnnouncement(message, 'finance_laporan', {
+      branch_name: cabang,
+      report_date: tanggal,
+      file_url: fileUrl,
+      file_name: file.getName(),
+      deep_link: fileUrl,
+    });
 
     SpreadsheetApp.getUi().alert(
-      '✅ Pesan WA terkirim ke grup!\n\n' +
+      '✅ Pesan terkirim ke chat Pengumuman!\n\n' +
       '📄 ' + file.getName() + '\n🔗 ' + fileUrl);
 
   } catch (err) {
-    // Error dari waSendToGroup() sudah include pesan "FONNTE_TOKEN belum di-setup"
+    _gasLogError('RAOS Laporan', 'pdfKirimKeChat', err, { branch_name: cabang });
     SpreadsheetApp.getUi().alert(
-      '❌ Gagal kirim WA:\n' + err.message +
-      (err.message.indexOf('FONNTE_TOKEN') !== -1
-        ? '\n\nJalankan dari GAS Editor:\nsetupWaEngine("TOKEN", "GROUPID")'
-        : ''));
+      '❌ Gagal kirim ke RAOS Chat:\n' + err.message);
   }
 }

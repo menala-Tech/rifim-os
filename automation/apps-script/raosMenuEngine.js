@@ -3,7 +3,7 @@
  *
  * Dua menu di toolbar:
  *   🚛 RIFIM OS  → operasi data (Potongan, Saldo AIST, Setup)
- *   📄 PDF & WA  → generate laporan, export PDF, kirim WA/Email
+ *   📄 PDF & Chat → generate laporan, export PDF, kirim Chat/Email
  *
  * onOpen() dipanggil otomatis oleh GAS saat spreadsheet dibuka.
  */
@@ -103,27 +103,27 @@ function onOpen() {
     .addSubMenu(
       ui.createMenu('💳 Monitoring Saldo')
         .addItem('Refresh Dashboard Saldo',         'refreshMonitoringSaldo')
-        .addItem('Cek SLA Saldo (Kirim WA)',        'cekSLASaldo')
+        .addItem('Cek SLA Saldo (Kirim Chat)',      'cekSLASaldo')
         .addSeparator()
-        .addItem('Test WA Saldo (semua grup)',      'testMonitoringSaldoWA')
+        .addItem('Test Chat Saldo (semua cabang)',  'testMonitoringSaldoChat')
     )
     .addSubMenu(
       ui.createMenu('📦 Monitoring Potongan')
         .addItem('Refresh Dashboard Potongan',      'refreshMonitoringPotongan')
-        .addItem('Cek SLA Potongan (Kirim WA)',     'cekSLAPotongan')
+        .addItem('Cek SLA Potongan (Kirim Chat)',   'cekSLAPotongan')
         .addSeparator()
-        .addItem('Test WA Potongan (semua grup)',   'testMonitoringPotonganWA')
+        .addItem('Test Chat Potongan (semua cabang)', 'testMonitoringPotonganChat')
     )
     .addToUi();
 
   // ─────────────────────────────────────────────────────────────
-  // Menu 2: PDF & WA (laporan dan distribusi)
+  // Menu 2: PDF & Chat (laporan dan distribusi)
   // ─────────────────────────────────────────────────────────────
-  ui.createMenu('📄 PDF & WA')
+  ui.createMenu('📄 PDF & Chat')
     .addItem('Generate Laporan Cabang',   'generateLaporanCabang')
     .addSeparator()
     .addItem('PDF → Simpan Drive',        'pdfSimpanKeDrive')
-    .addItem('PDF → Kirim WA Grup',       'pdfKirimKeWAGrup')
+    .addItem('PDF → Kirim Chat Pengumuman', 'pdfKirimKeChat')
     .addItem('PDF → Kirim Email',         'pdfKirimViaEmail')
     .addToUi();
 
