@@ -438,11 +438,22 @@ function _docIsAction_(action) {
 }
 
 function _docJsonOk_(data) {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, data: data })).setMimeType(ContentService.MimeType.JSON);
+  return _docJsonOutput_({ ok: true, data: data });
 }
 
 function _docJsonError_(err) {
-  return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err && err.message ? err.message : String(err) })).setMimeType(ContentService.MimeType.JSON);
+  var message = err && err.message ? err.message : String(err || 'Unknown error');
+  return _docJsonOutput_({ ok: false, error: message });
+}
+
+function _docJsonOutput_(payload) {
+  var text;
+  try {
+    text = JSON.stringify(payload);
+  } catch (err) {
+    text = JSON.stringify({ ok: false, error: 'Response JSON tidak valid: ' + (err && err.message ? err.message : String(err)) });
+  }
+  return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.JSON);
 }
 
 function _docRestUrl_(table, params) {
