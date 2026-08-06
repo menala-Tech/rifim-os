@@ -126,14 +126,33 @@ function verifyChain(input) {
       var storedHash = _auditHashPart(row.row_hash).toLowerCase();
 
       if (!storedHash || expectedHash !== storedHash) {
-        return { ok: false, brokenAt: row.id || null, checkedRows: checkedRows };
+        return _auditVerifyResult(false, row.id, checkedRows);
       }
     }
 
-    return { ok: true, brokenAt: null, checkedRows: checkedRows };
+    return _auditVerifyResult(true, null, checkedRows);
   } catch (err) {
     throw new Error('verifyChain gagal: ' + (err && err.message ? err.message : String(err)));
   }
+}
+
+function _auditVerifyResult(ok, brokenAt, checkedRows) {
+  return {
+    ok: ok === true,
+    brokenAt: _auditSafeRowId(brokenAt),
+    checkedRows: _auditSafeCount(checkedRows),
+  };
+}
+
+function _auditSafeRowId(value) {
+  if (value === undefined || value === null || value === '') return null;
+  return String(value);
+}
+
+function _auditSafeCount(value) {
+  var count = Number(value || 0);
+  if (!isFinite(count) || count < 0) return 0;
+  return Math.floor(count);
 }
 
 function _auditValidateLogInput(input) {
