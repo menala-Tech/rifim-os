@@ -104,20 +104,53 @@ function _searchEscLike(s) {
 }
 
 function _searchSbGetWithCount(url) {
-  var cfg = _getSupabaseConfig();
-  var res = UrlFetchApp.fetch(url, {
-    method: 'GET',
-    headers: _sbHeaders(cfg.key, 'count=exact'),
-    muteHttpExceptions: true,
-  });
-  _searchCheckResponse(res, 'GET ' + url);
+  var rows = _sbGet(url);
+  var fallbackTotal = rows.length;
+  var total = fallbackTotal;
 
-  var rows = JSON.parse(res.getContentText() || '[]');
-  var total = _searchParseTotalCount(res, rows.length);
+  try {
+    total = _searchSbHeadCount(url, fallbackTotal);
+  } catch (headErr) {
+    try {
+      total = _searchSbAggregateCount(url, fallbackTotal);
+    } catch (aggregateErr) {
+      total = fallbackTotal;
+    }
+  }
+
   return { rows: rows, total: total };
 }
 
-function _searchParseTotalCount(res, fallback) {
+function _searchSbHeadCount(url, fallback) {
+  var cfg = _getSupabaseConfig();
+  var res = UrlFetchApp.fetch(url, {
+    method: 'HEAD',
+    headers: _sbHeaders(cfg.key, 'count=exact'),
+    muteHttpExceptions: true,
+  });
+  _searchCheckResponse(res, 'HEAD ' + url);
+  return _searchParseContentRangeTotal(res, fallback);
+}
+
+function _searchSbAggregateCount(url, fallback) {
+  var rows = _sbGet(_searchCountAggregateUrl(url));
+  if (!rows || !rows.length || rows[0].count === undefined) return fallback;
+  var total = Number(rows[0].count);
+  return isFinite(total) ? total : fallback;
+}
+
+function _searchCountAggregateUrl(url) {
+  var parts = String(url).split('?');
+  var query = parts[1] || '';
+  var params = query ? query.split('&') : [];
+  var filters = params.filter(function (param) {
+    return !/^(select|order|limit|offset)=/.test(param);
+  });
+  filters.unshift('select=count()');
+  return parts[0] + '?' + filters.join('&');
+}
+
+function _searchParseContentRangeTotal(res, fallback) {
   var headers = res.getAllHeaders ? res.getAllHeaders() : res.getHeaders();
   var contentRange = headers['Content-Range'] || headers['content-range'] || '';
   var match = String(contentRange).match(/\/(\d+|\*)$/);
