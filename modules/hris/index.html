@@ -188,6 +188,17 @@ tr:last-child td{border-bottom:none}
   outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(233,69,96,.1);
 }
 .form-span-2{grid-column:1/-1}
+.att-photo-group{display:flex;gap:6px;justify-content:center;align-items:center}
+.att-photo-thumb{width:28px;height:28px;border:1px solid var(--border);border-radius:7px;object-fit:cover;cursor:pointer;background:#f8f9fa}
+.att-location{display:flex;flex-direction:column;gap:3px;align-items:flex-start;min-width:110px}
+.att-location a{color:var(--accent);font-weight:600;text-decoration:none;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att-location .badge{font-size:9px;padding:1px 6px}
+.att-lightbox-img{max-width:100%;max-height:72vh;border-radius:12px;object-fit:contain;background:#111}
+.attendance-subtabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.attendance-subtabs button{border:1px solid var(--border);background:#fff;color:var(--text);border-radius:999px;padding:8px 14px;font-weight:700;cursor:pointer}
+.attendance-subtabs button.active{background:var(--primary);border-color:var(--primary);color:#fff}
+.attendance-panel{display:none}
+.attendance-panel.active{display:block}
 .required::after{content:' *';color:var(--danger)}
 
 /* ─── DETAIL PANEL ─── */
@@ -355,6 +366,12 @@ tr:last-child td{border-bottom:none}
           <button class="btn btn-primary" onclick="openModal('modal-add-contract')">+ Kontrak Baru</button>
         </div>
         <div class="card-body">
+          <div class="attendance-subtabs">
+            <button class="active" id="att-subtab-rekap-btn" onclick="switchAttendanceSubtab('rekap')">Rekap Absensi</button>
+            <button id="att-subtab-gapok-btn" onclick="switchAttendanceSubtab('gapok')">Gapok Proporsional</button>
+          </div>
+
+          <div id="att-panel-rekap" class="attendance-panel active">
           <div class="toolbar">
             <input type="text" id="search-contract" placeholder="Cari ID karyawan…" oninput="filterContracts()">
             <select id="filter-contract-status" onchange="filterContracts()">
@@ -387,7 +404,6 @@ tr:last-child td{border-bottom:none}
         <div class="card-header">
           <h3>Rekap Absensi <span style="font-size:11px;color:#888;font-weight:400">— source: PWA RAOS (<code>raos_attendance</code>)</span></h3>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-secondary" onclick="exportAttendancePDF()">📄 Save PDF</button>
             <button class="btn btn-secondary" onclick="showAttendanceSummaryModal()">📊 Summary Bulan</button>
             <button class="btn btn-primary" onclick="openModal('modal-add-attendance')">+ Catat Manual</button>
           </div>
@@ -401,6 +417,7 @@ tr:last-child td{border-bottom:none}
             <input type="date" id="att-date-from" onchange="loadAttendance()">
             <input type="date" id="att-date-to" onchange="loadAttendance()">
             <button class="btn btn-secondary" onclick="loadAttendance()">Tampilkan</button>
+            <button class="btn btn-secondary" onclick="exportAttendancePDF()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> Export PDF</button>
           </div>
           <div class="table-wrap">
             <table style="font-size:12px">
@@ -420,6 +437,27 @@ tr:last-child td{border-bottom:none}
                 <tr><td colspan="12" class="empty-state"><p>Pilih rentang tanggal lalu klik Tampilkan.</p></td></tr>
               </tbody>
             </table>
+          </div>
+
+          <div id="att-panel-gapok" class="attendance-panel">
+            <div class="toolbar">
+              <input type="month" id="gapok-month" onchange="loadGapokProporsional()">
+              <button class="btn btn-secondary" onclick="loadGapokProporsional()">Tampilkan</button>
+              <button class="btn btn-secondary" onclick="exportGapokProporsionalXLSX()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> Export XLSX</button>
+            </div>
+            <div class="table-wrap">
+              <table style="font-size:12px">
+                <thead>
+                  <tr>
+                    <th>Nama</th><th>ID</th><th>Hari Masuk</th><th>Hari Kerja Ideal</th>
+                    <th>Gapok Bulanan</th><th>Potongan Terlambat</th><th>Gapok Proporsional</th><th>Gapok Final</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-gapok-proporsional">
+                  <tr><td colspan="8" class="empty-state"><p>Pilih bulan lalu klik Tampilkan.</p></td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -789,6 +827,54 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- Modal: Edit Absensi RAOS -->
+<div class="modal-overlay" id="modal-edit-attendance-raos">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h3 id="edit-att-title">Edit Absensi</h3>
+      <button class="modal-close" onclick="closeModal('modal-edit-attendance-raos')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input id="edit-att-id" type="hidden">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Jam Masuk</label>
+          <input id="edit-att-check-in" type="datetime-local">
+        </div>
+        <div class="form-group">
+          <label>Jam Pulang</label>
+          <input id="edit-att-check-out" type="datetime-local">
+        </div>
+        <div class="form-group form-span-2">
+          <label>Potongan Rp</label>
+          <input id="edit-att-deduction" type="number" min="0" step="1000">
+        </div>
+        <div class="form-group form-span-2">
+          <label class="required">Alasan Edit</label>
+          <textarea id="edit-att-reason" rows="3" minlength="5" placeholder="Minimal 5 karakter, contoh: koreksi jam pulang driver"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-attendance-raos')">Batal</button>
+      <button class="btn btn-primary" onclick="submitAttendanceRaosEdit()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Foto Absensi -->
+<div class="modal-overlay" id="modal-attendance-photo">
+  <div class="modal" style="max-width:760px;background:#111;color:#fff">
+    <div class="modal-header" style="border-color:#333">
+      <h3 id="attendance-photo-title">Foto Absensi</h3>
+      <button class="modal-close" style="color:#fff" onclick="closeModal('modal-attendance-photo')">&times;</button>
+    </div>
+    <div class="modal-body" style="display:flex;justify-content:center;background:#111">
+      <img id="attendance-photo-img" class="att-lightbox-img" alt="Foto Absensi">
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Ajukan Cuti -->
 <div class="modal-overlay" id="modal-apply-leave">
   <div class="modal" style="max-width:480px">
@@ -1152,6 +1238,7 @@ function initApp() {
   document.getElementById('att-date-from').value = today.slice(0,7) + '-01';
   document.getElementById('att-date-to').value   = today;
   document.getElementById('att-date').value      = today;
+  document.getElementById('gapok-month').value   = today.slice(0,7);
   document.getElementById('lv-start').value      = today;
   document.getElementById('lv-end').value        = today;
   document.getElementById('emp-join').value      = today;
@@ -1173,7 +1260,7 @@ function initApp() {
     const activeTab = document.querySelector('.tab-content.active');
     if (!activeTab) return;
     if (activeTab.id === 'tab-absensi') loadAttendance({ forceRefresh: true });
-  }, 60 * 60 * 1000);
+  }, 30 * 1000);
 }
 
 function onCompanyChange() {
@@ -1191,7 +1278,7 @@ function switchTab(tab, btn) {
   btn.classList.add('active');
 
   if (tab === 'kontrak')  loadContracts();
-  if (tab === 'absensi')  {} // user klik Tampilkan manual
+  if (tab === 'absensi')  { if (document.getElementById('att-panel-gapok')?.classList.contains('active')) loadGapokProporsional(); }
   if (tab === 'cuti')     loadLeave();
   if (tab === 'payroll')  loadPayroll();
 }
@@ -2094,92 +2181,211 @@ function _renderAttendanceRows(rows) {
   }
 
   const fmtTime = (iso) => {
-    if (!iso) return '<span style="color:#888">–</span>';
+    if (!iso) return '<span style="color:#888">&ndash;</span>';
     try { return new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }); }
-    catch (_) { return iso; }
+    catch (_) { return escH(iso); }
   };
   const statusColor = { HADIR:'aktif', hadir:'aktif', IZIN:'pending', SAKIT:'warning', ALPHA:'ditolak', CUTI:'pkwt' };
 
   tbody.innerHTML = rows.map(r => {
-    const lateBadge = r.late_minutes > 0
-      ? `<span style="color:#dc2626;font-weight:700">${r.late_minutes}m</span>`
-      : `<span style="color:#16a34a">0m</span>`;
-    const potBadge = r.late_deduction > 0
-      ? `<span style="color:#dc2626;font-family:monospace">Rp ${fmtNum(r.late_deduction)}</span>`
-      : `<span style="color:#888">–</span>`;
-    const foto = [
-      r.selfie_in_url  ? `<a href="${r.selfie_in_url}"  target="_blank" title="Foto masuk" style="text-decoration:none">📸in</a>` : '',
-      r.selfie_out_url ? `<a href="${r.selfie_out_url}" target="_blank" title="Foto pulang" style="text-decoration:none">📸out</a>` : '',
-    ].filter(Boolean).join(' ') || '<span style="color:#888">–</span>';
-    const lokasi = r.location
-      ? `<a href="${r.maps_link}" target="_blank" title="${r.location}" style="text-decoration:none">📍${r.is_location_valid ? '✓' : '⚠'}</a>`
-      : '<span style="color:#888">–</span>';
+    const rowId = String(r.id || '');
+    const lateMinutes = Number(r.late_minutes || 0);
+    const lateDeduction = Number(r.late_deduction || 0);
+    const lateBadge = lateMinutes > 0
+      ? '<span style="color:#dc2626;font-weight:700">' + lateMinutes + ' menit</span>'
+      : '<span style="color:#16a34a">0 menit</span>';
+    const potBadge = lateDeduction > 0
+      ? '<span style="color:#dc2626;font-family:monospace">Rp ' + fmtNum(lateDeduction) + '</span>'
+      : '<span style="color:#888">&ndash;</span>';
+    const foto = _attendancePhotoButtons(r);
+    const lokasi = _attendanceLocationCell(r);
     const stKey = (r.status || 'HADIR').toString();
-    return `<tr>
-      <td><strong style="font-size:11px">${r.staff_code || '–'}</strong></td>
-      <td>${r.staff_name || '–'}</td>
-      <td style="font-size:10px">${r.branch_name || '–'}</td>
-      <td>${fmtDate(r.date)}</td>
-      <td>${fmtTime(r.check_in_at)}</td>
-      <td>${fmtTime(r.check_out_at)}</td>
-      <td style="text-align:right">${lateBadge}</td>
-      <td style="text-align:right">${potBadge}</td>
-      <td style="text-align:center">${lokasi}</td>
-      <td style="text-align:center">${foto}</td>
-      <td><span class="badge badge-${statusColor[stKey] || 'pkwt'}">${stKey}</span></td>
-      <td><button class="btn btn-ghost btn-sm" onclick="editAttendanceRaos('${r.id}','${(r.staff_name || '').replace(/'/g,"\\'")}','${r.check_in_at || ''}','${r.check_out_at || ''}','${stKey}')">✏️</button></td>
-    </tr>`;
+    return '<tr>' +
+      '<td><strong style="font-size:11px">' + escH(r.staff_code || '-') + '</strong></td>' +
+      '<td>' + escH(r.staff_name || '-') + '</td>' +
+      '<td style="font-size:10px">' + escH(r.branch_name || '-') + '</td>' +
+      '<td>' + fmtDate(r.date) + '</td>' +
+      '<td>' + fmtTime(r.check_in_at_override || r.check_in_at) + '</td>' +
+      '<td>' + fmtTime(r.check_out_at_override || r.check_out_at) + '</td>' +
+      '<td style="text-align:right">' + lateBadge + '</td>' +
+      '<td style="text-align:right">' + potBadge + '</td>' +
+      '<td>' + lokasi + '</td>' +
+      '<td style="text-align:center">' + foto + '</td>' +
+      '<td><span class="badge badge-' + (statusColor[stKey] || 'pkwt') + '">' + escH(stKey) + '</span></td>' +
+      '<td><button class="btn btn-ghost btn-sm" title="Edit absensi" onclick="openAttendanceEditModal(' + escAttr(JSON.stringify(rowId)) + ')">' + iconSvg('pencil') + '</button></td>' +
+    '</tr>';
   }).join('');
 }
 
+function _attendanceLocationCell(row) {
+  const location = row.location ? String(row.location) : '';
+  if (!location && !row.maps_link) return '<span style="color:#888">&ndash;</span>';
+  const shortLocation = location.length > 28 ? location.slice(0, 28) + '...' : location;
+  const badgeClass = row.is_location_valid ? 'badge-aktif' : 'badge-ditolak';
+  const badgeText = row.is_location_valid ? 'Sesuai' : 'Di luar radius';
+  const link = row.maps_link
+    ? '<a href="' + escAttr(row.maps_link) + '" target="_blank" rel="noopener">' + escH(shortLocation || 'Buka Maps') + '</a>'
+    : '<span>' + escH(shortLocation || '-') + '</span>';
+  return '<div class="att-location">' + link + '<span class="badge ' + badgeClass + '">' + badgeText + '</span></div>';
+}
+
+function _attendancePhotoButtons(row) {
+  const items = [
+    { url: row.selfie_in_url, label: 'Masuk' },
+    { url: row.selfie_out_url, label: 'Pulang' },
+  ].filter(item => item.url);
+  if (!items.length) return '<span style="color:#888">&ndash;</span>';
+  return '<div class="att-photo-group">' + items.map(item =>
+    '<img class="att-photo-thumb" src="' + escAttr(item.url) + '" alt="Foto ' + escAttr(item.label) + '" title="Foto ' + escAttr(item.label) + '" onclick="openAttendancePhotoLightbox(' + escAttr(JSON.stringify(item.url)) + ',' + escAttr(JSON.stringify('Foto ' + item.label)) + ')">'
+  ).join('') + '</div>';
+}
+
 // Modal edit — jam masuk/pulang/status
-function editAttendanceRaos(id, staffName, checkIn, checkOut, status) {
-  const toLocalDT = (iso) => {
-    if (!iso) return '';
-    try {
-      const d = new Date(iso);
-      // Format YYYY-MM-DDTHH:MM (datetime-local input)
-      const p = (n) => String(n).padStart(2,'0');
-      return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
-    } catch (_) { return ''; }
-  };
-  const inVal = prompt('Jam Masuk (YYYY-MM-DDTHH:MM, kosongkan = clear):\n\nStaff: ' + staffName, toLocalDT(checkIn));
-  if (inVal === null) return;
-  const outVal = prompt('Jam Pulang (YYYY-MM-DDTHH:MM, kosongkan = clear):', toLocalDT(checkOut));
-  if (outVal === null) return;
-  const stVal = prompt('Status (HADIR/IZIN/SAKIT/ALPHA/CUTI):', status || 'HADIR');
-  if (stVal === null) return;
+function openAttendanceEditModal(id) {
+  const row = (allAttendanceRaos || []).find(item => String(item.id) === String(id));
+  if (!row) return alert('Data absensi tidak ditemukan di tabel saat ini.');
+  document.getElementById('edit-att-id').value = row.id || '';
+  document.getElementById('edit-att-title').textContent = 'Edit Absensi - ' + (row.staff_name || row.staff_code || row.id || 'Staff');
+  document.getElementById('edit-att-check-in').value = toDatetimeLocal(row.check_in_at_override || row.check_in_at);
+  document.getElementById('edit-att-check-out').value = toDatetimeLocal(row.check_out_at_override || row.check_out_at);
+  document.getElementById('edit-att-deduction').value = Number(row.late_deduction || 0);
+  document.getElementById('edit-att-reason').value = '';
+  openModal('modal-edit-attendance-raos');
+}
 
-  const toISO = (local) => {
-    if (!local) return '';
-    try {
-      // Assume WIB +07:00
-      return new Date(local + '+07:00').toISOString();
-    } catch (_) { return local; }
-  };
+async function submitAttendanceRaosEdit() {
+  const id = document.getElementById('edit-att-id').value;
+  const reason = document.getElementById('edit-att-reason').value.trim();
+  if (!id) return alert('ID absensi tidak ditemukan.');
+  if (reason.length < 5) return alert('Alasan edit wajib minimal 5 karakter.');
 
-  gasGet({
-    action: 'hris_attendance_edit',
-    id: id,
-    check_in_at:  toISO(inVal),
-    check_out_at: toISO(outVal),
-    status:       stVal.toUpperCase(),
-  }).then(res => {
-    if (res.success) {
-      showToast('✅ Absensi ' + staffName + ' diperbarui', 'success');
-      loadAttendance();
+  try {
+    const res = await gasGet({
+      action: 'hris_attendance_edit',
+      id: id,
+      check_in_at_override: fromDatetimeLocal(document.getElementById('edit-att-check-in').value),
+      check_out_at_override: fromDatetimeLocal(document.getElementById('edit-att-check-out').value),
+      late_deduction_idr: document.getElementById('edit-att-deduction').value || 0,
+      reason: reason,
+    });
+    if (res && res.success) {
+      alert('\u2705 Absensi diupdate');
+      closeModal('modal-edit-attendance-raos');
+      loadAttendance({ forceRefresh: true });
     } else {
-      showToast('❌ ' + (res.message || 'Gagal'), 'error');
+      alert('\u274C ' + ((res && (res.message || res.error)) || 'Gagal update absensi'));
     }
-  }).catch(err => showToast('❌ ' + err.message, 'error'));
+  } catch (error) {
+    alert('\u274C ' + (error && error.message ? error.message : String(error)));
+  }
+}
+
+function openAttendancePhotoLightbox(url, title) {
+  if (!url) return;
+  document.getElementById('attendance-photo-title').textContent = title || 'Foto Absensi';
+  document.getElementById('attendance-photo-img').src = url;
+  openModal('modal-attendance-photo');
+}
+
+function toDatetimeLocal(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    const p = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  } catch (_) { return ''; }
+}
+
+function fromDatetimeLocal(localValue) {
+  if (!localValue) return '';
+  try { return new Date(localValue).toISOString(); }
+  catch (_) { return localValue; }
+}
+
+let allGapokProporsional = [];
+
+function switchAttendanceSubtab(tab) {
+  document.getElementById('att-panel-rekap').classList.toggle('active', tab === 'rekap');
+  document.getElementById('att-panel-gapok').classList.toggle('active', tab === 'gapok');
+  document.getElementById('att-subtab-rekap-btn').classList.toggle('active', tab === 'rekap');
+  document.getElementById('att-subtab-gapok-btn').classList.toggle('active', tab === 'gapok');
+  if (tab === 'gapok') loadGapokProporsional();
+}
+
+async function loadGapokProporsional() {
+  const tbody = document.getElementById('tbody-gapok-proporsional');
+  const monthInput = document.getElementById('gapok-month').value || new Date().toISOString().slice(0, 7);
+  const month = monthInput + '-01';
+  tbody.innerHTML = '<tr><td colspan="8" class="loading">Memuat gapok proporsional...</td></tr>';
+
+  const res = await gasGet({ action: 'hris_gapok_proporsional_list', month: month });
+  if (!res || !res.success) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><p style="color:#dc2626">' + escH((res && res.message) || 'Gagal load gapok proporsional') + '</p></td></tr>';
+    return;
+  }
+
+  allGapokProporsional = res.rows || [];
+  renderGapokProporsionalRows(allGapokProporsional);
+}
+
+function renderGapokProporsionalRows(rows) {
+  const tbody = document.getElementById('tbody-gapok-proporsional');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><p>Belum ada data gapok proporsional untuk bulan ini.</p></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(row => '<tr>' +
+    '<td>' + escH(row.staff_name || '-') + '</td>' +
+    '<td><strong style="font-size:11px">' + escH(row.employee_code || row.staff_id || '-') + '</strong></td>' +
+    '<td style="text-align:center">' + fmtNum(row.hari_masuk || 0) + '</td>' +
+    '<td style="text-align:center">' + fmtNum(row.hari_kerja_ideal || 0) + '</td>' +
+    '<td style="text-align:right;font-family:monospace">Rp ' + fmtNum(row.gapok_bulanan || 0) + '</td>' +
+    '<td style="text-align:right;font-family:monospace;color:#dc2626">Rp ' + fmtNum(row.total_potongan_terlambat || 0) + '</td>' +
+    '<td style="text-align:right;font-family:monospace">Rp ' + fmtNum(row.gapok_proporsional || 0) + '</td>' +
+    '<td style="text-align:right;font-family:monospace;font-weight:800;color:#16a34a">Rp ' + fmtNum(row.gapok_final || 0) + '</td>' +
+  '</tr>').join('');
+}
+
+function exportGapokProporsionalXLSX() {
+  const rows = allGapokProporsional || [];
+  if (!rows.length) return showToast('Tidak ada data gapok untuk export.', 'error');
+  const month = document.getElementById('gapok-month').value || new Date().toISOString().slice(0, 7);
+  const escXml = (value) => String(value == null ? '' : value)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+  const headers = ['Nama','ID','Hari Masuk','Hari Kerja Ideal','Gapok Bulanan','Potongan Terlambat','Gapok Proporsional','Gapok Final'];
+  const headerRow = '<Row>' + headers.map(h => '<Cell ss:StyleID="hdr"><Data ss:Type="String">' + escXml(h) + '</Data></Cell>').join('') + '</Row>';
+  const dataRows = rows.map(row => '<Row>' + [
+    '<Cell><Data ss:Type="String">' + escXml(row.staff_name || '') + '</Data></Cell>',
+    '<Cell><Data ss:Type="String">' + escXml(row.employee_code || row.staff_id || '') + '</Data></Cell>',
+    '<Cell><Data ss:Type="Number">' + (Number(row.hari_masuk) || 0) + '</Data></Cell>',
+    '<Cell><Data ss:Type="Number">' + (Number(row.hari_kerja_ideal) || 0) + '</Data></Cell>',
+    '<Cell ss:StyleID="num"><Data ss:Type="Number">' + (Number(row.gapok_bulanan) || 0) + '</Data></Cell>',
+    '<Cell ss:StyleID="num"><Data ss:Type="Number">' + (Number(row.total_potongan_terlambat) || 0) + '</Data></Cell>',
+    '<Cell ss:StyleID="num"><Data ss:Type="Number">' + (Number(row.gapok_proporsional) || 0) + '</Data></Cell>',
+    '<Cell ss:StyleID="num"><Data ss:Type="Number">' + (Number(row.gapok_final) || 0) + '</Data></Cell>',
+  ].join('') + '</Row>').join('');
+  const xml = '<?xml version="1.0"?>\n<?mso-application progid="Excel.Sheet"?>\n' +
+    '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' +
+    '<Styles><Style ss:ID="hdr"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#C40000" ss:Pattern="Solid"/></Style><Style ss:ID="num"><NumberFormat ss:Format="&quot;Rp &quot;#,##0"/></Style></Styles>' +
+    '<Worksheet ss:Name="Gapok ' + escXml(month) + '"><Table>' + headerRow + dataRows + '</Table></Worksheet></Workbook>';
+  const blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'gapok_proporsional_' + month + '.xls';
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast('XLSX gapok berhasil diunduh (' + rows.length + ' staff).', 'success');
 }
 
 // Save PDF absensi
 function exportAttendancePDF() {
   if (!allAttendanceRaos.length) return showToast('Tidak ada data untuk export.', 'error');
   const now = new Date();
-  const df = document.getElementById('att-date-from').value || '—';
-  const dt = document.getElementById('att-date-to').value || '—';
+  const df = document.getElementById('att-date-from').value || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10);
+  const dt = document.getElementById('att-date-to').value || new Date().toISOString().slice(0,10);
   const stamp = now.toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' });
   const escHtml = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const fmtT = (iso) => { try { return new Date(iso).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}); } catch(_) { return iso || '–'; } };
@@ -2191,15 +2397,18 @@ function exportAttendancePDF() {
       <td>${escHtml(r.staff_name || '–')}</td>
       <td>${escHtml(r.branch_name || '–')}</td>
       <td>${escHtml(r.date)}</td>
-      <td>${escHtml(fmtT(r.check_in_at))}</td>
-      <td>${escHtml(fmtT(r.check_out_at))}</td>
+      <td>${escHtml(fmtT(r.check_in_at_override || r.check_in_at))}</td>
+      <td>${escHtml(fmtT(r.check_out_at_override || r.check_out_at))}</td>
       <td class="num">${r.late_minutes || 0}m</td>
       <td class="num">Rp ${fmtNum(r.late_deduction || 0)}</td>
       <td>${escHtml(r.status || 'HADIR')}</td>
     </tr>`).join('');
   const totalLate = allAttendanceRaos.reduce((a, r) => a + (r.late_deduction || 0), 0);
 
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rekap Absensi ${escHtml(df)} - ${escHtml(dt)}</title>
+  const branchSlug = (document.getElementById('filter-att-branch').selectedOptions[0]?.text || 'semua-cabang').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'semua-cabang';
+  const fileName = 'Absensi_' + branchSlug + '_' + df + '_to_' + dt + '.pdf';
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escHtml(fileName)}</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', Arial, sans-serif; color: #111; padding: 20px; font-size: 11px; }
@@ -2215,6 +2424,7 @@ td.num { text-align: right; font-family: monospace; }
 @media print { th { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 </style></head><body>
 <h1>Rekap Absensi Karyawan</h1>
+<div class="meta">Simpan dialog print sebagai: <b>${escHtml(fileName)}</b></div>
 <div class="meta">Periode: <b>${escHtml(df)}</b> s.d <b>${escHtml(dt)}</b> · Total: <b>${allAttendanceRaos.length}</b> record · Dibuat: ${escHtml(stamp)}</div>
 <table>
   <thead><tr><th>#</th><th>ID</th><th>Nama</th><th>Cabang</th><th>Tanggal</th><th>Masuk</th><th>Keluar</th><th>Telat</th><th>Potongan</th><th>Status</th></tr></thead>
@@ -2665,6 +2875,24 @@ function showToast(msg, type) {
 // ════════════════════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════════════════════
+function escH(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function escAttr(s) {
+  return escH(s);
+}
+
+function iconSvg(name) {
+  const icons = {
+    'pencil': '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>',
+    'file-text': '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>',
+  };
+  return icons[name] || '';
+}
+
 function fmtDate(str) {
   if (!str) return '–';
   const d = new Date(str);
