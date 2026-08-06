@@ -293,7 +293,7 @@ function docHandleGet(e) {
         data = getPendingForApprover(ctx.userId);
         break;
       case 'doc_verify_chain':
-        data = verifyChain({ fromId: params.fromId, toId: params.toId });
+        data = _docVerifyChainSafe_({ fromId: params.fromId, toId: params.toId });
         break;
       default:
         throw new Error('doc GET action tidak dikenal: ' + action);
@@ -437,6 +437,15 @@ function _docIsAction_(action) {
   return String(action || '').indexOf('doc_') === 0;
 }
 
+function _docVerifyChainSafe_(input) {
+  var result = verifyChain(input || {});
+  return {
+    ok: result && result.ok === true,
+    brokenAt: result && result.brokenAt !== undefined && result.brokenAt !== null ? String(result.brokenAt) : null,
+    checkedRows: Number(result && result.checkedRows) || 0,
+  };
+}
+
 function _docJsonOk_(data) {
   return _docJsonOutput_({ ok: true, data: data });
 }
@@ -449,11 +458,31 @@ function _docJsonError_(err) {
 function _docJsonOutput_(payload) {
   var text;
   try {
-    text = JSON.stringify(payload);
+    text = JSON.stringify(_docSafeJsonValue_(payload));
   } catch (err) {
     text = JSON.stringify({ ok: false, error: 'Response JSON tidak valid: ' + (err && err.message ? err.message : String(err)) });
   }
   return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.JSON);
+}
+
+function _docSafeJsonValue_(value) {
+  if (value === undefined) return null;
+  if (value === null) return null;
+  if (typeof value === 'number') return isFinite(value) ? value : null;
+  if (typeof value === 'bigint') return String(value);
+  if (typeof value === 'function') return null;
+  if (Object.prototype.toString.call(value) === '[object Date]') return value.toISOString();
+  if (typeof value !== 'object') return value;
+
+  if (Object.prototype.toString.call(value) === '[object Array]') {
+    return value.map(function (item) { return _docSafeJsonValue_(item); });
+  }
+
+  var safe = {};
+  Object.keys(value).forEach(function (key) {
+    safe[key] = _docSafeJsonValue_(value[key]);
+  });
+  return safe;
 }
 
 function _docRestUrl_(table, params) {
@@ -468,7 +497,11 @@ function _docRestUrl_(table, params) {
 function doGet(e) {
   var action = e && e.parameter && e.parameter.action;
   if (_docIsAction_(action)) {
-    return docHandleGet(e);
+    try {
+      return docHandleGet(e);
+    } catch (err) {
+      return _docJsonError_(err);
+    }
   }
 
   // CRM API dispatcher (sesi 2026-08-02) — return early kalau action
