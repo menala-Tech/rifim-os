@@ -2,7 +2,34 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-08-06 malam (PR #10 audit closed — 5 decision approved, Fonnte deprecation roadmap Sesi 2 KPI + Sesi 3 chat migration comprehensive)
+> Last updated: 2026-08-07 (Sesi 3 chat migration implementation — Decision #4)
+
+## Sesi 2026-08-07 — Chat Migration Full (Decision #4)
+
+### Implementasi selesai di branch
+- Commit `56e5d1c` mengganti seluruh call site `waSend*` dengan RPC
+  `raos_post_system_message` dan resolver room dari migration `raos_073`.
+- `chatBridge.js` menjadi boundary GAS untuk RPC, builder plaintext, metadata
+  `SYSMETA`, dan mapping UUID 9 cabang.
+- Notifikasi Smart Office, HRIS, Finance, laporan, SLA saldo, SLA potongan,
+  dan saldo PWA diarahkan ke room Pengumuman/private/saldo sesuai kontrak.
+- `waEngine.js` dihapus; komentar setup dan menu Fonnte dibersihkan.
+- Script Properties `FONNTE_TOKEN` / `WA_GROUP_ID` sengaja tidak dihapus;
+  user akan menghapus manual setelah production stabil 1 minggu.
+- Driver eksternal membership ditunda ke sub-sesi 3B sesuai keputusan user.
+
+### Verifikasi
+- Seluruh file Apps Script lolos `node --check`.
+- Audit folder Apps Script: tidak ada `waSend`, `fonnte`, `FONNTE_TOKEN`,
+  `WA_GROUP_ID`, `waEngine`, atau mapping grup WA yang tersisa.
+- Runtime GAS, test 9 cabang, push notification, dan screenshot production
+  masih menunggu deploy/redeploy serta smoke test manual.
+
+### Companion RAOS
+- Commit `9561681`: renderer `type='system'`, parser metadata, avatar 🤖,
+  label “Sistem RAOS”, badge kategori, dan deep link aman.
+
+---
 
 ## Sesi 2026-08-06 malam — PR #10 Decision + Fonnte Deprecation Roadmap
 
