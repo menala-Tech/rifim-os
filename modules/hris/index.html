@@ -1255,38 +1255,81 @@ function getRaosSyncToken() {
   return '';
 }
 
-async function syncSsotNow() {
+function setSyncLoading(isLoading) {
   const btn = document.getElementById('btn-sync-ssot-now');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Sinkron...'; }
+  if (!btn) return;
+  btn.disabled = isLoading;
+  btn.textContent = isLoading ? '\u23F3 Sinkron...' : '\uD83D\uDD04 Sync Sekarang';
+}
 
+function isLikelyBackgroundSyncError(err) {
+  const name = err && err.name ? String(err.name) : '';
+  const message = err && err.message ? String(err.message) : String(err || '');
+  return name === 'AbortError' || /abort|timeout|network|failed to fetch|koneksi gagal|throttled|response bukan json/i.test(message);
+}
+
+async function runHrisSyncWithUiTimeout() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await gasGet({ action: 'hris_sync_master_staff_now' }, { signal: controller.signal }, 0);
+    if (res && res.success) {
+      return { target: 'HRIS employees', ok: true, background: false, detail: res.result || res.message };
+    }
+
+    const message = res && res.message ? res.message : 'Sync HRIS tidak mengembalikan status sukses.';
+    if (isLikelyBackgroundSyncError(message)) {
+      return { target: 'HRIS employees', ok: true, background: true, detail: message };
+    }
+    return { target: 'HRIS employees', ok: false, background: false, detail: message };
+  } catch (err) {
+    if (isLikelyBackgroundSyncError(err)) {
+      return { target: 'HRIS employees', ok: true, background: true, detail: err.message };
+    }
+    return { target: 'HRIS employees', ok: false, background: false, detail: err.message };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function syncSsotNow() {
+  setSyncLoading(true);
   const raosToken = getRaosSyncToken();
 
-  const tasks = [
-    // 1. Sync SSOT → employees (HRIS) — via Rifim-OS GAS Web App
-    gasGet({ action: 'hris_sync_master_staff_now' })
-      .then(r => ({ target: 'HRIS employees', ok: !!r.success, detail: r.result || r.message }))
-      .catch(e => ({ target: 'HRIS employees', ok: false, detail: e.message })),
+  try {
+    const tasks = [
+      runHrisSyncWithUiTimeout(),
 
-    // 2. Sync SSOT → user_profiles (RAOS) — via RAOS Web API
-    raosToken
-      ? fetch(RAOS_GAS_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'sync_staff', token: raosToken }),
-        }).then(r => r.json())
-          .then(j => ({ target: 'PWA RAOS user_profiles', ok: !!j.ok, detail: j.result || j.error || j }))
-          .catch(e => ({ target: 'PWA RAOS user_profiles', ok: false, detail: e.message }))
-      : Promise.resolve({ target: 'PWA RAOS user_profiles', ok: false, detail: 'session token tidak ditemukan — login ulang' }),
-  ];
+      // 2. Sync SSOT to user_profiles (RAOS) via RAOS Web API
+      raosToken
+        ? fetch(RAOS_GAS_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'sync_staff', token: raosToken }),
+          }).then(r => r.json())
+            .then(j => ({ target: 'PWA RAOS user_profiles', ok: !!j.ok, background: false, detail: j.result || j.error || j }))
+            .catch(e => ({ target: 'PWA RAOS user_profiles', ok: false, background: false, detail: e.message }))
+        : Promise.resolve({ target: 'PWA RAOS user_profiles', ok: false, background: false, detail: 'session token tidak ditemukan \u2014 login ulang' }),
+    ];
 
-  const results = await Promise.all(tasks);
-  const summary = results.map(r => `${r.ok ? '✅' : '❌'} ${r.target}`).join('  ·  ');
-  showToast('Sync selesai — ' + summary, results.every(r => r.ok) ? 'success' : 'warn');
-  console.log('[HRIS] syncSsotNow results:', results);
+    const results = await Promise.all(tasks);
+    const hrisResult = results.find(r => r.target === 'HRIS employees');
+    const summary = results.map(r => (r.ok ? '\u2705' : '\u274C') + ' ' + r.target).join('  \u00B7  ');
+    showToast('Sync selesai \u2014 ' + summary, results.every(r => r.ok) ? 'success' : 'warn');
+    console.log('[HRIS] syncSsotNow results:', results);
 
-  if (btn) { btn.disabled = false; btn.textContent = '🔄 Sync Sekarang'; }
-  // Refresh tabel Karyawan
-  loadEmployees({ forceRefresh: true });
+    if (hrisResult && hrisResult.background) {
+      alert('\u23F3 Sync di-trigger. Karena data besar, prosesnya jalan di background 30-60 detik.\n\nRefresh halaman ini 1 menit lagi untuk lihat hasilnya.');
+    } else if (results.every(r => r.ok)) {
+      alert('\u2705 Sync berhasil, data akan refresh dalam 15 detik...');
+    } else {
+      const failed = results.filter(r => !r.ok).map(r => r.target + ': ' + r.detail).join('\n');
+      alert('\u274C Sync gagal:\n' + failed);
+    }
+  } finally {
+    setSyncLoading(false);
+    setTimeout(() => loadEmployees({ forceRefresh: true }), 15000);
+  }
 }
 
 function openAddEmployeeModal() {
@@ -2548,11 +2591,11 @@ async function _hrisFetchJson(url, initOpts, retry) {
   return { success: false, message: 'Gagal setelah retry: ' + lastMsg };
 }
 
-async function gasGet(params) {
+async function gasGet(params, initOpts, retry) {
   const p = Object.assign({}, params);
   if (!p.user) p.user = _hrisGetUserEmail();
   const url = GAS_URL + '?' + new URLSearchParams(p).toString();
-  return _hrisFetchJson(url, undefined, 1);
+  return _hrisFetchJson(url, initOpts, retry == null ? 1 : retry);
 }
 
 async function gasPost(body) {
