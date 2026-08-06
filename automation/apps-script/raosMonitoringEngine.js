@@ -1,20 +1,18 @@
 /**
  * RIFIM OS — RAOS Monitoring Engine
- * Monitoring real-time + WA alert dua modul:
+ * Monitoring real-time + RAOS Chat alert dua modul:
  *
  *   1. SALDO   — Form Input Saldo AIST: baris belum diisi Login ID > SLA menit
- *                Alert ke grup WA saldo per-cabang (SAL_WA_GROUP_PER_CABANG)
+ *                Alert ke chat room saldo per-cabang
  *
  *   2. POTONGAN — Database Potongan: cabang tanpa input baru > 60 menit
- *                Alert ke grup WA admin cabang (MON_WA_POT_GRUP)
+ *                Alert ke chat room saldo per-cabang
  *
  * Setup awal (jalankan SEKALI dari GAS Editor):
  *   1. setupMonitoringSheets()   — buat sheet MONITORING_SALDO + MONITORING_POTONGAN
  *   2. setupMonitoringTriggers() — pasang semua trigger tiap 5 menit
  *
- * Sumber WA group ID:
- *   MonitoringSaldo.gs (SAL_WA_GROUP_PER_CABANG) → _MON_WA_SALDO_GRUP
- *   Monitoring.gs (MON_WA_GROUP_PER_CABANG) → _MON_WA_POT_GRUP
+ * Routing cabang memakai BRANCH_ID_BY_NAME di chatBridge.js.
  */
 
 // ── KONFIGURASI ───────────────────────────────────────────────────
@@ -65,26 +63,6 @@ var _MON_POT_CABANG = [
   'ID Rifim Airport Manado',
   'ID Rifim Airport Pekanbaru',
 ];
-
-// WA Grup saldo per cabang — dari MonitoringSaldo.gs SAL_WA_GROUP_PER_CABANG
-var _MON_WA_SALDO_GRUP = {
-  'ID Rifim Airport Batam':      '120363416803569567@g.us',
-  'ID Rifim Batam':              '120363428603841015@g.us',
-  'ID Rifim Airport Jambi':      '120363426397739283@g.us',
-  'ID Rifim Jambi Luar':         '120363428541236760@g.us',
-  'ID Rifim Airport Balikpapan': '120363421746844167@g.us',
-  'ID Rifim Airport Manado':     '120363423659965572@g.us',
-  'ID Rifim Airport Pekanbaru':  '120363402974243112@g.us',
-};
-
-// WA Grup admin per cabang — dari Monitoring.gs MON_WA_GROUP_PER_CABANG
-var _MON_WA_POT_GRUP = {
-  'ID Rifim Airport Batam':      '120363162218897223@g.us',
-  'ID Rifim Airport Jambi':      '120363142722288524@g.us',
-  'ID Rifim Airport Balikpapan': '120363420259437087@g.us',
-  'ID Rifim Airport Manado':     '120363423102090113@g.us',
-  'ID Rifim Airport Pekanbaru':  '120363347628262640@g.us',
-};
 
 // ── HELPER ────────────────────────────────────────────────────────
 
@@ -303,7 +281,7 @@ function refreshMonitoringSaldo() {
 }
 
 /**
- * Cek SLA saldo — kirim WA ke grup per-cabang jika Login ID belum diisi > SLA.
+ * Cek SLA saldo — kirim RAOS Chat per-cabang jika Login ID belum diisi > SLA.
  * Repeat tiap SLA menit selama belum diisi.
  */
 function cekSLASaldo() {
@@ -355,7 +333,7 @@ function cekSLASaldo() {
   Object.keys(telatPerCabang).forEach(function(kunci) {
     var list    = telatPerCabang[kunci];
     var cabang  = list[0].cabang;
-    var groupId = kunci !== '_UNKNOWN_' ? _MON_WA_SALDO_GRUP[cabang] : null;
+    var branchId = kunci !== '_UNKNOWN_' ? BRANCH_ID_BY_NAME[cabang] : null;
 
     // Cek repeat: baru kirim lagi setelah SLA menit berlalu dari alert terakhir
     var alertKey    = 'MON_SAL_ALERT_' + kunci;
@@ -370,16 +348,15 @@ function cekSLASaldo() {
 
     var pesan = _monPesanSaldoTelat(cabang, list, tz);
     try {
-      if (groupId) {
-        waSendToTarget(groupId, pesan);
-      } else {
-        // Fallback: kirim ke grup utama (WA_GROUP_ID)
-        waSendToGroup(pesan);
-      }
+      if (!branchId) throw new Error('Branch ID belum dipetakan: ' + cabang);
+      _chatPostSaldoRoom(cabang, pesan, 'sla_saldo', {
+        overdue_count: list.length,
+        source: 'aist_sheet',
+      });
       props.setProperty(alertKey, tsStr);
-      Logger.log('cekSLASaldo: alert terkirim ke ' + (groupId || 'grup utama') + ' untuk ' + cabang);
+      Logger.log('cekSLASaldo: alert chat terkirim untuk ' + cabang);
     } catch (err) {
-      Logger.log('cekSLASaldo: gagal kirim WA (' + cabang + '): ' + err.message);
+      _gasLogError('RAOS Monitoring', 'cekSLASaldo_chat', err, { branch_name: cabang, branch_id: branchId });
     }
   });
 }
@@ -535,7 +512,7 @@ function cekSLAPotongan() {
     var lastInput    = lastInputPerCabang[cabang];
     var stateKey     = 'MON_POT_STATE_' + cabang;
     var stateLama    = props.getProperty(stateKey) || 'ONLINE';
-    var groupId      = _MON_WA_POT_GRUP[cabang];
+    var branchId     = BRANCH_ID_BY_NAME[cabang];
 
     if (!lastInput) return; // belum pernah ada data → skip
 
@@ -552,28 +529,31 @@ function cekSLAPotongan() {
         if (lad && Math.floor((now - lad) / 60000) < _MON_SLA_POTONGAN_MENIT) bolehAlert = false;
       }
 
-      if (bolehAlert && groupId) {
+      if (bolehAlert && branchId) {
         var pesan = _monPesanPotonganOffline(cabang, lastInput, selisihMenit, tz);
         try {
-          waSendToTarget(groupId, pesan);
+          _chatPostSaldoRoom(cabang, pesan, 'sla_potongan', {
+            state: 'offline',
+            minutes_since_last_input: selisihMenit,
+          });
           props.setProperty(alertKey, tsStr);
           props.setProperty(stateKey, 'OFFLINE');
           Logger.log('cekSLAPotongan: alert OFFLINE terkirim — ' + cabang);
         } catch (err) {
-          Logger.log('cekSLAPotongan: gagal kirim WA (' + cabang + '): ' + err.message);
+          _gasLogError('RAOS Monitoring', 'cekSLAPotongan_offline_chat', err, { branch_name: cabang, branch_id: branchId });
         }
       } else if (!bolehAlert) {
         props.setProperty(stateKey, 'OFFLINE');
       }
     } else {
       // Cabang kembali online setelah offline
-      if (stateLama === 'OFFLINE' && groupId) {
+      if (stateLama === 'OFFLINE' && branchId) {
         try {
-          waSendToTarget(groupId, _monPesanPotonganOnline(cabang, tz));
+          _chatPostSaldoRoom(cabang, _monPesanPotonganOnline(cabang, tz), 'sla_potongan', { state: 'online' });
           props.setProperty(stateKey, 'ONLINE');
           Logger.log('cekSLAPotongan: ONLINE kembali — ' + cabang);
         } catch (err) {
-          Logger.log('cekSLAPotongan: gagal kirim WA ONLINE (' + cabang + '): ' + err.message);
+          _gasLogError('RAOS Monitoring', 'cekSLAPotongan_online_chat', err, { branch_name: cabang, branch_id: branchId });
         }
       } else {
         props.setProperty(stateKey, 'ONLINE');
@@ -617,7 +597,7 @@ function _monPesanPotonganOnline(cabang, tz) {
 // ══════════════════════════════════════════════════════════════════
 
 /**
- * Cek SLA saldo PWA — kirim WA ke grup per-cabang jika ada driver request
+ * Cek SLA saldo PWA — kirim RAOS Chat per-cabang jika ada driver request
  * di "Form Input Saldo PWA" yang belum dicentang "Sudah Diisi" (col G) > SLA menit.
  *
  * Format sheet Form Input Saldo PWA (1-based):
@@ -682,7 +662,7 @@ function cekSLASaldoPWA() {
   Object.keys(telatPerCabang).forEach(function(kunci) {
     var group   = telatPerCabang[kunci];
     var cabang  = group.cabang;
-    var groupId = kunci !== '_UNKNOWN_' ? _MON_WA_SALDO_GRUP[cabang] : null;
+    var branchId = kunci !== '_UNKNOWN_' ? BRANCH_ID_BY_NAME[cabang] : null;
 
     // Cek repeat — jangan kirim lebih sering dari SLA
     var alertKey    = 'MON_PWA_ALERT_' + kunci;
@@ -694,11 +674,11 @@ function cekSLASaldoPWA() {
 
     var pesan = _monPesanSaldoPWATelat(cabang, group.items, tz);
     try {
-      if (groupId) {
-        waSendToTarget(groupId, pesan);
-      } else {
-        waSendToGroup(pesan);
-      }
+      if (!branchId) throw new Error('Branch ID belum dipetakan: ' + cabang);
+      _chatPostSaldoRoom(cabang, pesan, 'sla_saldo', {
+        overdue_count: group.items.length,
+        source: 'pwa_sheet',
+      });
       props.setProperty(alertKey, tsStr);
 
       // FIX #13 + #14 — tulis ISO UTC ke col I; wrapped ScriptLock anti concurrent trigger
@@ -709,9 +689,9 @@ function cekSLASaldoPWA() {
         });
       });
 
-      Logger.log('cekSLASaldoPWA: alert terkirim ke ' + (groupId || 'grup utama') + ' — ' + cabang);
+      Logger.log('cekSLASaldoPWA: alert chat terkirim — ' + cabang);
     } catch (err) {
-      Logger.log('cekSLASaldoPWA: gagal kirim WA (' + cabang + '): ' + err.message);
+      _gasLogError('RAOS Monitoring', 'cekSLASaldoPWA_chat', err, { branch_name: cabang, branch_id: branchId });
     }
   });
 }
@@ -737,23 +717,21 @@ function _monPesanSaldoPWATelat(cabang, items, tz) {
 
 // ── TEST MANUAL ───────────────────────────────────────────────────
 
-/** Test: kirim pesan test ke semua grup saldo */
-function testMonitoringSaldoWA() {
-  var msg = '🔧 Test koneksi WA Monitoring Saldo RIFIM OS — jika pesan ini muncul, routing OK.';
-  Object.keys(_MON_WA_SALDO_GRUP).forEach(function(cabang) {
-    try { waSendToTarget(_MON_WA_SALDO_GRUP[cabang], '(' + _monNamaSingkat(cabang) + ') ' + msg); }
-    catch (e) { Logger.log('Test saldo WA gagal (' + cabang + '): ' + e.message); }
-    Utilities.sleep(500);
+/** Test: kirim pesan test ke semua chat room saldo */
+function testMonitoringSaldoChat() {
+  var msg = '🔧 Test koneksi RAOS Chat Monitoring Saldo — jika pesan ini muncul, routing OK.';
+  _MON_SALDO_CABANG.forEach(function(cabang) {
+    try { _chatPostSaldoRoom(cabang, '(' + _monNamaSingkat(cabang) + ') ' + msg, 'test_monitoring', { test: true }); }
+    catch (e) { _gasLogError('RAOS Monitoring', 'testMonitoringSaldoChat', e, { branch_name: cabang }); }
   });
 }
 
-/** Test: kirim pesan test ke semua grup potongan */
-function testMonitoringPotonganWA() {
-  var msg = '🔧 Test koneksi WA Monitoring Potongan RIFIM OS — jika pesan ini muncul, routing OK.';
-  Object.keys(_MON_WA_POT_GRUP).forEach(function(cabang) {
-    try { waSendToTarget(_MON_WA_POT_GRUP[cabang], '(' + _monNamaSingkat(cabang) + ') ' + msg); }
-    catch (e) { Logger.log('Test potongan WA gagal (' + cabang + '): ' + e.message); }
-    Utilities.sleep(500);
+/** Test: kirim pesan test ke semua chat room potongan */
+function testMonitoringPotonganChat() {
+  var msg = '🔧 Test koneksi RAOS Chat Monitoring Potongan — jika pesan ini muncul, routing OK.';
+  _MON_POT_CABANG.forEach(function(cabang) {
+    try { _chatPostSaldoRoom(cabang, '(' + _monNamaSingkat(cabang) + ') ' + msg, 'test_monitoring', { test: true, module: 'potongan' }); }
+    catch (e) { _gasLogError('RAOS Monitoring', 'testMonitoringPotonganChat', e, { branch_name: cabang }); }
   });
 }
 
