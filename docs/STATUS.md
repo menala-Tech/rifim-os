@@ -2,7 +2,47 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-08-05 sore (Task Division CC vs Codex — dokumen `docs/TASK_DIVISION_CC_CODEX.md` di kedua repo untuk sinkron kerja 2 agent + kolom tabel kontrak lintas repo)
+> Last updated: 2026-08-06 (Document Engine v1 complete + HRIS Absensi Overhaul 5 phase — 12 PR merged, 8 migration Supabase)
+
+## Sesi 2026-08-06 — Document Engine v1 + HRIS Absensi Overhaul
+
+### Konteks
+Sesi paralel CC+CX. Document Engine v1 FEATURE COMPLETE (workflow/approval/revision/audit/search + PWA scaffold + skill file). HRIS Absensi 5 phase overhaul (SSoT RAOS realtime + Cabang + edit + PDF + Foto + Lokasi + Gapok proporsional + payroll wiring + cron backup). Bug HRIS sync 0 upserted fixed (pin column missing).
+
+### Deliverable — 12 PR merged
+- Document Engine core: PR #13 workflow, #14 scaffold, #15 audit, #16 revision, #18 approval, #21 search, #22 test E2E, #23 webApp dispatch, #24 CrmApi.docs client, #25 PWA modules/documents, #27 skill file
+- Document Engine fixes: #28 search header limit, #29 audit crash, #30 hash v4 skip payload, #32 verifyChain JSON safe
+- HRIS: #30 pin column + audit v4, #31 Absensi phase 1 backend, #33 Absensi UI phase 3
+- Branding: #ad1c839 logo transparent + Maxim bg + portal session bridge + HRIS gasGet
+- Housekeeping: 4 stale PR closed (#1 Connectivity Engine, #6 STATUS Jul-14, #8 QR debt, #9 CLAUDE.md v1.5)
+
+### Deliverable — 8 migration Supabase applied
+- `docengine_001_core_tables` — 5 tabel doc_* + RLS + immutability
+- `docengine_002_audit_rpc` — RPC doc_log_event + doc_get_pending_approvals
+- `docengine_003_normalize_hash_algo` — strip whitespace (DEPRECATED oleh 006)
+- `docengine_004_rename_pending_approvals_param` — p_approver_id
+- `docengine_005_user_profiles_email_sync` — email col + trigger auth.users
+- `docengine_006_hash_algo_v4_preserve_string_space` — skip payload dari hash chain
+- `hris_add_pin_column` — fix sync PGRST204
+- `raos_071_attendance_late_deduction_edit` — late_minutes+deduction+override+edit audit + views + RPC hris_attendance_edit
+- `raos_072_payroll_late_deduction` — kolom late_deduction_total + thp recompute + RPC integrate
+
+### Endpoint HTTP baru (crmApi.js + webApp.js)
+Document Engine (12): doc_list, doc_get, doc_revisions, doc_revision_diff, doc_audit, doc_pending, doc_verify_chain (GET); doc_create, doc_transition, doc_decide, doc_revise, doc_restore (POST)
+HRIS Absensi: hris_attendance_edit (via RPC role-gate), hris_gapok_proporsional_list (new)
+
+### Debt tersisa
+- PR #10 audit Opsi D — 5 poin approval user (KPI V1 vs V2 migration, WA config konsolidasi, timeline)
+- Migration `raos_070*` commit ke `raos-menala/sql/` folder
+- PR #8 refile — QR real URL + DDS text-color compliance (base 15 hari stale)
+- Prompt Codex M — HRIS sync UI graceful timeout (fire-and-forget pattern)
+- Sign action Document Engine — attach TTD+stempel (butuh asset config)
+- MV `doc_search_index` — defer sampai volume >10k doc
+
+### Session prev
+2026-08-05 sore (Task Division CC vs Codex + Skill Extraction) — pindah ke skill files.
+
+---
 
 ## Sesi 2026-08-05 sore — Task Division Claude Code Desktop vs Codex Desktop
 
