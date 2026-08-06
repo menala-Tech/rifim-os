@@ -189,6 +189,26 @@ Setiap `_gas*` util di `automation/apps-script/gasUtils.js` — JANGAN implement
 
 ---
 
+## TIERED REVIEW POLICY (added 2026-08-06)
+
+CX punya `gh` CLI valid + boleh self-create/self-merge untuk PR trivial. **Kamu skip review** untuk PR type di bawah supaya hemat token (target saving 50-70% per sesi busy):
+
+| PR type | Skip review? |
+|---|---|
+| Docs (STATUS.md, README, CLAUDE.md append) | ✅ SKIP |
+| CSS/label/copy UI tweak, icon swap, skeleton loader | ✅ SKIP |
+| Refactor internal komponen (no props change) | ✅ SKIP |
+| PWA UI feature baru (form, tabel, modal) | ⚠️ light review (fetch files, no full audit) |
+| Backend engine, migration, RPC signature, RLS, contract | ✅ **WAJIB** full review |
+| Cross-repo change | ✅ **WAJIB** full review |
+| Hotfix critical prod bug | ⚠️ light review |
+
+**Ritual awal sesi tetap sama** — cek open PR via `mcp__github__list_pull_requests state=open`. Filter yang bukan whitelist self-merge, review yang perlu, ignore yang CX sudah self-merge (state=merged with CX commit).
+
+**Sinyal CX butuh review** (jangan skip): PR body ada string `cc @claude waiting review` atau `⚠️ WAJIB CC review`.
+
+---
+
 ## REFERENSI WAJIB BUKA SAAT COMMIT
 
 - Kedua repo: `docs/TASK_DIVISION_CC_CODEX.md`, `CLAUDE.md`, `STATUS.md`
