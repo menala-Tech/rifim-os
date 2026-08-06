@@ -99,6 +99,7 @@ function crmHandleGet(e) {
     if (action === 'hris_attendance_raos_list')        return _crmJson(_hrisAttendanceRaosList_(e.parameter));
     if (action === 'hris_attendance_summary_month')    return _crmJson(_hrisAttendanceSummaryMonth_(e.parameter));
     if (action === 'hris_attendance_edit')             return _crmJson(_hrisAttendanceEdit_(e.parameter));
+    if (action === 'hris_gapok_proporsional_list')     return _crmJson(_hrisGapokProporsionalList_(e.parameter));
 
     return null; // bukan CRM action, delegate ke handler lain di doGet
   } catch (err) {
@@ -1436,29 +1437,44 @@ function _hrisAttendanceSummaryMonth_(params) {
   return { success: true, month: monthISO, staff_id: staffId, rows: Array.isArray(res) ? res : [] };
 }
 
-// Edit raos_attendance row (jam masuk, jam pulang, status) — admin/mgmt/direksi only
-// PATCH via Supabase; kolom check_in_at/check_out_at/status
+// Edit raos_attendance row via RPC hris_attendance_edit (migration raos_071).
+// RPC SECURITY DEFINER role-gate admin/mgmt/direksi + support override jam +
+// potongan override + edit_reason + audit trail (manual_edited_by/_at).
+// Sinkron ke sheet dilakukan via cron sync layer existing (jangan direct write sheet).
 function _hrisAttendanceEdit_(params) {
   _finRoleGate_(params);
   var id = String(params.id || '').trim();
   if (!id) return { success: false, message: 'id (raos_attendance.id) wajib' };
 
-  // Build sparse body (hanya kolom yang ada di params)
-  var body = {};
-  if (params.check_in_at !== undefined)  body.check_in_at  = String(params.check_in_at)  || null;
-  if (params.check_out_at !== undefined) body.check_out_at = String(params.check_out_at) || null;
-  if (params.status !== undefined)       body.status       = String(params.status)       || null;
+  // Body optional — endpoint boleh dipanggil dgn subset field
+  var body = { p_attendance_id: id };
+  if (params.check_in_at_override  !== undefined) body.p_check_in_override  = String(params.check_in_at_override)  || null;
+  if (params.check_out_at_override !== undefined) body.p_check_out_override = String(params.check_out_at_override) || null;
+  if (params.late_deduction_idr    !== undefined) body.p_late_deduction_idr = Number(params.late_deduction_idr) || 0;
+  if (params.reason                !== undefined) body.p_reason             = String(params.reason || '') || null;
 
-  if (Object.keys(body).length === 0) return { success: false, message: 'Tidak ada field yang diubah' };
-
-  // Fetch existing untuk audit before
-  var before = _crmSbFetch_('GET', '/rest/v1/raos_attendance?select=check_in_at,check_out_at,status&id=eq.' + encodeURIComponent(id));
+  // Fetch existing untuk audit before (kolom yg bisa berubah)
+  var before = _crmSbFetch_('GET',
+    '/rest/v1/raos_attendance?select=check_in_at,check_in_at_override,check_out_at,check_out_at_override,late_deduction_idr,edit_reason&id=eq.' +
+    encodeURIComponent(id));
   var beforeStr = (before && before[0]) ? JSON.stringify(before[0]) : '(none)';
 
-  var res = _crmSbFetch_('PATCH', '/rest/v1/raos_attendance?id=eq.' + encodeURIComponent(id), body);
-  _crmAuditWrite_(params, 'edit', 'raos_attendance', id, beforeStr, JSON.stringify(body));
+  var res = _crmSbFetch_('POST', '/rest/v1/rpc/hris_attendance_edit', body);
+  _crmAuditWrite_(params, 'edit_via_rpc', 'raos_attendance', id, beforeStr, JSON.stringify(body));
 
-  return { success: true, id: id, row: Array.isArray(res) ? res[0] : res };
+  return { success: true, id: id, rpc: res };
+}
+
+// Gapok proporsional per bulan berdasarkan hari_masuk vs (jml_hari_bulan - MONTHLY_LIBUR_DAYS).
+// Source: view hris_gapok_proporsional_view (migration raos_071).
+function _hrisGapokProporsionalList_(params) {
+  _finRoleGate_(params);
+  var monthISO = _finMonthNorm_(params.month);
+  var staffId  = String(params.staff_id || '').trim();
+  var qs = 'select=*&bulan=eq.' + encodeURIComponent(monthISO) + '&order=staff_name.asc&limit=1000';
+  if (staffId) qs += '&staff_id=eq.' + encodeURIComponent(staffId);
+  var rows = _crmSbFetch_('GET', '/rest/v1/hris_gapok_proporsional_view?' + qs);
+  return { success: true, month: monthISO, count: (rows || []).length, rows: rows || [] };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
