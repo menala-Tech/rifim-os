@@ -23,7 +23,10 @@
 - Audit folder Apps Script: tidak ada `waSend`, `fonnte`, `FONNTE_TOKEN`,
   `WA_GROUP_ID`, `waEngine`, atau mapping grup WA yang tersisa.
 - Runtime GAS, test 9 cabang, push notification, dan screenshot production
-  masih menunggu deploy/redeploy serta smoke test manual.
+  masih menunggu Web App redeploy serta smoke test manual.
+- Source GAS sudah di-push via `clasp push --force` ke project Rifim-OS
+  pada 2026-08-07; PR implementasi: rifim-os #40. Aktivasi versi Web App
+  ditahan sampai RAOS PR #62 merge dan PWA production selesai deploy.
 
 ### Companion RAOS
 - Commit `9561681`: renderer `type='system'`, parser metadata, avatar 🤖,
