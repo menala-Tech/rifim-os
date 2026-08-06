@@ -840,6 +840,65 @@ Merge sequence: kontrak (CC) → UI (CX) → docs (CC).
 
 ---
 
+## 20. Tiered Review Policy (added 2026-08-06)
+
+CX sekarang punya `gh` CLI valid — boleh self-execute `gh pr create/view/merge`.
+Supaya hemat token CC + speed up throughput, adopt tiered review:
+
+| PR type | CC review wajib? | CX auto-merge boleh? |
+|---|---|---|
+| Docs (STATUS.md, README, CLAUDE.md append) | ❌ skip | ✅ YA self-merge setelah CI green |
+| CSS/label/copy UI tweak, icon swap, skeleton loader | ❌ skip | ✅ YA self-merge |
+| Refactor internal komponen (no props change) | ❌ skip | ✅ YA self-merge |
+| PWA UI feature baru (form, tabel, modal) | ⚠️ light review | ⚠️ tunggu CC 30 min, kalau unresponsive → self-merge |
+| Backend engine, migration Supabase, RPC signature, RLS policy | ✅ **WAJIB** CC review | ❌ **NEVER** self-merge |
+| Cross-repo change (kontrak lintas repo) | ✅ **WAJIB** CC review | ❌ **NEVER** self-merge |
+| Hotfix critical prod bug | ⚠️ light review kalau CC available <15 min | ⚠️ CX self-merge kalau CC unavailable |
+
+### Aturan kapan CX BOLEH self-merge
+
+File touched HANYA:
+- `modules/<modul>/index.html` (Rifim-OS UI)
+- `apps/pwa/src/**/*.tsx` (RAOS component/page)
+- `modules/<modul>/styles/*.css`, `modules/<modul>/pages/*.html`
+- `docs/*.md` (append only, no rewrite)
+- Asset image di `public/images/` atau `branding/`
+
+TIDAK touch (kalau touch = otomatis WAJIB CC review):
+- `automation/apps-script/*.js`
+- `gas/*.gs` (RAOS)
+- `sql/*.sql`
+- Migration Supabase (via MCP, CC only)
+- `crmApi.js`, `webApp.js` (backend contract)
+- `.env.local`, secrets, GitHub Actions workflow
+
+### Flow CX self-merge
+
+```bash
+git commit -m "..."
+git push -u origin <branch>
+gh pr create --base main --title "..." --body "..."
+# Cek CI status
+gh pr checks
+# Kalau semua ✓ dan file touched sesuai whitelist self-merge:
+gh pr merge --squash --delete-branch
+```
+
+### Flow CX yang butuh CC review
+
+```bash
+gh pr create --draft --base main --title "..." --body "cc @claude waiting review"
+# Comment/mention di PR body: cc @claude, jangan self-merge, tunggu CC approve
+```
+
+CC pantau via `mcp__github__list_pull_requests state=open` di ritual awal sesi.
+
+### Rationale
+
+Sesi 2026-08-06 (14 PR) — CC spend ~210k tokens hanya untuk review PR Codex. Dengan tiered review, target saving ~50-70% (~60-80k per sesi busy). Quality gate tetap ada untuk backend/contract change.
+
+---
+
 **Referensi wajib baca:**
 - `rifim-os/CLAUDE.md` (operating manual)
 - `rifim-os/PROJECT_RULES.md` (business rules + integration rules)

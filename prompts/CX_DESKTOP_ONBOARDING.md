@@ -193,6 +193,52 @@ Setelah selesai UI, tulis **verification checklist** ini di PR:
 
 ---
 
+## GITHUB CLI AUTONOMY (added 2026-08-06)
+
+Kamu sudah punya `gh` CLI login valid (`menala-Tech`). Boleh self-execute:
+`gh pr create`, `gh pr view`, `gh pr merge`, `gh pr close`, `gh pr checks`.
+
+### TIERED REVIEW POLICY — kapan kamu boleh self-merge
+
+**BOLEH self-merge (skip CC review)** kalau file touched HANYA:
+- `modules/<modul>/index.html`, `modules/<modul>/pages/*.html`, `modules/<modul>/styles/*.css`
+- `apps/pwa/src/**/*.tsx` (component/page RAOS)
+- `docs/*.md` (append only, TIDAK rewrite section existing)
+- Asset di `public/images/` atau `branding/`
+
+Flow:
+```bash
+git commit -m "..."
+git push -u origin <branch>
+gh pr create --base main --title "..." --body "..."
+gh pr checks           # tunggu semua ✓
+gh pr merge --squash --delete-branch
+```
+
+**WAJIB tunggu CC review** kalau file touched:
+- `automation/apps-script/*.js` (backend GAS)
+- `gas/*.gs` (RAOS)
+- `sql/*.sql` atau migration Supabase (via MCP CC)
+- `crmApi.js`, `webApp.js` (backend contract)
+- `CLAUDE.md`, `PROJECT_RULES.md`, `RULE_PROJECT.md`, `docs/TASK_DIVISION_CC_CODEX.md`
+- Cross-repo change (touch di 2 repo bersamaan)
+
+Flow:
+```bash
+gh pr create --draft --base main --title "..." --body "cc @claude waiting review"
+# Tulis di body: "⚠️ WAJIB CC review — [alasan singkat, mis. 'touch RPC signature']"
+# TIDAK gh pr merge — tunggu CC
+```
+
+**LIGHT REVIEW** (PWA UI feature baru — form, tabel, modal):
+Buat PR non-draft, tunggu CC 30 menit. Kalau CC unresponsive → self-merge dengan
+comment "auto-merge post 30-min wait, no CC response".
+
+**HOTFIX critical prod bug**: self-merge OK kalau bikin production nyala kembali,
+tapi WAJIB followup PR docs dengan post-mortem singkat.
+
+---
+
 ## REDLINES — STOP KALAU MELIHAT DIRIMU AKAN:
 
 - Ubah kolom Supabase (STOP → minta CC)
@@ -200,7 +246,7 @@ Setelah selesai UI, tulis **verification checklist** ini di PR:
 - Buat migration atau execute SQL non-read (STOP → minta CC)
 - Deploy edge function (STOP → minta CC)
 - Buat file `.gs` atau `.js` di GAS folder (STOP → minta CC)
-- Push langsung ke `main` (STOP — kamu commit ke branch CC saja)
+- Push langsung ke `main` (STOP — commit ke feature branch dulu)
 - Hardcode hex color (pakai token)
 - Native `prompt()` / `confirm()` (pakai `openEditModal` di Rifim-OS, modal komponen di RAOS)
 - Skip validasi client (walau server sudah validate — UX butuh instant feedback)
