@@ -19,51 +19,43 @@ Kalau ragu apakah task ini kavlingmu → **baca `docs/TASK_DIVISION_CC_CODEX.md`
 
 ## ZONA KERJAMU (DILAKUKAN)
 
-1. **Arsitektur & desain** — engine baru, module baru, integration flow lintas repo
-2. **Supabase**
-   - Migration (`apply_migration`), execute_sql (semua jenis)
-   - RLS policy (SECURITY INVOKER default, DEFINER wajib `SET search_path=public,extensions,vault`)
-   - RPC function (SECURITY DEFINER role-gate)
-   - Edge Function (`raos-send-push`, dll)
-   - Vault secret (harus format `sb_secret_*`, JANGAN pakai JWT legacy)
-   - View, trigger, publication realtime
-3. **GAS Backend**
-   - `automation/apps-script/*.js` (Rifim-OS) — engine, endpoint dispatcher, sync layer
-   - `gas/*.gs` (RAOS) — cron, sheet sync, Web API
-   - Manual redeploy di GAS editor (**URL `/exec` tetap** — jangan buat deployment baru)
-   - Advanced Services (Drive v2, Slides v1)
-4. **Kontrak lintas repo** — kolom DB / enum / endpoint / RPC signature / sheet schema / chat_messages.type / notification_prefs schema
-5. **Dokumentasi**
-   - `CLAUDE.md` kedua repo — append sesi baru di paling bawah
-   - `PROJECT_RULES.md` (rifim-os) & `RULE_PROJECT.md` (raos-menala) — kalau rule berubah
-   - `STATUS.md` — rekonsiliasi akhir sesi
-   - `docs/TASK_DIVISION_CC_CODEX.md` — kalau pola division berubah
-   - `SESSION_PROMPT.md` (raos-menala) — resumable prompt
-6. **Infrastruktur**
-   - Vercel env vars (NEXT_PUBLIC_* public, secret dengan hati-hati), domain, deployment protection
-   - GitHub Actions workflow, branch protection, secret
-   - GAS Script Properties
-7. **GitHub PR flow** — create branch, create PR draft, tulis handoff body untuk CX, review CX commit, merge setelah CI green
-8. **Google Drive** — buat folder baru sesuai naming convention, set permission, tidak buat folder liar
-9. **Spreadsheet SSoT** — tambah/rename tab/kolom (WAJIB update GAS `initXxxSheet()`), formula master
-10. **Automation** — cron trigger, dispatcher, WA template Fonnte placeholder, bookmarklet source logic
+1. **Prompt writer untuk CX**
+   - Tulis spec endpoint/RPC/UI/backend yang jelas.
+   - Sertakan file scope, request/response contract, acceptance test, dan redline.
+   - Pecah task besar menjadi prompt kecil yang bisa dieksekusi CX.
+2. **Migration Supabase apply via MCP**
+   - Tool eksklusif CC: `apply_migration`, execute SQL write, RLS/RPC/view apply.
+   - CX boleh menulis draft SQL file; CC yang review + apply ke Supabase.
+   - Pastikan role-gate, `search_path`, rollback note, dan test query ada.
+3. **Review PR critical**
+   - Wajib review backend/contract/migration/RLS/RPC/cross-repo.
+   - Review PR UI hanya kalau menyentuh contract, auth, payroll, finance, atau flow produksi critical.
+   - Minta test evidence dari CX sebelum approve/merge.
+4. **Terminal executor**
+   - Jalankan `git push`, `clasp push`, deploy trigger, atau PR merge kalau tool/credential ada di CC atau diminta user.
+   - Jangan ambil alih coding rutin yang sudah bisa dikerjakan CX.
+5. **Ritual awal sesi**
+   - Baca operating manual/status/task division.
+   - Cek branch, git status, open PR, blocker.
+   - Laporkan ringkas ke user sebelum eksekusi besar.
+6. **Memory + skill file**
+   - Maintain memory/skill/prompt policy CC.
+   - Update dokumen koordinasi kalau user eksplisit meminta.
+   - Jangan ubah skill/CLAUDE policy tanpa instruksi user.
 
 ---
 
-## YANG DILARANG (KAVLING CX)
+## YANG DIDELEGASIKAN KE CX
 
-Jangan sentuh tanpa alasan sangat kuat:
+Delegasikan ke CX sebagai default executor:
 
-- ❌ Styling per pixel di komponen React/HTML (kecuali fix bug rendering)
-- ❌ Refactor internal komponen yang murni presentational
-- ❌ Copywriting label UI Indonesian (kecuali muncul di error/warning)
-- ❌ Icon swap
-- ❌ Skeleton loader, toast styling
-
-Kalau CC edit UI, itu **hanya** untuk:
-- Menambah state/handler yang butuh backend contract
-- Fix bug logic yang tidak bisa CX resolve tanpa ubah schema
-- Setup awal komponen sebelum handoff ke CX (mode "scaffolding")
+- UI React/HTML, styling, modal, tabel, toast, empty/loading state.
+- Backend GAS code (`automation/apps-script/*.js`, `gas/*.gs`) sesuai spec CC.
+- SQL migration draft di `sql/` folder; CC tetap apply via MCP.
+- Endpoint implementation (`crmApi.js`, `webApp.js`, RAOS Web API) sesuai contract.
+- Test endpoint via curl/browser/log dan lampirkan evidence.
+- PR create/view/merge untuk whitelist docs/UI/internal refactor setelah checks green.
+- Append `STATUS.md` entry per commit/PR.
 
 ---
 

@@ -19,49 +19,48 @@ Kalau ragu apakah task ini kavlingmu → **baca `docs/TASK_DIVISION_CC_CODEX.md`
 
 ## ZONA KERJAMU (DILAKUKAN)
 
-1. **UI komponen**
-   - `apps/pwa/src/components/**/*.tsx` (RAOS)
-   - `apps/pwa/src/app/<page>/components/*.tsx` (RAOS)
-   - `modules/<modul>/**/*.html` + subkomponen (Rifim-OS)
-2. **Styling**
-   - Tailwind classes dengan token dari DDS (`--primary`, `--secondary`, `--success`, `--warning`, `--error`, dll)
-   - RIFIM Chat Dark theme punya token terpisah (`--chat-bg`, `--chat-accent`, dll)
-   - **JANGAN hardcode hex** — selalu pakai CSS variable
-3. **Form & validation**
-   - Client-side validation (di atas server yang sudah validate)
-   - Loading state, error state, empty state
-   - Skeleton loader, toast
-4. **Refactor internal komponen** tanpa ubah props / interface public
-5. **Copywriting label UI** (Indonesian text — Poppins font)
-6. **Asset**
-   - Icon (Lucide React di RAOS, emoji di Rifim-OS)
-   - `public/images/*` (RAOS), asset di module folder (Rifim-OS)
-   - Logo perusahaan HARUS dari `branding/logo/` — lihat CLAUDE.md rifim-os "Logo Perusahaan"
-7. **Unit test scaffolding** (kalau ada framework di project)
-8. **PWA manifest icon** — regenerate via `scripts/generate-icons.js` di RAOS
-9. **Bookmarklet install page HTML** (`automation/aist-bookmarklet/install.html`)
-10. **Selector heuristic** di bookmarklet source (label keyword array)
+1. **UI React/HTML**
+   - `apps/pwa/src/components/**/*.tsx` dan page components RAOS.
+   - `modules/<modul>/**/*.html` + subkomponen Rifim-OS.
+   - Styling, modal, tabel, toast, loading/empty/error state.
+2. **Backend GAS**
+   - Boleh coding `automation/apps-script/*.js` dan `gas/*.gs` sesuai spec.
+   - CX menulis code; CC yang bantu `clasp push` jika credential/tool eksklusif CC.
+3. **SQL migration file draft**
+   - Boleh tulis draft migration di `sql/` folder.
+   - Sertakan purpose, rollback note, dan test query.
+   - CC yang apply migration via Supabase MCP.
+4. **Endpoint `crmApi.js` / `webApp.js`**
+   - Implementasi endpoint sesuai spec dari CC.
+   - Jaga request/response contract dan backward compatibility.
+5. **RPC + view + RLS SQL**
+   - CX boleh menulis SQL implementation file.
+   - CC review security/role-gate dan apply ke Supabase.
+6. **Test endpoint via curl + log**
+   - Jalankan curl/browser/log test.
+   - Tempel output ringkas di PR body atau final report.
+7. **PR create/view/merge whitelist via `gh` CLI**
+   - Boleh create/view/merge PR docs/UI/internal refactor setelah checks green.
+   - Backend/contract/migration/cross-repo tetap butuh CC review.
+8. **Git operations**
+   - Branch, commit, rebase, push, dan resolve conflict sesuai scope task.
+   - Jangan push langsung ke `main`.
+9. **`STATUS.md` append entry per commit**
+   - Append ringkas per commit/PR yang kamu kerjakan.
+   - Jangan rewrite history status lama tanpa instruksi.
 
 ---
 
-## YANG DILARANG (KAVLING CC — JANGAN SENTUH)
+## YANG DILARANG / BUTUH CC REVIEW
 
-- ❌ Supabase migration (`apply_migration`)
-- ❌ `execute_sql` non-read (SELECT ok, INSERT/UPDATE/DELETE/ALTER dilarang)
-- ❌ `deploy_edge_function`
-- ❌ Ubah RPC signature (nama, param, return type)
-- ❌ Ubah kolom / enum di tabel yang dipakai kedua PWA
-- ❌ File `apps/pwa/src/lib/*.ts` yang menyentuh network / RPC / Supabase auth
-- ❌ File `automation/apps-script/*.js` (Rifim-OS)
-- ❌ File `gas/*.gs` (RAOS)
-- ❌ File `sql/*.sql`
-- ❌ `next.config.js`, `vercel.json`, `package.json`
-- ❌ Edit `CLAUDE.md`, `PROJECT_RULES.md`, `RULE_PROJECT.md`, `docs/TASK_DIVISION_CC_CODEX.md`
-- ❌ Vercel env vars / secrets / domain
-- ❌ GitHub Actions workflow, branch protection
-- ❌ Sheet SSoT (schema kolom, formula master, protect range)
-- ❌ Google Drive folder baru (pakai yang sudah ada)
-- ❌ Buat branch sendiri — commit ke branch yang sudah CC create
+- ❌ Apply migration Supabase langsung (`apply_migration` / SQL write via MCP) — tulis SQL file, CC yang apply.
+- ❌ `deploy_edge_function` tanpa instruksi CC/user.
+- ❌ Merge sendiri PR backend/contract/migration/cross-repo.
+- ❌ Edit `CLAUDE.md`, `PROJECT_RULES.md`, `RULE_PROJECT.md`, atau skill files.
+- ❌ Vercel env vars / secrets / domain tanpa instruksi user.
+- ❌ GitHub Actions workflow / branch protection tanpa instruksi user.
+- ❌ Sheet SSoT schema kolom, formula master, protect range tanpa spec CC.
+- ❌ Google Drive folder baru tanpa naming/permission spec.
 
 **Kalau CX menemukan bug yang butuh ubah salah satu di atas:**
 1. STOP jangan self-fix
@@ -241,17 +240,17 @@ tapi WAJIB followup PR docs dengan post-mortem singkat.
 
 ## REDLINES — STOP KALAU MELIHAT DIRIMU AKAN:
 
-- Ubah kolom Supabase (STOP → minta CC)
-- Ubah RPC atau endpoint signature (STOP → minta CC)
-- Buat migration atau execute SQL non-read (STOP → minta CC)
+- Apply migration Supabase langsung (tulis SQL file, CC yang apply via MCP)
+- Edit `CLAUDE.md` / `PROJECT_RULES.md` / `RULE_PROJECT.md` / skill files
+- Ubah kolom Supabase tanpa spec/review CC
+- Ubah RPC atau endpoint signature tanpa spec/review CC
+- Execute SQL non-read langsung ke Supabase (STOP → minta CC apply)
 - Deploy edge function (STOP → minta CC)
-- Buat file `.gs` atau `.js` di GAS folder (STOP → minta CC)
 - Push langsung ke `main` (STOP — commit ke feature branch dulu)
 - Hardcode hex color (pakai token)
 - Native `prompt()` / `confirm()` (pakai `openEditModal` di Rifim-OS, modal komponen di RAOS)
 - Skip validasi client (walau server sudah validate — UX butuh instant feedback)
-- Buat branch sendiri (kamu commit ke branch CC)
-- Edit CLAUDE.md / PROJECT_RULES.md / RULE_PROJECT.md / docs/TASK_DIVISION_CC_CODEX.md
+- Self-merge PR backend/contract/migration/cross-repo
 
 ---
 
