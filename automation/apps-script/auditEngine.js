@@ -84,47 +84,56 @@ function queryEvents(input) {
 }
 
 function verifyChain(input) {
-  input = input || {};
+  try {
+    input = input || {};
 
-  var params = [
-    'select=id,entity_type,entity_id,action,payload,prev_hash,row_hash',
-    'order=id.asc',
-    'limit=1000',
-  ];
+    var fromId = _auditOptionalPositiveId(input.fromId, 'fromId');
+    var toId = _auditOptionalPositiveId(input.toId, 'toId');
+    var params = [
+      'select=id,entity_type,entity_id,action,payload,prev_hash,row_hash',
+      'order=id.asc',
+      'limit=1000',
+    ];
 
-  if (input.fromId) {
-    params.push('id=gte.' + encodeURIComponent(input.fromId));
-  }
-  if (input.toId) {
-    params.push('id=lte.' + encodeURIComponent(input.toId));
-  }
-
-  var rows = _sbGet(_auditRestUrl('doc_audit_log', params));
-  var checkedRows = 0;
-
-  for (var i = 0; rows && i < rows.length; i++) {
-    var row = rows[i];
-    checkedRows++;
-
-    var payloadText = _auditCanonicalJson(
-      Object.prototype.hasOwnProperty.call(row, 'payload') ? row.payload : null
-    );
-    var hashInput = [
-      row.prev_hash || '',
-      row.entity_type || '',
-      row.entity_id || '',
-      row.action || '',
-      payloadText,
-    ].join('|');
-    var expectedHash = _auditSha256Hex(hashInput);
-    var storedHash = String(row.row_hash || '').toLowerCase();
-
-    if (expectedHash !== storedHash) {
-      return { ok: false, brokenAt: row.id, checkedRows: checkedRows };
+    if (fromId !== null) {
+      params.push('id=gte.' + encodeURIComponent(fromId));
     }
-  }
+    if (toId !== null) {
+      params.push('id=lte.' + encodeURIComponent(toId));
+    }
 
-  return { ok: true, brokenAt: null, checkedRows: checkedRows };
+    var rows = _sbGet(_auditRestUrl('doc_audit_log', params));
+    if (!rows || Object.prototype.toString.call(rows) !== '[object Array]') {
+      throw new Error('verifyChain: response audit log tidak valid.');
+    }
+
+    var checkedRows = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i] || {};
+      checkedRows++;
+
+      var payloadText = _auditCanonicalJson(
+        Object.prototype.hasOwnProperty.call(row, 'payload') ? row.payload : {}
+      );
+      var hashInput = [
+        _auditHashPart(row.prev_hash),
+        _auditHashPart(row.entity_type),
+        _auditHashPart(row.entity_id),
+        _auditHashPart(row.action),
+        payloadText,
+      ].join('|');
+      var expectedHash = _auditSha256Hex(hashInput);
+      var storedHash = _auditHashPart(row.row_hash).toLowerCase();
+
+      if (!storedHash || expectedHash !== storedHash) {
+        return { ok: false, brokenAt: row.id || null, checkedRows: checkedRows };
+      }
+    }
+
+    return { ok: true, brokenAt: null, checkedRows: checkedRows };
+  } catch (err) {
+    throw new Error('verifyChain gagal: ' + (err && err.message ? err.message : String(err)));
+  }
 }
 
 function _auditValidateLogInput(input) {
@@ -138,12 +147,38 @@ function _auditRestUrl(table, params) {
   return cfg.url + '/rest/v1/' + table + (params && params.length ? '?' + params.join('&') : '');
 }
 
+function _auditOptionalPositiveId(value, fieldName) {
+  if (value === undefined || value === null || value === '') return null;
+  var id = Number(value);
+  if (!isFinite(id) || id < 1 || Math.floor(id) !== id) {
+    throw new Error(fieldName + ' harus berupa angka positif.');
+  }
+  return String(id);
+}
+
 function _auditCanonicalJson(value) {
-  return JSON.stringify(_auditSortJsonValue(value));
+  var normalized = _auditNormalizeJsonValue(value);
+  var json = JSON.stringify(_auditSortJsonValue(normalized));
+  return typeof json === 'string' ? json : '{}';
+}
+
+function _auditNormalizeJsonValue(value) {
+  if (value === undefined || value === null || value === '') return {};
+  if (typeof value !== 'string') return value;
+
+  var text = value.trim();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    return text;
+  }
 }
 
 function _auditSortJsonValue(value) {
-  if (value === null || typeof value !== 'object') return value;
+  if (value === undefined || value === null) return {};
+  if (typeof value !== 'object') return value;
 
   if (Object.prototype.toString.call(value) === '[object Array]') {
     return value.map(function (item) {
@@ -158,8 +193,14 @@ function _auditSortJsonValue(value) {
   return sorted;
 }
 
+function _auditHashPart(value) {
+  if (value === undefined || value === null) return '';
+  return String(value);
+}
+
 function _auditSha256Hex(value) {
-  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, value);
+  var text = _auditHashPart(value);
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8);
   return digest.map(function (byte) {
     var unsigned = byte < 0 ? byte + 256 : byte;
     return ('0' + unsigned.toString(16)).slice(-2);
