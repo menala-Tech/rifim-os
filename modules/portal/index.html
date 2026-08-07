@@ -17,55 +17,47 @@
 html,body{min-height:100%;overflow-x:hidden}
 body{font-family:var(--font);background:#050914;color:#fff;min-height:100dvh;display:flex;flex-direction:column}
 
-/* ─── AUTH GATE — PREMIUM FLOATING GLASS ─── */
+/* ─── AUTH GATE — MAXIM BACKGROUND + FLOATING CONTROLS ─── */
 #auth-gate{
   position:relative;isolation:isolate;overflow:hidden;
   flex:1;display:flex;align-items:center;justify-content:center;
   min-height:100dvh;padding:28px 18px;
   background:
-    radial-gradient(circle at 50% 38%,rgba(255,210,70,.13),transparent 30%),
-    radial-gradient(circle at 50% 60%,rgba(40,100,255,.12),transparent 45%),
-    linear-gradient(145deg,#050914 0%,#081426 48%,#030711 100%);
+    linear-gradient(145deg,rgba(6,12,24,.62) 0%,rgba(18,25,42,.48) 52%,rgba(32,5,8,.50) 100%),
+    url('/branding/backgrounds/bagroun-maxim.png') center/cover no-repeat;
 }
 #auth-gate::before{
-  content:'';position:absolute;inset:-20%;z-index:-3;pointer-events:none;
+  content:'';position:absolute;inset:0;z-index:-2;pointer-events:none;
   background:
-    radial-gradient(circle at 18% 18%,rgba(0,92,255,.10),transparent 25%),
-    radial-gradient(circle at 82% 80%,rgba(196,0,0,.08),transparent 26%);
-  filter:blur(18px);
+    radial-gradient(circle at 50% 38%,rgba(255,210,70,.13),transparent 30%),
+    radial-gradient(circle at 50% 62%,rgba(40,100,255,.08),transparent 46%);
 }
 .login-glow{
   position:absolute;z-index:-1;pointer-events:none;
   width:min(560px,92vw);height:min(560px,92vw);border-radius:50%;
-  background:radial-gradient(circle,rgba(255,200,60,.22) 0%,rgba(255,170,30,.08) 35%,transparent 70%);
-  filter:blur(35px);animation:glowPulse 5s ease-in-out infinite;
+  background:radial-gradient(circle,rgba(255,200,60,.20) 0%,rgba(255,170,30,.07) 35%,transparent 70%);
+  filter:blur(38px);animation:glowPulse 5s ease-in-out infinite;
 }
 .auth-card{
-  position:relative;z-index:1;width:min(440px,90vw);padding:38px 36px 32px;
-  border-radius:28px;text-align:center;color:#fff;
-  background:rgba(255,255,255,.08);
-  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
-  border:1px solid rgba(255,255,255,.16);
-  box-shadow:0 25px 80px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.12);
+  position:relative;z-index:1;width:min(440px,90vw);padding:0;
+  text-align:center;color:#fff;background:transparent;border:none;
+  border-radius:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
   animation:loginFloat 7s ease-in-out infinite;
 }
-.auth-card::before{
-  content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
-  background:linear-gradient(135deg,rgba(255,255,255,.08),transparent 34%,transparent 66%,rgba(255,255,255,.035));
-}
+.auth-card::before{content:none;display:none}
 .logo-stage{
   position:relative;display:flex;align-items:center;justify-content:center;
-  height:142px;margin:0 auto 24px;perspective:900px;transform-style:preserve-3d;
+  height:156px;margin:0 auto 30px;perspective:900px;transform-style:preserve-3d;
 }
 .logo-glow{
-  position:absolute;width:190px;height:190px;border-radius:50%;z-index:-1;pointer-events:none;
-  background:radial-gradient(circle,rgba(255,210,70,.28),rgba(255,180,30,.08) 45%,transparent 70%);
-  filter:blur(20px);
+  position:absolute;width:220px;height:220px;border-radius:50%;z-index:-1;pointer-events:none;
+  background:radial-gradient(circle,rgba(255,210,70,.28),rgba(255,180,30,.09) 45%,transparent 72%);
+  filter:blur(24px);
 }
 .auth-logo{
-  width:min(230px,72%);height:auto;max-height:none;display:block;object-fit:contain;
+  width:min(250px,78%);height:auto;max-height:none;display:block;object-fit:contain;
   transform-style:preserve-3d;will-change:transform,translate;
-  filter:drop-shadow(0 15px 25px rgba(0,0,0,.35)) drop-shadow(0 0 22px rgba(255,205,70,.20));
+  filter:drop-shadow(0 15px 25px rgba(0,0,0,.42)) drop-shadow(0 0 22px rgba(255,205,70,.22));
   animation:rifimLogo3D 9s ease-in-out infinite,rifimFloat 4s ease-in-out infinite;
 }
 .auth-logo-fallback{
@@ -74,18 +66,20 @@ body{font-family:var(--font);background:#050914;color:#fff;min-height:100dvh;dis
   font-size:30px;font-weight:800;color:#fff;letter-spacing:1px;
   box-shadow:0 16px 34px rgba(0,0,0,.30),0 0 28px rgba(255,200,60,.18);
 }
+.login-stack{width:100%;display:flex;flex-direction:column;gap:14px;align-items:stretch}
 .auth-card input{
-  width:100%;height:54px;padding:0 16px;margin-bottom:14px;
-  background:rgba(255,255,255,.07);color:#fff;
-  border:1px solid rgba(255,255,255,.14);border-radius:15px;
+  width:100%;height:56px;padding:0 18px;margin:0;
+  background:rgba(9,19,36,.64);color:#fff;
+  border:1px solid rgba(255,255,255,.20);border-radius:16px;
   outline:none;font-size:15px;caret-color:#ffd24a;
+  box-shadow:0 12px 34px rgba(0,0,0,.26);
   transition:border-color .25s ease,box-shadow .25s ease,background .25s ease,transform .25s ease;
 }
-.auth-card input::placeholder{color:rgba(223,230,242,.55)}
-.auth-card input:hover{background:rgba(255,255,255,.095);border-color:rgba(255,255,255,.22)}
+.auth-card input::placeholder{color:rgba(230,236,246,.62)}
+.auth-card input:hover{background:rgba(10,22,42,.74);border-color:rgba(255,255,255,.28)}
 .auth-card input:focus{
-  background:rgba(255,255,255,.10);border-color:rgba(255,200,60,.65);
-  box-shadow:0 0 0 3px rgba(255,190,50,.08),0 8px 30px rgba(0,0,0,.16);
+  background:rgba(12,24,44,.80);border-color:rgba(255,200,60,.70);
+  box-shadow:0 0 0 3px rgba(255,190,50,.10),0 14px 36px rgba(0,0,0,.30);
 }
 .auth-card input:-webkit-autofill,
 .auth-card input:-webkit-autofill:hover,
@@ -95,21 +89,25 @@ body{font-family:var(--font);background:#050914;color:#fff;min-height:100dvh;dis
   transition:background-color 9999s ease-in-out 0s;
 }
 .btn-login{
-  width:100%;height:54px;padding:0 18px;margin-top:2px;
+  width:100%;height:56px;padding:0 18px;margin-top:2px;
   background:linear-gradient(135deg,#df0909 0%,#c40000 52%,#940000 100%);color:#fff;
-  border:1px solid rgba(255,255,255,.10);border-radius:15px;
+  border:1px solid rgba(255,255,255,.10);border-radius:16px;
   font-size:15px;font-weight:800;letter-spacing:.02em;cursor:pointer;
-  box-shadow:0 10px 30px rgba(0,0,0,.25),0 0 0 1px rgba(255,70,70,.08) inset;
+  box-shadow:0 12px 34px rgba(0,0,0,.30),0 0 0 1px rgba(255,70,70,.08) inset;
   transition:transform .22s ease,filter .22s ease,box-shadow .22s ease;
 }
-.btn-login:hover{transform:translateY(-2px);filter:brightness(1.08);box-shadow:0 14px 34px rgba(0,0,0,.30),0 0 24px rgba(196,0,0,.18)}
+.btn-login:hover{transform:translateY(-2px);filter:brightness(1.08);box-shadow:0 16px 38px rgba(0,0,0,.34),0 0 24px rgba(196,0,0,.18)}
 .btn-login:active{transform:scale(.98)}
 .btn-login:disabled{opacity:.62;cursor:default;transform:none;filter:none}
 #auth-err{
   color:#ffd0d0;font-size:12px;line-height:1.45;margin-top:12px;display:none;
-  background:rgba(196,0,0,.16);border:1px solid rgba(255,96,96,.20);border-radius:12px;padding:9px 10px;
+  background:rgba(196,0,0,.20);border:1px solid rgba(255,96,96,.22);border-radius:12px;padding:9px 10px;
+  box-shadow:0 10px 26px rgba(0,0,0,.22);
 }
-.auth-footer{margin-top:20px;font-size:11px;line-height:1.55;color:rgba(226,233,245,.52)}
+.auth-footer{
+  margin-top:18px;font-size:11px;line-height:1.55;color:rgba(245,245,245,.78);
+  text-shadow:0 2px 10px rgba(0,0,0,.45);
+}
 
 @keyframes glowPulse{
   0%,100%{transform:scale(.95);opacity:.65}
@@ -219,11 +217,11 @@ main{flex:1;padding:32px 24px;max-width:960px;width:100%;margin:0 auto}
 footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
 
 @media(max-width:600px){
-  #auth-gate{padding:16px}
-  .auth-card{width:calc(100vw - 32px);padding:30px 24px 26px;border-radius:24px}
-  .logo-stage{height:126px;margin-bottom:18px}
-  .auth-logo{width:min(210px,74%)}
-  .logo-glow{width:155px;height:155px}
+  #auth-gate{padding:16px;background-position:center center}
+  .auth-card{width:calc(100vw - 32px);padding:0;border-radius:0}
+  .logo-stage{height:132px;margin-bottom:20px}
+  .auth-logo{width:min(220px,76%)}
+  .logo-glow{width:165px;height:165px}
   .auth-card input,.btn-login{height:52px}
   .auth-footer{font-size:10px;margin-top:17px}
   header{padding:12px 16px}
@@ -233,10 +231,10 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
 }
 @media(max-height:700px){
   #auth-gate{align-items:flex-start;padding-top:24px;padding-bottom:24px;overflow-y:auto}
-  .auth-card{animation:none;padding-top:24px;padding-bottom:22px}
-  .logo-stage{height:102px;margin-bottom:12px}
-  .auth-logo{width:min(190px,66%)}
-  .logo-glow{width:135px;height:135px}
+  .auth-card{animation:none;padding:0}
+  .logo-stage{height:104px;margin-bottom:14px}
+  .auth-logo{width:min(195px,68%)}
+  .logo-glow{width:140px;height:140px}
   .auth-footer{margin-top:14px}
 }
 @media(prefers-reduced-motion:reduce){
@@ -257,9 +255,13 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
            onerror="this.style.display='none';document.getElementById('logo-fb').style.display='flex'">
       <div class="auth-logo-fallback" id="logo-fb" style="display:none">RG</div>
     </div>
-    <input type="text" id="auth-email" placeholder="Email atau ID Staff" autocomplete="username">
-    <input type="password" id="auth-pin" placeholder="RAOS PIN" autocomplete="current-password" inputmode="numeric">
-    <button class="btn-login" id="btn-masuk" onclick="doLogin()">Masuk ke RIFIM OS</button>
+
+    <div class="login-stack">
+      <input type="text" id="auth-email" placeholder="Email atau ID Staff" autocomplete="username">
+      <input type="password" id="auth-pin" placeholder="RAOS PIN" autocomplete="current-password" inputmode="numeric">
+      <button class="btn-login" id="btn-masuk" onclick="doLogin()">Masuk ke RIFIM OS</button>
+    </div>
+
     <div id="auth-err"></div>
     <p class="auth-footer">Akses terbatas untuk admin/direksi/mgmt/koordinator.<br>RAOS PIN diisi di sheet SSOT kolom I (terpisah dari PIN existing).</p>
   </div>
