@@ -1363,8 +1363,10 @@ function _finDriverAssignRandom_(params) {
   var verified = authVerifyUser(email);
   if (!verified.success) return { success: false, message: 'Email tidak diizinkan' };
   var role = String(verified.user && verified.user.role || '').toLowerCase();
-  if (role !== 'management' && role !== 'direksi' && role !== 'direktur') {
-    return { success: false, message: 'Hanya management/direksi yang boleh random-assign driver' };
+  // Fix 2026-08-07: role 'admin' (Bobby di users table) sebelumnya di-tolak
+  // walau semantically ADMIN adalah role tertinggi. Include 'admin' ke daftar.
+  if (role !== 'admin' && role !== 'management' && role !== 'direksi' && role !== 'direktur') {
+    return { success: false, message: 'Hanya admin/management/direksi yang boleh random-assign driver' };
   }
 
   var branchId = String(params.branch_id || '').trim();
