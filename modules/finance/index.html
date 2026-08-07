@@ -350,11 +350,11 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
       </div>
       <table class="tbl">
         <thead><tr>
-          <th>No Request</th><th>Cabang</th><th>Driver</th>
+          <th>No Request</th><th>Cabang</th><th>Staff</th><th>Driver</th>
           <th style="text-align:right">Nominal</th><th>Status</th><th>Diajukan</th><th>Aksi</th>
         </tr></thead>
         <tbody id="sr-body">
-          <tr><td colspan="7"><div class="empty"><div class="icon">💳</div>Belum terhubung ke Supabase.</div></td></tr>
+          <tr><td colspan="8"><div class="empty"><div class="icon">💳</div>Belum terhubung ke Supabase.</div></td></tr>
         </tbody>
       </table>
     </div>
@@ -891,13 +891,13 @@ function _rekapRenderRows(res) {
 // ═══════════════════════════════════════════════════════════════════════
 async function loadSaldoRaos() {
   const tb = document.getElementById('sr-body');
-  tb.innerHTML = '<tr><td colspan="7"><div class="empty">Loading Supabase…</div></td></tr>';
+  tb.innerHTML = '<tr><td colspan="8"><div class="empty">Loading Supabase…</div></td></tr>';
   try {
     const data = await _gasCall('finance_saldo_raos_list', {
       status: document.getElementById('sr-status').value || '',
     });
     if (!data.success) throw new Error(data.message || 'Gagal load');
-    if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="7"><div class="empty">Tidak ada request cocok filter</div></td></tr>'; return; }
+    if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="8"><div class="empty">Tidak ada request cocok filter</div></td></tr>'; return; }
     tb.innerHTML = data.rows.map(r => {
       const statusChip = r.is_processed
         ? '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(22,163,74,.2);color:#4ade80">Lunas</span>'
@@ -906,11 +906,19 @@ async function loadSaldoRaos() {
           : r.status === 'rejected'
             ? '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(220,38,38,.2);color:#f87171">Rejected</span>'
             : '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(234,179,8,.2);color:#facc15">Pending</span>';
+      // Poin 1 (2026-08-07): pisahkan kolom Staff vs Driver. Sebelumnya
+      // kolom "Driver" nyatanya render staff_name (bug — screenshot user
+      // 'yudi ultra RIF0144' = staff Bobby bukan driver).
+      const staffCell = `${esc(r.staff_name || '—')}${r.staff_code ? '<br><span style="font-size:11px;color:#facc15">' + esc(r.staff_code) + '</span>' : ''}`;
+      const driverCell = r.driver_name || r.driver_login_id
+        ? `${esc(r.driver_name || '—')}${r.driver_login_id ? '<br><span style="font-size:11px;color:#38bdf8">' + esc(r.driver_login_id) + '</span>' : ''}`
+        : '<span style="font-size:11px;color:#666">—</span>';
       return `
         <tr>
           <td class="key" style="font-family:monospace;font-size:11px;color:#facc15">${esc(r.id.substring(0, 8))}…</td>
           <td style="font-size:11px">${esc(r.branch_name || '—')}</td>
-          <td>${esc(r.staff_name)}<br><span style="font-size:11px;color:#facc15">${esc(r.staff_code)}</span></td>
+          <td>${staffCell}</td>
+          <td>${driverCell}</td>
           <td style="text-align:right;font-weight:600">${fmtRp(r.nominal)}</td>
           <td>${statusChip}</td>
           <td style="font-size:11px">${fmtDateTime(r.created_at)}</td>
@@ -921,7 +929,7 @@ async function loadSaldoRaos() {
       btn.addEventListener('click', () => markSaldoPaid(btn.dataset.markSaldo));
     });
   } catch (err) {
-    tb.innerHTML = `<tr><td colspan="7"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
+    tb.innerHTML = `<tr><td colspan="8"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
   }
 }
 
