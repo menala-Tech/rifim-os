@@ -4,6 +4,16 @@
 >
 > Last updated: 2026-08-07 (Sesi 3 chat migration + Saldo P0 fixes — merged + deployed prod)
 
+## Sesi 2026-08-07 — Skip Approval Flow Saldo (poin 2+6)
+
+Finance sekarang dapat memproses pengajuan `pending` langsung tanpa approval koordinator/admin. Migration `raos_076_mark_paid_skip_approval` relax guard RPC `raos_saldo_mark_paid` — accept `status IN ('pending','approved')`. Legacy request `approved` tetap processable. `rejected`/`cancelled` tetap ditolak dengan label `not_processable` (rename dari `not_approved`).
+
+**File touched:**
+- RAOS: `apps/pwa/src/components/SaldoRequestCard.tsx` (view-only, hapus Setujui/Tolak UI)
+- RAOS: `apps/pwa/src/lib/saldoRequest.ts` (approve/reject deprecated, tidak dihapus untuk backward compat)
+- RAOS: `sql/raos_076_mark_paid_skip_approval.sql` (guard relax, applied prod)
+- rifim-os: `modules/finance/index.html` (Lunas button accept pending, handle not_processable)
+
 ## Sesi 2026-08-07 — Saldo P0 + Fonnte Deprecation DEPLOYED
 
 ### PR merged & prod deploy
