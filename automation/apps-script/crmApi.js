@@ -1024,17 +1024,35 @@ function _finKpiTargetBranchList_(params) {
   var byBranch = {};
   rows.forEach(function(r) { byBranch[r.branch_id] = r; });
 
+  // Poin 10 (2026-08-07): count staff aktif per cabang untuk auto-prorate.
+  var allStaffLite = _crmSbFetch_('GET', '/rest/v1/user_profiles?select=branch_id&is_active=eq.true&role=in.(staff,koordinator)');
+  var staffCountByBranch = {};
+  (allStaffLite || []).forEach(function(s) {
+    if (!s.branch_id) return;
+    staffCountByBranch[s.branch_id] = (staffCountByBranch[s.branch_id] || 0) + 1;
+  });
+
   var out = branches.map(function(b) {
     var t = byBranch[b.id] || {};
     var slugLower = String(b.slug || '').toLowerCase();
     var isExcluded = /soeta|makassar/.test(slugLower);
+    var targetCabang = Number(t.target_cabang) || 0;
+    var branchDefault = t.target_staff_default != null ? Number(t.target_staff_default) : null;
+    var staffCount = staffCountByBranch[b.id] || 0;
+    var autoProrated = null;
+    if (branchDefault == null && targetCabang > 0 && staffCount > 0) {
+      autoProrated = Math.round(targetCabang / staffCount);
+    }
     return {
       branch_id: b.id,
       branch_name: b.name,
       branch_slug: b.slug,
       is_excluded_saldo: isExcluded,
-      target_cabang: Number(t.target_cabang) || 0,
-      target_staff_default: t.target_staff_default != null ? Number(t.target_staff_default) : null,
+      target_cabang: targetCabang,
+      target_staff_default: branchDefault,
+      target_staff_effective: branchDefault != null ? branchDefault : autoProrated,
+      target_staff_auto_prorated: autoProrated,
+      staff_count: staffCount,
       mode: t.mode || (isExcluded ? 'order' : 'saldo'),
       target_id: t.id || null,
       updated_at: t.updated_at || null,
@@ -1102,10 +1120,20 @@ function _finKpiTargetStaffList_(params) {
   var realisasiMap = {};
   (realisasi || []).forEach(function(r) { realisasiMap[r.staff_id] = r; });
 
-  // Ambil default per cabang
-  var branchTargets = _crmSbFetch_('GET', '/rest/v1/raos_kpi_targets_branch?select=branch_id,target_staff_default,mode&effective_month=eq.' + encodeURIComponent(month));
+  // Ambil default per cabang (target_cabang untuk auto-prorate poin 10+11)
+  var branchTargets = _crmSbFetch_('GET', '/rest/v1/raos_kpi_targets_branch?select=branch_id,target_cabang,target_staff_default,mode&effective_month=eq.' + encodeURIComponent(month));
   var branchTargetMap = {};
   (branchTargets || []).forEach(function(b) { branchTargetMap[b.branch_id] = b; });
+
+  // Poin 10+11 (2026-08-07): auto-prorate target_staff_default kalau null.
+  // Hitung count staff aktif per cabang (semua cabang, tidak dibatasi branchId
+  // filter, karena Target Cabang page butuh angka semua cabang).
+  var allStaffLite = _crmSbFetch_('GET', '/rest/v1/user_profiles?select=branch_id&is_active=eq.true&role=in.(staff,koordinator)');
+  var staffCountByBranch = {};
+  (allStaffLite || []).forEach(function(s) {
+    if (!s.branch_id) return;
+    staffCountByBranch[s.branch_id] = (staffCountByBranch[s.branch_id] || 0) + 1;
+  });
 
   // Ambil branch info
   var branches = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug');
@@ -1123,7 +1151,16 @@ function _finKpiTargetStaffList_(params) {
     var bt = branchTargetMap[s.branch_id] || {};
     var b = branchMap[s.branch_id] || {};
     var p = payrollMap[s.id] || {};
-    var target = override.target_saldo != null ? Number(override.target_saldo) : Number(bt.target_staff_default || 0);
+    // Poin 10+11: chain fallback — override > branch default > auto-prorate (target_cabang / count staff aktif)
+    var branchDefault = bt.target_staff_default != null ? Number(bt.target_staff_default) : null;
+    var autoProrated = null;
+    if (branchDefault == null && bt.target_cabang) {
+      var cnt = staffCountByBranch[s.branch_id] || 0;
+      if (cnt > 0) autoProrated = Math.round(Number(bt.target_cabang) / cnt);
+    }
+    var target = override.target_saldo != null
+      ? Number(override.target_saldo)
+      : (branchDefault != null ? branchDefault : (autoProrated != null ? autoProrated : 0));
     var real = Number(r.realisasi_saldo || 0);
     var pct = target > 0 ? Math.round((real / target) * 10000) / 100 : 0;
     var slugLower = String(b.slug || '').toLowerCase();

@@ -1104,15 +1104,25 @@ async function loadTargetCabang() {
     // Bonus tetap Rupiah di tier hardcoded (tidak dipengaruhi mode).
     const fmtTarget = (mode, v) => v == null ? '—' :
       (mode === 'order' ? Number(v).toLocaleString('id-ID') + ' scan' : fmtRp(v));
-    tb.innerHTML = data.rows.map(r => `
+    // Poin 10 (2026-08-07): tampilkan target_staff_effective (auto-prorate kalau default null).
+    // Kalau auto-prorate, tambah badge "auto" biar user tahu asal angkanya.
+    tb.innerHTML = data.rows.map(r => {
+      const staffVal = r.target_staff_effective != null ? r.target_staff_effective : r.target_staff_default;
+      const isAuto = r.target_staff_default == null && r.target_staff_auto_prorated != null;
+      const staffCell = staffVal == null ? '—' : (
+        fmtTarget(r.mode, staffVal) +
+        (isAuto ? ` <span style="font-size:9px;color:#94a3b8;font-weight:400" title="Auto-prorate: ${fmtTarget(r.mode, r.target_cabang)} ÷ ${r.staff_count} staff">auto ÷${r.staff_count}</span>` : '')
+      );
+      return `
       <tr data-branch="${esc(r.branch_id)}">
         <td>${esc(r.branch_name)}${r.is_excluded_saldo ? ' <span style="font-size:9px;color:#facc15">(order)</span>' : ''}</td>
         <td><span style="padding:2px 8px;border-radius:8px;background:${r.mode==='order'?'rgba(234,179,8,.2);color:#facc15':'rgba(14,165,233,.2);color:#38bdf8'};font-size:10px;font-weight:600">${esc(r.mode)}</span></td>
         <td style="text-align:right;font-family:monospace">${fmtTarget(r.mode, r.target_cabang)}</td>
-        <td style="text-align:right;font-family:monospace">${fmtTarget(r.mode, r.target_staff_default)}</td>
+        <td style="text-align:right;font-family:monospace">${staffCell}</td>
         <td style="font-size:10px;color:#888">${fmtDateTime(r.updated_at)}</td>
         <td><button class="btn small" onclick="editTargetCabang('${esc(r.branch_id)}','${esc(r.branch_name)}',${r.target_cabang},${r.target_staff_default},'${esc(r.mode)}')">✏️ Edit</button></td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
   } catch (err) {
     tb.innerHTML = `<tr><td colspan="6"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
   }
