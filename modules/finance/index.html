@@ -948,10 +948,12 @@ async function markSaldoPaid(id) {
     if (data.status === 'not_found') throw new Error('Pengajuan tidak ditemukan.');
     if (!data.success) throw new Error(data.message);
     if (data.status === 'already_processed') {
+      _srStopLoop(id);
       showToast(`Info: saldo ${id.substring(0, 8)}... sudah pernah diproses`, 'ok');
       await loadSaldoRaos();
       return;
     }
+    _srStopLoop(id);
     showToast(`✅ Saldo ${id.substring(0, 8)}… tandai lunas`, 'ok');
     await loadSaldoRaos();
   } catch (err) { showToast('❌ ' + err.message, 'err'); }
@@ -968,6 +970,10 @@ let _srAudioCtx = null;
 let _srChannel = null;
 let _srFallbackTimer = null;
 let _srFallbackFirstRun = true;
+// Poin 5 (2026-08-08): repeating alert state per saldo request.
+const _srActiveLoops = new Map();
+const _srAlertIntervalMs = 5000;
+const _srAlertMaxMs = 5 * 60 * 1000;
 
 function _srBeep() {
   try {
@@ -988,13 +994,88 @@ function _srBeep() {
   } catch (_) { /* audio blocked, silent */ }
 }
 
+function _srStopLoop(id) {
+  if (!id) return;
+  const state = _srActiveLoops.get(id);
+  if (!state) return;
+  if (state.loopId) clearInterval(state.loopId);
+  if (state.autoStop) clearTimeout(state.autoStop);
+  if (state.notification) {
+    try { state.notification.close(); } catch (_) {}
+  }
+  if (state.toast && state.toast.isConnected) state.toast.remove();
+  _srActiveLoops.delete(id);
+}
+
+function _srShowAlertToast(payload, body) {
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:20px;right:20px;width:min(420px,calc(100vw - 32px));padding:14px;background:var(--dark2,#2B2B2B);color:#fff;border:1px solid rgba(250,204,21,.35);border-radius:10px;font-size:13px;z-index:10000;box-shadow:0 10px 32px rgba(0,0,0,.5)';
+  const title = document.createElement('div');
+  title.textContent = '🔔 Pengajuan Saldo Baru';
+  title.style.cssText = 'font-weight:800;color:#facc15;margin-bottom:5px;cursor:pointer';
+  const desc = document.createElement('div');
+  desc.textContent = body;
+  desc.style.cssText = 'line-height:1.45;cursor:pointer';
+  const actions = document.createElement('div');
+  actions.style.cssText = 'display:flex;justify-content:flex-end;margin-top:10px';
+  const mute = document.createElement('button');
+  mute.type = 'button';
+  mute.textContent = '🔕 Bisukan';
+  mute.style.cssText = 'padding:5px 10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:7px;color:#fff;cursor:pointer;font-size:11px;font-weight:600';
+  const acknowledge = () => {
+    _srStopLoop(payload.id);
+    const tab = document.querySelector('.tab[data-tab="saldo-raos"]');
+    if (tab && !tab.classList.contains('active')) tab.click();
+  };
+  title.addEventListener('click', acknowledge);
+  desc.addEventListener('click', acknowledge);
+  mute.addEventListener('click', (event) => {
+    event.stopPropagation();
+    _srStopLoop(payload.id);
+  });
+  actions.appendChild(mute);
+  toast.appendChild(title);
+  toast.appendChild(desc);
+  toast.appendChild(actions);
+  document.body.appendChild(toast);
+  return toast;
+}
+
 function _srNotify(payload) {
   if (!payload || !payload.id) return;
   if (_srSeenIds.has(payload.id)) return;
   _srSeenIds.add(payload.id);
-  _srBeep();
   const nominal = Number(payload.nominal || 0).toLocaleString('id-ID');
-  showToast(`🔔 Pengajuan baru: ${payload.staff_name || '?'} — Rp${nominal} (${payload.branch_name || '?'})`, 'ok');
+  const body = `${payload.staff_name || '?'} — Rp${nominal} (${payload.branch_name || '?'})`;
+  _srStopLoop(payload.id);
+  _srBeep();
+  const loopId = setInterval(_srBeep, _srAlertIntervalMs);
+  const autoStop = setTimeout(() => _srStopLoop(payload.id), _srAlertMaxMs);
+  _srActiveLoops.set(payload.id, { loopId, autoStop, notification: null, toast: null });
+  const toast = _srShowAlertToast(payload, body);
+  let notification = null;
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      notification = new Notification('🔔 Pengajuan Saldo Baru', {
+        body,
+        icon: '/branding/logo/logo-rifim-transparent.png',
+        tag: `saldo-${payload.id}`,
+        requireInteraction: true,
+      });
+      notification.onclick = () => {
+        window.focus();
+        _srStopLoop(payload.id);
+        try { notification.close(); } catch (_) {}
+        const tab = document.querySelector('.tab[data-tab="saldo-raos"]');
+        if (tab && !tab.classList.contains('active')) tab.click();
+      };
+    } catch (_) {}
+  }
+  const active = _srActiveLoops.get(payload.id);
+  if (active) {
+    active.toast = toast;
+    active.notification = notification;
+  }
   const activeTab = document.querySelector('.tab.active');
   if (activeTab && activeTab.dataset.tab === 'saldo-raos') loadSaldoRaos();
 }
@@ -1003,6 +1084,10 @@ async function _srFallbackPoll() {
   try {
     const data = await _gasCall('finance_saldo_raos_list', { status: 'pending' });
     if (!data.success || !Array.isArray(data.rows)) return;
+    const stillPendingIds = new Set(data.rows.map(r => r.id));
+    for (const id of _srActiveLoops.keys()) {
+      if (!stillPendingIds.has(id)) _srStopLoop(id);
+    }
     if (_srFallbackFirstRun) {
       data.rows.forEach(r => _srSeenIds.add(r.id));
       _srFallbackFirstRun = false;
@@ -1016,8 +1101,16 @@ async function _srFallbackPoll() {
 
 function startSaldoRaosNotifier() {
   // Unlock AudioContext on first user gesture (autoplay policy)
-  const unlock = () => {
-    if (_srAudioCtx && _srAudioCtx.state === 'suspended') _srAudioCtx.resume();
+  const unlock = async () => {
+    try {
+      if (!_srAudioCtx && (window.AudioContext || window.webkitAudioContext)) {
+        _srAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (_srAudioCtx && _srAudioCtx.state === 'suspended') await _srAudioCtx.resume();
+    } catch (_) {}
+    if ('Notification' in window && Notification.permission === 'default') {
+      try { await Notification.requestPermission(); } catch (_) {}
+    }
     document.removeEventListener('click', unlock);
     document.removeEventListener('keydown', unlock);
   };
