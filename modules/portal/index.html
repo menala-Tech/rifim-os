@@ -17,12 +17,12 @@
 html,body{min-height:100%;overflow-x:hidden}
 body{font-family:var(--font);background:#050914;color:#fff;min-height:100dvh;display:flex;flex-direction:column}
 
-/* ─── AUTH GATE — MAXIM BACKGROUND + FLOATING CONTROLS ─── */
+/* ─── AUTH GATE — MAXIM BACKGROUND + TRUE BOTTOM-CENTER CONTROLS ─── */
 #auth-gate{
   position:relative;isolation:isolate;
   flex:1;display:flex;align-items:flex-end;justify-content:center;
   min-height:100dvh;
-  padding:clamp(260px,42vh,520px) 18px clamp(28px,5vh,64px);
+  padding:24px 18px clamp(28px,4vh,52px);
   overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:contain;
   -webkit-overflow-scrolling:touch;
   background:
@@ -33,18 +33,18 @@ body{font-family:var(--font);background:#050914;color:#fff;min-height:100dvh;dis
   content:'';position:absolute;inset:0;z-index:-2;pointer-events:none;
   background:
     radial-gradient(circle at 50% 38%,rgba(255,210,70,.13),transparent 30%),
-    radial-gradient(circle at 50% 76%,rgba(40,100,255,.08),transparent 42%);
+    radial-gradient(circle at 50% 82%,rgba(40,100,255,.08),transparent 38%);
 }
 .login-glow{
-  position:absolute;left:50%;bottom:clamp(70px,10vh,130px);transform:translateX(-50%);
+  position:absolute;left:50%;bottom:clamp(36px,6vh,78px);transform:translateX(-50%);
   z-index:-1;pointer-events:none;
-  width:min(560px,92vw);height:min(420px,60vh);border-radius:50%;
+  width:min(560px,92vw);height:min(360px,52vh);border-radius:50%;
   background:radial-gradient(circle,rgba(255,200,60,.20) 0%,rgba(255,170,30,.07) 35%,transparent 70%);
   filter:blur(38px);animation:glowPulse 5s ease-in-out infinite;
 }
 .auth-card{
   position:relative;z-index:1;width:min(440px,calc(100vw - 36px));padding:0;
-  flex:0 0 auto;
+  flex:0 0 auto;margin-top:auto;margin-bottom:0;
   text-align:center;color:#fff;background:transparent;border:none;
   border-radius:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
   animation:loginFloat 7s ease-in-out infinite;
@@ -52,15 +52,15 @@ body{font-family:var(--font);background:#050914;color:#fff;min-height:100dvh;dis
 .auth-card::before{content:none;display:none}
 .logo-stage{
   position:relative;display:flex;align-items:center;justify-content:center;
-  height:142px;margin:0 auto 20px;perspective:900px;transform-style:preserve-3d;
+  height:112px;margin:0 auto 12px;perspective:900px;transform-style:preserve-3d;
 }
 .logo-glow{
-  position:absolute;width:210px;height:210px;border-radius:50%;z-index:-1;pointer-events:none;
+  position:absolute;width:170px;height:170px;border-radius:50%;z-index:-1;pointer-events:none;
   background:radial-gradient(circle,rgba(255,210,70,.28),rgba(255,180,30,.09) 45%,transparent 72%);
   filter:blur(24px);
 }
 .auth-logo{
-  width:min(240px,76%);height:auto;max-height:none;display:block;object-fit:contain;
+  width:min(205px,70%);height:auto;max-height:none;display:block;object-fit:contain;
   transform-style:preserve-3d;will-change:transform,translate;
   filter:drop-shadow(0 15px 25px rgba(0,0,0,.42)) drop-shadow(0 0 22px rgba(255,205,70,.22));
   animation:rifimLogo3D 9s ease-in-out infinite,rifimFloat 4s ease-in-out infinite;
@@ -71,9 +71,9 @@ body{font-family:var(--font);background:#050914;color:#fff;min-height:100dvh;dis
   font-size:30px;font-weight:800;color:#fff;letter-spacing:1px;
   box-shadow:0 16px 34px rgba(0,0,0,.30),0 0 28px rgba(255,200,60,.18);
 }
-.login-stack{width:100%;display:flex;flex-direction:column;gap:14px;align-items:stretch}
+.login-stack{width:100%;display:flex;flex-direction:column;gap:12px;align-items:stretch}
 .auth-card input{
-  width:100%;height:56px;padding:0 18px;margin:0;
+  width:100%;height:54px;padding:0 18px;margin:0;
   background:rgba(9,19,36,.64);color:#fff;
   border:1px solid rgba(255,255,255,.20);border-radius:16px;
   outline:none;font-size:15px;caret-color:#ffd24a;
@@ -94,7 +94,7 @@ body{font-family:var(--font);background:#050914;color:#fff;min-height:100dvh;dis
   transition:background-color 9999s ease-in-out 0s;
 }
 .btn-login{
-  width:100%;height:56px;padding:0 18px;margin-top:2px;
+  width:100%;height:54px;padding:0 18px;margin-top:2px;
   background:linear-gradient(135deg,#df0909 0%,#c40000 52%,#940000 100%);color:#fff;
   border:1px solid rgba(255,255,255,.10);border-radius:16px;
   font-size:15px;font-weight:800;letter-spacing:.02em;cursor:pointer;
@@ -110,7 +110,7 @@ body{font-family:var(--font);background:#050914;color:#fff;min-height:100dvh;dis
   box-shadow:0 10px 26px rgba(0,0,0,.22);
 }
 .auth-footer{
-  margin-top:16px;font-size:11px;line-height:1.55;color:rgba(245,245,245,.78);
+  margin-top:10px;font-size:10px;line-height:1.45;color:rgba(245,245,245,.78);
   text-shadow:0 2px 10px rgba(0,0,0,.45);
 }
 
@@ -127,11 +127,11 @@ body{font-family:var(--font);background:#050914;color:#fff;min-height:100dvh;dis
 }
 @keyframes rifimFloat{
   0%,100%{translate:0 0}
-  50%{translate:0 -9px}
+  50%{translate:0 -7px}
 }
 @keyframes loginFloat{
   0%,100%{transform:translateY(0)}
-  50%{transform:translateY(-5px)}
+  50%{transform:translateY(-3px)}
 }
 
 /* ─── PORTAL APP ─── */
@@ -224,15 +224,15 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
 @media(max-width:600px){
   #auth-gate{
     align-items:flex-end;
-    padding:clamp(190px,32vh,300px) 16px max(20px,env(safe-area-inset-bottom));
+    padding:56px 16px max(18px,env(safe-area-inset-bottom));
     background-position:center center;
   }
-  .auth-card{width:min(100%,420px);padding:0;border-radius:0}
-  .logo-stage{height:116px;margin-bottom:14px}
-  .auth-logo{width:min(205px,72%)}
-  .logo-glow{width:155px;height:155px}
-  .auth-card input,.btn-login{height:52px}
-  .auth-footer{font-size:10px;margin-top:14px}
+  .auth-card{width:min(100%,420px);padding:0;border-radius:0;margin-top:auto}
+  .logo-stage{height:94px;margin-bottom:8px}
+  .auth-logo{width:min(180px,64%)}
+  .logo-glow{width:140px;height:140px}
+  .auth-card input,.btn-login{height:50px}
+  .auth-footer{font-size:9px;margin-top:8px}
   header{padding:12px 16px}
   main{padding:24px 16px}
   .modules-grid{grid-template-columns:1fr 1fr}
@@ -241,17 +241,17 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
 @media(max-height:700px){
   #auth-gate{
     align-items:flex-start;
-    padding-top:max(24px,env(safe-area-inset-top));
-    padding-bottom:max(24px,env(safe-area-inset-bottom));
+    padding-top:max(20px,env(safe-area-inset-top));
+    padding-bottom:max(20px,env(safe-area-inset-bottom));
     overflow-y:auto;
   }
   .login-glow{bottom:20px}
   .auth-card{animation:none;padding:0;margin:0 auto}
-  .logo-stage{height:92px;margin-bottom:10px}
-  .auth-logo{width:min(180px,64%)}
-  .logo-glow{width:130px;height:130px}
-  .auth-card input,.btn-login{height:48px}
-  .auth-footer{margin-top:12px}
+  .logo-stage{height:78px;margin-bottom:6px}
+  .auth-logo{width:min(155px,58%)}
+  .logo-glow{width:115px;height:115px}
+  .auth-card input,.btn-login{height:46px}
+  .auth-footer{margin-top:8px}
 }
 @media(prefers-reduced-motion:reduce){
   .login-glow,.auth-card,.auth-logo{animation:none!important}
@@ -300,7 +300,6 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
   </header>
 
   <main>
-    <!-- Company Selector -->
     <div class="section-label">Konteks Perusahaan</div>
     <div class="company-pills">
       <div class="company-pill active" data-code="ALL" onclick="selectCompany(this)">
@@ -330,7 +329,6 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
       </div>
     </div>
 
-    <!-- Module Grid -->
     <div class="section-title">Pilih Modul</div>
     <div class="section-desc">Klik modul untuk mulai bekerja</div>
     <div class="modules-grid">
@@ -392,7 +390,6 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
 <script>
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec';
 
-// ── SUPABASE (RAOS project) — untuk auth PIN dari SSOT sheet ─────────
 const SB_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co';
 const SB_ANON = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
 let _sbClient = null;
@@ -407,16 +404,6 @@ function _sb() {
 
 const ALLOWED_ROLES = ['admin', 'direksi', 'management', 'koordinator'];
 
-// ── AUTH ─────────────────────────────────────────────────────────────
-// Pipeline 2-lapis (raos_068 bridge, sesi 2026-08-04):
-//   1. Client input email/ID + RAOS_PIN (kolom I sheet SSOT, terpisah dari
-//      SSOT PIN kolom H yg dipakai PWA lain)
-//   2. RPC raos_verify_and_bridge → verify RAOS_PIN, kalau match return
-//      email + ssot_pin
-//   3. signInWithPassword(email, ssot_pin) transparent → session Auth aktif
-// Fallback: kalau bridge return not_found (admin manual yg belum di-sync
-// ke raos_credentials), coba direct signInWithPassword pakai input PIN
-// sebagai password Auth (backward compat).
 async function doLogin() {
   const loginId = document.getElementById('auth-email').value.trim();
   const pin     = document.getElementById('auth-pin').value.trim();
@@ -431,7 +418,6 @@ async function doLogin() {
   if (!sb) { btn.textContent = 'Masuk ke RIFIM OS'; btn.disabled = false; return showErr('Supabase SDK belum load — refresh halaman.'); }
 
   try {
-    // Tahap 1: bridge — verify RAOS_PIN
     const { data: bridge, error: bridgeErr } = await sb.rpc('raos_verify_and_bridge', {
       p_login_id: loginId, p_raos_pin: pin,
     });
@@ -441,13 +427,9 @@ async function doLogin() {
       email = bridge.email;
       signInPassword = bridge.ssot_pin;
     } else if (bridge && bridge.ok === false && bridge.reason === 'bad_pin') {
-      // Bridge ketemu tapi PIN salah — jangan fallback (biar tidak accidentally
-      // pakai raos_pin sbg Auth password yang aslinya beda)
       showErr(bridge.message || 'RAOS PIN salah.');
       return;
     }
-    // Kalau bridge return not_found / no_ssot_pin / inactive — coba direct signIn
-    // (untuk admin manual yg belum masuk raos_credentials).
 
     const { data: signData, error: signErr } = await sb.auth.signInWithPassword({
       email, password: signInPassword,
@@ -457,7 +439,6 @@ async function doLogin() {
       return;
     }
 
-    // Verify role
     const { data: profile } = await sb.from('user_profiles')
       .select('id, full_name, role, staff_id, branch_id, is_active')
       .eq('id', signData.user.id).maybeSingle();
@@ -509,7 +490,6 @@ function showPortal(user) {
   document.getElementById('app').style.display = 'flex';
   document.getElementById('user-name').textContent = user.full_name || user.email;
   document.getElementById('user-role').textContent = user.role || 'USER';
-  // Restore saved company
   const savedCo = localStorage.getItem('rifim_company') || 'ALL';
   document.querySelectorAll('.company-pill').forEach(p => {
     p.classList.toggle('active', p.dataset.code === savedCo);
@@ -532,14 +512,12 @@ function doLogout() {
   location.reload();
 }
 
-// ── COMPANY SELECTOR ─────────────────────────────────────────────────
 function selectCompany(el) {
   document.querySelectorAll('.company-pill').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
   localStorage.setItem('rifim_company', el.dataset.code);
 }
 
-// ── NAVIGATION ───────────────────────────────────────────────────────
 function goTo(path) {
   window.location.href = path;
 }
@@ -559,7 +537,6 @@ function goTo(path) {
   });
 });
 
-// ── AUTO-LOGIN ────────────────────────────────────────────────────────
 (function init() {
   const raw = localStorage.getItem('rifim_auth');
   if (raw) {
