@@ -1094,12 +1094,17 @@ async function loadTargetCabang() {
     const data = await _gasCall('finance_kpi_target_branch_list', { month: monthEl.value });
     if (!data.success) throw new Error(data.message || 'Gagal load');
     if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="6"><div class="empty">Tidak ada cabang</div></td></tr>'; return; }
+    // Poin 12 (2026-08-07): Cabang mode='order' (Soeta/Makassar) tampil
+    // Target Cabang + Target Staff sebagai ANGKA scan count, bukan Rupiah.
+    // Bonus tetap Rupiah di tier hardcoded (tidak dipengaruhi mode).
+    const fmtTarget = (mode, v) => v == null ? '—' :
+      (mode === 'order' ? Number(v).toLocaleString('id-ID') + ' scan' : fmtRp(v));
     tb.innerHTML = data.rows.map(r => `
       <tr data-branch="${esc(r.branch_id)}">
         <td>${esc(r.branch_name)}${r.is_excluded_saldo ? ' <span style="font-size:9px;color:#facc15">(order)</span>' : ''}</td>
         <td><span style="padding:2px 8px;border-radius:8px;background:${r.mode==='order'?'rgba(234,179,8,.2);color:#facc15':'rgba(14,165,233,.2);color:#38bdf8'};font-size:10px;font-weight:600">${esc(r.mode)}</span></td>
-        <td style="text-align:right;font-family:monospace">${fmtRp(r.target_cabang)}</td>
-        <td style="text-align:right;font-family:monospace">${r.target_staff_default != null ? fmtRp(r.target_staff_default) : '—'}</td>
+        <td style="text-align:right;font-family:monospace">${fmtTarget(r.mode, r.target_cabang)}</td>
+        <td style="text-align:right;font-family:monospace">${fmtTarget(r.mode, r.target_staff_default)}</td>
         <td style="font-size:10px;color:#888">${fmtDateTime(r.updated_at)}</td>
         <td><button class="btn small" onclick="editTargetCabang('${esc(r.branch_id)}','${esc(r.branch_name)}',${r.target_cabang},${r.target_staff_default},'${esc(r.mode)}')">✏️ Edit</button></td>
       </tr>`).join('');
@@ -1282,14 +1287,21 @@ async function loadTargetStaff() {
                       r.status_target === 'warning' ? '#facc15' :
                       r.status_target === 'na' ? '#888' : '#f87171';
       const stLabel = { ok:'Capai', warning:'Warning', cut_off:'Cut Off', na:'N/A' }[r.status_target] || r.status_target;
+      // Poin 12 (2026-08-07): staff di cabang mode='order' (is_excluded_saldo=true,
+      // yaitu Soeta/Makassar) sebelumnya kolom Target/Realisasi/% tampil '—'.
+      // Sekarang tampil ANGKA scan count (target_scan/realisasi_scan bila
+      // backend expose). Fallback ke '—' kalau backend belum kirim field-nya.
+      const targetScan = r.target_scan != null ? Number(r.target_scan).toLocaleString('id-ID') + ' scan' : '—'
+      const realScan = r.realisasi_scan != null ? Number(r.realisasi_scan).toLocaleString('id-ID') + ' scan' : '—'
+      const pctScan = r.pct_scan != null ? Number(r.pct_scan).toFixed(1) + '%' : '—'
       return `
         <tr>
           <td>${esc(r.staff_name)}<br><span style="font-size:9px;color:#888">${esc(r.staff_code)} · ${esc(r.role)}</span></td>
           <td style="font-size:10px">${esc(r.branch_name)}${r.is_excluded_saldo ? ' <span style="color:#facc15">(order)</span>' : ''}</td>
           <td style="text-align:right;font-family:monospace">${fmtRp(r.gapok)}</td>
-          <td style="text-align:right;font-family:monospace">${r.is_excluded_saldo ? '—' : fmtRp(r.target_saldo)}</td>
-          <td style="text-align:right;font-family:monospace">${r.is_excluded_saldo ? '—' : fmtRp(r.realisasi_saldo)}</td>
-          <td style="text-align:right;color:${stColor};font-weight:600">${r.is_excluded_saldo ? '—' : (Number(r.pct).toFixed(1) + '%')}</td>
+          <td style="text-align:right;font-family:monospace">${r.is_excluded_saldo ? targetScan : fmtRp(r.target_saldo)}</td>
+          <td style="text-align:right;font-family:monospace">${r.is_excluded_saldo ? realScan : fmtRp(r.realisasi_saldo)}</td>
+          <td style="text-align:right;color:${stColor};font-weight:600">${r.is_excluded_saldo ? pctScan : (Number(r.pct).toFixed(1) + '%')}</td>
           <td style="text-align:right;font-family:monospace;color:${r.bonus_saldo>0?'#4ade80':'#666'}">${fmtRp(r.bonus_saldo)}</td>
           <td style="text-align:right;font-family:monospace">${fmtRp(r.bpjs)}</td>
           <td style="text-align:right;font-family:monospace">${fmtRp(r.paket_data)}</td>
