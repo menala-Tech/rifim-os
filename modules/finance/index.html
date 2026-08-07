@@ -570,7 +570,9 @@ const CABANG_LIST = [
 function checkAuth() {
   let sess = null;
   try { sess = JSON.parse(localStorage.getItem('rifim_auth') || 'null'); } catch(e) {}
-  if (!sess || !sess.email) { showGate(); return null; }
+  if (!sess || !sess.email || !sess.access_token) {
+    localStorage.removeItem('rifim_auth'); showGate(); return null;
+  }
   if (sess.ts && Date.now() - sess.ts > 12 * 3600 * 1000) {
     localStorage.removeItem('rifim_auth'); showGate(); return null;
   }
@@ -638,7 +640,51 @@ function _finGetUserEmail() {
   catch (e) { return ''; }
 }
 
+let _finSessionClient = null;
+async function _finGetAccessToken() {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('rifim_auth') || '{}'); }
+  catch (e) { return ''; }
+
+  if (window.supabase && saved.refresh_token) {
+    try {
+      if (!_finSessionClient) {
+        _finSessionClient = window.supabase.createClient(
+          'https://vlievtojpmrbsmzlqswl.supabase.co',
+          'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1',
+          { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } },
+        );
+      }
+      let session = (await _finSessionClient.auth.getSession()).data.session;
+      const expiring = !session || !session.expires_at || session.expires_at * 1000 < Date.now() + 60000;
+      if (expiring) {
+        session = (await _finSessionClient.auth.refreshSession({ refresh_token: saved.refresh_token })).data.session;
+      }
+      if (session?.access_token) {
+        saved.access_token = session.access_token;
+        saved.refresh_token = session.refresh_token || saved.refresh_token;
+        saved.expires_at = session.expires_at || saved.expires_at;
+        localStorage.setItem('rifim_auth', JSON.stringify(saved));
+        return session.access_token;
+      }
+    } catch (_) { /* fail closed below */ }
+  }
+  return saved.access_token || '';
+}
+
 async function _gasCall(action, extra) {
+  if (action === 'finance_saldo_raos_list' || action === 'finance_saldo_raos_mark_paid') {
+    const token = await _finGetAccessToken();
+    if (!token) throw new Error('Session token tidak ada. Login ulang melalui Portal.');
+    const body = Object.assign({ action, access_token: token }, extra || {});
+    if (window.RifimAPI) return RifimAPI.post(body);
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body),
+    });
+    return res.json();
+  }
   // Sesi 2026-08-05: delegate ke RifimAPI shared (auto-inject user + retry HTML throttled).
   // Backward-compat — semua call site _gasCall(action, extra) masih bekerja.
   if (window.RifimAPI) {
@@ -884,7 +930,14 @@ async function markSaldoPaid(id) {
   showToast('Memproses…');
   try {
     const data = await _gasCall('finance_saldo_raos_mark_paid', { id });
+    if (data.status === 'not_approved') throw new Error(`Status saat ini ${data.current_status || 'bukan approved'}.`);
+    if (data.status === 'not_found') throw new Error('Pengajuan tidak ditemukan.');
     if (!data.success) throw new Error(data.message);
+    if (data.status === 'already_processed') {
+      showToast(`Info: saldo ${id.substring(0, 8)}... sudah pernah diproses`, 'ok');
+      await loadSaldoRaos();
+      return;
+    }
     showToast(`✅ Saldo ${id.substring(0, 8)}… tandai lunas`, 'ok');
     await loadSaldoRaos();
   } catch (err) { showToast('❌ ' + err.message, 'err'); }

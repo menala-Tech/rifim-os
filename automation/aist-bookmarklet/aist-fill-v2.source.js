@@ -25,8 +25,9 @@
   // Cek auth: butuh localStorage.rifim_auth dari sesi Rifim-OS Portal
   var auth;
   try { auth = JSON.parse(localStorage.getItem('rifim_auth') || '{}'); } catch (e) { auth = {}; }
-  if (!auth.email) {
-    alert('❌ Belum login Rifim-OS.\n\nBuka https://rifim-os.vercel.app/portal dulu untuk login.\nSetelah login, coba klik bookmark ini lagi.');
+  if (!auth.access_token) {
+    alert('Session token Rifim-OS tidak ada. Login ulang di Portal, lalu jalankan bookmarklet lagi.');
+    window.open('https://rifim-os.vercel.app/portal', '_blank', 'noopener');
     return;
   }
 
@@ -78,18 +79,32 @@
   function fmtRp(n) { return 'Rp ' + (Number(n) || 0).toLocaleString('id-ID'); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
 
+  function gasPost(action, payload) {
+    var body = Object.assign({ action: action, access_token: auth.access_token }, payload || {});
+    return fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body)
+    }).then(function (r) { return r.json(); }).then(function (data) {
+      if (data.code === 'TOKEN_INVALID' || data.code === 'TOKEN_REQUIRED') {
+        throw new Error('Session Rifim-OS kedaluwarsa. Login ulang lalu jalankan bookmarklet lagi.');
+      }
+      return data;
+    });
+  }
+
   // Fetch dari Supabase via GAS Web App
   function fetchRows() {
     var status = document.getElementById('__aist_status').value;
-    var url = GAS_URL + '?action=finance_saldo_raos_list&user=' + encodeURIComponent(auth.email) + '&status=' + encodeURIComponent(status);
     document.getElementById('__aist_meta').textContent = 'Loading dari Supabase…';
-    return fetch(url).then(function (r) { return r.json(); }).then(function (data) {
+    return gasPost('finance_saldo_raos_list', { status: status }).then(function (data) {
       if (!data.success) throw new Error(data.message || 'Gagal load');
       return data.rows || [];
     });
   }
 
   var _cached = [];
+  var _busy = {};
   function render(rows) {
     _cached = rows;
     var q = (document.getElementById('__aist_search').value || '').toLowerCase();
@@ -108,7 +123,7 @@
     body.innerHTML = filtered.map(function (r, i) {
       return [
         '<div class="__aist_row" data-idx="' + i + '" data-id="' + esc(r.id) + '"',
-        '     style="padding:10px 12px;border-bottom:1px solid #eee;cursor:pointer;display:flex;justify-content:space-between;align-items:center"',
+        '     style="padding:10px 12px;border-bottom:1px solid #eee;cursor:' + (_busy[r.id] ? 'wait' : 'pointer') + ';display:flex;justify-content:space-between;align-items:center;opacity:' + (_busy[r.id] ? '.55' : '1') + ';pointer-events:' + (_busy[r.id] ? 'none' : 'auto') + '"',
         '     onmouseover="this.style.background=\'#fff3f3\'" onmouseout="this.style.background=\'#fff\'">',
         '  <div style="flex:1;min-width:0">',
         '    <div style="font-weight:700;font-size:13px">' + esc(r.staff_name || '?') + ' <span style="color:#888;font-weight:400">→</span> <span style="color:#C40000">' + esc(r.driver_name || r.driver_login || '?') + '</span></div>',
@@ -125,7 +140,7 @@
       el.addEventListener('click', function () {
         var idx = parseInt(el.dataset.idx);
         var row = filtered[idx];
-        fillAistModal(row);
+        processRow(row);
       });
     });
   }
@@ -137,23 +152,78 @@
 
     if (!amountEl || !loginEl) {
       showToast('❌ Tidak nemu input Amount/Login di modal AIST. Buka modal Balance replenishment dulu.', 'err');
-      return;
+      return false;
     }
 
     setInputValue(amountEl, String(row.nominal));
     setInputValue(loginEl,  String(row.driver_login || row.driver_id || ''));
 
-    showToast('✅ Terisi: ' + fmtRp(row.nominal) + ' → ' + (row.driver_login || row.driver_id) + '. Klik OK di AIST untuk kirim.', 'ok');
+    showToast('Field terisi: ' + fmtRp(row.nominal) + ' → ' + (row.driver_login || row.driver_id) + '. Tekan OK di AIST; menunggu konfirmasi.', 'info');
+    return true;
+  }
 
-    // Mark as processed di Supabase (fire-and-forget)
-    var url = GAS_URL + '?action=finance_saldo_raos_mark_paid&user=' + encodeURIComponent(auth.email) + '&id=' + encodeURIComponent(row.id);
-    fetch(url).then(function (r) { return r.json(); }).then(function (res) {
-      if (res.success) {
-        // Refresh list — remove row that was clicked
-        _cached = _cached.filter(function (x) { return x.id !== row.id; });
-        render(_cached);
+  function processRow(row) {
+    if (_busy[row.id]) return;
+    if (!fillAistModal(row)) return;
+    _busy[row.id] = true;
+    render(_cached);
+
+    waitForAistAcknowledgement(30000).then(function () {
+      showToast('AIST terkonfirmasi. Menyimpan status lunas…', 'info');
+      return gasPost('finance_saldo_raos_mark_paid', { id: row.id });
+    }).then(function (res) {
+      if (res.status === 'not_approved') throw new Error('Request berubah ke status ' + (res.current_status || 'bukan approved') + '.');
+      if (res.status === 'not_found') throw new Error('Request tidak ditemukan.');
+      if (!res.success) throw new Error(res.message || 'Mark-paid gagal.');
+
+      delete _busy[row.id];
+      _cached = _cached.filter(function (x) { return x.id !== row.id; });
+      render(_cached);
+      showToast(res.status === 'already_processed'
+        ? 'Request ini sudah pernah diproses.'
+        : 'AIST sukses dan request ditandai lunas.', 'ok');
+    }).catch(function (err) {
+      delete _busy[row.id];
+      render(_cached);
+      showToast(err.message + ' Row tetap approved; klik lagi untuk retry.', 'err');
+    });
+  }
+
+  function waitForAistAcknowledgement(timeoutMs) {
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      var successPattern = /\b(success|successful|successfully|sukses|berhasil|completed)\b/i;
+      var errorPattern = /\b(error|failed|failure|gagal|batal|cancelled|canceled|invalid)\b/i;
+
+      function finish(fn, value) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        observer.disconnect();
+        fn(value);
       }
-    }).catch(function () { /* ignore */ });
+
+      function inspect(node) {
+        if (!node || (node.nodeType !== 1 && node.nodeType !== 3)) return;
+        var element = node.nodeType === 1 ? node : node.parentElement;
+        if (element && element.closest && element.closest('#__aist_fill_v2_picker__')) return;
+        var text = String(node.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!text) return;
+        if (errorPattern.test(text)) finish(reject, new Error('AIST melaporkan gagal/batal.'));
+        else if (successPattern.test(text)) finish(resolve, text);
+      }
+
+      var observer = new MutationObserver(function (mutations) {
+        mutations.forEach(function (mutation) {
+          Array.prototype.forEach.call(mutation.addedNodes || [], inspect);
+          if (mutation.type === 'characterData') inspect(mutation.target);
+        });
+      });
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+      var timer = setTimeout(function () {
+        finish(reject, new Error('Timeout 30 detik menunggu konfirmasi AIST.'));
+      }, timeoutMs);
+    });
   }
 
   // Utility: find input by nearby label text (label[for], legend, or preceding sibling)

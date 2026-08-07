@@ -929,3 +929,13 @@ RADMS (Batch 7) sudah production:
 | Spreadsheet ID | `1jHeA-w1bM32S3-AU-ENN2UjiaCb4iLzRhaf4G7y4ozM` |
 | Supabase | `vlievtojpmrbsmzlqswl.supabase.co` |
 | Deploy GAS | GitHub Actions → clasp push (lokal ETIMEDOUT) |
+
+## 2026-08-07 — Saldo P0 F-01..F-04
+
+- Commit `3903d67` mengamankan saldo Finance dengan Supabase access token yang diverifikasi server-side dan actor UUID/role dari `user_profiles`.
+- Endpoint saldo Finance memakai POST body untuk menjaga token keluar dari query string. Mark-paid memakai RPC `raos_saldo_mark_paid`, bukan PATCH langsung.
+- Bookmarklet menunggu acknowledgement sukses AIST maksimal 30 detik sebelum mark-paid; error/cancel/timeout tetap approved dan dapat di-retry.
+- Portal menyimpan session Supabase dan Finance merefresh access token sebelum request saldo.
+- Migration prod `raos_074` dan `raos_075` telah diterapkan serta diverifikasi oleh CC.
+- Validasi lokal: `node --check` untuk GAS/Bookmarklet dan parse inline script Finance/Portal lulus.
+- `[gas-redeploy pending]` `clasp push` dan edit deployment aktif masih wajib sebelum endpoint produksi memakai implementasi baru.

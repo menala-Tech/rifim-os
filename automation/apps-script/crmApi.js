@@ -73,8 +73,9 @@ function crmHandleGet(e) {
     if (action === 'finance_rekap_harian')  return _crmJson(_finRekapHarian_(e.parameter));
     if (action === 'finance_rekap_bulanan') return _crmJson(_finRekapBulanan_(e.parameter));
     if (action === 'finance_log_list')      return _crmJson(_finLogList_(e.parameter));
-    if (action === 'finance_saldo_raos_list') return _crmJson(_finSaldoRaosList_(e.parameter));
-    if (action === 'finance_saldo_raos_mark_paid') return _crmJson(_finSaldoRaosMarkPaid_(e.parameter));
+    if (action === 'finance_saldo_raos_list' || action === 'finance_saldo_raos_mark_paid') {
+      return _crmJson({ success: false, code: 'METHOD_NOT_ALLOWED', message: 'Endpoint saldo Finance wajib POST.' });
+    }
 
     // ─── KPI Targets V2 (raos_070) — Target Cabang + Target Staff + Payroll
     if (action === 'finance_kpi_target_branch_list')   return _crmJson(_finKpiTargetBranchList_(e.parameter));
@@ -104,6 +105,21 @@ function crmHandleGet(e) {
     return null; // bukan CRM action, delegate ke handler lain di doGet
   } catch (err) {
     return _crmJson({ success: false, message: 'CRM API error: ' + err.message });
+  }
+}
+
+function crmHandlePost(input) {
+  var action = input && input.action;
+  if (action !== 'finance_saldo_raos_list' && action !== 'finance_saldo_raos_mark_paid') return null;
+  try {
+    if (action === 'finance_saldo_raos_list') return _crmJson(_finSaldoRaosList_(input));
+    return _crmJson(_finSaldoRaosMarkPaid_(input));
+  } catch (err) {
+    return _crmJson({
+      success: false,
+      code: err.code || 'FINANCE_SALDO_ERROR',
+      message: err.message || String(err),
+    });
   }
 }
 
@@ -871,8 +887,8 @@ function _finLogList_(params) {
 
 // ─── Saldo RAOS (proxy Supabase raos_saldo_requests, bypass RLS via service_role)
 function _finSaldoRaosList_(params) {
-  _finRoleGate_(params);
-  var qs = 'select=id,staff_id,branch_id,nominal,status,is_processed,processed_at,processed_by,created_at&order=created_at.desc&limit=200';
+  _finSaldoTokenGate_(params);
+  var qs = 'select=id,staff_id,branch_id,nominal,status,is_processed,processed_at,processed_by,created_at,driver_id,driver_login_id,driver_name&order=created_at.desc&limit=200';
   var status = String(params.status || '');
   var branchId = String(params.branch_id || '');
   if (status === 'pending')   qs += '&is_processed=eq.false&status=eq.pending';
@@ -921,23 +937,59 @@ function _finSaldoRaosList_(params) {
       processed_at:  r.processed_at,
       processed_by:  r.processed_by,
       created_at:    r.created_at,
+      driver_id:     r.driver_id || null,
+      driver_login_id: r.driver_login_id || '',
+      driver_login:  r.driver_login_id || '',
+      driver_name:   r.driver_name || '',
     };
   });
   return { success: true, total: out.length, rows: out };
 }
 
 function _finSaldoRaosMarkPaid_(params) {
-  _finRoleGate_(params);
+  var actor = _finSaldoTokenGate_(params);
   var id = String(params.id || '').trim();
-  if (!id) return { success: false, message: 'Parameter id wajib' };
-  var body = {
-    is_processed: true,
-    processed_at: new Date().toISOString(),
-    processed_by: String(params.user || ''),
+  if (!id) return { success: false, code: 'INVALID_INPUT', message: 'Parameter id wajib' };
+  if (!actor.id) return { success: false, code: 'PROCESSOR_NOT_FOUND', message: 'UUID processor tidak ditemukan.' };
+
+  var result = _crmSbFetch_('POST', '/rest/v1/rpc/raos_saldo_mark_paid', {
+    p_request_id: id,
+    p_processor_id: actor.id,
+  });
+  var status = result && result.status;
+  if (['updated', 'already_processed', 'not_approved', 'not_found'].indexOf(status) === -1) {
+    return { success: false, code: 'RPC_RESPONSE_INVALID', message: 'Response mark-paid tidak valid.' };
+  }
+  if (status === 'updated') {
+    var auditParams = { user: actor.email || actor.id };
+    _crmAuditWrite_(auditParams, 'mark_paid', 'saldo_raos', id, '', 'Lunas oleh ' + (actor.email || actor.id));
+  }
+  return {
+    success: status === 'updated' || status === 'already_processed',
+    status: status,
+    code: status === 'not_approved' ? 'NOT_APPROVED' : (status === 'not_found' ? 'NOT_FOUND' : null),
+    current_status: result.current_status || null,
+    row: result.row || null,
+    message: status === 'already_processed' ? 'Pengajuan sudah pernah diproses.' :
+      (status === 'not_approved' ? 'Pengajuan belum approved.' :
+      (status === 'not_found' ? 'Pengajuan tidak ditemukan.' : 'Pengajuan ditandai lunas.')),
   };
-  var res = _crmSbFetch_('PATCH', '/rest/v1/raos_saldo_requests?id=eq.' + encodeURIComponent(id), body);
-  _crmAuditWrite_(params, 'mark_paid', 'saldo_raos', id, '', 'Lunas oleh ' + params.user);
-  return { success: true, id: id, row: Array.isArray(res) ? res[0] : res };
+}
+
+function _finSaldoTokenGate_(params) {
+  var verified = authVerifyAccessToken(params && (params.access_token || params.token));
+  if (!verified.success) {
+    var authErr = new Error(verified.message || 'Unauthorized');
+    authErr.code = verified.code || 'UNAUTHORIZED';
+    throw authErr;
+  }
+  var role = String(verified.user && verified.user.role || '').toLowerCase();
+  if (['admin', 'management', 'direksi', 'direktur'].indexOf(role) === -1) {
+    var roleErr = new Error('Role ' + role + ' tidak boleh akses Finance.');
+    roleErr.code = 'ROLE_NOT_ALLOWED';
+    throw roleErr;
+  }
+  return verified.user;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

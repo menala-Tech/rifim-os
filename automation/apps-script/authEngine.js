@@ -57,18 +57,81 @@ function authVerifyUser(email) {
       };
     }
   } catch (e) {
-    console.warn('AuthEngine Supabase unavailable, fallback to config:', e.message);
+    console.warn('AuthEngine Supabase unavailable, fail closed:', e.message);
+    return { success: false, code: 'AUTH_BACKEND_UNAVAILABLE', message: 'Layanan autentikasi tidak tersedia.' };
   }
 
-  // Fallback: user ada di config tapi belum di tabel users
+  return { success: false, code: 'PROFILE_NOT_FOUND', message: 'Profil user aktif tidak ditemukan.' };
+}
+
+/**
+ * Validasi access token Supabase ke Auth server dan derive actor dari token.sub.
+ * GAS Web App tidak mengekspos request Authorization header, sehingga caller
+ * mengirim token di JSON POST body; token tidak boleh masuk query string/log.
+ *
+ * @param {string} accessToken
+ * @returns {{success:boolean, code?:string, message?:string, user?:Object}}
+ */
+function authVerifyAccessToken(accessToken) {
+  var token = String(accessToken || '').trim();
+  if (!token) return { success: false, code: 'TOKEN_REQUIRED', message: 'Session token diperlukan.' };
+
+  var cfg = _getSupabaseConfig();
+  var authRes;
+  try {
+    authRes = UrlFetchApp.fetch(cfg.url + '/auth/v1/user', {
+      method: 'GET',
+      headers: {
+        'apikey': cfg.key,
+        'Authorization': 'Bearer ' + token,
+      },
+      muteHttpExceptions: true,
+    });
+  } catch (e) {
+    return { success: false, code: 'AUTH_BACKEND_UNAVAILABLE', message: 'Layanan autentikasi tidak tersedia.' };
+  }
+
+  if (authRes.getResponseCode() !== 200) {
+    return { success: false, code: 'TOKEN_INVALID', message: 'Session tidak valid atau kedaluwarsa.' };
+  }
+
+  var authUser;
+  try { authUser = JSON.parse(authRes.getContentText()); }
+  catch (_) { return { success: false, code: 'TOKEN_INVALID', message: 'Response autentikasi tidak valid.' }; }
+  if (!authUser || !authUser.id) {
+    return { success: false, code: 'TOKEN_INVALID', message: 'Token tidak memiliki subject.' };
+  }
+
+  var profileRes = UrlFetchApp.fetch(
+    cfg.url + '/rest/v1/user_profiles?id=eq.' + encodeURIComponent(authUser.id) +
+      '&select=id,email,full_name,role,branch_id,is_active&limit=1',
+    {
+      method: 'GET',
+      headers: { 'apikey': cfg.key, 'Authorization': 'Bearer ' + cfg.key },
+      muteHttpExceptions: true,
+    }
+  );
+  if (profileRes.getResponseCode() !== 200) {
+    return { success: false, code: 'PROFILE_LOOKUP_FAILED', message: 'Profil user gagal dibaca.' };
+  }
+
+  var profiles;
+  try { profiles = JSON.parse(profileRes.getContentText()); }
+  catch (_) { profiles = []; }
+  var profile = profiles && profiles[0];
+  if (!profile || !profile.is_active) {
+    return { success: false, code: 'PROFILE_NOT_FOUND', message: 'Profil user aktif tidak ditemukan.' };
+  }
+
   return {
     success: true,
     user: {
-      email:        email,
-      full_name:    config.director_name || 'Admin',
-      role:         'ADMIN',
-      company_code: 'ALL',
-      is_active:    true,
+      id: profile.id,
+      email: profile.email || authUser.email || '',
+      full_name: profile.full_name || '',
+      role: profile.role || '',
+      branch_id: profile.branch_id || null,
+      is_active: true,
     },
   };
 }

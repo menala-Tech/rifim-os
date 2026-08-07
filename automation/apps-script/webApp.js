@@ -36,6 +36,9 @@ function doPost(e) {
   }
 
   try {
+    var crmPostResp = crmHandlePost(input);
+    if (crmPostResp) return crmPostResp;
+
     if (_docIsAction_(input.action)) {
       return docHandlePost(e);
     }
