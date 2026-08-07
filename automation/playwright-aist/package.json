@@ -1,0 +1,16 @@
+{
+  "name": "menala-aist-playwright-runner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check runner.js && node --check server.js",
+    "install-browser": "npx playwright install chromium",
+    "codegen": "npx playwright codegen https://aist-id.taxsee.com/"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "playwright": "^1.54.2"
+  }
+}
