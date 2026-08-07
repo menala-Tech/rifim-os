@@ -18,8 +18,9 @@ jobs:
           ref: feat/finance-desktop-notif-repeating
           fetch-depth: 0
       - name: Apply exact Finance notifier patch
-        shell: python
+        shell: bash
         run: |
+          cat > /tmp/patch.py <<'PY'
           from pathlib import Path
           p = Path('modules/finance/index.html')
           s = p.read_text(encoding='utf-8')
@@ -32,135 +33,133 @@ jobs:
               s = s.replace(old, new, 1)
 
           replace_once(
-              """let _srFallbackTimer = null;\nlet _srFallbackFirstRun = true;""",
-              """let _srFallbackTimer = null;\nlet _srFallbackFirstRun = true;\n// Poin 5 (2026-08-08): repeating alert state per saldo request.\nconst _srActiveLoops = new Map();\nconst _srAlertIntervalMs = 5000;\nconst _srAlertMaxMs = 5 * 60 * 1000;""",
+              "let _srFallbackTimer = null;\nlet _srFallbackFirstRun = true;",
+              "let _srFallbackTimer = null;\nlet _srFallbackFirstRun = true;\n// Poin 5 (2026-08-08): repeating alert state per saldo request.\nconst _srActiveLoops = new Map();\nconst _srAlertIntervalMs = 5000;\nconst _srAlertMaxMs = 5 * 60 * 1000;",
               'state insert'
           )
 
-          old_notify = """function _srNotify(payload) {\n  if (!payload || !payload.id) return;\n  if (_srSeenIds.has(payload.id)) return;\n  _srSeenIds.add(payload.id);\n  _srBeep();\n  const nominal = Number(payload.nominal || 0).toLocaleString('id-ID');\n  showToast(`🔔 Pengajuan baru: ${payload.staff_name || '?'} — Rp${nominal} (${payload.branch_name || '?'})`, 'ok');\n  const activeTab = document.querySelector('.tab.active');\n  if (activeTab && activeTab.dataset.tab === 'saldo-raos') loadSaldoRaos();\n}\n"""
+          old_notify = """function _srNotify(payload) {
+            if (!payload || !payload.id) return;
+            if (_srSeenIds.has(payload.id)) return;
+            _srSeenIds.add(payload.id);
+            _srBeep();
+            const nominal = Number(payload.nominal || 0).toLocaleString('id-ID');
+            showToast(`🔔 Pengajuan baru: ${payload.staff_name || '?'} — Rp${nominal} (${payload.branch_name || '?'})`, 'ok');
+            const activeTab = document.querySelector('.tab.active');
+            if (activeTab && activeTab.dataset.tab === 'saldo-raos') loadSaldoRaos();
+          }
+          """.replace('\n          ', '\n').lstrip()
 
-          new_notify = r"""function _srStopLoop(id) {
-  if (!id) return;
-  const state = _srActiveLoops.get(id);
-  if (!state) return;
-  if (state.loopId) clearInterval(state.loopId);
-  if (state.autoStop) clearTimeout(state.autoStop);
-  if (state.notification) {
-    try { state.notification.close(); } catch (_) {}
-  }
-  if (state.toast && state.toast.isConnected) state.toast.remove();
-  _srActiveLoops.delete(id);
-}
+          new_notify = """function _srStopLoop(id) {
+            if (!id) return;
+            const state = _srActiveLoops.get(id);
+            if (!state) return;
+            if (state.loopId) clearInterval(state.loopId);
+            if (state.autoStop) clearTimeout(state.autoStop);
+            if (state.notification) {
+              try { state.notification.close(); } catch (_) {}
+            }
+            if (state.toast && state.toast.isConnected) state.toast.remove();
+            _srActiveLoops.delete(id);
+          }
 
-function _srShowAlertToast(payload, body) {
-  const toast = document.createElement('div');
-  toast.style.cssText = 'position:fixed;bottom:20px;right:20px;width:min(420px,calc(100vw - 32px));padding:14px;background:var(--dark2,#2B2B2B);color:#fff;border:1px solid rgba(250,204,21,.35);border-radius:10px;font-size:13px;z-index:10000;box-shadow:0 10px 32px rgba(0,0,0,.5)';
+          function _srShowAlertToast(payload, body) {
+            const toast = document.createElement('div');
+            toast.style.cssText = 'position:fixed;bottom:20px;right:20px;width:min(420px,calc(100vw - 32px));padding:14px;background:var(--dark2,#2B2B2B);color:#fff;border:1px solid rgba(250,204,21,.35);border-radius:10px;font-size:13px;z-index:10000;box-shadow:0 10px 32px rgba(0,0,0,.5)';
+            const title = document.createElement('div');
+            title.textContent = '🔔 Pengajuan Saldo Baru';
+            title.style.cssText = 'font-weight:800;color:#facc15;margin-bottom:5px;cursor:pointer';
+            const desc = document.createElement('div');
+            desc.textContent = body;
+            desc.style.cssText = 'line-height:1.45;cursor:pointer';
+            const actions = document.createElement('div');
+            actions.style.cssText = 'display:flex;justify-content:flex-end;margin-top:10px';
+            const mute = document.createElement('button');
+            mute.type = 'button';
+            mute.textContent = '🔕 Bisukan';
+            mute.style.cssText = 'padding:5px 10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:7px;color:#fff;cursor:pointer;font-size:11px;font-weight:600';
+            const acknowledge = () => {
+              _srStopLoop(payload.id);
+              const tab = document.querySelector('.tab[data-tab="saldo-raos"]');
+              if (tab && !tab.classList.contains('active')) tab.click();
+            };
+            title.addEventListener('click', acknowledge);
+            desc.addEventListener('click', acknowledge);
+            mute.addEventListener('click', (event) => {
+              event.stopPropagation();
+              _srStopLoop(payload.id);
+            });
+            actions.appendChild(mute);
+            toast.appendChild(title);
+            toast.appendChild(desc);
+            toast.appendChild(actions);
+            document.body.appendChild(toast);
+            return toast;
+          }
 
-  const title = document.createElement('div');
-  title.textContent = '🔔 Pengajuan Saldo Baru';
-  title.style.cssText = 'font-weight:800;color:#facc15;margin-bottom:5px;cursor:pointer';
+          function _srNotify(payload) {
+            if (!payload || !payload.id) return;
+            if (_srSeenIds.has(payload.id)) return;
+            _srSeenIds.add(payload.id);
+            const nominal = Number(payload.nominal || 0).toLocaleString('id-ID');
+            const body = `${payload.staff_name || '?'} — Rp${nominal} (${payload.branch_name || '?'})`;
+            _srStopLoop(payload.id);
+            _srBeep();
+            const loopId = setInterval(_srBeep, _srAlertIntervalMs);
+            const autoStop = setTimeout(() => _srStopLoop(payload.id), _srAlertMaxMs);
+            _srActiveLoops.set(payload.id, { loopId, autoStop, notification: null, toast: null });
+            const toast = _srShowAlertToast(payload, body);
+            let notification = null;
+            if ('Notification' in window && Notification.permission === 'granted') {
+              try {
+                notification = new Notification('🔔 Pengajuan Saldo Baru', {
+                  body,
+                  icon: '/branding/logo/logo-rifim-transparent.png',
+                  tag: `saldo-${payload.id}`,
+                  requireInteraction: true,
+                });
+                notification.onclick = () => {
+                  window.focus();
+                  _srStopLoop(payload.id);
+                  try { notification.close(); } catch (_) {}
+                  const tab = document.querySelector('.tab[data-tab="saldo-raos"]');
+                  if (tab && !tab.classList.contains('active')) tab.click();
+                };
+              } catch (_) {}
+            }
+            const active = _srActiveLoops.get(payload.id);
+            if (active) {
+              active.toast = toast;
+              active.notification = notification;
+            }
+            const activeTab = document.querySelector('.tab.active');
+            if (activeTab && activeTab.dataset.tab === 'saldo-raos') loadSaldoRaos();
+          }
+          """.replace('\n          ', '\n').lstrip()
 
-  const desc = document.createElement('div');
-  desc.textContent = body;
-  desc.style.cssText = 'line-height:1.45;cursor:pointer';
-
-  const actions = document.createElement('div');
-  actions.style.cssText = 'display:flex;justify-content:flex-end;margin-top:10px';
-
-  const mute = document.createElement('button');
-  mute.type = 'button';
-  mute.textContent = '🔕 Bisukan';
-  mute.style.cssText = 'padding:5px 10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:7px;color:#fff;cursor:pointer;font-size:11px;font-weight:600';
-
-  const acknowledge = () => {
-    _srStopLoop(payload.id);
-    const tab = document.querySelector('.tab[data-tab="saldo-raos"]');
-    if (tab && !tab.classList.contains('active')) tab.click();
-  };
-
-  title.addEventListener('click', acknowledge);
-  desc.addEventListener('click', acknowledge);
-  mute.addEventListener('click', (event) => {
-    event.stopPropagation();
-    _srStopLoop(payload.id);
-  });
-
-  actions.appendChild(mute);
-  toast.appendChild(title);
-  toast.appendChild(desc);
-  toast.appendChild(actions);
-  document.body.appendChild(toast);
-  return toast;
-}
-
-function _srNotify(payload) {
-  if (!payload || !payload.id) return;
-  if (_srSeenIds.has(payload.id)) return;
-  _srSeenIds.add(payload.id);
-
-  const nominal = Number(payload.nominal || 0).toLocaleString('id-ID');
-  const body = `${payload.staff_name || '?'} — Rp${nominal} (${payload.branch_name || '?'})`;
-
-  // Beep pertama + loop tiap 5 detik. Satu request hanya punya satu loop aktif.
-  _srStopLoop(payload.id);
-  _srBeep();
-  const loopId = setInterval(_srBeep, _srAlertIntervalMs);
-  const autoStop = setTimeout(() => _srStopLoop(payload.id), _srAlertMaxMs);
-  _srActiveLoops.set(payload.id, { loopId, autoStop, notification: null, toast: null });
-
-  const toast = _srShowAlertToast(payload, body);
-  let notification = null;
-
-  // Finance bukan PWA: gunakan Notification API browser standar.
-  if ('Notification' in window && Notification.permission === 'granted') {
-    try {
-      notification = new Notification('🔔 Pengajuan Saldo Baru', {
-        body,
-        icon: '/branding/logo/logo-rifim-transparent.png',
-        tag: `saldo-${payload.id}`,
-        requireInteraction: true,
-      });
-      notification.onclick = () => {
-        window.focus();
-        _srStopLoop(payload.id);
-        try { notification.close(); } catch (_) {}
-        const tab = document.querySelector('.tab[data-tab="saldo-raos"]');
-        if (tab && !tab.classList.contains('active')) tab.click();
-      };
-    } catch (_) { /* browser blocked, toast + audio tetap jalan */ }
-  }
-
-  const active = _srActiveLoops.get(payload.id);
-  if (active) {
-    active.toast = toast;
-    active.notification = notification;
-  }
-
-  const activeTab = document.querySelector('.tab.active');
-  if (activeTab && activeTab.dataset.tab === 'saldo-raos') loadSaldoRaos();
-}
-"""
           replace_once(old_notify, new_notify, 'notify replacement')
 
           replace_once(
-              """    if (data.status === 'already_processed') {\n      showToast(`Info: saldo ${id.substring(0, 8)}... sudah pernah diproses`, 'ok');\n      await loadSaldoRaos();\n      return;\n    }\n    showToast(`✅ Saldo ${id.substring(0, 8)}… tandai lunas`, 'ok');""",
-              """    if (data.status === 'already_processed') {\n      _srStopLoop(id);\n      showToast(`Info: saldo ${id.substring(0, 8)}... sudah pernah diproses`, 'ok');\n      await loadSaldoRaos();\n      return;\n    }\n    _srStopLoop(id);\n    showToast(`✅ Saldo ${id.substring(0, 8)}… tandai lunas`, 'ok');""",
+              "    if (data.status === 'already_processed') {\n      showToast(`Info: saldo ${id.substring(0, 8)}... sudah pernah diproses`, 'ok');\n      await loadSaldoRaos();\n      return;\n    }\n    showToast(`✅ Saldo ${id.substring(0, 8)}… tandai lunas`, 'ok');",
+              "    if (data.status === 'already_processed') {\n      _srStopLoop(id);\n      showToast(`Info: saldo ${id.substring(0, 8)}... sudah pernah diproses`, 'ok');\n      await loadSaldoRaos();\n      return;\n    }\n    _srStopLoop(id);\n    showToast(`✅ Saldo ${id.substring(0, 8)}… tandai lunas`, 'ok');",
               'mark paid stop'
           )
 
           replace_once(
-              """    if (!data.success || !Array.isArray(data.rows)) return;\n    if (_srFallbackFirstRun) {""",
-              """    if (!data.success || !Array.isArray(data.rows)) return;\n    // Bookmarklet / device lain bisa memproses request. Reconcile loop aktif\n    // dengan pending list pada fallback poll maksimal 60 detik.\n    const stillPendingIds = new Set(data.rows.map(r => r.id));\n    for (const id of _srActiveLoops.keys()) {\n      if (!stillPendingIds.has(id)) _srStopLoop(id);\n    }\n    if (_srFallbackFirstRun) {""",
+              "    if (!data.success || !Array.isArray(data.rows)) return;\n    if (_srFallbackFirstRun) {",
+              "    if (!data.success || !Array.isArray(data.rows)) return;\n    const stillPendingIds = new Set(data.rows.map(r => r.id));\n    for (const id of _srActiveLoops.keys()) {\n      if (!stillPendingIds.has(id)) _srStopLoop(id);\n    }\n    if (_srFallbackFirstRun) {",
               'fallback reconcile'
           )
 
           replace_once(
-              """  const unlock = () => {\n    if (_srAudioCtx && _srAudioCtx.state === 'suspended') _srAudioCtx.resume();\n    document.removeEventListener('click', unlock);\n    document.removeEventListener('keydown', unlock);\n  };""",
-              """  const unlock = async () => {\n    try {\n      if (!_srAudioCtx && (window.AudioContext || window.webkitAudioContext)) {\n        _srAudioCtx = new (window.AudioContext || window.webkitAudioContext)();\n      }\n      if (_srAudioCtx && _srAudioCtx.state === 'suspended') await _srAudioCtx.resume();\n    } catch (_) {}\n\n    // Permission diminta saat user gesture pertama agar tidak diblok browser.\n    if ('Notification' in window && Notification.permission === 'default') {\n      try { await Notification.requestPermission(); } catch (_) {}\n    }\n\n    document.removeEventListener('click', unlock);\n    document.removeEventListener('keydown', unlock);\n  };""",
-              'unlock + permission'
+              "  const unlock = () => {\n    if (_srAudioCtx && _srAudioCtx.state === 'suspended') _srAudioCtx.resume();\n    document.removeEventListener('click', unlock);\n    document.removeEventListener('keydown', unlock);\n  };",
+              "  const unlock = async () => {\n    try {\n      if (!_srAudioCtx && (window.AudioContext || window.webkitAudioContext)) {\n        _srAudioCtx = new (window.AudioContext || window.webkitAudioContext)();\n      }\n      if (_srAudioCtx && _srAudioCtx.state === 'suspended') await _srAudioCtx.resume();\n    } catch (_) {}\n    if ('Notification' in window && Notification.permission === 'default') {\n      try { await Notification.requestPermission(); } catch (_) {}\n    }\n    document.removeEventListener('click', unlock);\n    document.removeEventListener('keydown', unlock);\n  };",
+              'unlock permission'
           )
 
           p.write_text(s, encoding='utf-8')
+          PY
+          python /tmp/patch.py
       - name: Commit actual change and remove temp workflow
         run: |
           git config user.name "ChatGPT"
