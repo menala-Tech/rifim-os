@@ -966,3 +966,15 @@ RADMS (Batch 7) sudah production:
 - Migration prod `raos_074` dan `raos_075` telah diterapkan serta diverifikasi oleh CC.
 - Validasi lokal: `node --check` untuk GAS/Bookmarklet dan parse inline script Finance/Portal lulus.
 - `[gas-redeploy pending]` `clasp push` dan edit deployment aktif masih wajib sebelum endpoint produksi memakai implementasi baru.
+
+## 2026-08-07 sore — FASE 1 backlog Isi Saldo (poin 10+11)
+
+**Poin 10+11 (Target Staff Default auto-prorate):**
+- Bug root cause: `target_staff_default` NULL untuk semua 9 cabang → target=0 → pct=0 → Bonus Rp 0.
+- Fix di GAS `crmApi.js` + Finance UI `index.html`:
+  - `_finKpiTargetBranchList_`: expose `target_staff_effective` + `target_staff_auto_prorated` + `staff_count`.
+  - `_finKpiTargetStaffList_`: chain fallback override > branch default > auto-prorate.
+  - `loadTargetCabang`: badge `auto ÷N` supaya user tahu asal angkanya.
+- Companion migration di RAOS: `raos_077_payroll_auto_prorate_target_staff.sql` (applied prod) — RPC compute_payroll_month juga chain fallback sama.
+- PR: rifim-os#46 + raos-menala#69 — merged.
+- Verified prod: 8/9 cabang dapat prorate valid; RPC re-run 29 staff processed.
