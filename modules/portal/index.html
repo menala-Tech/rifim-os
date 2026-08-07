@@ -19,9 +19,12 @@ body{font-family:var(--font);background:#050914;color:#fff;min-height:100dvh;dis
 
 /* ─── AUTH GATE — MAXIM BACKGROUND + FLOATING CONTROLS ─── */
 #auth-gate{
-  position:relative;isolation:isolate;overflow:hidden;
-  flex:1;display:flex;align-items:center;justify-content:center;
-  min-height:100dvh;padding:28px 18px;
+  position:relative;isolation:isolate;
+  flex:1;display:flex;align-items:flex-end;justify-content:center;
+  min-height:100dvh;
+  padding:clamp(260px,42vh,520px) 18px clamp(28px,5vh,64px);
+  overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:contain;
+  -webkit-overflow-scrolling:touch;
   background:
     linear-gradient(145deg,rgba(6,12,24,.62) 0%,rgba(18,25,42,.48) 52%,rgba(32,5,8,.50) 100%),
     url('/branding/backgrounds/bagroun-maxim.png') center/cover no-repeat;
@@ -30,16 +33,18 @@ body{font-family:var(--font);background:#050914;color:#fff;min-height:100dvh;dis
   content:'';position:absolute;inset:0;z-index:-2;pointer-events:none;
   background:
     radial-gradient(circle at 50% 38%,rgba(255,210,70,.13),transparent 30%),
-    radial-gradient(circle at 50% 62%,rgba(40,100,255,.08),transparent 46%);
+    radial-gradient(circle at 50% 76%,rgba(40,100,255,.08),transparent 42%);
 }
 .login-glow{
-  position:absolute;z-index:-1;pointer-events:none;
-  width:min(560px,92vw);height:min(560px,92vw);border-radius:50%;
+  position:absolute;left:50%;bottom:clamp(70px,10vh,130px);transform:translateX(-50%);
+  z-index:-1;pointer-events:none;
+  width:min(560px,92vw);height:min(420px,60vh);border-radius:50%;
   background:radial-gradient(circle,rgba(255,200,60,.20) 0%,rgba(255,170,30,.07) 35%,transparent 70%);
   filter:blur(38px);animation:glowPulse 5s ease-in-out infinite;
 }
 .auth-card{
-  position:relative;z-index:1;width:min(440px,90vw);padding:0;
+  position:relative;z-index:1;width:min(440px,calc(100vw - 36px));padding:0;
+  flex:0 0 auto;
   text-align:center;color:#fff;background:transparent;border:none;
   border-radius:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
   animation:loginFloat 7s ease-in-out infinite;
@@ -47,15 +52,15 @@ body{font-family:var(--font);background:#050914;color:#fff;min-height:100dvh;dis
 .auth-card::before{content:none;display:none}
 .logo-stage{
   position:relative;display:flex;align-items:center;justify-content:center;
-  height:156px;margin:0 auto 30px;perspective:900px;transform-style:preserve-3d;
+  height:142px;margin:0 auto 20px;perspective:900px;transform-style:preserve-3d;
 }
 .logo-glow{
-  position:absolute;width:220px;height:220px;border-radius:50%;z-index:-1;pointer-events:none;
+  position:absolute;width:210px;height:210px;border-radius:50%;z-index:-1;pointer-events:none;
   background:radial-gradient(circle,rgba(255,210,70,.28),rgba(255,180,30,.09) 45%,transparent 72%);
   filter:blur(24px);
 }
 .auth-logo{
-  width:min(250px,78%);height:auto;max-height:none;display:block;object-fit:contain;
+  width:min(240px,76%);height:auto;max-height:none;display:block;object-fit:contain;
   transform-style:preserve-3d;will-change:transform,translate;
   filter:drop-shadow(0 15px 25px rgba(0,0,0,.42)) drop-shadow(0 0 22px rgba(255,205,70,.22));
   animation:rifimLogo3D 9s ease-in-out infinite,rifimFloat 4s ease-in-out infinite;
@@ -105,13 +110,13 @@ body{font-family:var(--font);background:#050914;color:#fff;min-height:100dvh;dis
   box-shadow:0 10px 26px rgba(0,0,0,.22);
 }
 .auth-footer{
-  margin-top:18px;font-size:11px;line-height:1.55;color:rgba(245,245,245,.78);
+  margin-top:16px;font-size:11px;line-height:1.55;color:rgba(245,245,245,.78);
   text-shadow:0 2px 10px rgba(0,0,0,.45);
 }
 
 @keyframes glowPulse{
-  0%,100%{transform:scale(.95);opacity:.65}
-  50%{transform:scale(1.08);opacity:1}
+  0%,100%{scale:.95;opacity:.65}
+  50%{scale:1.08;opacity:1}
 }
 @keyframes rifimLogo3D{
   0%{transform:rotateY(-10deg) rotateX(3deg)}
@@ -217,25 +222,36 @@ main{flex:1;padding:32px 24px;max-width:960px;width:100%;margin:0 auto}
 footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
 
 @media(max-width:600px){
-  #auth-gate{padding:16px;background-position:center center}
-  .auth-card{width:calc(100vw - 32px);padding:0;border-radius:0}
-  .logo-stage{height:132px;margin-bottom:20px}
-  .auth-logo{width:min(220px,76%)}
-  .logo-glow{width:165px;height:165px}
+  #auth-gate{
+    align-items:flex-end;
+    padding:clamp(190px,32vh,300px) 16px max(20px,env(safe-area-inset-bottom));
+    background-position:center center;
+  }
+  .auth-card{width:min(100%,420px);padding:0;border-radius:0}
+  .logo-stage{height:116px;margin-bottom:14px}
+  .auth-logo{width:min(205px,72%)}
+  .logo-glow{width:155px;height:155px}
   .auth-card input,.btn-login{height:52px}
-  .auth-footer{font-size:10px;margin-top:17px}
+  .auth-footer{font-size:10px;margin-top:14px}
   header{padding:12px 16px}
   main{padding:24px 16px}
   .modules-grid{grid-template-columns:1fr 1fr}
   .brand-txt .brand-sub{display:none}
 }
 @media(max-height:700px){
-  #auth-gate{align-items:flex-start;padding-top:24px;padding-bottom:24px;overflow-y:auto}
-  .auth-card{animation:none;padding:0}
-  .logo-stage{height:104px;margin-bottom:14px}
-  .auth-logo{width:min(195px,68%)}
-  .logo-glow{width:140px;height:140px}
-  .auth-footer{margin-top:14px}
+  #auth-gate{
+    align-items:flex-start;
+    padding-top:max(24px,env(safe-area-inset-top));
+    padding-bottom:max(24px,env(safe-area-inset-bottom));
+    overflow-y:auto;
+  }
+  .login-glow{bottom:20px}
+  .auth-card{animation:none;padding:0;margin:0 auto}
+  .logo-stage{height:92px;margin-bottom:10px}
+  .auth-logo{width:min(180px,64%)}
+  .logo-glow{width:130px;height:130px}
+  .auth-card input,.btn-login{height:48px}
+  .auth-footer{margin-top:12px}
 }
 @media(prefers-reduced-motion:reduce){
   .login-glow,.auth-card,.auth-logo{animation:none!important}
@@ -529,11 +545,17 @@ function goTo(path) {
 }
 
 ['auth-email','auth-pin'].forEach(id => {
-  document.getElementById(id).addEventListener('keydown', e => {
+  const input = document.getElementById(id);
+  input.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
       if (id === 'auth-email') document.getElementById('auth-pin').focus();
       else doLogin();
     }
+  });
+  input.addEventListener('focus', () => {
+    window.setTimeout(() => {
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 250);
   });
 });
 
