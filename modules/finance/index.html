@@ -322,7 +322,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div class="panel" data-panel="saldo-raos">
       <h2>Pelunasan Isi Saldo — RAOS</h2>
-      <div class="desc">Approve pengajuan Isi Saldo driver &amp; tandai lunas. Data langsung dari Supabase RAOS.</div>
+      <div class="desc">Tandai lunas pengajuan Isi Saldo dari staff. Sejak 2026-08-07 tidak lagi butuh approval koord/admin — request pending langsung processable. Data langsung dari Supabase RAOS.</div>
       <div class="sinks">
         <span class="sink supabase">🔵 Supabase: <code>raos_saldo_requests</code></span>
         <span class="sink raos">🚗 Owner logic: RAOS</span>
@@ -339,8 +339,8 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
       <div class="toolbar">
         <select id="sr-status">
           <option value="semua">Semua Status</option>
-          <option value="pending">Pending Approval</option>
-          <option value="approved">Disetujui Belum Lunas</option>
+          <option value="pending">Menunggu Diproses</option>
+          <option value="approved">Legacy Approved (belum lunas)</option>
           <option value="paid">Sudah Lunas</option>
           <option value="rejected">Ditolak</option>
         </select>
@@ -922,7 +922,7 @@ async function loadSaldoRaos() {
           <td style="text-align:right;font-weight:600">${fmtRp(r.nominal)}</td>
           <td>${statusChip}</td>
           <td style="font-size:11px">${fmtDateTime(r.created_at)}</td>
-          <td>${r.is_processed ? '—' : (r.status === 'approved' ? '<button class="btn ok small" data-mark-saldo="' + esc(r.id) + '">✓ Lunas</button>' : '<span style="font-size:11px;color:#888">tunggu approve</span>')}</td>
+          <td>${r.is_processed ? '—' : (['pending','approved'].includes(r.status) ? '<button class="btn ok small" data-mark-saldo="' + esc(r.id) + '">✓ Lunas</button>' : '<span style="font-size:11px;color:#888">—</span>')}</td>
         </tr>`;
     }).join('');
     tb.querySelectorAll('button[data-mark-saldo]').forEach(btn => {
@@ -938,7 +938,12 @@ async function markSaldoPaid(id) {
   showToast('Memproses…');
   try {
     const data = await _gasCall('finance_saldo_raos_mark_paid', { id });
-    if (data.status === 'not_approved') throw new Error(`Status saat ini ${data.current_status || 'bukan approved'}.`);
+    // Sesi 2026-08-07 (poin 2+6): skip approval flow. RPC raos_076 rename
+    // 'not_approved' → 'not_processable' (untuk rejected/cancelled).
+    // Handle keduanya untuk toleran deployment drift frontend/backend.
+    if (data.status === 'not_processable' || data.status === 'not_approved') {
+      throw new Error(`Pengajuan tidak dapat diproses. Status saat ini: ${data.current_status || 'unknown'}.`);
+    }
     if (data.status === 'not_found') throw new Error('Pengajuan tidak ditemukan.');
     if (!data.success) throw new Error(data.message);
     if (data.status === 'already_processed') {
