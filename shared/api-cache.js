@@ -255,3 +255,12 @@
   RifimAPI._version = '1.0.0';
   RifimAPI._loadedAt = new Date().toISOString();
 })(typeof window !== 'undefined' ? window : globalThis);
+
+// FASE 3 Poin D: load enhancer hanya di module Finance.
+// File dipisah supaya automation AIST tidak mempengaruhi module lain.
+if (typeof window !== 'undefined' && /\/finance(?:\/|$)/.test(window.location.pathname)) {
+  var aistScript = document.createElement('script');
+  aistScript.src = '/shared/aist-finance.js';
+  aistScript.async = true;
+  document.head.appendChild(aistScript);
+}
