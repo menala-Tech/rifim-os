@@ -2,7 +2,24 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-08-07 (Sesi 3 chat migration implementation — Decision #4)
+> Last updated: 2026-08-07 (Sesi 3 chat migration + Saldo P0 fixes — merged + deployed prod)
+
+## Sesi 2026-08-07 — Saldo P0 + Fonnte Deprecation DEPLOYED
+
+### PR merged & prod deploy
+- **PR #39** (Saldo P0 F-01..F-04) — merged, Vercel READY, GAS auto-clasp-push
+- **PR #40** (Fonnte deprecation 100%, chat migration full) — merged, Vercel READY, GAS auto-clasp-push
+- **RAOS PR #61** (F-05 client_id idempotency) — merged
+- GAS Web App **Version 76** aktif (redeploy manual 2026-08-07 12:32 WITA)
+- URL /exec preserved — smoke test `?action=ping` return `{success:true, status:running}`
+
+### Migration DB
+- `raos_073` — 5 RPC chat + type='system' (CC apply)
+- `raos_074` — RPC raos_saldo_mark_paid dgn transition guard (CC apply from CX SQL)
+- `raos_075` — client_id column + unique partial index + RPC raos_saldo_submit atomic (CC apply from CX SQL)
+
+### CX reset
+CX (Codex) mencapai limit token, reset ~2026-08-12. Sisa backlog Sesi 2 KPI V2 ditunda.
 
 ## Sesi 2026-08-07 — Chat Migration Full (Decision #4)
 
