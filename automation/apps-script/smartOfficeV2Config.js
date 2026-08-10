@@ -3,7 +3,7 @@ var SO_V2_VERSION = 'v2';
 var SO_V2_APPROVER_ROLES = ['direksi','direktur'];
 var SO_V2_WRITE_ROLES = ['admin','direksi','direktur'];
 var SO_V2_VIEW_ROLES = ['admin','direksi','direktur','management','koordinator'];
-var SO_V2_EMPLOYEE_REQUEST_ROLES = ['staff','koordinator','admin','direksi','direktur'];
+var SO_V2_EMPLOYEE_REQUEST_ROLES = ['staff','admin','direksi','direktur'];
 function soV2Role_(role){var r=String(role||'').trim().toLowerCase().replace(/\s+/g,'_');if(r==='direktur_utama')r='direktur';return r;}
 function soV2CanWrite_(role){return SO_V2_WRITE_ROLES.indexOf(soV2Role_(role))>=0;}
 function soV2CanApprove_(role){return SO_V2_APPROVER_ROLES.indexOf(soV2Role_(role))>=0;}
