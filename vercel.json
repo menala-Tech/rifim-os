@@ -3,7 +3,7 @@
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
     { "source": "/portal", "destination": "/modules/portal/secure.html" },
-    { "source": "/smart-office", "destination": "/modules/smart-office/index.html" },
+    { "source": "/smart-office", "destination": "/modules/smart-office/v2-shell.html" },
     { "source": "/smart-office/(.*)", "destination": "/modules/smart-office/$1" },
     { "source": "/hris", "destination": "/modules/hris/index.html" },
     { "source": "/hris/(.*)", "destination": "/modules/hris/$1" },
