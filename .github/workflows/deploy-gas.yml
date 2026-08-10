@@ -5,11 +5,14 @@ on:
     branches: [main]
     paths:
       - 'automation/apps-script/**'
+      - '.github/workflows/deploy-gas.yml'
 
 jobs:
   deploy-gas:
-    name: clasp push
+    name: clasp push + production redeploy
     runs-on: ubuntu-latest
+    env:
+      GAS_DEPLOYMENT_ID: AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw
 
     steps:
       - name: Checkout repository
@@ -26,7 +29,12 @@ jobs:
       - name: Write clasp credentials
         run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
 
-      - name: Push to Apps Script
+      - name: Push source to Apps Script
         run: |
           cd automation/apps-script
           clasp push --force
+
+      - name: Redeploy existing production Web App
+        run: |
+          cd automation/apps-script
+          clasp update-deployment "$GAS_DEPLOYMENT_ID" --description "GitHub main ${GITHUB_SHA}"
