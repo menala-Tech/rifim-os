@@ -1,22 +1,208 @@
-/** Smart Office V2 — renderer adapter. Extends existing HTML renderer; no third engine. */
-function soV2BuildPreview_(input){input=soV2EnrichInputFromHris_(input);var config=getCompanyConfig(),company=soV2GetCompany_(input.company_code||'RIFIM'),prefix=company.doc_prefix||company.code||'RIFIM',data=buildPlaceholderData(input,config,'PREVIEW/'+prefix+'/'+input.documentType),co={name:company.name||'',address:company.address||'',phone:company.phone||'',email:company.email||'',director_name:company.director_name||'',director_title:company.director_title||''};return buildDocumentPreviewHtml(input.documentType,data,String(company.code||'RIFIM').toUpperCase(),co)}
-function soV2GenerateApproved_(input){
-  var ctx=soV2Auth_(input);soV2RequireWrite_(ctx);var doc=soV2RequireApprovedDocument_(input.documentId);
-  if(doc.pdf_url&&doc.doc_number&&String(doc.doc_number).indexOf('DOC-')!==0){return{success:true,reused:true,documentId:doc.id,documentNumber:doc.doc_number,pdfUrl:doc.pdf_url,gdocUrl:doc.metadata&&doc.metadata.gdoc_url||'',message:'Dokumen final sudah tersedia; nomor lama digunakan kembali.'};}
-  var rev=soV2GetCanonicalRevision_(doc.current_revision_id),payload=rev.payload||{};
-  delete payload.action;delete payload.hrisAction;
-  payload.access_token=input.access_token||input.token||'';payload.performed_by={name:ctx.email,email:ctx.email};payload.documentType=payload.documentType||doc.doc_type;payload.company_code=payload.company_code||String(doc.company_slug||'RIFIM').toUpperCase();payload.use_html_pipeline=true;payload._canonical_document_id=doc.id;payload=soV2EnrichInputFromHris_(payload);
-  var result=generateDocument(payload);if(!result||!result.success)throw new Error(result&&result.message||'Generate document gagal.');
-  _sbPatch('doc_documents','id=eq.'+encodeURIComponent(doc.id),{doc_number:result.documentNumber||doc.doc_number,pdf_drive_id:result.pdfFileId||null,pdf_url:result.pdfUrl||null,metadata:Object.assign({},doc.metadata||{},{gdoc_url:result.gdocUrl||'',template_version:SO_V2_VERSION}),updated_at:new Date().toISOString()});
-  if(String(doc.doc_type||'').toUpperCase()==='PKWT')soV2ReconcilePkwtContract_(doc,payload,result);
-  return Object.assign({documentId:doc.id},result);
+/** Smart Office V2 — canonical renderer adapter.
+ * Reuses the existing HTML template dispatcher/buildDocumentHtml().
+ * V2 only owns workflow glue, legal-number timing, native page branding, and DOC/PDF persistence.
+ */
+function soV2PreviewAssets_(companyCode) {
+  var ids = HTML_TPL_ASSETS[companyCode] || HTML_TPL_ASSETS.RIFIM;
+  function thumb(id, width) {
+    return id ? 'https://drive.google.com/thumbnail?id=' + id + '&sz=w' + (width || 500) : '';
+  }
+  return {
+    logo: thumb(ids.logo_id, 300),
+    ttd: thumb(ids.ttd_id, 300),
+    stempel: thumb(ids.stempel_id, 300),
+    signature: '',
+    kop_banner: thumb(ids.kop_banner_id, 1240),
+    footer_banner: thumb(ids.footer_banner_id, 1240),
+    color: ids.color || '#C40000'
+  };
 }
-function soV2ReconcilePkwtContract_(doc,payload,result){
-  var employeeId=payload.extra&&payload.extra.employee_id;if(!employeeId)throw new Error('PKWT approved tidak memiliki employee_id.');
-  var emp=hrisGetEmployee(employeeId);if(!emp)throw new Error('Employee PKWT tidak ditemukan.');
-  var startDate=payload.extra&&payload.extra.contract_start;if(!startDate)throw new Error('PKWT wajib memiliki contract_start sebelum final generate.');
-  var rows=_sbGet(_docRestUrl_('employee_contracts',['employee_id=eq.'+encodeURIComponent(emp.employee_id),'contract_type=eq.PKWT','order=created_at.desc','limit=1']));
-  var patch={document_number:result.documentNumber||doc.doc_number,gdoc_url:result.gdocUrl||null,pdf_url:result.pdfUrl||null,start_date:startDate,end_date:payload.extra&&payload.extra.contract_end||null,status:'AKTIF',source:'smart_office',smart_office_code:'PKWT',smart_office_document_id:String(doc.id),payload_snapshot:payload,validation_status:'pending',validated_at:null,validated_by:null,updated_at:new Date().toISOString()};
-  if(rows&&rows.length)_sbPatch('employee_contracts','id=eq.'+encodeURIComponent(rows[0].id),patch);
-  else _sbPost('employee_contracts',Object.assign({employee_id:emp.employee_id,contract_type:'PKWT',created_at:new Date().toISOString()},patch));
+
+function soV2CompanyView_(company, config, input) {
+  return {
+    name: (company && company.name) || config.company_name || '',
+    address: (company && company.address) || config.company_address || '',
+    phone: (company && company.phone) || config.company_phone || '',
+    email: (company && company.email) || config.company_email || '',
+    city: (company && company.city) || config.company_city || 'Batam',
+    director_name: input.directorName || (company && company.director_name) || config.director_name || '',
+    director_title: input.directorTitle || (company && company.director_title) || config.director_title || ''
+  };
+}
+
+function soV2BuildPreview_(input) {
+  input = soV2EnrichInputFromHris_(input || {});
+  var config = getCompanyConfig();
+  var company = soV2GetCompany_(input.company_code || 'RIFIM');
+  var prefix = company.doc_prefix || company.code || 'RIFIM';
+  var data = buildPlaceholderData(input, config, 'PREVIEW/' + prefix + '/' + input.documentType);
+  var code = String(company.code || input.company_code || 'RIFIM').toUpperCase();
+  var qrPlaceholder = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="white" stroke="%23bbb"/><text x="60" y="62" text-anchor="middle" font-family="Arial" font-size="15" fill="%23888">QR</text></svg>'
+  );
+  return buildDocumentHtml(
+    String(input.documentType || '').toUpperCase(),
+    data,
+    soV2PreviewAssets_(code),
+    soV2CompanyView_(company, config, input),
+    qrPlaceholder
+  );
+}
+
+function soV2StripBodyBranding_(html) {
+  // V2 final uses native DocumentApp page header/footer. Remove the fallback
+  // body-level kop generated by the shared renderer and do not append a footer banner.
+  return String(html || '').replace(
+    /<table style="width:100%;margin-bottom:0;border-collapse:collapse;">[\s\S]*?<\/table><hr style="border:0;border-top:2\.5px solid #C40000;margin:8px 0 16px;">/,
+    ''
+  );
+}
+
+function soV2GenerateApproved_(input) {
+  var ctx = soV2Auth_(input);
+  soV2RequireWrite_(ctx);
+  var doc = soV2RequireApprovedDocument_(input.documentId);
+
+  // Idempotent reprint/retry: never consume another legal document number.
+  if (doc.pdf_url && doc.doc_number && String(doc.doc_number).indexOf('DOC-') !== 0) {
+    return {
+      success: true,
+      reused: true,
+      documentId: doc.id,
+      documentNumber: doc.doc_number,
+      pdfUrl: doc.pdf_url,
+      gdocUrl: doc.metadata && doc.metadata.gdoc_url || '',
+      message: 'Dokumen final sudah tersedia; nomor lama digunakan kembali.'
+    };
+  }
+
+  var rev = soV2GetCanonicalRevision_(doc.current_revision_id);
+  var payload = rev.payload || {};
+  delete payload.action;
+  delete payload.hrisAction;
+  payload.documentType = payload.documentType || doc.doc_type;
+  payload.company_code = payload.company_code || String(doc.company_slug || 'RIFIM').toUpperCase();
+  payload._canonical_document_id = doc.id;
+  payload.performed_by = { name: ctx.email, email: ctx.email };
+  payload = soV2EnrichInputFromHris_(payload);
+
+  var config = getCompanyConfig();
+  var company = soV2GetCompany_(payload.company_code || 'RIFIM');
+  var prefix = company.doc_prefix || company.code || 'RIFIM';
+  var legalNumber = generateDocumentNumber(payload.documentType, prefix);
+  var data = buildPlaceholderData(payload, config, legalNumber);
+  var companyCode = String(company.code || payload.company_code || 'RIFIM').toUpperCase();
+  var assets = _loadCompanyAssets(companyCode);
+  // Native header/footer are applied after HTML → Google Doc conversion.
+  assets.kop_banner = '';
+  assets.footer_banner = '';
+  assets.logo = '';
+  var qr = generateQrBase64(legalNumber + ' | RIFIM OS');
+  var html = buildDocumentHtml(payload.documentType, data, assets, soV2CompanyView_(company, config, payload), qr);
+  html = soV2StripBodyBranding_(html);
+
+  var htmlBlob = Utilities.newBlob(html, 'text/html', legalNumber + '.html');
+  var converted = Drive.Files.insert({
+    title: legalNumber,
+    mimeType: 'application/vnd.google-apps.document',
+    parents: [{ id: 'root' }]
+  }, htmlBlob, { convert: true });
+  var files = soV2PreserveDocAndExportPdf_(converted.id, legalNumber, '', companyCode, payload.documentType);
+
+  try {
+    saveDocumentRecord({
+      id: _gasUuid(),
+      document_number: legalNumber,
+      document_type: payload.documentType,
+      document_code: companyCode,
+      document_date: data.DOCUMENT_DATE || _gasToday('short'),
+      recipient_name: payload.recipientName || payload.extra && payload.extra.recipient_name || '',
+      recipient_address: payload.recipientAddress || payload.extra && payload.extra.recipient_address || '',
+      subject: payload.subject || '',
+      attachment: payload.attachment || 0,
+      body_summary: (payload.body || payload.extra && payload.extra.body || '').substring(0, 200),
+      status: 'FINAL',
+      gdoc_url: files.docUrl || '',
+      pdf_url: files.pdfUrl || '',
+      qr_url: 'qr:' + legalNumber,
+      created_by: ctx.email || '',
+      pipeline_type: 'html-v2',
+      workflow_document_id: doc.id,
+      template_version: SO_V2_VERSION
+    });
+  } catch (mirrorErr) {
+    _gasLogError('smartOfficeV2Renderer', 'saveDocumentRecord', mirrorErr, { documentId: doc.id, docNumber: legalNumber });
+  }
+
+  _sbPatch('doc_documents', 'id=eq.' + encodeURIComponent(doc.id), {
+    doc_number: legalNumber,
+    pdf_drive_id: files.pdfId || null,
+    pdf_url: files.pdfUrl || null,
+    metadata: Object.assign({}, doc.metadata || {}, {
+      gdoc_url: files.docUrl || '',
+      gdoc_drive_id: files.docId || '',
+      template_version: SO_V2_VERSION
+    }),
+    updated_at: new Date().toISOString()
+  });
+
+  if (String(doc.doc_type || '').toUpperCase() === 'PKWT') {
+    soV2ReconcilePkwtContract_(doc, payload, {
+      documentNumber: legalNumber,
+      gdocUrl: files.docUrl || '',
+      pdfUrl: files.pdfUrl || ''
+    });
+  }
+
+  return {
+    success: true,
+    documentId: doc.id,
+    documentNumber: legalNumber,
+    gdocUrl: files.docUrl || '',
+    gdocFileId: files.docId || '',
+    pdfUrl: files.pdfUrl || '',
+    pdfFileId: files.pdfId || '',
+    message: 'Dokumen berhasil dibuat: ' + legalNumber
+  };
+}
+
+function soV2ReconcilePkwtContract_(doc, payload, result) {
+  var employeeId = payload.extra && payload.extra.employee_id;
+  if (!employeeId) throw new Error('PKWT approved tidak memiliki employee_id.');
+  var emp = hrisGetEmployee(employeeId);
+  if (!emp) throw new Error('Employee PKWT tidak ditemukan.');
+  var startDate = payload.extra && payload.extra.contract_start;
+  if (!startDate) throw new Error('PKWT wajib memiliki contract_start sebelum final generate.');
+
+  var rows = _sbGet(_docRestUrl_('employee_contracts', [
+    'employee_id=eq.' + encodeURIComponent(emp.employee_id),
+    'contract_type=eq.PKWT',
+    'order=created_at.desc',
+    'limit=1'
+  ]));
+  var patch = {
+    document_number: result.documentNumber || doc.doc_number,
+    gdoc_url: result.gdocUrl || null,
+    pdf_url: result.pdfUrl || null,
+    start_date: startDate,
+    end_date: payload.extra && payload.extra.contract_end || null,
+    status: 'AKTIF',
+    source: 'smart_office',
+    smart_office_code: 'PKWT',
+    smart_office_document_id: String(doc.id),
+    payload_snapshot: payload,
+    validation_status: 'pending',
+    validated_at: null,
+    validated_by: null,
+    updated_at: new Date().toISOString()
+  };
+  if (rows && rows.length) {
+    _sbPatch('employee_contracts', 'id=eq.' + encodeURIComponent(rows[0].id), patch);
+  } else {
+    _sbPost('employee_contracts', Object.assign({
+      employee_id: emp.employee_id,
+      contract_type: 'PKWT',
+      created_at: new Date().toISOString()
+    }, patch));
+  }
 }
