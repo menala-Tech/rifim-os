@@ -2,9 +2,9 @@
 function soV2BuildPreview_(input){input=soV2EnrichInputFromHris_(input);var config=getCompanyConfig(),company=soV2GetCompany_(input.company_code||'RIFIM'),prefix=company.doc_prefix||company.code||'RIFIM',data=buildPlaceholderData(input,config,'PREVIEW/'+prefix+'/'+input.documentType),co={name:company.name||'',address:company.address||'',phone:company.phone||'',email:company.email||'',director_name:company.director_name||'',director_title:company.director_title||''};return buildDocumentPreviewHtml(input.documentType,data,String(company.code||'RIFIM').toUpperCase(),co)}
 function soV2GenerateApproved_(input){
   var ctx=soV2Auth_(input);soV2RequireWrite_(ctx);var doc=soV2RequireApprovedDocument_(input.documentId);
-  // Idempotent final generate: reprint/retry must never consume a new legal number.
   if(doc.pdf_url&&doc.doc_number&&String(doc.doc_number).indexOf('DOC-')!==0){return{success:true,reused:true,documentId:doc.id,documentNumber:doc.doc_number,pdfUrl:doc.pdf_url,gdocUrl:doc.metadata&&doc.metadata.gdoc_url||'',message:'Dokumen final sudah tersedia; nomor lama digunakan kembali.'};}
   var rev=soV2GetCanonicalRevision_(doc.current_revision_id),payload=rev.payload||{};
+  delete payload.action;delete payload.hrisAction;
   payload.access_token=input.access_token||input.token||'';payload.performed_by={name:ctx.email,email:ctx.email};payload.documentType=payload.documentType||doc.doc_type;payload.company_code=payload.company_code||String(doc.company_slug||'RIFIM').toUpperCase();payload.use_html_pipeline=true;payload._canonical_document_id=doc.id;payload=soV2EnrichInputFromHris_(payload);
   var result=generateDocument(payload);if(!result||!result.success)throw new Error(result&&result.message||'Generate document gagal.');
   _sbPatch('doc_documents','id=eq.'+encodeURIComponent(doc.id),{doc_number:result.documentNumber||doc.doc_number,pdf_drive_id:result.pdfFileId||null,pdf_url:result.pdfUrl||null,metadata:Object.assign({},doc.metadata||{},{gdoc_url:result.gdocUrl||'',template_version:SO_V2_VERSION}),updated_at:new Date().toISOString()});
