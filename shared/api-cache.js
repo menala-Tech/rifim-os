@@ -1,4 +1,5 @@
 /** RIFIM OS shared bootstrap. Core preserved in api-cache-core.js. */
+/* hotfix production redeploy marker 2026-08-10 */
 (function(){
   'use strict';
   function load(src){document.write('<script src="'+src+'"></'+'script>');}
