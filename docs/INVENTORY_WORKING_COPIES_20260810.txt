@@ -1,0 +1,31 @@
+SESI 0 INVENTORY — 2026-08-10
+Source: folder chatgpt local(1).zip
+
+Physical ZIPs: 18
+Active working copies: 17
+Superseded/skip: P8_PREPRODUCTION_REAUDITED_PACKAGE_NOT_APPLIED.zip (V1), replaced by P8_PREPRODUCTION_REAUDITED_V2_PACKAGE_NOT_APPLIED.zip
+
+ACTIVE 17:
+1. aist-portable-agent-working-copy.zip
+2. fase3-ui-working-copy-v2.zip
+3. hris-attendance-rules-v2-working-copy.zip
+4. hris-contract-activation-sync-working-copy-v2.zip
+5. hris-payroll-v2-working-copy.zip
+6. hris-target-sync-working-copy-v2-final-rule.zip
+7. master-modules-sync-working-copy.zip
+8. raos-p2-unified-canonical-working-copy(1).zip
+9. raos-p4-security-operational-working-copy.zip
+10. raos-p5-full-integration-working-copy.zip
+11. rifim-os-final-canonical-storage-v4-regression-passed.zip
+12. rifim-os-smart-office-v2-refactor.zip
+13. rifim-os-system-module-v3-final-working-copy.zip
+14. P6_FULL_REPOSITORY_CLOSURE_REAUDITED.zip
+15. P7_PREPRODUCTION_VALIDATION.zip
+16. P7_RAOS_RELEASE_CANDIDATE.zip
+17. P8_PREPRODUCTION_REAUDITED_V2_PACKAGE_NOT_APPLIED.zip
+
+RECONCILIATION:
+- P2/P4/P5 are inherited into P6 closure; do not replay older overlays after P6/P7.
+- P6 + P7 validation + P7 release are inherited into the nested P7 cross-module reaudited release shipped with P8 V2.
+- P8 V1 is obsolete; V2 wins.
+- Independent working copies (master modules, System V3, HRIS, Smart Office, storage, Fase3 UI, AIST) are merged into current main while preserving newer production commits already on GitHub.
