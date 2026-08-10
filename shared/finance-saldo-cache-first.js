@@ -1,116 +1,116 @@
 /**
- * Finance Isi Saldo — cache-first / stale-while-revalidate
- * LOCAL STAGING ONLY — NO COMMIT / NO PUSH / NO DEPLOY.
- *
- * Tujuan:
- * - Saat tab Isi Saldo dibuka, tampilkan data terakhir dari localStorage seketika.
- * - Jangan kosongkan tabel dengan "Loading Supabase…" bila cache tersedia.
- * - Fetch data terbaru tetap berjalan di background.
- * - Filter status/cabang/search tetap menggunakan data fresh/cached yang sama.
- * - Realtime notifier existing tetap source untuk pengajuan baru.
- *
- * Integrasi minimal:
- * 1) load sebelum inline Finance script atau sesudah api-cache.js.
- * 2) ganti body loadSaldoRaos() menjadi:
- *      return FinanceSaldoCacheFirst.load({
- *        fetcher: () => _gasCall('finance_saldo_raos_list', {...}),
- *        render: renderSaldoRaosRows,
- *        status: ...,
- *        branch: ...,
- *        search: ...,
- *        tbody: document.getElementById('sr-body')
- *      })
- *
- * Adapter ini tidak melakukan mark-paid dan tidak mengubah data.
+ * Finance Isi Saldo — cache-first / stale-while-revalidate.
+ * Auto-wraps existing _gasCall without changing Finance inline renderer.
  */
 (function (global) {
-  'use strict';
+  'use strict'
 
-  var PREFIX = 'rifim_finance_saldo_raos_v2:';
-  var TTL = 15 * 60 * 1000;
-  var MAX_STALE = 24 * 60 * 60 * 1000;
+  var PREFIX = 'rifim_finance_saldo_raos_v3:'
+  var TTL = 15 * 60 * 1000
+  var MAX_STALE = 24 * 60 * 60 * 1000
+  var originalGasCall = null
+  var nextFresh = null
+  var installed = false
+
+  function scopeKey() {
+    try {
+      var auth = JSON.parse(localStorage.getItem('rifim_auth') || '{}')
+      return [auth.id || auth.user_id || auth.email || 'anonymous', String(auth.role || 'none').toLowerCase()].join('|')
+        .replace(/[^a-zA-Z0-9@._|:-]/g, '_')
+    } catch (_) { return 'anonymous|none' }
+  }
 
   function key(params) {
-    params = params || {};
-    return PREFIX + JSON.stringify({ status: params.status || '', branch: params.branch || '' });
+    params = params || {}
+    return PREFIX + scopeKey() + ':' + JSON.stringify({ status: params.status || '', branch: params.branch || '' })
   }
 
   function read(params) {
     try {
-      var raw = localStorage.getItem(key(params));
-      if (!raw) return null;
-      var parsed = JSON.parse(raw);
-      if (!parsed || !parsed.at || !parsed.payload) return null;
-      var age = Date.now() - parsed.at;
-      if (age > MAX_STALE) return null;
-      return { payload: parsed.payload, at: parsed.at, age: age, fresh: age <= TTL };
-    } catch (_) { return null; }
+      var raw = localStorage.getItem(key(params))
+      if (!raw) return null
+      var parsed = JSON.parse(raw)
+      if (!parsed || !parsed.at || !parsed.payload) return null
+      var age = Date.now() - parsed.at
+      if (age > MAX_STALE) { localStorage.removeItem(key(params)); return null }
+      return { payload: parsed.payload, at: parsed.at, age: age, fresh: age <= TTL }
+    } catch (_) { return null }
   }
 
   function write(params, payload) {
-    try { localStorage.setItem(key(params), JSON.stringify({ at: Date.now(), payload: payload })); } catch (_) {}
+    try { localStorage.setItem(key(params), JSON.stringify({ at: Date.now(), payload: payload })) } catch (_) {}
   }
 
   function clear() {
     try {
-      var keys = [];
+      var prefix = PREFIX + scopeKey() + ':'
+      var keys = []
       for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k && k.indexOf(PREFIX) === 0) keys.push(k);
+        var k = localStorage.key(i)
+        if (k && k.indexOf(prefix) === 0) keys.push(k)
       }
-      keys.forEach(function (k) { localStorage.removeItem(k); });
+      keys.forEach(function (k) { localStorage.removeItem(k) })
     } catch (_) {}
   }
 
-  function showSoftState(tbody, text) {
-    if (!tbody) return;
-    var row = tbody.querySelector('[data-finance-saldo-soft-state]');
-    if (!row) {
-      row = document.createElement('tr');
-      row.setAttribute('data-finance-saldo-soft-state', '1');
-      row.innerHTML = '<td colspan="8" style="padding:7px 11px;font-size:10px;opacity:.55"></td>';
-      tbody.insertBefore(row, tbody.firstChild);
-    }
-    row.firstElementChild.textContent = text;
+  function samePayload(a, b) {
+    try { return JSON.stringify(a) === JSON.stringify(b) } catch (_) { return false }
   }
 
-  function hideSoftState(tbody) {
-    if (!tbody) return;
-    var row = tbody.querySelector('[data-finance-saldo-soft-state]');
-    if (row) row.remove();
-  }
+  function install() {
+    if (installed || typeof global._gasCall !== 'function') return false
+    installed = true
+    originalGasCall = global._gasCall
 
-  async function load(opts) {
-    opts = opts || {};
-    if (typeof opts.fetcher !== 'function') throw new Error('FinanceSaldoCacheFirst.fetcher wajib');
-    if (typeof opts.render !== 'function') throw new Error('FinanceSaldoCacheFirst.render wajib');
+    global._gasCall = async function (action, params) {
+      params = params || {}
+      if (action === 'finance_saldo_raos_list') {
+        var cacheId = key(params)
+        if (nextFresh && nextFresh.cacheId === cacheId) {
+          var ready = nextFresh.payload
+          nextFresh = null
+          return ready
+        }
 
-    var params = { status: opts.status || '', branch: opts.branch || '' };
-    var cached = read(params);
-    if (cached) {
-      opts.render(cached.payload, { fromCache: true, background: false });
-      showSoftState(opts.tbody, cached.fresh ? 'Data tersimpan • memperbarui di background…' : 'Menampilkan data terakhir • sinkronisasi terbaru berjalan…');
-    } else if (opts.tbody && !opts.tbody.children.length) showSoftState(opts.tbody, 'Mengambil data pertama kali…');
+        var cached = read(params)
+        if (cached) {
+          Promise.resolve(originalGasCall(action, params)).then(function (fresh) {
+            if (!fresh || fresh.success === false) return
+            var changed = !samePayload(cached.payload, fresh)
+            write(params, fresh)
+            if (changed && typeof global.loadSaldoRaos === 'function') {
+              nextFresh = { cacheId: cacheId, payload: fresh }
+              setTimeout(function () { global.loadSaldoRaos() }, 0)
+            }
+          }).catch(function () {})
+          return cached.payload
+        }
 
-    try {
-      var fresh = await opts.fetcher();
-      if (!fresh || fresh.success === false) throw new Error((fresh && fresh.message) || 'Gagal mengambil data terbaru');
-      write(params, fresh);
-      hideSoftState(opts.tbody);
-      opts.render(fresh, { fromCache: false, background: !!cached });
-      return fresh;
-    } catch (err) {
-      if (cached) {
-        showSoftState(opts.tbody, 'Offline/koneksi lambat • menampilkan data terakhir');
-        console.warn('[FinanceSaldoCacheFirst] refresh gagal; cache dipertahankan', err);
-        return cached.payload;
+        var first = await originalGasCall(action, params)
+        if (first && first.success !== false) write(params, first)
+        return first
       }
-      hideSoftState(opts.tbody);
-      throw err;
+
+      var result = await originalGasCall(action, params)
+      if (action === 'finance_saldo_raos_mark_paid' && result && result.success !== false) clear()
+      return result
     }
+    global._gasCall.__financeSaldoCacheWrapped = true
+    return true
   }
 
-  function invalidateAfterMutation() { clear(); }
+  function installWhenReady() {
+    if (install()) return
+    var attempts = 0
+    var timer = setInterval(function () {
+      attempts++
+      if (install() || attempts > 200) clearInterval(timer)
+    }, 25)
+  }
 
-  global.FinanceSaldoCacheFirst = { load: load, read: read, write: write, clear: clear, invalidateAfterMutation: invalidateAfterMutation, version: 'staging-1.0.0' };
-})(window);
+  global.FinanceSaldoCacheFirst = {
+    read: read, write: write, clear: clear, invalidateAfterMutation: clear,
+    install: install, version: '3.0.0-auto-wrapper'
+  }
+  installWhenReady()
+})(window)
