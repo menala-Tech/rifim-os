@@ -120,17 +120,17 @@ select option:checked{background:var(--red);color:#fff}
 .empty .icon{font-size:44px;margin-bottom:10px;opacity:.3}
 
 .cabang-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:16px}
-.cab-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;cursor:pointer;transition:all .15s}
-.cab-card:hover{background:rgba(255,255,255,.06);border-color:rgba(196,0,0,.5)}
-.cab-card.active{background:rgba(196,0,0,.15);border-color:var(--red)}
+.cab-card{background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:18px;padding:14px 16px;cursor:pointer;transition:all .15s;box-shadow:0 8px 22px rgba(15,23,42,.05)}
+.cab-card:hover{background:#fff;border-color:rgba(196,0,0,.34);transform:translateY(-1px);box-shadow:0 14px 28px rgba(15,23,42,.08)}
+.cab-card.active{background:#fff5f5;border-color:var(--red);box-shadow:0 16px 30px rgba(196,0,0,.12)}
 .cab-card .cab-name{font-size:13px;font-weight:600;margin-bottom:4px}
-.cab-card .cab-total{font-size:11px;color:#aaa;font-family:'Consolas','Menlo',monospace}
+.cab-card .cab-total{font-size:11px;color:var(--muted);font-family:'Consolas','Menlo',monospace}
 
 .launcher{display:flex;flex-direction:column;align-items:center;gap:16px;padding:32px;
-  background:linear-gradient(135deg,rgba(196,0,0,.15),rgba(147,51,234,.1));border-radius:14px;border:1px solid rgba(196,0,0,.3)}
+  background:linear-gradient(135deg,rgba(255,245,245,.96),rgba(255,255,255,.96));border-radius:22px;border:1px solid rgba(196,0,0,.16);box-shadow:0 16px 36px rgba(15,23,42,.08)}
 .launcher .big-icon{font-size:56px}
-.launcher h3{font-size:18px;font-weight:700}
-.launcher p{font-size:13px;color:#ddd;text-align:center;max-width:520px;line-height:1.55}
+.launcher h3{font-size:18px;font-weight:800;color:#111827}
+.launcher p{font-size:13px;color:var(--muted);text-align:center;max-width:520px;line-height:1.6}
 .launcher .btn{font-size:14px;padding:12px 24px}
 
 footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
