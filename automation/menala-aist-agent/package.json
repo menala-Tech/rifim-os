@@ -1,0 +1,14 @@
+{
+  "name": "menala-aist-agent",
+  "version": "2.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/main.js",
+    "check": "node --check src/main.js && node --check src/browser.js && node --check src/api.js && node --check src/identity.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.1",
+    "playwright": "^1.54.2"
+  }
+}
