@@ -9,7 +9,17 @@ function soV2CanWrite_(role){return SO_V2_WRITE_ROLES.indexOf(soV2Role_(role))>=
 function soV2CanApprove_(role){return SO_V2_APPROVER_ROLES.indexOf(soV2Role_(role))>=0;}
 function soV2CanView_(role){return SO_V2_VIEW_ROLES.indexOf(soV2Role_(role))>=0;}
 function soV2CanEmployeeRequest_(role){return SO_V2_EMPLOYEE_REQUEST_ROLES.indexOf(soV2Role_(role))>=0;}
-function soV2Auth_(input){var by=input&&input.performed_by||{};var email=String(by.email||input.user||'').toLowerCase().trim();if(!email)throw new Error('unauthorized: email session tidak ditemukan');var ctx=_docAuthContext_(email);var rows=_sbGet(_docRestUrl_('user_profiles',['id=eq.'+encodeURIComponent(ctx.userId),'select=id,email,role,branch_id,staff_id,is_active','limit=1']));if(rows&&rows.length){ctx.branchId=rows[0].branch_id||null;ctx.staffId=rows[0].staff_id||null;}return ctx;}
+function soV2Auth_(input){
+  input=input||{};
+  var verified=authVerifyAccessToken(input.access_token||input.token||'');
+  if(!verified||verified.success!==true){var err=new Error(verified&&verified.message||'Session tidak valid.');err.code=verified&&verified.code||'UNAUTHORIZED';throw err;}
+  var actor=verified.user||{};
+  var ctx={userId:actor.id,email:actor.email||'',role:soV2Role_(actor.role),branchId:actor.branch_id||null,staffId:null};
+  var rows=_sbGet(_docRestUrl_('user_profiles',['id=eq.'+encodeURIComponent(ctx.userId),'select=id,email,role,branch_id,staff_id,is_active','limit=1']));
+  if(!rows||!rows.length||rows[0].is_active===false)throw new Error('Profil user aktif tidak ditemukan.');
+  ctx.role=soV2Role_(rows[0].role);ctx.branchId=rows[0].branch_id||null;ctx.staffId=rows[0].staff_id||null;
+  return ctx;
+}
 function soV2RequireWrite_(ctx){if(!soV2CanWrite_(ctx.role))throw new Error('forbidden: role '+ctx.role+' tidak boleh mengubah Smart Office');}
 function soV2RequireApprove_(ctx){if(!soV2CanApprove_(ctx.role))throw new Error('forbidden: hanya Direksi/Direktur boleh approve');}
 function soV2GetCompany_(companyCode){var row=getCompanyByCode(String(companyCode||'RIFIM').toUpperCase());if(!row)throw new Error('Company tidak ditemukan: '+companyCode);return row;}
