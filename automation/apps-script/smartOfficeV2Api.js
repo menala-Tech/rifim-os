@@ -12,6 +12,7 @@ function soV2RoutePost(input){
   if(action.indexOf('so_')!==0)return null;
   if(action==='so_preview'){soV2Auth_(input);return{success:true,html:soV2BuildPreview_(input)};}
   if(action==='so_create_draft')return soV2CreateCanonicalDraft_(input);
+  if(action==='so_revise')return soV2ReviseCanonical_(input);
   if(action==='so_submit')return soV2SubmitCanonical_(input);
   if(action==='so_decide')return soV2DecideCanonical_(input);
   if(action==='so_generate')return soV2GenerateApproved_(input);
