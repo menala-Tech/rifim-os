@@ -1,7 +1,8 @@
 /** RIFIM OS shared bootstrap. Core preserved in api-cache-core.js. */
 (function(){
   'use strict';
-  function load(src){document.write('<script src="'+src+'"><\\/script>');}
+  function load(src){document.write('<script src="'+src+'"></'+'script>');}
+  load('/shared/gas-fetch-proxy.js');
   load('/shared/api-cache-core.js');
   var p=String(location.pathname||'');
   if(/\/hris(?:\/|$)/.test(p)) {
