@@ -11,9 +11,6 @@ function soV2AssertRequestScope_(ctx,input){
   if(!employeeId)return;
   var linked=soV2EmployeeProfile_(employeeId);
   if(ctx.role==='staff'&&String(ctx.staffId||'')!==String(employeeId))throw new Error('Staff hanya boleh mengajukan dokumen untuk dirinya sendiri.');
-  if(ctx.role==='koordinator'){
-    if(!ctx.branchId||!linked.profile||String(linked.profile.branch_id||'')!==String(ctx.branchId))throw new Error('Koordinator hanya boleh mengajukan dokumen karyawan di cabangnya sendiri.');
-  }
   input._scope_branch_id=linked.profile&&linked.profile.branch_id||ctx.branchId||null;
 }
 function soV2CreateCanonicalDraft_(input){
@@ -21,10 +18,24 @@ function soV2CreateCanonicalDraft_(input){
   if(source==='RAOS'){if(!soV2CanEmployeeRequest_(ctx.role))throw new Error('Role tidak boleh mengajukan dokumen karyawan.');soV2AssertRequestScope_(ctx,input);}else soV2RequireWrite_(ctx);
   input=soV2EnrichInputFromHris_(input);var company=soV2GetCompany_(input.company_code||'RIFIM');var docType=soV2GetDocType_(input.documentType);
   var metadata={request_source:source,employee_id:input.extra&&input.extra.employee_id||null,branch_id:input._scope_branch_id||ctx.branchId||null,branch_scope:input.extra&&(input.extra.employee_branch||input.extra.branch||input.extra.cabang)||null,company_code:company.code||input.company_code,layout_group:soV2LayoutGroup_(docType),template_version:SO_V2_VERSION};
-  var payload=JSON.parse(JSON.stringify(input));payload.metadata=metadata;
+  var payload=JSON.parse(JSON.stringify(input));delete payload.access_token;delete payload.token;payload.metadata=metadata;
   var created=_docCreateDraft_({title:input.subject||docType.label||input.documentType,companySlug:String(company.code||input.company_code||'RIFIM').toLowerCase(),docType:String(input.documentType||'').toUpperCase(),payload:payload},ctx);
   _sbPatch('doc_documents','id=eq.'+encodeURIComponent(created.documentId),{metadata:metadata,updated_at:new Date().toISOString()});
   return{success:true,documentId:created.documentId,revisionId:created.revisionId,status:'draft',metadata:metadata};
+}
+function soV2ReviseCanonical_(input){
+  var ctx=soV2Auth_(input);var doc=soV2GetCanonicalDocument_(input.documentId);var source=String(doc.metadata&&doc.metadata.request_source||input.request_source||'SMART_OFFICE').toUpperCase();
+  if(source==='RAOS'){
+    if(!soV2CanEmployeeRequest_(ctx.role))throw new Error('Tidak diizinkan merevisi dokumen.');
+    if(ctx.role==='staff'&&String(doc.created_by)!==String(ctx.userId))throw new Error('Staff hanya boleh merevisi draft miliknya sendiri.');
+  }else soV2RequireWrite_(ctx);
+  if(['rejected','draft'].indexOf(String(doc.status||'').toLowerCase())<0)throw new Error('Dokumen hanya dapat direvisi saat draft/rejected. Status: '+doc.status);
+  var payload=JSON.parse(JSON.stringify(input.payload||input));delete payload.action;delete payload.documentId;delete payload.access_token;delete payload.token;delete payload.performed_by;
+  payload.documentType=payload.documentType||doc.doc_type;payload.company_code=payload.company_code||String(doc.company_slug||'RIFIM').toUpperCase();payload=soV2EnrichInputFromHris_(payload);payload.metadata=doc.metadata||{};
+  var rev=createRevision({documentId:doc.id,payload:payload,actor:ctx.userId});
+  _sbPatch('doc_documents','id=eq.'+encodeURIComponent(doc.id),{current_revision_id:rev.revisionId,status:'draft',updated_at:new Date().toISOString()});
+  _sbPost('rpc/doc_log_event',{p_entity_type:'document',p_entity_id:doc.id,p_action:'revised',p_payload:{revision_id:rev.revisionId,actor:ctx.userId}});
+  return{success:true,documentId:doc.id,revisionId:rev.revisionId,status:'draft'};
 }
 function soV2DireksiApprover_(){
   var rows=_sbGet(_docRestUrl_('user_profiles',['role=in.(direksi,direktur)','is_active=eq.true','select=id,email,role','order=created_at.asc','limit=1']));
@@ -33,11 +44,11 @@ function soV2DireksiApprover_(){
 }
 function soV2SubmitCanonical_(input){
   var ctx=soV2Auth_(input);var doc=soV2GetCanonicalDocument_(input.documentId);var source=String(doc.metadata&&doc.metadata.request_source||input.request_source||'SMART_OFFICE').toUpperCase();
-  if(source==='RAOS'){if(!soV2CanEmployeeRequest_(ctx.role))throw new Error('Tidak diizinkan mengajukan dokumen.');if(ctx.role==='staff'&&String(doc.created_by)!==String(ctx.userId))throw new Error('Staff hanya boleh submit draft miliknya sendiri.');if(ctx.role==='koordinator'&&String(doc.metadata&&doc.metadata.branch_id||'')!==String(ctx.branchId||''))throw new Error('Koordinator hanya boleh submit draft cabangnya.');}else soV2RequireWrite_(ctx);
+  if(source==='RAOS'){if(!soV2CanEmployeeRequest_(ctx.role))throw new Error('Tidak diizinkan mengajukan dokumen.');if(ctx.role==='staff'&&String(doc.created_by)!==String(ctx.userId))throw new Error('Staff hanya boleh submit draft miliknya sendiri.');}else soV2RequireWrite_(ctx);
   if(String(doc.status||'').toLowerCase()!=='draft')throw new Error('Hanya draft yang dapat diajukan. Status: '+doc.status);
   if(!doc.current_revision_id)throw new Error('Draft belum mempunyai revision.');
-  var existing=_sbGet(_docRestUrl_('doc_approvals',['document_id=eq.'+encodeURIComponent(doc.id),'status=in.(pending,approved)','select=id,status','limit=1']));
-  if(existing&&existing.length)throw new Error('Dokumen sudah mempunyai proses approval aktif.');
+  var existing=_sbGet(_docRestUrl_('doc_approvals',['document_id=eq.'+encodeURIComponent(doc.id),'revision_id=eq.'+encodeURIComponent(doc.current_revision_id),'status=in.(pending,approved)','select=id,status','limit=1']));
+  if(existing&&existing.length)throw new Error('Revision ini sudah mempunyai proses approval aktif.');
   var approver=soV2DireksiApprover_();var approvalId=Utilities.getUuid();
   _sbPost('doc_approvals',{id:approvalId,document_id:doc.id,revision_id:doc.current_revision_id,approver_id:approver.id,order_index:0,status:'pending'});
   _sbPatch('doc_documents','id=eq.'+encodeURIComponent(doc.id),{status:'pending_approval',updated_at:new Date().toISOString()});
