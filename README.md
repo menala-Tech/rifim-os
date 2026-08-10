@@ -6,6 +6,8 @@
 ![Version](https://img.shields.io/badge/Version-v0.1.0-blue)
 ![Phase](https://img.shields.io/badge/Phase-Foundation-green)
 
+<!-- deploy-trigger: 2026-08-10T23:47:00+08:00 -->
+
 ---
 
 ## Vision
