@@ -3,10 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#1A1A1A">
+<meta name="theme-color" content="#f7f8fb">
 <title>RIFIM OS — CRM &amp; Config Center</title>
 <link rel="manifest" href="/manifest.json">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -118,6 +117,50 @@ main{max-width:1280px;margin:0 auto;padding:24px;width:100%}
 
 footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
 .dirty-badge{display:inline-block;width:8px;height:8px;background:var(--warn);border-radius:50%;margin-left:6px}
+
+/* ─── CRM Sync/UI v2: bright theme + Maxim background + sticky chrome ─── */
+:root{
+  --crm-bg:#f7f8fb;--crm-surface:rgba(255,255,255,.94);--crm-surface-2:#ffffff;
+  --crm-text:#172033;--crm-muted:#667085;--crm-border:#d8dee9;--crm-header-h:76px;--crm-tabs-h:52px;
+}
+html{scroll-behavior:smooth;background:var(--crm-bg)}
+body{color:var(--crm-text);background:
+  linear-gradient(rgba(248,249,252,.90),rgba(248,249,252,.94)),
+  url('/branding/backgrounds/bagroun-maxim.png') center/cover fixed no-repeat;}
+#app{background:transparent;color:var(--crm-text)}
+#gate{background:linear-gradient(rgba(248,249,252,.82),rgba(248,249,252,.92)),url('/branding/backgrounds/bagroun-maxim.png') center/cover no-repeat}
+header{min-height:var(--crm-header-h);background:rgba(255,255,255,.94);border-bottom:1px solid var(--crm-border);color:var(--crm-text);backdrop-filter:blur(14px);box-shadow:0 4px 18px rgba(17,24,39,.06)}
+.module-badge{background:#f1f3f7;color:#20283a;border-color:#d6dbe5}
+.user-role{background:#fff0f0;border-color:#ffd0d0;color:#a00000}
+.btn-back{color:#344054;border-color:#cfd5df;background:#fff}.btn-back:hover{background:#f3f5f8}
+main{max-width:1440px;padding-top:18px}
+.page-title{color:#182230}.page-sub{color:#667085;opacity:1}
+.tabs{position:sticky;top:var(--crm-header-h);z-index:45;background:rgba(255,255,255,.96);border:1px solid var(--crm-border);border-radius:12px;padding:4px 8px;margin-bottom:18px;box-shadow:0 5px 16px rgba(17,24,39,.05);backdrop-filter:blur(12px)}
+.tab{color:#667085}.tab:hover{color:#111827;background:#f4f6f9;border-radius:8px}.tab.active{color:#a40000}
+.panel{background:var(--crm-surface);border-color:var(--crm-border);box-shadow:0 10px 28px rgba(17,24,39,.06);color:var(--crm-text)}
+.panel .desc,.desc-cell{color:var(--crm-muted)!important}
+.sink.sheet{background:#ecfdf3;color:#067647;border-color:#abefc6}.sink.supabase{background:#eff8ff;color:#175cd3;border-color:#b2ddff}.sink.github{background:#f4f3ff;color:#5925dc;border-color:#d9d6fe}.sink.gas{background:#fffaeb;color:#b54708;border-color:#fedf89}
+.roadmap{background:#fff7ed;border-color:#fdba74;color:#9a3412}.roadmap strong{color:#c2410c}.roadmap code{background:#ffedd5;color:#7c2d12}
+.toolbar{position:relative}.toolbar input,.toolbar select{background:#fff;border-color:#cfd6e2;color:#101828}.toolbar select option{color:#101828;background:#fff}.btn.ghost{color:#344054;border-color:#cfd5df;background:#fff}.btn.ghost:hover{background:#f3f5f8}
+.cfg-table{background:#fff;border:1px solid #e4e7ec}.cfg-table th,.cfg-table td{border-bottom-color:#eef0f4;color:#344054}.cfg-table th{top:calc(var(--crm-header-h) + var(--crm-tabs-h) + 10px);z-index:20;background:#f4f6f8;color:#475467;box-shadow:0 1px 0 #dfe3ea}.cfg-table tr:hover td{background:#fafbfc}.cfg-table .key{color:#9a6700}.cfg-table .val{color:#172033}.cfg-table .val input{background:#fff;color:#172033;border-color:#d0d5dd}.cfg-table .val input:disabled{background:#f6f7f9;color:#667085}.cfg-table .val input:focus{background:#fff}
+.section-hdr{color:#8a4b00;border-bottom-color:#f4d7a1}.cat.company{background:#fee4e2;color:#b42318}.cat.drive{background:#dcfae6;color:#067647}.cat.template{background:#ebe9fe;color:#5925dc}.cat.feature{background:#fef0c7;color:#93370d}.cat.kpi{background:#fee4e2;color:#b42318}.cat.time{background:#d1e9ff;color:#175cd3}.cat.integration{background:#ebe9fe;color:#5925dc}
+.status-bar{background:#fff;border-color:#d0d5dd;color:#344054;box-shadow:0 12px 28px rgba(16,24,40,.14)}
+footer{color:#667085;opacity:1}
+#ru-modal>div,#ct-modal>div{background:#fff!important;color:#172033!important;border-color:#d0d5dd!important;box-shadow:0 24px 60px rgba(16,24,40,.24)}
+#ru-modal input,#ru-modal select,#ct-modal input,#ct-modal select,#ct-modal textarea{background:#fff!important;color:#172033!important;border-color:#d0d5dd!important}
+#ru-modal label,#ct-modal label{color:#475467!important}
+.info-compact{margin:0 0 16px;border:1px solid var(--crm-border);border-radius:10px;background:#fbfcfe;overflow:hidden}.info-compact summary{cursor:pointer;padding:10px 12px;font-weight:700;color:#344054;list-style:none}.info-compact summary::-webkit-details-marker{display:none}.info-compact .info-body{padding:0 12px 12px}.info-compact .info-body>*{margin-bottom:10px}.info-compact .roadmap{margin-bottom:0}
+.sync-health{display:none;margin:0 0 14px;padding:12px;border-radius:10px;border:1px solid #d0d5dd;background:#fff;font-size:12px;line-height:1.55}.sync-health.show{display:block}.sync-health.ok{border-color:#abefc6;background:#ecfdf3;color:#067647}.sync-health.warn{border-color:#fedf89;background:#fffaeb;color:#92400e}
+.table-wrap{overflow-x:auto;max-width:100%;border-radius:10px}.table-wrap>.cfg-table{min-width:760px}
+@media(max-width:760px){
+  :root{--crm-header-h:64px;--crm-tabs-h:48px}
+  header{padding:10px 12px}.brand-logo{height:40px}.module-badge{font-size:11px}.user-info{max-width:140px}.user-name{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.btn-back{padding:6px 9px}
+  main{padding:12px 10px}.page-title{font-size:19px}.page-sub{font-size:12px;margin-bottom:12px}.tabs{border-radius:9px;padding:3px;gap:2px}.tab{padding:9px 11px;font-size:12px}.panel{padding:12px;border-radius:10px}.toolbar{gap:7px}.toolbar>*{flex:1 1 140px}.toolbar .grow{min-width:100%}.btn{min-height:40px}
+  .cfg-table th{top:calc(var(--crm-header-h) + var(--crm-tabs-h) + 6px)}
+  #ru-modal,#ct-modal{padding:8px!important;align-items:flex-end!important}#ru-modal>div,#ct-modal>div{max-width:none!important;border-radius:16px 16px 0 0!important;max-height:92dvh!important}
+  .status-bar{left:10px;right:10px;bottom:10px;text-align:center}
+}
+
 </style>
 <script src="/shared/api-cache.js"></script>
 </head>
@@ -148,10 +191,8 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
   </header>
 
   <main>
-    <div class="page-title">CRM &amp; Config Center</div>
-    <div class="page-sub">Single Source of Truth untuk seluruh konfigurasi &amp; data master RIFIM OS,
-      Smart Office, HRIS, dan PWA RAOS Menala. Edit sekali di sini — otomatis propagate ke Google
-      Sheets, Supabase, dan GitHub (auto-deploy Vercel).</div>
+    <div class="page-title">CRM</div>
+    <details class="info-compact" id="crm-global-info"><summary>ⓘ Keterangan CRM & Sinkronisasi</summary><div class="info-body"><div class="page-sub">CRM mengelola relasi eksternal dan menjadi console konfigurasi. Karyawan tetap milik HRIS/SSOT, user + role/cabang milik Auth/Master Data, dokumen milik Smart Office, transaksi milik Finance, dan komunikasi operasional milik RAOS.</div></div></details>
 
     <div class="tabs">
       <button class="tab active" data-tab="company">🏢 Company Config</button>
@@ -176,17 +217,21 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <strong>Sumber data:</strong> Sheet <code>company_config</code> di spreadsheet
         <code>1jHeA-w1bM32S3-AU-ENN2UjiaCb4iLzRhaf4G7y4ozM</code> (RIFIM OS — Smart Office Database).<br>
         <strong>Read path:</strong> GAS endpoint Smart Office (existing) → JSON key-value.<br>
-        <strong>Write path (TODO):</strong> extend GAS dengan <code>?action=config_set&amp;key=X&amp;value=Y</code>
-        yang admin-only + audit log ke tab <code>activity_log</code>.<br>
-        <strong>Konsumer:</strong> Smart Office document generator (setiap kali generate surat, baca
-        <code>company_name</code>, <code>director_name</code>, <code>drive_folder_*</code>, dst).
+        <strong>Write path:</strong> CRM memakai GAS backend existing dengan token session; hanya Admin/Direksi yang boleh mutation.<br>
+        <strong>Konsumer:</strong> semua writer Drive memakai root canonical dari <code>company_config</code>. Write baru mengikuti
+        <code>Module → Tahun → Bulan → Jenis Data</code>; key <code>drive_folder_*</code> legacy hanya kompatibilitas baca/audit.
       </div>
 
       <div class="toolbar">
         <input class="grow" placeholder="Cari key atau description…" id="cc-search">
         <button class="btn ghost small" id="cc-refresh">🔄 Refresh dari Sheet</button>
+        <button class="btn ghost small" id="cc-audit-drive">🩺 Audit Drive</button>
+        <button class="btn ghost small crm-write-only" id="cc-prepare-month">🗂 Siapkan Bulan</button>
+        <button class="btn ghost small crm-write-only" id="cc-backup-master">💾 Backup Master</button>
+        <button class="btn ghost small" id="crm-refresh-all">⟳ Refresh Semua</button>
         <button class="btn" id="cc-save" disabled>💾 Simpan Perubahan</button>
       </div>
+      <div class="sync-health" id="cc-health"></div>
 
       <div class="section-hdr">🏢 Identitas Perusahaan</div>
       <table class="cfg-table">
@@ -228,10 +273,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <strong>Sumber data:</strong> Sheet <code>SISTEM CONFIG</code> di spreadsheet
         <code>1eYS2mM3Sy-BNAVGfp8BUHtsZuLiGDetnJeGw-AWk__8</code> (RAOS master), sekaligus mirror ke
         tabel Supabase <code>public.system_config</code> untuk konsumsi cepat oleh PWA.<br>
-        <strong>Write path (TODO):</strong> saat user save di CRM →
-        (a) POST GAS <code>?action=sistem_config_set</code> update sheet,
-        (b) Supabase RPC <code>set_system_config(key,value)</code> SECURITY DEFINER admin-only update tabel,
-        (c) trigger <code>notification</code> ke user PWA supaya reload cache (opsional untuk key kritikal).<br>
+        <strong>Write path:</strong> CRM → GAS <code>sistem_config_set</code> → Sheet canonical → Supabase mirror server-side. Token session diverifikasi backend.<br>
         <strong>Konsumer:</strong> RAOS PWA (KPI engine, geofence check, reminder cron), GAS (KPI update,
         reminder dispatcher).
       </div>
@@ -239,9 +281,12 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
       <div class="toolbar">
         <input class="grow" placeholder="Cari key…" id="sc-search">
         <button class="btn ghost small" id="sc-refresh">🔄 Refresh dari Sheet</button>
-        <button class="btn" id="sc-save" disabled>💾 Simpan &amp; Sync Supabase</button>
+        <button class="btn ghost small" id="sc-audit">🩺 Audit Sinkron</button>
+        <button class="btn ghost small" id="sc-sync-all">⇄ Sync Semua → Supabase</button>
+        <button class="btn" id="sc-save" disabled>💾 Simpan Perubahan</button>
       </div>
 
+      <div class="sync-health" id="sc-health"></div>
       <div class="section-hdr">🎯 KPI Configuration</div>
       <table class="cfg-table">
         <thead><tr><th style="width:260px">Key</th><th style="width:180px">Value</th><th>Description</th><th style="width:100px">Kategori</th></tr></thead>
@@ -296,16 +341,13 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div class="panel" data-panel="raos-users">
       <h2>User Supabase RAOS</h2>
-      <div class="desc">CRUD akun <code>auth.users</code> + <code>user_profiles</code> PWA RAOS. Reset PIN, ubah email, ubah role/branch.</div>
+      <div class="desc">Data user tetap milik Auth + <code>user_profiles</code>. Management hanya melihat; mutation hanya Admin/Direksi sesuai permission.</div>
       <div class="sinks">
         <span class="sink supabase">🔵 Supabase: <code>auth.users</code> + <code>user_profiles</code></span>
         <span class="sink sheet">📊 Sheet SSOT: <code>MASTER DATA STAFF</code></span>
       </div>
       <div class="roadmap">
-        <strong>TODO backend:</strong> Perhatian — <code>user_profiles.source='ssot_master_staff'</code>
-        akan ter-overwrite tiap sync 1 jam kalau hanya diubah di Supabase. Perlu 2-way sync: edit di
-        CRM → (a) UPDATE Supabase langsung untuk efek immediate, (b) UPDATE row sheet SSOT MASTER
-        DATA STAFF via GAS supaya sync berikutnya tidak revert.
+        <strong>Aturan sinkron:</strong> Nama/Role/Phone/Aktif untuk akun <code>source=ssot_*</code> mengikuti sumber SSOT dan dikunci di CRM. <code>branch_id</code> adalah data operasional RAOS dan tetap bisa diatur. PIN yang dikelola dari sini adalah <strong>PIN RAOS dedicated</strong>, bukan PIN legacy aplikasi lain.
       </div>
       <div class="toolbar">
         <input class="grow" placeholder="Cari email, nama, atau staff_id…" id="ru-search">
@@ -343,7 +385,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
             <th style="width:180px">Cabang</th>
             <th style="width:80px">Aktif</th>
             <th style="width:80px">Sumber</th>
-            <th style="width:110px">PIN Portal</th>
+            <th style="width:110px">PIN RAOS</th>
             <th style="width:170px">Aksi</th>
           </tr>
         </thead>
@@ -356,7 +398,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
     <!-- Modal edit user RAOS -->
     <div id="ru-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;padding:20px">
       <div style="background:var(--dark2);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:24px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto">
-        <h3 style="margin-bottom:4px" id="ru-modal-title">Edit User RAOS</h3>
+        <h3 style="margin-bottom:4px" id="ru-modal-title">Cabang &amp; PIN RAOS</h3>
         <div class="desc-cell" id="ru-modal-sub" style="margin-bottom:16px;color:#888;font-size:12px"></div>
         <div id="ru-modal-warn" style="display:none;background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.3);border-radius:6px;padding:10px 12px;margin-bottom:12px;color:#facc15;font-size:12px;line-height:1.5"></div>
         <div style="display:flex;flex-direction:column;gap:12px">
@@ -392,9 +434,8 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         </div>
         <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;align-items:center">
           <button class="btn" id="ru-modal-save">💾 Simpan</button>
-          <button class="btn ghost small" id="ru-modal-reset-pin" style="background:rgba(196,0,0,.15);border-color:rgba(196,0,0,.4);color:#ff9999" title="Reset password Supabase Auth (login PWA RAOS) langsung. Akan ter-overwrite next sync SSOT.">🔑 Reset PIN PWA</button>
-          <button class="btn ghost small" id="ru-modal-update-ssot-pin" style="background:rgba(234,179,8,.12);border-color:rgba(234,179,8,.4);color:#facc15" title="Edit kolom H (Pin) di sheet MASTER DATA STAFF. Sumber kanonis — Auth password sync max 6 jam atau via Force Refresh Staff Auth di /sistem.">📝 PIN Sheet SSOT</button>
-          <button class="btn ghost small" id="ru-modal-reset-portal-pin" style="background:rgba(14,165,233,.12);border-color:rgba(14,165,233,.4);color:#7dd3fc" title="Reset PIN untuk login Portal Rifim OS (raos_credentials.raos_pin). Berbeda dari PIN PWA.">🌐 Reset PIN Portal</button>
+          <button class="btn ghost small" id="ru-modal-reset-raos-pin" title="Atur dedicated RAOS PIN. Untuk akun SSOT, backend juga memperbarui kolom RAOS PIN di MASTER DATA STAFF.">🔐 Atur PIN RAOS</button>
+          <button class="btn ghost small" id="ru-modal-send-user" title="Buka draft email berisi identitas login dan PIN RAOS yang baru dibuat.">✉️ Kirim ke User</button>
           <button class="btn ghost small" id="ru-modal-close" style="margin-left:auto">Batal</button>
         </div>
       </div>
@@ -499,13 +540,12 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
       <h2>Audit Log Perubahan</h2>
       <div class="desc">Semua perubahan config, whitelist, user Supabase, kontak. Actor + before/after + timestamp.</div>
       <div class="sinks">
-        <span class="sink supabase">🔵 Supabase: <code>crm_audit_log</code> (TODO)</span>
-        <span class="sink github">💾 GitHub commit trail (untuk config yg di-bake)</span>
+        <span class="sink sheet">📊 Sheet: <code>CRM_AUDIT_LOG</code></span>
+        <span class="sink supabase">🔵 Supabase: <code>crm_audit_log</code></span>
       </div>
       <div class="roadmap">
-        <strong>TODO:</strong> tabel <code>crm_audit_log</code> — id, actor_email, action, target_type
-        (company_config/system_config/whitelist/raos_user/contact), target_key, before jsonb, after
-        jsonb, ip, user_agent, github_commit_sha (nullable), created_at. Retensi ≥90 hari.
+        <strong>Audit path:</strong> setiap mutation CRM ditulis ke <code>CRM_AUDIT_LOG</code> dan dimirror best-effort ke
+        <code>public.crm_audit_log</code>. Tampilan membaca Supabase terlebih dahulu lalu fallback ke Sheet bila mirror tidak tersedia.
       </div>
       <div class="toolbar">
         <input type="date" id="au-from"> — <input type="date" id="au-to">
@@ -546,85 +586,8 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════════════════════
-// SEED DATA — dari kedua sheet config (untuk preview UI, sebelum backend ready)
-// ═══════════════════════════════════════════════════════════════════════
-const COMPANY_CONFIG_SEED = {
-  company: [
-    ['company_name', 'PT. RIFIM Internasional Gemilang', 'Nama lengkap perusahaan (default: RIFIM)'],
-    ['company_short', 'RIFIM', 'Nama singkat untuk nomor dokumen (default)'],
-    ['company_tagline', 'Membangun Hari Ini, Menginspirasi Masa Depan', 'Tagline perusahaan'],
-    ['company_role', 'Vendor Operasional Maxim', 'Peran / bidang usaha'],
-    ['company_address', 'Fanindo Blok S No. 20, Tanjung Uncang, Batu Aji, Kota Batam', 'Alamat lengkap perusahaan'],
-    ['company_city', 'Batam', 'Kota domisili'],
-    ['company_phone', '+62 821 7010 2349', 'Nomor telepon resmi'],
-    ['company_email', 'rifiminternasionalgemilang@gmail.com', 'Email resmi perusahaan'],
-    ['company_website', 'www.rifimgroup.com', 'Website perusahaan'],
-    ['director_name', 'BOBBY RAHMAN M.B', 'Nama direktur utama'],
-    ['director_title', 'Direktur Utama', 'Jabatan direktur'],
-    ['company_npwp', '-', 'Nomor NPWP perusahaan'],
-    ['company_nib', '-', 'Nomor Induk Berusaha'],
-    ['company_siup', '-', 'Nomor SIUP'],
-  ],
-  drive: [
-    ['drive_root_folder_id', '19taBn0YXxjXTb-SxqFXGhwOPShZ4VIIt', 'ID folder root Smart Office di Google Drive'],
-    ['drive_dokumen_folder_id', '1XZDBwNNDrcLquTaKB-1cbegz7rniXdgK', 'ID folder Dokumen (hasil generate)'],
-    ['drive_folder_surat', '12xonf6PjSMJRzpcQylcuYsPzAMwlq_DO', 'ID folder Drive — Surat'],
-    ['drive_folder_invoice', '1CaihPCFzy_lRyXpJBVaP5MW0GN3NIzGW', 'ID folder Drive — Invoice'],
-    ['drive_folder_kwitansi', '15MpOYopdsJMpqz9gWspWrcX7byMTmLpU', 'ID folder Drive — Kwitansi'],
-    ['drive_folder_proposal', '1q9J3ib0LP29u5z4ZzmWvc8YsqUaO6w6V', 'ID folder Drive — Proposal'],
-    ['drive_folder_cp', '1WJevB0auuTuhmWVUHy5HaWaOZuA02Zob', 'ID folder Drive — Company Profile'],
-    ['drive_folder_mou', '1LBE86oPD9HdbHDoSMMA4M5UXojzm0i1I', 'ID folder Drive — MOU'],
-    ['drive_folder_pks', '1dXFsjTFgIWpSavXuWIKBaThmUfu3GKdP', 'ID folder Drive — Perjanjian Kerjasama'],
-    ['drive_folder_kontrak', '1fj7ccKbJQAjgcgEB23JvwBRIsII2neYU', 'ID folder Drive — Kontrak Karyawan'],
-    ['drive_folder_sp', '1M2Nch7tcV-FYpqoh1WpYOHMwLIWL34Bb', 'ID folder Drive — Surat Peringatan'],
-  ],
-  template: [
-    ['gdoc_template_surat', '1JWcGbFWiyODAaTt_2BBs_xWu2Q0xkaQYsz-KTmFi44g', 'Template Surat Resmi (fallback default)'],
-    ['gdoc_template_inv', '1pVEt4wohHQgX_X0SsKPQOQh5DF4Uk_Z3d10Ifz24j-g', 'Template Invoice (fallback default)'],
-    ['gdoc_template_pkwt', '1wE9vQKSs2VFDjMiLqrYqEEg8kGCXbwo1Cw4epDQpl_c', 'Template Kontrak PKWT (fallback default)'],
-    ['gdoc_template_sp', '1MEbbgLCiH6zUsj7Ds7JvffFfKB55YioXgI-tn2VVQC0', 'Template Surat Peringatan (fallback default)'],
-    ['gdoc_template_mou', '1h3CfgVvTvPHllw4ulyXk-p_ZLjVBhiQRhyoEQDgsGHg', 'Template MOU / PKS (fallback default)'],
-    ['gdoc_template_kwt', '1H3xjfFjUVWLYMO7-lHWBKW-JuBWhIsGdyXF8tjDRuz8', 'Template Kwitansi (fallback default)'],
-  ],
-  feature: [
-    ['timezone', 'Asia/Jakarta', 'Timezone sistem (WIB)'],
-    ['date_locale', 'id-ID', 'Locale tanggal (Indonesia)'],
-    ['pdf_export_enabled', 'TRUE', 'Aktifkan export PDF otomatis setelah generate'],
-    ['email_notify_enabled', 'FALSE', 'Kirim email notifikasi setelah generate'],
-    ['qr_enabled', 'TRUE', 'Generate QR Code link ke Google Doc'],
-    ['version', '1.1.2000', 'Versi RIFIM OS Smart Office'],
-  ],
-};
-
-const SYSTEM_CONFIG_SEED = {
-  kpi: [
-    ['KPI_PILAR_1_ORDER_MAX', '50', 'Poin max Pilar 1 mode Order (Soeta)'],
-    ['KPI_PILAR_1_SALDO_MAX', '50', 'Poin max Pilar 1 mode Saldo (cabang lain)'],
-    ['KPI_PILAR_2_DRIVER_MAX', '30', 'Poin max Pilar 2 pembinaan driver'],
-    ['KPI_PILAR_3_SOP_MAX', '20', 'Poin max Pilar 3 disiplin & SOP'],
-    ['KPI_AKTIF_TINGGI_MIN', '8', 'Threshold scan/bulan driver dianggap aktif tinggi (Pilar 2)'],
-    ['KPI_EXPECTED_WORKDAYS', '26', 'Ekspektasi hari kerja per bulan (Pilar 3)'],
-    ['KPI_BOBOT_KOORDINATOR', '1.2', 'Bobot jabatan koordinator target staff'],
-    ['KPI_BOBOT_STAFF', '1.0', 'Bobot jabatan staff'],
-  ],
-  time: [
-    ['SALDO_REMINDER_MENIT', '5', 'Menit sebelum reminder chat "Belum Diisi" dikirim'],
-    ['SALDO_SYNC_MENIT', '5', 'Interval sync raos_saldo_requests → sheet Form Isi Saldo'],
-    ['ATTENDANCE_TOLERANCE_MENIT', '15', 'Toleransi keterlambatan absensi (menit)'],
-    ['GEOFENCE_TOLERANCE_METER', '50', 'Toleransi hard-block scan/absen di luar radius (staff only)'],
-    ['AUTO_CHECKOUT_TIME', '23:59', 'Waktu auto checkout jika staff lupa absen pulang'],
-    ['DATA_RETENTION_DAYS', '30', 'Retensi log activity & sistem (hari)'],
-  ],
-  integration: [
-    ['EMAIL_ADMIN', 'rifiminternationalgemilang@gmail.com', 'Email penerima laporan harian'],
-    ['COMPANY_NAME', 'PT. Rifim Internasional Gemilang', 'Nama perusahaan'],
-    ['APP_VERSION', '2.0.0-multicabang', 'Versi aplikasi RAOS (P1-P3 multi-cabang)'],
-    ['SSOT_STAFF_SHEET_ID', '1fcraq3QHqIaD-13Ebzt6stT9aA6j_loTXeAtpNX12kw', 'Spreadsheet MASTER DATA STAFF'],
-    ['SSOT_DRIVER_SHEET_ID', '1FEZxyHPx_GCQKw92hLSf6QxxkXgZn5R1sRswOYM_Tlc', 'Spreadsheet Database Driver Airport'],
-    ['SUPABASE_URL', 'https://vlievtojpmrbsmzlqswl.supabase.co', 'URL project Supabase RAOS'],
-  ],
-};
+// Config values are never baked into the CRM frontend.
+// Company/System Config must hydrate from authenticated canonical backends.
 
 // ═══════════════════════════════════════════════════════════════════════
 // AUTH GATE
@@ -650,6 +613,37 @@ function checkAuth() {
   return sess;
 }
 
+let CRM_UI_CAN_WRITE = false;
+
+function applyCrmUiRolePolicy(sess) {
+  const role = String((sess && sess.role) || '').toLowerCase();
+  const canRead = ['admin','management','direksi','direktur'].includes(role);
+  CRM_UI_CAN_WRITE = ['admin','direksi','direktur'].includes(role);
+
+  if (!canRead) {
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('gate').style.display = 'flex';
+    const gateText = document.querySelector('#gate .gate-card p');
+    if (gateText) gateText.textContent = 'Role Anda tidak memiliki akses administratif ke CRM.';
+    return false;
+  }
+
+  if (!CRM_UI_CAN_WRITE) {
+    document.querySelectorAll('#cc-save,#sc-save,#sc-sync-all,#wl-add-btn,#ct-add-btn,.crm-write-only').forEach(el => {
+      if (el) el.style.display = 'none';
+    });
+    const newEmail = document.getElementById('wl-new-email');
+    if (newEmail) newEmail.style.display = 'none';
+  }
+  return true;
+}
+
+function requireCrmUiWrite() {
+  if (CRM_UI_CAN_WRITE) return true;
+  showStatus('Role Management hanya memiliki akses lihat.', 'err');
+  return false;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // RENDER CONFIG TABLES
 // ═══════════════════════════════════════════════════════════════════════
@@ -665,6 +659,7 @@ function renderRow(tbody, section, cat, [key, val, desc]) {
     <td><span class="cat ${cat}">${cat}</span></td>
   `;
   const input = tr.querySelector('input');
+  input.disabled = !CRM_UI_CAN_WRITE;
   const orig = input.value;
   input.addEventListener('input', () => {
     const isDirty = input.value !== orig;
@@ -675,33 +670,36 @@ function renderRow(tbody, section, cat, [key, val, desc]) {
   tbody.appendChild(tr);
 }
 
-function renderCompanyConfig() {
-  const map = [
-    ['cc-company', 'company', COMPANY_CONFIG_SEED.company],
-    ['cc-drive', 'drive', COMPANY_CONFIG_SEED.drive],
-    ['cc-template', 'template', COMPANY_CONFIG_SEED.template],
-    ['cc-feature', 'feature', COMPANY_CONFIG_SEED.feature],
-  ];
-  for (const [id, cat, rows] of map) {
-    const tb = document.getElementById(id); tb.innerHTML = '';
-    for (const row of rows) renderRow(tb, 'company', cat, row);
+function _configCategory(section, key) {
+  const k = String(key || '').toLowerCase();
+  if (section === 'company') {
+    if (k.startsWith('drive_') || k.includes('_drive_') || k.includes('folder')) return 'drive';
+    if (k.startsWith('gdoc_') || k.startsWith('tpl_') || k.includes('template')) return 'template';
+    if (k.startsWith('company_') || k.startsWith('director_')) return 'company';
+    return 'feature';
   }
+  if (k.includes('kpi') || k.includes('bobot') || k.includes('target')) return 'kpi';
+  if (k.includes('menit') || k.includes('time') || k.includes('retention') || k.includes('tolerance') || k.includes('checkout')) return 'time';
+  return 'integration';
 }
 
-function renderSystemConfig() {
-  const map = [
-    ['sc-kpi', 'kpi', SYSTEM_CONFIG_SEED.kpi],
-    ['sc-time', 'time', SYSTEM_CONFIG_SEED.time],
-    ['sc-integration', 'integration', SYSTEM_CONFIG_SEED.integration],
-  ];
-  for (const [id, cat, rows] of map) {
-    const tb = document.getElementById(id); tb.innerHTML = '';
-    for (const row of rows) renderRow(tb, 'system', cat, row);
-  }
+function renderConfigRows(section, rows) {
+  const ids = section === 'company'
+    ? {company:'cc-company',drive:'cc-drive',template:'cc-template',feature:'cc-feature'}
+    : {kpi:'sc-kpi',time:'sc-time',integration:'sc-integration'};
+  Object.values(ids).forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=''; });
+  (rows || []).forEach(row => {
+    const cat = _configCategory(section, row.key);
+    const target = document.getElementById(ids[cat] || Object.values(ids)[0]);
+    if (target) renderRow(target, section, cat, [row.key, row.value == null ? '' : String(row.value), row.description || '']);
+  });
 }
+
+function renderCompanyConfig() { renderConfigRows('company', []); }
+function renderSystemConfig() { renderConfigRows('system', []); }
 
 // ═══════════════════════════════════════════════════════════════════════
-// SAVE HANDLERS (TODO: backend integration)
+// SAVE HANDLERS — authenticated GAS backend integration
 // ═══════════════════════════════════════════════════════════════════════
 function showStatus(msg, kind) {
   const bar = document.getElementById('status');
@@ -711,6 +709,7 @@ function showStatus(msg, kind) {
 }
 
 document.getElementById('cc-save').addEventListener('click', async () => {
+  if (!requireCrmUiWrite()) return;
   const keys = [...dirty.company];
   if (keys.length === 0) return;
   const btn = document.getElementById('cc-save');
@@ -739,97 +738,155 @@ document.getElementById('cc-save').addEventListener('click', async () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// SUPABASE CLIENT (RAOS project) — untuk RPC set_system_config
+// SYSTEM CONFIG — GAS canonical gateway; Supabase mirror is server-side
 // ═══════════════════════════════════════════════════════════════════════
-const SUPABASE_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co';
-// Publishable key (safe to embed — RLS enforces access, RPC checks role via get_my_role())
-const SUPABASE_ANON_KEY = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
-let _sb = null;
-function getSb() {
-  if (_sb) return _sb;
-  if (typeof window.supabase === 'undefined') {
-    showStatus('Supabase SDK belum load — refresh halaman', 'err');
-    return null;
-  }
-  _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  return _sb;
-}
-
 document.getElementById('sc-save').addEventListener('click', async () => {
-  const sb = getSb();
-  if (!sb) return;
+  if (!requireCrmUiWrite()) return;
   const keys = [...dirty.system];
-  const payload = keys.map(k => {
-    const input = document.querySelector(`input[data-section="system"][data-key="${k}"]`);
-    return { key: k, value: input.value };
-  });
-
-  showStatus(`Menyimpan ${payload.length} perubahan ke Supabase…`, '');
+  if (!keys.length) return;
   const btn = document.getElementById('sc-save');
   btn.disabled = true;
-
-  const results = { ok: 0, err: 0, errors: [] };
   const me = _wlCurrentUserEmail();
-  for (const item of payload) {
-    const { data, error } = await sb.rpc('set_system_config', {
-      p_key: item.key, p_value: item.value,
-    });
-    if (error) { results.err++; results.errors.push(`${item.key}: ${error.message}`); }
-    else { results.ok++; }
-    // Fire-and-forget: sync juga ke sheet SISTEM CONFIG via GAS
-    // (Supabase Row sudah tersimpan; sheet sync boleh gagal tanpa blok user)
-    _gasCall('sistem_config_set', { key: item.key, value: item.value, user: me })
-      .catch(err => console.warn('Sheet sync gagal utk ' + item.key, err));
+  const results = { ok: 0, err: 0, warnings: [], errors: [] };
+  for (const key of keys) {
+    const input = document.querySelector(`input[data-section="system"][data-key="${key}"]`);
+    try {
+      const data = await _gasCall('sistem_config_set', { key, value: input.value, user: me });
+      if (!data.success) { results.err++; results.errors.push(`${key}: ${data.message}`); }
+      else {
+        results.ok++;
+        if (data.mirror_warning) results.warnings.push(`${key}: ${data.mirror_warning}`);
+      }
+    } catch (err) {
+      results.err++; results.errors.push(`${key}: ${err.message}`);
+    }
   }
-
-  if (results.err === 0) {
-    showStatus(`✅ ${results.ok} config tersimpan (Supabase + sync sheet fire-and-forget)`, 'ok');
+  if (!results.err) {
     dirty.system.clear();
     document.querySelectorAll('[data-panel="system"] tr').forEach(tr => tr.style.background = '');
+    showStatus(results.warnings.length
+      ? `⚠️ ${results.ok} tersimpan di Sheet; mirror warning: ${results.warnings[0]}`
+      : `✅ ${results.ok} config tersimpan (Sheet + Supabase mirror)`,
+      results.warnings.length ? 'err' : 'ok');
   } else {
-    showStatus(`⚠️ ${results.ok} sukses, ${results.err} gagal: ${results.errors[0]}`, 'err');
     btn.disabled = false;
+    showStatus(`⚠️ ${results.ok} sukses, ${results.err} gagal: ${results.errors[0]}`, 'err');
   }
 });
 
 document.getElementById('cc-refresh').addEventListener('click', async () => {
   showStatus('Loading dari sheet company_config…', '');
   try {
-    const me = _wlCurrentUserEmail();
-    const data = await _gasCall('company_config_list', { user: me });
+    const data = await _gasCall('company_config_list', { user: _wlCurrentUserEmail() });
     if (!data.success) throw new Error(data.message || 'Gagal load');
     const rows = data.config || [];
-    let updated = 0;
-    rows.forEach(row => {
-      const input = document.querySelector(`input[data-section="company"][data-key="${row.key}"]`);
-      if (input) { input.value = row.value == null ? '' : String(row.value); updated++; }
-    });
+    renderConfigRows('company', rows);
+    const updated = rows.length;
     dirty.company.clear();
     document.getElementById('cc-save').disabled = true;
     document.querySelectorAll('[data-panel="company"] tr').forEach(tr => tr.style.background = '');
-    showStatus(`✅ Refresh: ${updated} field ter-update dari sheet (${rows.length} total)`, 'ok');
-  } catch (err) {
-    showStatus('❌ ' + err.message, 'err');
-  }
+    showStatus(`✅ Refresh: ${updated} field ter-update dari Sheet (${rows.length} total)`, 'ok');
+  } catch (err) { showStatus('❌ ' + err.message, 'err'); }
 });
 
 document.getElementById('sc-refresh').addEventListener('click', async () => {
-  const sb = getSb();
-  if (!sb) return;
-  showStatus('Loading dari Supabase…', '');
-  const { data, error } = await sb.rpc('list_system_config');
-  if (error) { showStatus('❌ ' + error.message, 'err'); return; }
-  if (!data || data.length === 0) { showStatus('Tabel system_config kosong', 'err'); return; }
-  // Update input values dengan data live
-  let updated = 0;
-  data.forEach(row => {
-    const input = document.querySelector(`input[data-section="system"][data-key="${row.key}"]`);
-    if (input) { input.value = row.value || ''; input.dataset.orig = input.value; updated++; }
-  });
-  dirty.system.clear();
-  document.getElementById('sc-save').disabled = true;
-  document.querySelectorAll('[data-panel="system"] tr').forEach(tr => tr.style.background = '');
-  showStatus(`✅ Refresh: ${updated} field ter-update dari Supabase (${data.length} total)`, 'ok');
+  showStatus('Loading System Config dari backend…', '');
+  try {
+    const data = await _gasCall('sistem_config_list', { user: _wlCurrentUserEmail() });
+    if (!data.success) throw new Error(data.message || 'Gagal load');
+    const rows = data.config || [];
+    renderConfigRows('system', rows);
+    const updated = rows.length;
+    dirty.system.clear();
+    document.getElementById('sc-save').disabled = true;
+    document.querySelectorAll('[data-panel="system"] tr').forEach(tr => tr.style.background = '');
+    showStatus(`✅ Refresh: ${updated} field ter-update dari backend (${rows.length} total)`, 'ok');
+  } catch (err) { showStatus('❌ ' + err.message, 'err'); }
+});
+
+async function auditDriveConfig() {
+  const box = document.getElementById('cc-health');
+  box.className = 'sync-health show'; box.textContent = 'Memeriksa folder & template Google Drive…';
+  try {
+    const data = await _gasCall('company_config_drive_audit', { user:_wlCurrentUserEmail() });
+    if (!data.success) throw new Error(data.message || 'Audit Drive gagal');
+    const bad = (data.items || []).filter(x => !x.ok);
+    const canonicalIssues = data.canonical?.issues || [];
+    const hasIssue = bad.length > 0 || canonicalIssues.length > 0 || data.healthy === false;
+    box.className = 'sync-health show ' + (hasIssue ? 'warn' : 'ok');
+    const parts = [];
+    if (bad.length) parts.push(`${bad.length} referensi Drive invalid: ${bad.map(x => `${x.key} (${x.message || 'invalid'})`).join(' • ')}`);
+    if (canonicalIssues.length) parts.push(`Canonical layout: ${canonicalIssues.map(x => `${x.key || x.code}: ${x.message || x.code}`).join(' • ')}`);
+    if (!hasIssue) parts.push(`✅ ${data.checked} referensi Drive valid; layout ${data.canonical?.layout_version || 'canonical'} sehat.`);
+    if (data.legacy_count) parts.push(`${data.legacy_count} referensi legacy hanya dipertahankan untuk kompatibilitas dan tidak dipakai write baru.`);
+    box.textContent = parts.join(' ');
+  } catch (err) { box.className='sync-health show warn'; box.textContent='❌ '+err.message; }
+}
+
+document.getElementById('cc-audit-drive').addEventListener('click', auditDriveConfig);
+
+document.getElementById('cc-prepare-month').addEventListener('click', async () => {
+  if (!requireCrmUiWrite()) return;
+  const month = new Date().toISOString().slice(0,7);
+  if (!confirm(`Siapkan struktur canonical seluruh modul/PWA + database 3 perusahaan untuk ${month}?`)) return;
+  showStatus(`Menyiapkan struktur Drive ${month}…`, '');
+  try {
+    const data = await _gasCall('canonical_drive_prepare_month', { user:_wlCurrentUserEmail(), month });
+    if (!data.success) throw new Error(data.message || 'Gagal menyiapkan bulan');
+    showStatus(`✅ Struktur Drive ${data.year}/${data.month} siap.`, 'ok');
+    await auditDriveConfig();
+  } catch (err) { showStatus('❌ ' + err.message, 'err'); }
+});
+
+document.getElementById('cc-backup-master').addEventListener('click', async () => {
+  if (!requireCrmUiWrite()) return;
+  showStatus('Membuat backup Spreadsheet Master…', '');
+  try {
+    const data = await _gasCall('canonical_drive_backup_master', { user:_wlCurrentUserEmail() });
+    if (!data.success) throw new Error(data.message || 'Backup gagal');
+    showStatus(`✅ Backup dibuat: ${data.file_name}`, 'ok');
+  } catch (err) { showStatus('❌ ' + err.message, 'err'); }
+});
+
+
+async function auditSystemConfig() {
+  const box = document.getElementById('sc-health');
+  box.className = 'sync-health show'; box.textContent = 'Memeriksa Sheet ↔ Supabase…';
+  try {
+    const data = await _gasCall('sistem_config_audit', { user:_wlCurrentUserEmail() });
+    if (!data.success) throw new Error(data.message || 'Audit gagal');
+    const mismatch = (data.mismatched || []).map(x => `${x.key}: Sheet=${x.sheet}, Supabase=${x.supabase}`);
+    const issues = [];
+    if ((data.missing_in_supabase || []).length) issues.push(`Belum ada di Supabase: ${data.missing_in_supabase.join(', ')}`);
+    if (mismatch.length) issues.push(`Nilai berbeda: ${mismatch.join(' | ')}`);
+    if ((data.extra_in_supabase || []).length) issues.push(`Key ekstra Supabase: ${data.extra_in_supabase.join(', ')}`);
+    box.className = 'sync-health show ' + (data.healthy ? 'ok' : 'warn');
+    box.textContent = data.healthy
+      ? `✅ Sinkron. Sheet ${data.sheet_count} key = Supabase ${data.supabase_count} key.`
+      : `⚠️ Belum sinkron. ${issues.join(' • ')}`;
+  } catch (err) { box.className='sync-health show warn'; box.textContent='❌ '+err.message; }
+}
+
+async function syncAllSystemConfig() {
+  if (!requireCrmUiWrite()) return;
+  if (!confirm('Sync SEMUA key dari Sheet SISTEM CONFIG ke Supabase mirror?')) return;
+  showStatus('Sync semua System Config…','');
+  try {
+    const data = await _gasCall('sistem_config_sync_all', { user:_wlCurrentUserEmail() });
+    if (!data.success && !(data.synced > 0)) throw new Error(data.message || 'Sync gagal');
+    showStatus(`✅ ${data.synced}/${data.total} key disinkronkan`, data.failed && data.failed.length ? 'err' : 'ok');
+    await auditSystemConfig();
+  } catch(err){ showStatus('❌ '+err.message,'err'); }
+}
+
+document.getElementById('sc-audit').addEventListener('click', auditSystemConfig);
+document.getElementById('sc-sync-all').addEventListener('click', syncAllSystemConfig);
+document.getElementById('crm-refresh-all').addEventListener('click', async () => {
+  showStatus('Refresh semua data CRM…','');
+  document.getElementById('cc-refresh').click();
+  document.getElementById('sc-refresh').click();
+  await Promise.allSettled([loadWhitelist(),loadRaosUsers(),loadContacts(),loadAuditLog()]);
+  showStatus('✅ Refresh semua selesai','ok');
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -844,14 +901,28 @@ function _wlCurrentUserEmail() {
   } catch (e) { return ''; }
 }
 
+function _crmSession() {
+  try { return JSON.parse(localStorage.getItem('rifim_auth') || 'null'); }
+  catch (_) { return null; }
+}
+
 async function _gasCall(action, extra) {
-  // Sesi 2026-08-05: delegate ke RifimAPI shared (retry HTML throttled).
-  // CRM tidak inject user email di semua call — tetap forward extras apa adanya.
-  if (window.RifimAPI) {
-    return RifimAPI.get(action, extra || {});
+  const sess = _crmSession();
+  if (!sess || !sess.access_token) throw new Error('Session token tidak ditemukan. Silakan login ulang.');
+  const body = Object.assign({
+    action,
+    user: sess.email || '',
+    access_token: sess.access_token,
+  }, extra || {});
+
+  if (window.RifimAPI && typeof RifimAPI.post === 'function') {
+    return RifimAPI.post(body);
   }
-  const qs = new URLSearchParams(Object.assign({ action }, extra || {}));
-  const res = await fetch(GAS_URL + '?' + qs.toString());
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body),
+  });
   return res.json();
 }
 
@@ -873,8 +944,9 @@ async function loadWhitelist() {
         <td class="key">${email}</td>
         <td class="desc-cell">company_config.allowed_emails</td>
         <td style="white-space:nowrap">
-          <button class="btn ghost small" data-edit="${email}">✏️ Edit</button>
-          <button class="btn ghost small" data-remove="${email}">🗑️ Hapus</button>
+          ${CRM_UI_CAN_WRITE
+            ? `<button class="btn ghost small" data-edit="${email}">✏️ Edit</button> <button class="btn ghost small" data-remove="${email}">🗑️ Hapus</button>`
+            : '<span class="desc-cell">View only</span>'}
         </td>
       </tr>
     `).join('');
@@ -890,6 +962,7 @@ async function loadWhitelist() {
 }
 
 async function addWhitelist() {
+  if (!requireCrmUiWrite()) return;
   const input = document.getElementById('wl-new-email');
   const email = String(input.value || '').trim().toLowerCase();
   if (!email || email.indexOf('@') === -1) {
@@ -915,6 +988,7 @@ async function addWhitelist() {
 }
 
 function startEditWhitelist(oldEmail) {
+  if (!requireCrmUiWrite()) return;
   const tr = document.querySelector(`tr[data-row="${oldEmail}"]`);
   if (!tr) return;
   tr.innerHTML = `
@@ -953,6 +1027,7 @@ function startEditWhitelist(oldEmail) {
 }
 
 async function removeWhitelist(email) {
+  if (!requireCrmUiWrite()) return;
   if (!confirm(`Hapus ${email} dari whitelist portal?`)) return;
   showStatus('Menghapus…', '');
   try {
@@ -1067,7 +1142,8 @@ document.getElementById('au-to').addEventListener('change', () => renderAuditRow
 let _ruCache = [];
 let _ruBranches = [];
 let _ruEditing = null;
-let _rcCache = {};   // {user_id: {has_portal_pin, staff_code, updated_at, has_ssot_pin}}
+let _rcCache = {};   // {user_id: {has_raos_pin, staff_code, updated_at, has_ssot_pin}}
+let _lastGeneratedRaosPin = null;
 
 const RAOS_BRANCH_OPTIONS = [
   { key: 'soeta-t1',           label: 'ID Rifim Airport Soeta — T1' },
@@ -1106,7 +1182,7 @@ function renderRaosUsers() {
 
   tbody.innerHTML = rows.map(u => {
     const c = _rcCache[u.id];
-    const portalPin = c && c.has_portal_pin
+    const raosPin = c && c.has_raos_pin
       ? `<span class="cat feature" style="background:rgba(14,165,233,.15);color:#7dd3fc" title="raos_staff_code: ${_escapeHtml(c.staff_code || '')}">✓ Terset</span>`
       : `<span class="cat feature" style="background:rgba(107,114,128,.2);color:#9ca3af">— Kosong</span>`;
     return `
@@ -1117,8 +1193,8 @@ function renderRaosUsers() {
       <td class="desc-cell" style="font-size:12px">${_escapeHtml(u.branch_name || '—')}</td>
       <td>${u.is_active ? '<span class="cat feature" style="background:rgba(39,174,96,.2);color:#2ecc71">Aktif</span>' : '<span class="cat feature" style="background:rgba(220,38,38,.2);color:#f87171">Off</span>'}</td>
       <td class="desc-cell" style="font-size:11px">${_escapeHtml(u.source)}</td>
-      <td>${portalPin}</td>
-      <td><button class="btn ghost small" data-edit-user="${u.id}">✏️ Edit</button></td>
+      <td>${raosPin}</td>
+      <td>${CRM_UI_CAN_WRITE ? `<button class="btn ghost small" data-edit-user="${u.id}">${String(u.source||'').startsWith('ssot_') ? '⚙️ Cabang & PIN' : '✏️ Edit'}</button>` : `<span class="desc-cell">View only</span>`}</td>
     </tr>
   `; }).join('');
 
@@ -1133,7 +1209,7 @@ async function loadRaosUsers() {
   try {
     const me = _wlCurrentUserEmail();
     // Fetch profiles + credentials paralel. Credentials optional (kalau gagal
-    // kolom PIN Portal render "— Kosong", tidak block load).
+    // kolom PIN RAOS render "— Kosong", tidak block load).
     const [data, credRes] = await Promise.all([
       _gasCall('raos_users_list', { user: me }),
       _gasCall('raos_credentials_list', { user: me }).catch(() => ({ success: false })),
@@ -1157,11 +1233,13 @@ async function loadRaosUsers() {
 }
 
 function openRaosUserModal(userId) {
+  if (!requireCrmUiWrite()) return;
   const u = _ruCache.find(x => x.id === userId);
   if (!u) return;
   _ruEditing = u;
 
-  document.getElementById('ru-modal-title').textContent = 'Edit User RAOS';
+  const ssotManaged = String(u.source || '').startsWith('ssot_');
+  document.getElementById('ru-modal-title').textContent = ssotManaged ? 'Cabang & PIN RAOS' : 'Edit User RAOS';
   document.getElementById('ru-modal-sub').textContent = u.email + ' · ' + u.staff_id;
   document.getElementById('ru-edit-fullname').value = u.full_name || '';
   document.getElementById('ru-edit-phone').value    = u.phone || '';
@@ -1173,19 +1251,21 @@ function openRaosUserModal(userId) {
   branchSelect.innerHTML = '<option value="">(kosong / belum ditugaskan)</option>' +
     _ruBranches.map(b => `<option value="${b.id}" ${b.id === u.branch_id ? 'selected' : ''}>${_escapeHtml(b.name)}</option>`).join('');
 
-  // Warning banner untuk source ssot_master_staff
+  // SSOT-managed identity is read-only in CRM; only RAOS branch + dedicated RAOS PIN are mutable.
   const warn = document.getElementById('ru-modal-warn');
-  if (u.source === 'ssot_master_staff') {
+  ['ru-edit-fullname','ru-edit-phone','ru-edit-role','ru-edit-active'].forEach(id => {
+    const el=document.getElementById(id); if(el) el.disabled = ssotManaged;
+  });
+  if (ssotManaged) {
     warn.style.display = 'block';
-    warn.innerHTML = '<strong>⚠️ SSOT-managed:</strong> field <code>Nama</code>, <code>Role</code>, dan <code>Phone</code> akan ter-overwrite tiap sync 1 jam dari sheet MASTER DATA STAFF. Update juga di sheet supaya perubahan permanen. Field <code>Cabang</code> dan <code>Aktif</code> aman diubah di sini.';
-  } else {
-    warn.style.display = 'none';
-  }
+    warn.innerHTML = '<strong>🔒 Dikelola SSOT:</strong> Nama, Role, Phone dan status Aktif mengikuti HRIS/MASTER DATA STAFF atau SSOT Driver. Dari CRM hanya <code>Cabang RAOS</code> dan <code>PIN RAOS</code> yang dikelola.';
+  } else { warn.style.display = 'none'; }
 
   document.getElementById('ru-modal').style.display = 'flex';
 }
 
 async function saveRaosUser() {
+  if (!requireCrmUiWrite()) return;
   if (!_ruEditing) return;
   const btn = document.getElementById('ru-modal-save');
   btn.disabled = true;
@@ -1193,15 +1273,15 @@ async function saveRaosUser() {
   try {
     const me = _wlCurrentUserEmail();
     const branchVal = document.getElementById('ru-edit-branch').value;
-    const data = await _gasCall('raos_users_update', {
-      id:        _ruEditing.id,
+    const ssotManaged = String(_ruEditing.source || '').startsWith('ssot_');
+    const payload = { id:_ruEditing.id, branch_id:branchVal === '' ? 'null' : branchVal, user:me };
+    if (!ssotManaged) Object.assign(payload, {
       full_name: document.getElementById('ru-edit-fullname').value,
-      phone:     document.getElementById('ru-edit-phone').value,
-      role:      document.getElementById('ru-edit-role').value,
-      branch_id: branchVal === '' ? 'null' : branchVal,
+      phone: document.getElementById('ru-edit-phone').value,
+      role: document.getElementById('ru-edit-role').value,
       is_active: document.getElementById('ru-edit-active').checked ? 'true' : 'false',
-      user:      me,
     });
+    const data = await _gasCall('raos_users_update', payload);
     if (!data.success) throw new Error(data.message || 'Gagal update');
     showStatus('✅ User ter-update' + (data.warning ? ' (warning: ' + data.warning + ')' : ''), 'ok');
     document.getElementById('ru-modal').style.display = 'none';
@@ -1213,56 +1293,40 @@ async function saveRaosUser() {
   }
 }
 
-async function resetRaosPin() {
-  if (!_ruEditing) return;
-  const pin = prompt(`Reset PIN PWA untuk ${_ruEditing.email}\n\n⚠️ Ini update Supabase Auth password LANGSUNG. Akan ter-overwrite next sync SSOT (max 6 jam) kalau sheet MASTER DATA STAFF kolom H beda. Untuk permanen pakai "PIN Sheet SSOT".\n\nMasukkan PIN baru (min 6 digit angka):`);
-  if (pin === null) return;
-  if (!/^\d{6,}$/.test(pin.trim())) { showStatus('PIN harus min 6 digit angka', 'err'); return; }
-  showStatus('Reset PIN PWA…', '');
-  try {
-    const me = _wlCurrentUserEmail();
-    const data = await _gasCall('raos_users_reset_pin', { id: _ruEditing.id, pin: pin.trim(), user: me });
-    if (!data.success) throw new Error(data.message || 'Gagal reset');
-    showStatus(`✅ PIN PWA direset untuk ${_ruEditing.email}`, 'ok');
-  } catch (err) {
-    showStatus('❌ ' + err.message, 'err');
+async function setDedicatedRaosPin() {
+  if (!requireCrmUiWrite() || !_ruEditing) return;
+  if (String(_ruEditing.role || '').toLowerCase() === 'driver') {
+    showStatus('Driver menggunakan ID Driver sebagai PIN kanonis. Ubah dari SSOT Driver bila diperlukan.', 'err');
+    return;
   }
-}
-
-async function resetPortalPin() {
-  if (!_ruEditing) return;
-  const pin = prompt(`Reset PIN Portal untuk ${_ruEditing.email}\n\nPIN ini untuk login https://rifim-os.vercel.app/portal (bridge via raos_verify_and_bridge). Berbeda dari PIN PWA.\n\nMasukkan PIN Portal baru (min 6 digit angka):`);
+  const pin = prompt(`Atur PIN RAOS untuk ${_ruEditing.email || _ruEditing.staff_id}\n\nPIN ini dipakai Portal + PWA RAOS dan TIDAK mengubah PIN legacy aplikasi lain.\n\nMasukkan 4–12 digit angka:`);
   if (pin === null) return;
-  if (!/^\d{6,}$/.test(pin.trim())) { showStatus('PIN Portal harus min 6 digit angka', 'err'); return; }
-  showStatus('Reset PIN Portal…', '');
+  if (!/^\d{4,12}$/.test(pin.trim())) { showStatus('PIN RAOS harus 4–12 digit angka', 'err'); return; }
+  showStatus('Menyimpan PIN RAOS…', '');
   try {
-    const me = _wlCurrentUserEmail();
-    const data = await _gasCall('raos_credentials_reset_pin', { id: _ruEditing.id, pin: pin.trim(), user: me });
-    if (!data.success) throw new Error(data.message || 'Gagal reset');
-    showStatus(`✅ PIN Portal direset untuk ${_ruEditing.email}`, 'ok');
-    // Refresh credentials cache supaya kolom "PIN Portal" update ke "✓ Terset"
+    const data = await _gasCall('raos_credentials_reset_pin', { id:_ruEditing.id, pin:pin.trim(), user:_wlCurrentUserEmail() });
+    if (!data.success) throw new Error(data.message || 'Gagal menyimpan PIN RAOS');
+    _lastGeneratedRaosPin = pin.trim();
+    showStatus(`✅ PIN RAOS tersimpan${data.sheet_updated ? ' + SSOT diperbarui' : ''}`, 'ok');
     await loadRaosUsers();
-  } catch (err) {
-    showStatus('❌ ' + err.message, 'err');
-  }
+  } catch (err) { showStatus('❌ ' + err.message, 'err'); }
 }
 
-async function updateSsotPin() {
+function sendRaosLoginToUser() {
   if (!_ruEditing) return;
-  const staffCode = _ruEditing.staff_id;
-  if (!staffCode) { showStatus('Staff belum punya ID RIF di SSOT — tidak bisa update PIN sheet', 'err'); return; }
-  const pin = prompt(`Update PIN Sheet SSOT untuk ${_ruEditing.email}\n\nStaff ID: ${staffCode}\n\nAksi ini menulis kolom H (Pin) di sheet MASTER DATA STAFF. Sumber kanonis — Supabase Auth password akan sync max 6 jam, atau klik "Force Refresh Staff Auth" di /sistem untuk propagate segera.\n\nMasukkan PIN SSOT baru (min 6 digit angka):`);
-  if (pin === null) return;
-  if (!/^\d{6,}$/.test(pin.trim())) { showStatus('PIN SSOT harus min 6 digit angka', 'err'); return; }
-  showStatus('Update PIN Sheet SSOT…', '');
-  try {
-    const me = _wlCurrentUserEmail();
-    const data = await _gasCall('raos_ssot_pin_update', { staff_id: staffCode, pin: pin.trim(), user: me });
-    if (!data.success) throw new Error(data.message || 'Gagal update sheet');
-    showStatus(`✅ PIN Sheet SSOT diupdate (row ${data.row}). ${data.note || ''}`, 'ok');
-  } catch (err) {
-    showStatus('❌ ' + err.message, 'err');
+  if (!_lastGeneratedRaosPin) {
+    showStatus('Atur PIN RAOS terlebih dahulu agar PIN bisa dimasukkan ke email.', 'err');
+    return;
   }
+  const to = _ruEditing.email || '';
+  if (!to || to.endsWith('@driver.rifim.local')) {
+    showStatus('User ini tidak memiliki email publik untuk dikirim.', 'err');
+    return;
+  }
+  const login = (_rcCache[_ruEditing.id] && _rcCache[_ruEditing.id].staff_code) || _ruEditing.email || _ruEditing.staff_id || '';
+  const subject = encodeURIComponent('[RAOS] Akses Login Anda');
+  const body = encodeURIComponent(`Halo ${_ruEditing.full_name || ''},\n\nAkses PWA RAOS Anda sudah disiapkan.\nLogin: ${login}\nPIN RAOS: ${_lastGeneratedRaosPin}\nPWA: https://raos-menala.vercel.app\n\nJaga PIN ini dan jangan dibagikan kepada pihak lain.\n\nAdmin MENALA`);
+  window.location.href = `mailto:${encodeURIComponent(to)}?subject=${subject}&body=${body}`;
 }
 
 document.getElementById('ru-refresh').addEventListener('click', loadRaosUsers);
@@ -1270,9 +1334,8 @@ document.getElementById('ru-search').addEventListener('input', renderRaosUsers);
 document.getElementById('ru-filter-role').addEventListener('change', renderRaosUsers);
 document.getElementById('ru-filter-branch').addEventListener('change', renderRaosUsers);
 document.getElementById('ru-modal-save').addEventListener('click', saveRaosUser);
-document.getElementById('ru-modal-reset-pin').addEventListener('click', resetRaosPin);
-document.getElementById('ru-modal-reset-portal-pin').addEventListener('click', resetPortalPin);
-document.getElementById('ru-modal-update-ssot-pin').addEventListener('click', updateSsotPin);
+document.getElementById('ru-modal-reset-raos-pin').addEventListener('click', setDedicatedRaosPin);
+document.getElementById('ru-modal-send-user').addEventListener('click', sendRaosLoginToUser);
 document.getElementById('ru-modal-close').addEventListener('click', () => {
   document.getElementById('ru-modal').style.display = 'none';
   _ruEditing = null;
@@ -1333,8 +1396,9 @@ function renderContacts() {
           ${c.notes ? _escapeHtml(String(c.notes).substring(0, 100)) + (String(c.notes).length > 100 ? '…' : '') : ''}
         </td>
         <td style="white-space:nowrap">
-          <button class="btn ghost small" data-edit-ct="${c.id}">✏️</button>
-          <button class="btn ghost small" data-del-ct="${c.id}" style="color:#f87171">🗑️</button>
+          ${CRM_UI_CAN_WRITE
+            ? `<button class="btn ghost small" data-edit-ct="${c.id}">✏️</button> <button class="btn ghost small" data-del-ct="${c.id}" style="color:#f87171">🗑️</button>`
+            : '<span class="desc-cell">View only</span>'}
         </td>
       </tr>
     `;
@@ -1363,6 +1427,7 @@ async function loadContacts() {
 }
 
 function openContactModal(id) {
+  if (!requireCrmUiWrite()) return;
   _ctEditing = id ? _ctCache.find(c => c.id === id) : null;
   document.getElementById('ct-modal-title').textContent = _ctEditing ? 'Edit Kontak' : 'Tambah Kontak';
   document.getElementById('ct-form-name').value     = (_ctEditing && _ctEditing.name)     || '';
@@ -1376,6 +1441,7 @@ function openContactModal(id) {
 }
 
 async function saveContact() {
+  if (!requireCrmUiWrite()) return;
   const btn = document.getElementById('ct-modal-save');
   const name = document.getElementById('ct-form-name').value.trim();
   if (!name) { showStatus('Nama wajib diisi', 'err'); return; }
@@ -1407,6 +1473,7 @@ async function saveContact() {
 }
 
 async function deleteContact(id) {
+  if (!requireCrmUiWrite()) return;
   const c = _ctCache.find(x => x.id === id);
   if (!c || !confirm(`Hapus kontak "${c.name}"?`)) return;
   showStatus('Menghapus…', '');
@@ -1431,6 +1498,27 @@ document.getElementById('ct-modal-close').addEventListener('click', () => {
   _ctEditing = null;
 });
 
+function compactPanelHeaders() {
+  document.querySelectorAll('.panel').forEach(panel => {
+    const h2 = Array.from(panel.children).find(el => el.tagName === 'H2');
+    if (!h2) return;
+    const infoNodes = [];
+    let node = h2.nextElementSibling;
+    while (node && (node.classList.contains('desc') || node.classList.contains('sinks') || node.classList.contains('roadmap'))) {
+      const next = node.nextElementSibling; infoNodes.push(node); node = next;
+    }
+    if (!infoNodes.length) return;
+    const details=document.createElement('details'); details.className='info-compact';
+    const summary=document.createElement('summary'); summary.textContent='ⓘ '+h2.textContent+' — Keterangan';
+    const body=document.createElement('div'); body.className='info-body'; infoNodes.forEach(n=>body.appendChild(n));
+    details.append(summary,body); h2.replaceWith(details);
+  });
+  document.querySelectorAll('.cfg-table').forEach(table => {
+    if (table.parentElement && table.parentElement.classList.contains('table-wrap')) return;
+    const wrap=document.createElement('div'); wrap.className='table-wrap'; table.parentNode.insertBefore(wrap,table); wrap.appendChild(table);
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // TAB ROUTER
 // ═══════════════════════════════════════════════════════════════════════
@@ -1448,13 +1536,17 @@ document.querySelectorAll('.tab').forEach(btn => {
   });
 });
 
-const initTab = location.hash.replace('#', '') || 'company';
-const initBtn = document.querySelector(`.tab[data-tab="${initTab}"]`);
-if (initBtn) initBtn.click();
-
-if (checkAuth()) {
+const crmSession = checkAuth();
+if (crmSession && applyCrmUiRolePolicy(crmSession)) {
+  compactPanelHeaders();
   renderCompanyConfig();
   renderSystemConfig();
+  // Seed values are labels only; hydrate live values immediately from canonical backends.
+  document.getElementById('cc-refresh').click();
+  document.getElementById('sc-refresh').click();
+  const initTab = location.hash.replace('#', '') || 'company';
+  const initBtn = document.querySelector(`.tab[data-tab="${initTab}"]`);
+  if (initBtn) initBtn.click();
 }
 </script>
 

@@ -11,6 +11,11 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/branding/icon/icon-192.png">
   <title>Smart Office — RIFIM OS</title>
+  <script src="/shared/master-role-policy.js"></script>
+  <script src="/shared/master-reference-data.js"></script>
+  <script src="/shared/smart-office-doc-field-rules.js"></script>
+  <script src="/shared/smart-office-hris-sync.js"></script>
+  <script src="/shared/pkwt-hris-contract-bridge.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -487,6 +492,7 @@
     }
     .arsip-cpill.active { background:rgba(196,0,0,0.07);border-color:#C40000;color:#C40000;font-weight:800; }
   </style>
+  <link rel="stylesheet" href="/modules/smart-office/v2.css">
 </head>
 <body>
 
@@ -845,9 +851,9 @@
           </div>
 
           <div class="form-actions">
-            <button class="btn btn-primary"   onclick="generateDoc()">⚡ Generate Dokumen</button>
-            <button class="btn btn-secondary" onclick="previewDoc()">👁 Preview</button>
-            <button class="btn btn-ghost"     onclick="clearForm()">Bersihkan</button>
+            <button class="btn btn-primary" data-action="create" onclick="generateDoc()">Workflow V2</button>
+            <button class="btn btn-secondary" data-action="view" onclick="previewDoc()">Preview</button>
+            <button class="btn btn-ghost" data-action="edit" onclick="clearForm()">Bersihkan</button>
           </div>
         </div>
       </div><!-- end formPanel -->
@@ -1064,13 +1070,23 @@
     window.location.href = '/portal';
   }
 
+function normalizeUiRole(value) {
+  if (window.RifimMasterRolePolicy) return window.RifimMasterRolePolicy.normalizeRole(value);
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'direktur' || raw === 'direktur utama' || raw === 'direktur operasional' || raw === 'direktur keuangan') return 'direksi';
+  if (raw === 'management' || raw === 'manajemen' || raw === 'manager administrasi') return 'management';
+  if (raw === 'koord' || raw === 'coordinator') return 'koordinator';
+  return raw;
+}
   function normalizeAuth(auth) {
     if (!auth) return null;
     const fullName = auth.full_name || auth.name || auth.email || 'Admin';
+    const rawRole = auth.role_label || auth.role || 'admin';
     return Object.assign({}, auth, {
       full_name: fullName,
       name: fullName,
-      role: auth.role || 'admin',
+      role: normalizeUiRole(rawRole) || 'admin',
+      role_label: auth.role_label || rawRole,
       ts: auth.ts || Date.now(),
     });
   }
@@ -1107,20 +1123,12 @@
       const res  = await fetch(`${GAS_WEB_APP_URL}?action=auth&source=Smart+Office&email=${encodeURIComponent(email)}`);
       const data = await res.json();
       if (data.success) {
-        storeAuth({ email, name: data.user.full_name || data.user.name || email, role: data.user.role });
-      } else if (localAllowed) {
-        // GAS menolak tapi email ada di daftar lokal — izinkan masuk
-        storeAuth({ email, name: 'Bobby Rahman M.B', role: 'Direktur Utama' });
+        storeAuth({ email, name: data.user.full_name || data.user.name || email, role: data.user.role, role_label: data.user.role });
       } else {
         setLoginErr(data.message || 'Email tidak diizinkan untuk mengakses sistem ini.');
       }
     } catch (_) {
-      // Jaringan gagal — pakai daftar lokal
-      if (localAllowed) {
-        storeAuth({ email, name: 'Bobby Rahman M.B', role: 'Direktur Utama' });
-      } else {
-        setLoginErr('Email tidak diizinkan. Hubungi administrator RIFIM OS.');
-      }
+      setLoginErr('Autentikasi Smart Office gagal. Coba lagi saat koneksi stabil atau periksa akses GAS.');
     }
     btn.disabled    = false;
     btn.textContent = 'Masuk ke RIFIM OS';
@@ -1142,7 +1150,8 @@
     auth = normalizeAuth(auth);
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display         = 'block';
-    document.getElementById('navUser').textContent       = auth.full_name + ' - ' + auth.role;
+    document.getElementById('navUser').textContent       = auth.full_name + ' - ' + (auth.role_label || auth.role);
+    if (window.RifimMasterRolePolicy) window.RifimMasterRolePolicy.applyCrudToDom(auth.role);
     initApp();
   }
 
@@ -1264,6 +1273,10 @@
     renderDynFields('SURAT');
     loadCompanies();
     loadStaffList();
+    if (window.SmartOfficeHrisSync) {
+      window.SmartOfficeHrisSync.configure({ gasUrl: GAS_WEB_APP_URL });
+      window.SmartOfficeHrisSync.onDocumentFieldsRendered(document.getElementById('dynFields'));
+    }
   }
 
   // ── COMPANY SELECTOR ─────────────────────────────────────────
@@ -1324,7 +1337,7 @@
       if (data.success && data.staff) {
         _staffList = data.staff;
         _onSignerTitleChange();   // auto-fill nama penanda tangan
-        _wireStaffAutocomplete(); // wire autocomplete jika form sudah terbuka
+        _wireStaffAutocomplete(); // hints jabatan/cabang + fallback signer wiring
       }
     } catch(_) {}
   }
@@ -1340,39 +1353,32 @@
   }
 
   function _wireStaffAutocomplete() {
+    if (!_staffList.length) return;
+
     const nameEl = document.getElementById('employee_name');
-    if (!nameEl || !_staffList.length) return;
-
-    // Buat/update datalist
-    let dl = document.getElementById('_dl_staff');
-    if (!dl) { dl = document.createElement('datalist'); dl.id = '_dl_staff'; document.body.appendChild(dl); }
-    dl.innerHTML = _staffList.map(s => `<option value="${s.nama}">`).join('');
-    nameEl.setAttribute('list', '_dl_staff');
-    nameEl.setAttribute('autocomplete', 'off');
-
-    // Auto-fill saat nama dipilih
-    nameEl.addEventListener('change', function() {
-      const s = _staffList.find(x => x.nama.toLowerCase() === nameEl.value.toLowerCase());
-      if (!s) return;
-      // Field karyawan — selalu overwrite (data dari HRIS adalah sumber kebenaran)
-      const forceSet = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
-      // Field opsional — hanya isi jika masih kosong
-      const softSet  = (id, v) => { const el = document.getElementById(id); if (el && !el.value) el.value = v; };
-
-      forceSet('employee_id',       s.id);
-      forceSet('employee_position', s.jabatan);
-      forceSet('employee_dept',     s.department);
-      forceSet('join_date',         s.join_date);
-
-      // Gaji: format Rp jika ada data
-      if (s.salary_base) {
-        forceSet('salary', 'Rp ' + parseInt(s.salary_base).toLocaleString('id-ID'));
+    if (nameEl && !window.SmartOfficeHrisSync) {
+      let dl = document.getElementById('_dl_staff');
+      if (!dl) { dl = document.createElement('datalist'); dl.id = '_dl_staff'; document.body.appendChild(dl); }
+      dl.innerHTML = _staffList.map(s => `<option value="${s.nama}">`).join('');
+      nameEl.setAttribute('list', '_dl_staff');
+      nameEl.setAttribute('autocomplete', 'off');
+      if (nameEl.dataset.soLegacyBound !== '1') {
+        nameEl.dataset.soLegacyBound = '1';
+        nameEl.addEventListener('change', function() {
+          const s = _staffList.find(x => x.nama.toLowerCase() === nameEl.value.toLowerCase());
+          if (!s) return;
+          const forceSet = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+          const softSet  = (id, v) => { const el = document.getElementById(id); if (el && !el.value) el.value = v; };
+          forceSet('employee_id',       s.id);
+          forceSet('employee_position', s.jabatan);
+          forceSet('employee_dept',     s.department);
+          forceSet('join_date',         s.join_date);
+          if (s.salary_base) forceSet('salary', 'Rp ' + parseInt(s.salary_base).toLocaleString('id-ID'));
+          softSet('task_location', s.cabang);
+          softSet('from_dept',     s.department);
+        });
       }
-
-      // Field opsional
-      softSet('task_location', s.cabang);
-      softSet('from_dept',     s.department);
-    });
+    }
 
     // Datalist untuk Lokasi Tugas (unique cabang)
     const locEl = document.getElementById('task_location');
@@ -1449,6 +1455,9 @@
     container.innerHTML = html;
     _wireAutoTerbilang(code);
     _wireStaffAutocomplete();
+    if (window.SmartOfficeHrisSync) {
+      window.SmartOfficeHrisSync.onDocumentFieldsRendered(container);
+    }
   }
 
   // ── AUTO TERBILANG ────────────────────────────────────────────
@@ -1542,6 +1551,10 @@
 
   // ── GENERATE DOKUMEN ──────────────────────────────────────────
   async function generateDoc() {
+    if (window.soV2Generate) {
+      showToast('Gunakan workflow V2: Preview → Ajukan ke Direksi → Generate DOC + PDF.', false);
+      return;
+    }
     if (!GAS_WEB_APP_URL) { showToast('GAS_WEB_APP_URL belum diisi', false); return; }
     const subject = document.getElementById('subject').value.trim();
     if (!subject) { showToast('⚠️ Perihal / Judul wajib diisi', false); return; }
@@ -1559,6 +1572,14 @@
       const result = await res.json();
       setLoading(false);
       if (result.success) {
+        if (currentCode === 'PKWT' && window.SmartOfficePkwtHrisBridge) {
+          try {
+            await window.SmartOfficePkwtHrisBridge.onGenerated(currentCode, input, result);
+          } catch (bridgeErr) {
+            console.warn('[PKWT -> HRIS bridge]', bridgeErr);
+            showToast('⚠️ Dokumen jadi, tetapi sinkron kontrak HRIS gagal: ' + bridgeErr.message, false);
+          }
+        }
         lastResult = result;
         showResult(result);
         updateDocNum();
@@ -1569,7 +1590,7 @@
       setLoading(false);
       showToast('❌ Koneksi gagal: ' + err.message, false);
     } finally {
-      btn.disabled = false; btn.textContent = '⚡ Generate Dokumen';
+      btn.disabled = false; btn.textContent = '📨 Workflow V2';
     }
   }
 
@@ -1622,7 +1643,7 @@
             '<div style="display:flex;gap:8px;">',
               '<button onclick="previewToGenerate()" style="background:#C40000;color:#fff;border:none;',
                 'border-radius:7px;padding:8px 18px;cursor:pointer;font-size:12.5px;font-weight:700;">',
-                '⚡ Generate PDF Sekarang</button>',
+                'Gunakan Generate DOC + PDF V2</button>',
               '<button onclick="document.getElementById(\'previewModal\').style.display=\'none\'" ',
                 'style="background:#f5f5f5;border:none;border-radius:7px;padding:8px 14px;',
                 'cursor:pointer;font-size:12.5px;">✕ Tutup</button>',
@@ -1653,6 +1674,10 @@
 
   async function previewToGenerate() {
     document.getElementById('previewModal').style.display = 'none';
+    if (window.soV2Generate) {
+      showToast('Gunakan tombol Generate DOC + PDF pada panel Workflow V2.', false);
+      return;
+    }
     await generateDoc();
   }
 
@@ -1863,7 +1888,7 @@
         const expDate   = auth.ts ? new Date(auth.ts + 7*86400000).toLocaleDateString('id-ID') : '—';
         sessEl.innerHTML = `
           <div><b>Pengguna:</b> ${auth.full_name  || '—'}</div>
-          <div><b>Jabatan:</b>  ${auth.role  || '—'}</div>
+          <div><b>Jabatan:</b>  ${auth.role_label || auth.role || '—'}</div>
           <div><b>Email:</b>    ${auth.email || '—'}</div>
           <div><b>Login:</b>    ${loginDate}</div>
           <div><b>Berlaku s/d:</b> ${expDate}</div>
@@ -2022,5 +2047,6 @@
   // ── BOOT ─────────────────────────────────────────────────────
   checkAuth();
 </script>
+<script src="/modules/smart-office/v2.js"></script>
 </body>
 </html>

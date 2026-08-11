@@ -2,411 +2,78 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#1A1A1A">
-<title>RIFIM OS — Sistem (Admin Console)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>RIFIM OS — Sistem</title>
 <link rel="manifest" href="/manifest.json">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --red:#C40000;--red-dark:#3A0000;--red-mid:#8B0000;
-  --dark:#1A1A1A;--dark2:#2B2B2B;--dark3:#111;
-  --font:'Segoe UI',system-ui,sans-serif;
-  --ok:#16a34a;--warn:#eab308;--err:#dc2626;--info:#0ea5e9;
-}
-body{font-family:var(--font);background:var(--dark);color:#fff;min-height:100vh;display:flex;flex-direction:column}
-
-header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;
-  border-bottom:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.3);position:sticky;top:0;z-index:50}
-header .brand{display:flex;align-items:center;gap:10px;font-weight:800}
-.module-badge{font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:6px 12px;white-space:nowrap}
-header .brand img{height:60px;width:auto;object-fit:contain}
-header .brand .icon{font-size:22px}
-header .right{display:flex;align-items:center;gap:12px;font-size:12px;color:#aaa}
-header .btn-back{background:none;border:1px solid rgba(255,255,255,.2);color:#fff;
-  padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer}
-header .btn-back:hover{background:rgba(255,255,255,.05)}
-
-main{padding:24px 28px;flex:1;max-width:1400px;margin:0 auto;width:100%}
-h1{font-size:22px;font-weight:800;margin-bottom:4px}
-.sub{color:#888;font-size:13px;margin-bottom:24px}
-
-.section{margin-bottom:32px}
-.section h2{font-size:14px;font-weight:700;color:#facc15;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
-
-.card{background:var(--dark2);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;
-  display:flex;flex-direction:column;gap:8px;transition:border-color .2s,transform .1s}
-.card:hover{border-color:rgba(196,0,0,.5)}
-.card .icon{font-size:22px}
-.card .title{font-weight:700;font-size:14px}
-.card .desc{font-size:11px;color:#888;line-height:1.4;flex:1}
-.card button{background:var(--red);color:#fff;border:none;padding:8px 12px;
-  border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:background .2s}
-.card button:hover:not(:disabled){background:var(--red-mid)}
-.card button:disabled{opacity:.5;cursor:default}
-.card .result{font-size:11px;padding:6px 8px;border-radius:4px;background:rgba(0,0,0,.3);
-  border-left:3px solid #444;font-family:monospace;white-space:pre-wrap;word-break:break-word;max-height:120px;overflow-y:auto}
-.card .result.ok{border-left-color:var(--ok);color:#a7f3d0}
-.card .result.err{border-left-color:var(--err);color:#fca5a5}
-
-.log-panel{background:var(--dark2);border:1px solid rgba(255,255,255,.08);border-radius:10px;
-  padding:16px;max-height:400px;overflow-y:auto}
-.log-panel .toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
-.log-panel .toolbar select,.log-panel .toolbar input{background:var(--dark3);border:1px solid rgba(255,255,255,.1);
-  color:#fff;padding:6px 10px;border-radius:6px;font-size:12px}
-.log-panel .toolbar button{background:var(--info);color:#fff;border:none;padding:6px 12px;
-  border-radius:6px;font-size:12px;font-weight:600;cursor:pointer}
-.log-panel table{width:100%;border-collapse:collapse;font-size:12px}
-.log-panel th{text-align:left;padding:6px 8px;color:#888;font-weight:600;border-bottom:1px solid rgba(255,255,255,.1);
-  position:sticky;top:0;background:var(--dark2)}
-.log-panel td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top}
-.log-panel td.wib{color:#facc15;font-family:monospace;white-space:nowrap;font-size:11px}
-.log-panel td.status-success{color:#4ade80}
-.log-panel td.status-error{color:#f87171}
-.log-panel td.status-warning{color:#facc15}
-.log-panel .empty{padding:24px;text-align:center;color:#666}
-
-.gate{flex:1;display:flex;align-items:center;justify-content:center;padding:32px;text-align:center}
-.gate .box{max-width:400px}
-.gate h1{font-size:20px;margin-bottom:12px}
-.gate p{color:#888;margin-bottom:20px}
-.gate .role-tag{display:inline-block;padding:4px 10px;background:rgba(196,0,0,.2);border:1px solid var(--red);
-  border-radius:20px;font-size:11px;color:#ff9999;margin-bottom:16px}
-.gate a{color:var(--info);text-decoration:none}
-
-.toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;
-  background:var(--dark2);border:1px solid rgba(255,255,255,.1);color:#fff;font-size:13px;
-  box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:100;transition:opacity .3s;max-width:400px}
-.toast.hidden{opacity:0;pointer-events:none}
-.toast.ok{border-left:4px solid var(--ok)}
-.toast.err{border-left:4px solid var(--err)}
-</style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="/shared/api-cache.js"></script>
+<style>
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,"Segoe UI",system-ui,sans-serif;color:#172033}
+:root{--red:#d71920;--red2:#b5080e;--yellow:#ffd400;--blue:#165dff;--ink:#172033;--muted:#667085;--line:#e4e7ec;--card:rgba(255,255,255,.94);--ok:#16803b;--warn:#b66a00;--err:#c81e1e;--shadow:0 12px 32px rgba(16,24,40,.10)}
+body{background:linear-gradient(rgba(255,255,255,.90),rgba(255,255,255,.94)),url('/branding/backgrounds/bagroun-maxim.png') center/cover fixed no-repeat}
+button,input,select{font:inherit}.hidden{display:none!important}
+header{position:sticky;top:0;z-index:90;background:rgba(255,255,255,.96);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);padding:max(10px,env(safe-area-inset-top)) 22px 10px}
+.header-row{max-width:1440px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:14px}.brand{display:flex;align-items:center;gap:10px}.brand img{height:48px;max-width:105px;object-fit:contain}.badge{background:#fff3f3;border:1px solid #ffd1d3;color:var(--red);font-weight:850;letter-spacing:.12em;border-radius:999px;padding:7px 12px;font-size:12px}.right{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}.back{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 13px;cursor:pointer;color:var(--ink);font-weight:700}
+.progress-global{height:3px;background:transparent;overflow:hidden;margin:8px -22px -10px}.progress-global>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--red),var(--yellow));transition:width .3s}.progress-global.running>i{width:78%;animation:pulsebar 1.3s ease-in-out infinite alternate}@keyframes pulsebar{from{transform:translateX(-20%)}to{transform:translateX(30%)}}
+main{max-width:1440px;margin:auto;padding:26px 24px 60px}.hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:22px}.hero h1{font-size:28px;margin:0 0 6px}.hero p{margin:0;color:var(--muted);max-width:830px;line-height:1.5}.health-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap}.health-pill.ok{color:var(--ok);border-color:#b7e2c2;background:#f1fbf4}.health-pill.warn{color:var(--warn);border-color:#f1d3a2;background:#fff8ec}
+.info-panel{background:rgba(255,255,255,.88);border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin-bottom:22px;box-shadow:var(--shadow)}details summary{cursor:pointer;font-weight:800}.info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.mini{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:11px}.mini b{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}.mini span{font-size:13px;font-weight:700;word-break:break-word}
+.section{margin:28px 0}.section-title{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:14px;font-weight:900;color:#3b475a;text-transform:uppercase;letter-spacing:.06em}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:205px}.card:hover{border-color:#ffb6b9}.card .icon{font-size:25px}.card h3{margin:8px 0 6px;font-size:16px}.card p{margin:0;color:var(--muted);font-size:12px;line-height:1.55;flex:1}.tag{display:inline-flex;align-self:flex-start;margin-top:8px;font-size:10px;font-weight:850;border-radius:999px;padding:5px 8px;background:#f2f4f7;color:#475467}.tag.recovery{background:#fff4e5;color:#9a5b00}.tag.readonly{background:#eef4ff;color:#164c9c}.tag.canonical{background:#edf9f0;color:#16723b}.action{width:100%;margin-top:14px;border:0;border-radius:10px;padding:11px 12px;font-weight:850;cursor:pointer;background:var(--red);color:#fff}.action:hover:not(:disabled){background:var(--red2)}.action.secondary{background:#fff;color:var(--ink);border:1px solid var(--line)}.action:disabled{opacity:.48;cursor:not-allowed}.result{margin-top:9px;border-radius:9px;padding:9px;background:#f8fafc;border-left:4px solid #98a2b3;font:11px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;max-height:160px;overflow:auto;white-space:pre-wrap;word-break:break-word}.result.ok{border-color:var(--ok);background:#f1fbf4}.result.warn{border-color:#e8a52b;background:#fff9ef}.result.err{border-color:var(--err);background:#fff1f1;color:#8b1111}.card.running:after{content:'Sedang berjalan…';position:absolute;inset:0;display:grid;place-items:center;background:rgba(255,255,255,.82);border-radius:16px;font-weight:900;color:var(--red)}
+.role-note{font-size:12px;color:var(--muted);margin:8px 0 0}.view-only-banner{padding:12px 15px;border-radius:12px;background:#fff8e6;border:1px solid #f2d188;color:#7c5200;font-weight:750;margin-bottom:18px}
+.log-panel{background:rgba(255,255,255,.95);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:14px}.toolbar{display:grid;grid-template-columns:170px 1fr 130px auto auto;gap:8px;margin-bottom:12px}.toolbar input,.toolbar select{border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fff;color:var(--ink)}.toolbar button{border:0;border-radius:9px;background:#159ee8;color:#fff;font-weight:800;padding:9px 13px;cursor:pointer}.table-wrap{max-height:480px;overflow:auto;border:1px solid var(--line);border-radius:12px}table{width:100%;border-collapse:collapse;font-size:12px;background:#fff}th{position:sticky;top:0;background:#f8fafc;z-index:2;color:#667085;text-align:left;padding:10px;border-bottom:1px solid var(--line)}td{padding:10px;border-bottom:1px solid #eef0f3;vertical-align:top}.s-success{color:var(--ok);font-weight:800}.s-warning,.s-partial{color:var(--warn);font-weight:800}.s-error{color:var(--err);font-weight:800}.log-cards{display:none}.log-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0}.log-card .top{display:flex;justify-content:space-between;gap:8px}.log-card small{color:var(--muted)}.toast{position:fixed;z-index:120;right:18px;bottom:max(18px,env(safe-area-inset-bottom));max-width:420px;background:#172033;color:#fff;padding:12px 15px;border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.25);font-size:13px}.toast.ok{border-left:5px solid #34c759}.toast.err{border-left:5px solid #ff453a}.gate{min-height:100vh;display:grid;place-items:center;padding:24px}.gate-box{background:#fff;border:1px solid var(--line);border-radius:18px;padding:28px;max-width:440px;text-align:center;box-shadow:var(--shadow)}
+@media(max-width:1100px){.grid{grid-template-columns:repeat(2,1fr)}.info-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:700px){header{padding-left:12px;padding-right:12px}.progress-global{margin-left:-12px;margin-right:-12px}.brand img{height:38px}.badge{font-size:10px;padding:6px 9px}.right #user-info{display:none}main{padding:18px 12px 90px}.hero{display:block}.hero h1{font-size:22px}.health-pill{display:inline-block;margin-top:10px}.info-grid,.grid{grid-template-columns:1fr}.card{min-height:0}.toolbar{grid-template-columns:1fr 1fr}.toolbar #log-search{grid-column:1/-1;grid-row:1}.toolbar label{align-self:center}.table-wrap{display:none}.log-cards{display:block}.section{margin:22px 0}.toast{left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom))}}
+</style>
 </head>
 <body>
-
-<div id="gate" class="gate hidden" style="display:none">
-  <div class="box">
-    <img src="/branding/logo/logo-rifim-transparent.png" alt="RIFIM OS" style="height:64px;object-fit:contain;margin-bottom:10px">
-    <h1>⛔ Akses ditolak</h1>
-    <p>Halaman ini hanya untuk role <strong>admin</strong>, <strong>direksi</strong>, atau <strong>management</strong>.</p>
-    <div class="role-tag" id="role-display">Role: —</div>
-    <p><a href="/portal">← Kembali ke Portal</a></p>
-  </div>
-</div>
-
-<div id="app" style="display:none">
-<header>
-  <div class="brand"><img src="/branding/logo/logo-rifim-transparent.png" alt="RIFIM OS" onerror="this.style.display='none'"><span class="module-badge">Sistem</span></div>
-  <div class="right">
-    <span id="user-info">—</span>
-    <button class="btn-back" onclick="location.href='/portal'">← Portal</button>
-  </div>
-</header>
-
+<div id="gate" class="gate hidden"><div class="gate-box"><img src="/branding/logo/logo-rifim-transparent.png" style="height:62px" alt="RIFIM"><h2>Akses Modul Sistem</h2><p id="gate-msg">Silakan login dari Portal.</p><button class="back" onclick="location.href='/portal'">← Portal</button></div></div>
+<div id="app" class="hidden">
+<header><div class="header-row"><div class="brand"><img src="/branding/logo/logo-rifim-transparent.png" alt="RIFIM OS"><span class="badge">SISTEM</span></div><div class="right"><span id="user-info">—</span><button class="back" onclick="location.href='/portal'">← Portal</button></div></div><div id="global-progress" class="progress-global"><i></i></div></header>
 <main>
-  <h1>Admin Console</h1>
-  <p class="sub">Trigger semua fungsi maintenance/sync RAOS dari sini. RAOS Web App endpoint: <code id="raos-url" style="color:#facc15;font-size:11px">—</code></p>
+<div class="hero"><div><h1>System Control Center</h1><p>Pusat kontrol sinkronisasi, recovery, maintenance, health, dan audit RIFIM OS ↔ RAOS. Modul ini <b>bukan</b> master Employee, Finance, Payroll, KPI, Attendance, atau Document Engine.</p></div><span id="health-pill" class="health-pill">Health belum diperiksa</span></div>
+<div id="view-only-banner" class="view-only-banner hidden">👁️ Management menggunakan Modul Sistem dalam mode <b>VIEW ONLY</b>. Seluruh aksi tulis dinonaktifkan sesuai Rule Role + Cabang + Permission + Data Scope.</div>
+<div class="info-panel"><details><summary>ℹ️ Fungsi & ownership Modul Sistem</summary><div class="info-grid"><div class="mini"><b>Employee</b><span>HRIS / employees</span></div><div class="mini"><b>User & Role</b><span>user_profiles + Supabase Auth</span></div><div class="mini"><b>RAOS Login</b><span>PIN RAOS → raos_credentials → bridge</span></div><div class="mini"><b>KPI / Target</b><span>Existing Target/KPI Engine</span></div><div class="mini"><b>Drive Canonical</b><span>Module → Tahun → Bulan → Jenis Data</span></div><div class="mini"><b>RAOS Web API</b><span id="endpoint-state">Endpoint tersambung (URL disembunyikan)</span></div></div></details></div>
 
-  <!-- SINKRONISASI DATA -->
-  <div class="section">
-    <h2>🔄 Sinkronisasi Data (SSOT → Supabase)</h2>
-    <div class="grid">
-      <div class="card" data-action="sync_staff">
-        <div class="icon">👥</div>
-        <div class="title">Sync Staff dari SSOT</div>
-        <div class="desc">Tarik semua staff dari sheet MASTER DATA STAFF ke user_profiles Supabase + auth.users. <strong style="color:#4ade80">Butuh ~10 detik</strong> (bulk + parallel auth).</div>
-        <button onclick="runAction('sync_staff', this)">Jalankan</button>
-        <div class="result hidden"></div>
-      </div>
-      <div class="card" data-action="sync_driver_airport">
-        <div class="icon">✈️</div>
-        <div class="title">Sync Driver Airport</div>
-        <div class="desc">Loop 7 tab airport SSOT → raos_drivers Supabase. <strong style="color:#4ade80">Butuh ~30-40 detik</strong> (bulk + parallel auth).</div>
-        <button onclick="runAction('sync_driver_airport', this)">Jalankan</button>
-        <div class="result hidden"></div>
-      </div>
-      <div class="card" data-action="sync_driver_external">
-        <div class="icon">🚗</div>
-        <div class="title">Sync Driver External</div>
-        <div class="desc">Batam + Jambi Luar dari SSOT external → raos_drivers. <strong style="color:#4ade80">Butuh ~10-15 detik</strong> (bulk upsert).</div>
-        <button onclick="runAction('sync_driver_external', this)">Jalankan</button>
-        <div class="result hidden"></div>
-      </div>
-      <div class="card" data-action="sync_raos_credentials">
-        <div class="icon">🔐</div>
-        <div class="title">Sync RAOS Credentials</div>
-        <div class="desc">Baca kolom I (RAOS PIN) + J (RAOS ID) sheet SSOT → raos_credentials.</div>
-        <button onclick="runAction('sync_raos_credentials', this)">Jalankan</button>
-        <div class="result hidden"></div>
-      </div>
-    </div>
-  </div>
+<section class="section"><h2 class="section-title">🩺 Health & Audit</h2><div class="grid">
+<div class="card" data-action="system_health"><div class="icon">🩺</div><h3>Audit Health Sistem</h3><p>Read-only: cek source profile, kredensial PIN, System Config, KPI function version, dan blocker sinkronisasi tanpa mengubah data.</p><span class="tag readonly">READ ONLY</span><button class="action secondary" onclick="runAction('system_health',this)">Periksa Health</button><div class="result hidden"></div></div>
+<div class="card"><div class="icon">⚙️</div><h3>System Config</h3><p>Sumber canonical tetap Sheet SISTEM CONFIG → mirror Supabase → consumer. Perubahan konfigurasi dilakukan lewat CRM V4, bukan membuat engine kedua di Modul Sistem.</p><span class="tag canonical">CANONICAL VIA CRM V4</span><button class="action secondary" onclick="location.href='/crm'">Buka CRM Config</button></div>
+</div></section>
 
-  <!-- AUTH FORCE REFRESH -->
-  <div class="section">
-    <h2>🔑 Auth Force Refresh (opsional)</h2>
-    <div class="grid">
-      <div class="card" data-action="force_refresh_staff_auth">
-        <div class="icon">👤</div>
-        <div class="title">Force Refresh Staff Auth</div>
-        <div class="desc">Pakai kalau habis update PIN staff massal di sheet SSOT kolom H, mau langsung propagate ke Supabase Auth password. Skip staff PIN kosong/invalid. <strong style="color:#facc15">Butuh ~10 detik</strong>.</div>
-        <button onclick="runAction('force_refresh_staff_auth', this)">Jalankan</button>
-        <div class="result hidden"></div>
-      </div>
-      <div class="card" data-action="force_refresh_driver_auth">
-        <div class="icon">🚕</div>
-        <div class="title">Force Refresh Driver Airport Auth</div>
-        <div class="desc">Password driver = driver_id itu sendiri. Pakai kalau rotasi driver_id di SSOT. <strong style="color:#facc15">Butuh ~30-60 detik</strong> (200+ driver).</div>
-        <button onclick="runAction('force_refresh_driver_auth', this)">Jalankan</button>
-        <div class="result hidden"></div>
-      </div>
-    </div>
-  </div>
+<section class="section"><h2 class="section-title">🔄 Sinkronisasi Data — SSOT → Supabase</h2><div class="grid">
+<div class="card" data-action="sync_staff"><div class="icon">👥</div><h3>Sync Staff dari SSOT</h3><p>Identity berdasarkan staff_id + email + Auth UUID. Conflict tidak pernah digabung berdasarkan nama. Payload didedupe sebelum upsert.</p><span class="tag canonical">SSOT CANONICAL</span><button class="action write-action" onclick="runAction('sync_staff',this)">Jalankan</button><div class="result hidden"></div></div>
+<div class="card" data-action="sync_driver_airport"><div class="icon">✈️</div><h3>Sync Driver Airport</h3><p>Dedupe driver_id sebelum bulk raos_drivers dan dedupe id + staff_id sebelum user_profiles. Mencegah HTTP 500 PostgreSQL code 21000.</p><span class="tag canonical">DEDUPE SAFE</span><button class="action write-action" onclick="runAction('sync_driver_airport',this)">Jalankan</button><div class="result hidden"></div></div>
+<div class="card" data-action="sync_driver_external"><div class="icon">🚗</div><h3>Sync Driver External</h3><p>Gunakan implementasi V4: raos_drivers + Auth + user_profiles source=ssot_driver_external. Tidak membuat maintenance auth terpisah.</p><span class="tag canonical">V4 PROVISIONING</span><button class="action write-action" onclick="runAction('sync_driver_external',this)">Jalankan</button><div class="result hidden"></div></div>
+<div class="card" data-action="sync_raos_credentials"><div class="icon">🔐</div><h3>Sync PIN RAOS</h3><p>RAOS PIN adalah credential operasional. Legacy PIN hanya bridge internal ke Supabase Auth dan tidak diubah oleh fungsi ini.</p><span class="tag canonical">PIN RAOS</span><button class="action write-action" onclick="runAction('sync_raos_credentials',this)">Jalankan</button><div class="result hidden"></div></div>
+</div></section>
 
-  <!-- KPI & LAPORAN -->
-  <div class="section">
-    <h2>📊 KPI & Laporan</h2>
-    <div class="grid">
-      <div class="card" data-action="run_kpi">
-        <div class="icon">📈</div>
-        <div class="title">Update KPI Bulan Ini</div>
-        <div class="desc">Hitung ulang KPI semua staff bulan berjalan → kpi_targets Supabase + DASHBOARD STAFF sheet.</div>
-        <button onclick="runAction('run_kpi', this)">Jalankan</button>
-        <div class="result hidden"></div>
-      </div>
-    </div>
-  </div>
+<section class="section"><h2 class="section-title">🛟 Recovery Auth — Opsional</h2><p class="role-note">Gunakan hanya untuk recovery. Bukan workflow login normal RAOS.</p><div class="grid">
+<div class="card" data-action="force_refresh_staff_auth"><div class="icon">👤</div><h3>Recovery Staff Auth</h3><p>Menyelaraskan password Supabase Auth dari legacy SSOT PIN yang valid (≥6 digit). Tidak mengubah PIN RAOS.</p><span class="tag recovery">RECOVERY / BERISIKO</span><button class="action write-action risky" onclick="runAction('force_refresh_staff_auth',this)">Jalankan Recovery</button><div class="result hidden"></div></div>
+<div class="card" data-action="force_refresh_driver_auth"><div class="icon">🚕</div><h3>Recovery Driver Airport Auth</h3><p>Set ulang password internal driver menjadi driver_id. Gunakan hanya saat provisioning/login internal rusak.</p><span class="tag recovery">RECOVERY / BERISIKO</span><button class="action write-action risky" onclick="runAction('force_refresh_driver_auth',this)">Jalankan Recovery</button><div class="result hidden"></div></div>
+</div></section>
 
-  <!-- MAINTENANCE -->
-  <div class="section">
-    <h2>🧹 Maintenance</h2>
-    <div class="grid">
-      <div class="card" data-action="run_backup">
-        <div class="icon">💾</div>
-        <div class="title">Backup Spreadsheet Harian</div>
-        <div class="desc">Export sheet RAOS jadi XLSX + upload ke Google Drive Backup Spreadsheet/{bulan}.</div>
-        <button onclick="runAction('run_backup', this)">Jalankan</button>
-        <div class="result hidden"></div>
-      </div>
-      <div class="card" data-action="sync_selfie_drive">
-        <div class="icon">📸</div>
-        <div class="title">Sync Foto Selfie ke Drive</div>
-        <div class="desc">Pindahkan foto absensi dari Supabase Storage ke Drive folder Pickup Point/Bulan.</div>
-        <button onclick="runAction('sync_selfie_drive', this)">Jalankan</button>
-        <div class="result hidden"></div>
-      </div>
-    </div>
-  </div>
+<section class="section"><h2 class="section-title">📊 KPI & Laporan</h2><div class="grid"><div class="card" data-action="run_kpi"><div class="icon">📈</div><h3>Update KPI Bulan Ini</h3><p>Menjalankan engine KPI existing. Modul Sistem tidak menyimpan bobot/target sendiri. Parent-terminal dan payroll harus mengikuti RPC canonical production.</p><span class="tag canonical">EXISTING ENGINE</span><button class="action write-action risky" onclick="runAction('run_kpi',this)">Jalankan</button><div class="result hidden"></div></div></div></section>
 
-  <!-- MONITORING -->
-  <div class="section">
-    <h2>📋 Monitoring — System Log Supabase</h2>
-    <div class="log-panel">
-      <div class="toolbar">
-        <select id="log-status">
-          <option value="">Semua status</option>
-          <option value="success">Success</option>
-          <option value="warning">Warning</option>
-          <option value="error">Error</option>
-        </select>
-        <input id="log-search" placeholder="Filter process…" style="flex:1;min-width:160px">
-        <select id="log-limit">
-          <option value="50">50 baris</option>
-          <option value="100">100 baris</option>
-          <option value="200">200 baris</option>
-        </select>
-        <button onclick="loadLog()">🔄 Refresh</button>
-        <label style="font-size:12px;display:flex;align-items:center;gap:4px">
-          <input type="checkbox" id="log-autoref"> Auto 30s
-        </label>
-      </div>
-      <table>
-        <thead><tr><th>Waktu WIB</th><th>Type</th><th>Process</th><th>Status</th><th>Detail</th></tr></thead>
-        <tbody id="log-body">
-          <tr><td colspan="5" class="empty">Klik Refresh untuk load</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</main>
-</div>
+<section class="section"><h2 class="section-title">🧹 Maintenance Canonical</h2><div class="grid">
+<div class="card" data-action="run_backup"><div class="icon">💾</div><h3>Backup Spreadsheet Harian</h3><p>Writer V4 → RAOS_PWA / YYYY / MM_Bulan / 04_BACKUP_SPREADSHEET. Tidak menulis ke BACKUP_FOLDER_ID legacy.</p><span class="tag canonical">DRIVE V4</span><button class="action write-action risky" onclick="runAction('run_backup',this)">Buat Backup</button><div class="result hidden"></div></div>
+<div class="card" data-action="sync_selfie_drive"><div class="icon">📸</div><h3>Sync Foto Selfie ke Drive</h3><p>Supabase Storage → ABSENSI / YYYY / MM_Bulan / 01_FOTO_ABSENSI / Pickup Point. Schema attendance existing tetap dipakai.</p><span class="tag canonical">DRIVE V4</span><button class="action write-action" onclick="runAction('sync_selfie_drive',this)">Jalankan</button><div class="result hidden"></div></div>
+</div></section>
 
-<div id="toast" class="toast hidden"></div>
-
+<section class="section"><h2 class="section-title">📋 Monitoring — System Log</h2><div class="log-panel"><div class="toolbar"><select id="log-status"><option value="">Semua status</option><option value="success">Success</option><option value="warning">Warning</option><option value="partial">Partial</option><option value="error">Error</option></select><input id="log-search" placeholder="Filter process / detail…"><select id="log-limit"><option>50</option><option>100</option><option>200</option></select><button onclick="loadLog()">↻ Refresh</button><label><input type="checkbox" id="log-autoref"> Auto 30s</label></div><div class="table-wrap"><table><thead><tr><th>Waktu WIB</th><th>Type</th><th>Process</th><th>Status</th><th>Detail</th></tr></thead><tbody id="log-body"><tr><td colspan="5">Klik Refresh</td></tr></tbody></table></div><div id="log-cards" class="log-cards"></div></div></section>
+</main></div><div id="toast" class="toast hidden"></div>
 <script>
-// ═══════════════════════════════════════════════════════════════════════
-// CONFIG
-// ═══════════════════════════════════════════════════════════════════════
-const SB_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co';
-const SB_ANON = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
-const RAOS_URL = 'https://script.google.com/macros/s/AKfycbxrgQ_MWvsdA_bsbNF4deIALWATDCspYvY47fakpuXMZeAtGAd4baeVVe1dPGDAi1tZJA/exec';
-const ALLOWED_ROLES = ['admin', 'direksi', 'management'];
-
-let _sb = null;
-let _session = null;
-let _autorefTimer = null;
-
-function sb() {
-  if (_sb) return _sb;
-  _sb = window.supabase.createClient(SB_URL, SB_ANON, {
-    auth: { persistSession: true, storageKey: 'rifim_portal_sb', autoRefreshToken: true }
-  });
-  return _sb;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// AUTH BOOTSTRAP
-// ═══════════════════════════════════════════════════════════════════════
-async function bootstrap() {
-  document.getElementById('raos-url').textContent = RAOS_URL.replace(/^.+\/macros\/s\/([^/]+).*$/, '…/$1/exec');
-  const client = sb();
-  const { data: { session } } = await client.auth.getSession();
-  if (!session) { showGate('Belum login. Buka /portal dulu.'); return; }
-  _session = session;
-  const { data: profile } = await client.from('user_profiles')
-    .select('id, full_name, role, is_active').eq('id', session.user.id).maybeSingle();
-  if (!profile || !profile.is_active) { showGate('Profil tidak ditemukan / nonaktif.'); return; }
-  if (!ALLOWED_ROLES.includes(profile.role)) {
-    document.getElementById('role-display').textContent = 'Role Anda: ' + profile.role;
-    showGate();
-    return;
-  }
-  document.getElementById('user-info').textContent = `${profile.full_name} · ${profile.role}`;
-  document.getElementById('app').style.display = 'block';
-  // Load log initial
-  loadLog();
-}
-
-function showGate(msg) {
-  document.getElementById('gate').style.display = 'flex';
-  if (msg) document.querySelector('#gate p').textContent = msg;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// RAOS API CALL
-// ═══════════════════════════════════════════════════════════════════════
-async function callRaos(action, extra) {
-  if (!_session) throw new Error('Session hilang. Refresh halaman.');
-  // Refresh token kalau expired
-  const { data: { session } } = await sb().auth.getSession();
-  if (!session) throw new Error('Session expired. Login ulang.');
-  const body = Object.assign({ action, token: session.access_token }, extra || {});
-  const res = await fetch(RAOS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoid CORS preflight
-    body: JSON.stringify(body),
-    redirect: 'follow',
-  });
-  const text = await res.text();
-  let data;
-  try { data = JSON.parse(text); }
-  catch (e) { throw new Error('Response bukan JSON valid. Cek deployment Web App RAOS. Raw: ' + text.substring(0, 200)); }
-  return data;
-}
-
-async function runAction(action, btn) {
-  const card = btn.closest('.card');
-  const resultBox = card.querySelector('.result');
-  btn.disabled = true; btn.textContent = 'Menjalankan…';
-  resultBox.className = 'result';
-  resultBox.textContent = 'Waiting…';
-  resultBox.classList.remove('hidden');
-  try {
-    const data = await callRaos(action);
-    if (data.ok) {
-      resultBox.classList.add('ok');
-      const summary = typeof data.result === 'string' ? data.result :
-        (data.result && (data.result.summary || JSON.stringify(data.result, null, 2))) || 'OK';
-      resultBox.textContent = `✓ ${data.elapsed_ms || 0}ms · by ${data.by || '?'}\n${summary}`;
-      toast('✅ ' + (data.label || action) + ' selesai', 'ok');
-      // Refresh log setelah action selesai
-      setTimeout(loadLog, 1500);
-    } else {
-      resultBox.classList.add('err');
-      resultBox.textContent = '✗ ' + (data.error || 'unknown') + (data.detail ? '\n' + data.detail : '');
-      toast('❌ ' + (data.error || 'Gagal'), 'err');
-    }
-  } catch (err) {
-    resultBox.classList.add('err');
-    resultBox.textContent = '✗ ' + err.message;
-    toast('❌ ' + err.message, 'err');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Jalankan';
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// SYSTEM LOG
-// ═══════════════════════════════════════════════════════════════════════
-async function loadLog() {
-  const tbody = document.getElementById('log-body');
-  tbody.innerHTML = '<tr><td colspan="5" class="empty">Loading…</td></tr>';
-  const statusFilter = document.getElementById('log-status').value;
-  const searchTerm = document.getElementById('log-search').value.toLowerCase().trim();
-  const limit = parseInt(document.getElementById('log-limit').value || 50, 10);
-  try {
-    const data = await callRaos('system_log_recent', { limit });
-    if (!data.ok) throw new Error(data.error || 'Gagal load log');
-    let rows = data.rows || [];
-    if (statusFilter) rows = rows.filter(r => (r.status || '').toLowerCase() === statusFilter);
-    if (searchTerm) rows = rows.filter(r =>
-      (r.process || '').toLowerCase().includes(searchTerm) ||
-      (r.detail || '').toLowerCase().includes(searchTerm));
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty">Tidak ada log cocok filter</td></tr>';
-      return;
-    }
-    tbody.innerHTML = rows.map(r => {
-      const wib = new Date(r.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta',
-        year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
-      const st = (r.status || '').toLowerCase();
-      return `<tr>
-        <td class="wib">${wib}</td>
-        <td>${esc(r.type)}</td>
-        <td style="color:#facc15;font-family:monospace">${esc(r.process)}</td>
-        <td class="status-${st}">${esc(r.status)}</td>
-        <td style="color:#ddd">${esc(r.detail || '').substring(0, 300)}</td>
-      </tr>`;
-    }).join('');
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5" class="empty" style="color:#f87171">❌ ${err.message}</td></tr>`;
-  }
-}
-
-document.getElementById('log-status').addEventListener('change', loadLog);
-document.getElementById('log-search').addEventListener('input', debounce(loadLog, 400));
-document.getElementById('log-limit').addEventListener('change', loadLog);
-document.getElementById('log-autoref').addEventListener('change', function() {
-  if (this.checked) {
-    _autorefTimer = setInterval(loadLog, 30000);
-    toast('Auto-refresh 30s aktif', 'ok');
-  } else {
-    clearInterval(_autorefTimer); _autorefTimer = null;
-  }
-});
-
-// ═══════════════════════════════════════════════════════════════════════
-// UTILS
-// ═══════════════════════════════════════════════════════════════════════
-function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
-  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
-function debounce(fn, wait) {
-  let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), wait); };
-}
-let _toastTimer = null;
-function toast(msg, kind) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = 'toast ' + (kind || '');
-  clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => el.classList.add('hidden'), 4000);
-}
-
-bootstrap();
-</script>
-</body>
-</html>
+const SB_URL='https://vlievtojpmrbsmzlqswl.supabase.co';
+const SB_ANON='sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+const RAOS_URL='https://script.google.com/macros/s/AKfycbxrgQ_MWvsdA_bsbNF4deIALWATDCspYvY47fakpuXMZeAtGAd4baeVVe1dPGDAi1tZJA/exec';
+const PAGE_ROLES=['admin','direksi','management'];const WRITE_ROLES=['admin','direksi'];
+let _sb,_session,_profile,_runningAction=null,_auto=null,_toastTimer=null;
+function sb(){return _sb||(_sb=window.supabase.createClient(SB_URL,SB_ANON,{auth:{persistSession:true,storageKey:'rifim_portal_sb',autoRefreshToken:true}}))}
+async function bootstrap(){const {data:{session}}=await sb().auth.getSession();if(!session)return gate('Belum login. Buka Portal terlebih dahulu.');_session=session;const {data:p}=await sb().from('user_profiles').select('id,full_name,role,is_active').eq('id',session.user.id).maybeSingle();if(!p||!p.is_active)return gate('Profil tidak ditemukan atau nonaktif.');if(!PAGE_ROLES.includes(p.role))return gate('Role '+p.role+' tidak memiliki akses Modul Sistem.');_profile=p;document.getElementById('user-info').textContent=`${p.full_name} · ${p.role}`;document.getElementById('app').classList.remove('hidden');if(!WRITE_ROLES.includes(p.role)){document.getElementById('view-only-banner').classList.remove('hidden');document.querySelectorAll('.write-action').forEach(b=>{b.disabled=true;b.title='Management = view only'});}loadLog();}
+function gate(m){document.getElementById('gate-msg').textContent=m;document.getElementById('gate').classList.remove('hidden')}
+async function callRaos(action,extra){if(!_session)throw new Error('Session tidak tersedia');const {data:{session}}=await sb().auth.getSession();if(!session)throw new Error('Session expired. Login ulang.');const r=await fetch(RAOS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({action,token:session.access_token},extra||{})),redirect:'follow'});const txt=await r.text();try{return JSON.parse(txt)}catch(e){throw new Error('RAOS Web API tidak mengembalikan JSON valid.')};}
+function isWrite(action){return !['system_health','system_log_recent','action_preview','ping'].includes(action)}
+async function riskyPreviewConfirm(action,card){try{const data=await callRaos('action_preview',{target_action:action});const summary=data&&data.ok&&data.preview?(data.preview.summary||formatResult(data.preview)):'Preview tidak tersedia.';return confirm('PREVIEW AKSI\n\n'+summary+'\n\nAksi ini berdampak ke banyak data/akun. Lanjutkan '+card.querySelector('h3').textContent+'?')}catch(e){return confirm('Preview gagal: '+e.message+'\n\nTetap lanjutkan aksi berisiko ini?')}}
+async function runAction(action,btn){if(_runningAction){toast('Proses '+_runningAction+' masih berjalan.','err');return}if(isWrite(action)&&(!_profile||!WRITE_ROLES.includes(_profile.role))){toast('Role Management adalah VIEW ONLY.','err');return}const card=btn.closest('.card');if(btn.classList.contains('risky')&&!(await riskyPreviewConfirm(action,card)))return;const box=card.querySelector('.result');_runningAction=action;card.classList.add('running');document.getElementById('global-progress').classList.add('running');document.querySelectorAll('.write-action').forEach(b=>b.disabled=true);if(box){box.className='result';box.textContent='Menjalankan…';}try{const data=await callRaos(action);if(!data.ok)throw new Error(data.error+(data.detail?' — '+data.detail:''));const result=data.result||data.health||data;const warning=(result&&((result.errors||0)>0||(result.failed||0)>0||(result.warnings||0)>0||result.status==='warning'||result.status==='partial'));if(box){box.classList.add(warning?'warn':'ok');box.textContent=(warning?'⚠ ':'✓ ')+(data.elapsed_ms!=null?data.elapsed_ms+'ms\n':'')+formatResult(result);}if(action==='system_health')renderHealth(result);toast((warning?'⚠️ ':'✅ ')+(data.label||action)+' selesai',warning?'':'ok');setTimeout(loadLog,700)}catch(e){if(box){box.classList.add('err');box.textContent='✗ '+e.message}toast('❌ '+e.message,'err')}finally{_runningAction=null;card.classList.remove('running');document.getElementById('global-progress').classList.remove('running');document.querySelectorAll('.write-action').forEach(b=>b.disabled=!WRITE_ROLES.includes(_profile?.role));}}
+function renderHealth(h){const pill=document.getElementById('health-pill');const blockers=(h?.blockers||[]);pill.textContent=blockers.length?`${blockers.length} blocker perlu tindakan`:'Health contract OK';pill.className='health-pill '+(blockers.length?'warn':'ok')}
+async function loadLog(){const body=document.getElementById('log-body'),cards=document.getElementById('log-cards');try{const data=await callRaos('system_log_recent',{limit:Number(document.getElementById('log-limit').value||50)});if(!data.ok)throw new Error(data.error||'Gagal load log');let rows=data.rows||[];const st=document.getElementById('log-status').value,q=document.getElementById('log-search').value.trim().toLowerCase();if(st)rows=rows.filter(r=>(r.status||'').toLowerCase()===st);if(q)rows=rows.filter(r=>((r.process||'')+' '+(r.detail||'')).toLowerCase().includes(q));body.innerHTML=rows.length?rows.map(r=>`<tr><td>${fmtWib(r.created_at)}</td><td>${esc(r.type)}</td><td><b>${esc(r.process)}</b></td><td class="s-${esc((r.status||'').toLowerCase())}">${esc(r.status)}</td><td>${esc(r.detail||'')}</td></tr>`).join(''):'<tr><td colspan="5">Tidak ada log</td></tr>';cards.innerHTML=rows.map(r=>`<div class="log-card"><div class="top"><b>${esc(r.process)}</b><span class="s-${esc((r.status||'').toLowerCase())}">${esc(r.status)}</span></div><small>${fmtWib(r.created_at)} · ${esc(r.type)}</small><div style="margin-top:7px;font-size:12px">${esc(r.detail||'')}</div></div>`).join('')}catch(e){body.innerHTML=`<tr><td colspan="5" class="s-error">${esc(e.message)}</td></tr>`;cards.innerHTML=`<div class="log-card s-error">${esc(e.message)}</div>`}}
+function fmtWib(v){return new Date(v).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'})}function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function toast(m,k){const e=document.getElementById('toast');e.textContent=m;e.className='toast '+(k||'');clearTimeout(_toastTimer);_toastTimer=setTimeout(()=>e.classList.add('hidden'),4500)}
+let dbT;document.getElementById('log-status').addEventListener('change',loadLog);document.getElementById('log-limit').addEventListener('change',loadLog);document.getElementById('log-search').addEventListener('input',()=>{clearTimeout(dbT);dbT=setTimeout(loadLog,350)});document.getElementById('log-autoref').addEventListener('change',function(){clearInterval(_auto);_auto=this.checked?setInterval(loadLog,30000):null});bootstrap();
+</script></body></html>

@@ -6,6 +6,9 @@
 <meta name="theme-color" content="#1a1a2e">
 <title>RIFIM OS — HRIS</title>
 <link rel="manifest" href="/manifest.json">
+<link rel="stylesheet" href="/shared/payroll-v2.css">
+<script src="/shared/hris-attendance-ui-policy.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 /* ─── RESET & BASE ─── */
 *{box-sizing:border-box;margin:0;padding:0}
@@ -254,6 +257,12 @@ tr:last-child td{border-bottom:none}
 }
 </style>
 <script src="/shared/api-cache.js"></script>
+<script src="/shared/master-role-policy.js"></script>
+<script src="/shared/hris-contract-sync-ui.js"></script>
+<script src="/shared/hris-employee-activation-ui.js"></script>
+<script src="/shared/payroll-v2-ui.js"></script>
+<script src="/shared/payroll-v2-modal.js"></script>
+<script src="/shared/payroll-slip-v2.js"></script>
 </head>
 <body>
 
@@ -397,7 +406,7 @@ tr:last-child td{border-bottom:none}
           <h3>Rekap Absensi <span style="font-size:11px;color:#888;font-weight:400">- Source: PWA RAOS (<code>raos_attendance</code> realtime)</span></h3>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-secondary" onclick="showAttendanceSummaryModal()">Summary Bulan</button>
-            <button class="btn btn-primary" onclick="openModal('modal-add-attendance')">+ Catat Manual</button>
+            <button id="btn-att-manual" class="btn btn-primary" onclick="openModal('modal-add-attendance')">+ Catat Manual</button>
           </div>
         </div>
         <div class="card-body">
@@ -418,7 +427,8 @@ tr:last-child td{border-bottom:none}
               <input type="date" id="att-date-from" onchange="loadAttendance()">
               <input type="date" id="att-date-to" onchange="loadAttendance()">
               <button class="btn btn-secondary" onclick="loadAttendance()">Tampilkan</button>
-              <button class="btn btn-secondary" onclick="exportAttendancePDF()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> Export PDF</button>
+              <button id="btn-att-pdf" class="btn btn-secondary" onclick="exportAttendancePDF()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> Export PDF</button>
+              <button id="btn-att-overtime" class="btn btn-secondary" onclick="openAttendanceOvertimeRequest()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg> Ajukan Lembur</button>
             </div>
             <div class="table-wrap">
               <table style="font-size:12px">
@@ -504,8 +514,42 @@ tr:last-child td{border-bottom:none}
     </div>
 
     <!-- ═══ TAB: PAYROLL ═══ -->
-    <div id="tab-payroll" class="tab-content">
-      <div class="card">
+    <div id="tab-payroll" class="tab-content payroll-v2">
+      <div class="payroll-sticky-head">
+        <div class="payroll-summary-grid">
+          <div class="payroll-summary-card"><small>Total Pembayaran Gaji</small><strong id="pay-v2-total">Rp 0</strong></div>
+          <div class="payroll-summary-card"><small>Total Karyawan</small><strong id="pay-v2-count">0</strong></div>
+          <div class="payroll-summary-card"><small>Total Hadir</small><strong id="pay-v2-present">0</strong></div>
+          <div class="payroll-summary-card"><small>Total Terlambat</small><strong id="pay-v2-late">0</strong></div>
+          <div class="payroll-summary-card"><small>Total Cuti</small><strong id="pay-v2-leave">0</strong></div>
+          <div class="payroll-summary-card"><small>Total Kasbon</small><strong id="pay-v2-kasbon">Rp 0</strong></div>
+        </div>
+        <div class="payroll-actions">
+          <select id="pay-v2-month"></select>
+          <select id="pay-v2-year"></select>
+          <select id="pay-v2-branch"><option value="ALL">Semua Cabang</option></select>
+          <button class="btn btn-secondary" onclick="loadPayrollV2FromFilters()">Tampilkan</button>
+          <span class="spacer"></span>
+          <button class="btn btn-warning" data-payroll-write onclick="PayrollV2.deposit()">Deposit</button>
+          <button class="btn btn-warning" data-payroll-write onclick="PayrollV2.manualKasbon()">Kasbon (Manual)</button>
+          <button class="btn btn-primary" data-payroll-write onclick="PayrollV2.pdfAll()">PDF Semua</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="table-wrap">
+          <table id="table-payroll-v2">
+            <thead>
+              <tr>
+                <th>ID Karyawan</th><th>Nama</th><th>Cabang</th><th>Hadir</th><th>Terlambat</th><th>Cuti</th><th>Gaji Pokok</th><th>Tunjangan</th><th>Bonus/Deposit</th><th>Potongan</th><th>Kasbon</th><th>Total Pembayaran</th><th>No Dokumen</th><th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-payroll-v2">
+              <tr><td colspan="14" class="empty-state">Payroll siap. Data akan tampil dari cache lalu refresh realtime.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="display:none">
         <div class="card-header">
           <h3>Payroll</h3>
           <button class="btn btn-primary" onclick="openModal('modal-add-payroll')">+ Buat Payroll</button>
@@ -1123,6 +1167,19 @@ tr:last-child td{border-bottom:none}
 // CONFIG
 // ════════════════════════════════════════════════════════════
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec';
+const SB_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co';
+const SB_ANON = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+let _hrisSupabase = null;
+
+function _hrisSb() {
+  if (_hrisSupabase) return _hrisSupabase;
+  if (typeof window.supabase === 'undefined' || !window.supabase.createClient) return null;
+  _hrisSupabase = window.supabase.createClient(SB_URL, SB_ANON, {
+    auth: { persistSession: true, storageKey: 'rifim_portal_sb', autoRefreshToken: true },
+  });
+  window._supabase = _hrisSupabase;
+  return _hrisSupabase;
+}
 
 // ════════════════════════════════════════════════════════════
 // STATE
@@ -1165,21 +1222,36 @@ function showAuthError(msg) {
   el.style.display = 'block';
 }
 
+function normalizeUiRole(value) {
+  if (window.RifimMasterRolePolicy) return window.RifimMasterRolePolicy.normalizeRole(value);
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'direktur' || raw === 'direktur utama' || raw === 'direktur operasional' || raw === 'direktur keuangan') return 'direksi';
+  if (raw === 'management' || raw === 'manajemen' || raw === 'manager administrasi') return 'management';
+  if (raw === 'koord' || raw === 'coordinator') return 'koordinator';
+  return raw;
+}
 function normalizeHrisUser(user) {
   if (!user) return null;
+  const normalizedRole = normalizeUiRole(user.role || '');
   return Object.assign({}, user, {
     full_name: user.full_name || user.name || user.email || 'User',
-    role: String(user.role || '').toUpperCase(),
+    role: String(normalizedRole || '').toUpperCase(),
+    role_label: user.role_label || user.role || normalizedRole,
   });
 }
 
 function enterHris(user) {
   currentUser = normalizeHrisUser(user);
   if (!currentUser || !currentUser.email) return false;
+  _hrisSb();
   document.getElementById('auth-gate').style.display = 'none';
   document.getElementById('app').style.display       = 'flex';
-  document.getElementById('user-badge').textContent  = currentUser.full_name + ' (' + currentUser.role + ')';
+  document.getElementById('user-badge').textContent  = currentUser.full_name + ' (' + (currentUser.role_label || currentUser.role) + ')';
   sessionStorage.setItem('hris_user', JSON.stringify(currentUser));
+  if (window.applyAttendanceUiPolicy) window.applyAttendanceUiPolicy();
+  if (window.PayrollV2) {
+    window.PayrollV2.setRole(currentUser.role);
+  }
   initApp();
   return true;
 }
@@ -1229,11 +1301,13 @@ function initApp() {
   if (coSel) coSel.value = selectedCompany;
   // Set tahun di filter payroll
   const yearSel = document.getElementById('filter-payroll-year');
-  for (let y = 2024; y <= 2030; y++) {
-    const opt = document.createElement('option');
-    opt.value = y; opt.textContent = y;
-    if (y === new Date().getFullYear()) opt.selected = true;
-    yearSel.appendChild(opt);
+  if (yearSel && !yearSel.options.length) {
+    for (let y = 2024; y <= 2030; y++) {
+      const opt = document.createElement('option');
+      opt.value = y; opt.textContent = y;
+      if (y === new Date().getFullYear()) opt.selected = true;
+      yearSel.appendChild(opt);
+    }
   }
   // Set tanggal default absensi
   const today = new Date().toISOString().split('T')[0];
@@ -1244,6 +1318,7 @@ function initApp() {
   document.getElementById('lv-start').value      = today;
   document.getElementById('lv-end').value        = today;
   document.getElementById('emp-join').value      = today;
+  initPayrollV2Controls();
 
   loadEmployees();
 
@@ -1285,7 +1360,7 @@ function switchTab(tab, btn) {
     else if (!allAttendanceRaos.length) loadAttendance();
   }
   if (tab === 'cuti')     loadLeave();
-  if (tab === 'payroll')  loadPayroll();
+  if (tab === 'payroll')  loadPayrollV2FromFilters();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1882,9 +1957,11 @@ async function confirmResign() {
 // Upload foto ke Google Drive via GAS Web App POST
 async function _hrisUploadPhotoToDrive(employeeId, fullName, photoType, dataUrl) {
   if (!dataUrl || !dataUrl.startsWith('data:')) return null;
+  const accessToken = getRaosSyncToken();
   const body = {
     action: 'hris_upload_employee_photo',
     user: (JSON.parse(localStorage.getItem('rifim_auth') || '{}').email || ''),
+    access_token: accessToken || '',
     employee_id: employeeId,
     full_name: fullName,
     photo_type: photoType,
@@ -1980,6 +2057,9 @@ async function submitAddEmployee() {
 // KONTRAK
 // ════════════════════════════════════════════════════════════
 async function loadContracts() {
+  if (window.HrisContractSyncUI && typeof window.HrisContractSyncUI.load === 'function') {
+    return window.HrisContractSyncUI.load();
+  }
   const tbody = document.getElementById('tbody-contracts');
   tbody.innerHTML = '<tr><td colspan="8" class="loading">Memuat kontrak…</td></tr>';
   const res = await gasGet({ action: 'hris_contracts' });
@@ -2105,9 +2185,14 @@ async function _populateAttBranchDropdown() {
   try {
     const res = await gasGet({ action: 'finance_kpi_target_branch_list', month: new Date().toISOString().slice(0,7) + '-01' });
     if (res && res.success && res.rows) {
+      const branchRows = window.attendanceBranchOptions ? window.attendanceBranchOptions(res.rows) : res.rows;
       sel.innerHTML = '<option value="ALL">Semua Cabang</option>' +
-        res.rows.map(b => `<option value="${b.branch_id}">${b.branch_name}</option>`).join('');
+        branchRows.map(b => `<option value="${b.branch_id}">${b.branch_name}</option>`).join('');
       sel.dataset.populated = '1';
+      if (window.currentUser && String(window.currentUser.role || '').toUpperCase() === 'KOORDINATOR') {
+        const ownBranchId = String(window.currentUser.branch_id || window.currentUser.branchId || '');
+        if (ownBranchId) sel.value = ownBranchId;
+      }
     }
   } catch (_) {}
 }
@@ -2225,7 +2310,7 @@ function _renderAttendanceRows(rows) {
       '<td>' + lokasi + '</td>' +
       '<td style="text-align:center">' + foto + '</td>' +
       '<td><span class="badge badge-' + (statusColor[stKey] || 'pkwt') + '">' + escH(stKey) + '</span></td>' +
-      '<td><button class="btn btn-ghost btn-sm" title="Edit absensi" onclick="openAttendanceEditModal(' + escAttr(JSON.stringify(rowId)) + ')">' + iconSvg('pencil') + '</button></td>' +
+      '<td>' + (window.attendanceActionCell ? window.attendanceActionCell(rowId) : ('<button class="btn btn-ghost btn-sm" title="Edit absensi" onclick="openAttendanceEditModal(' + escAttr(JSON.stringify(rowId)) + ')">' + iconSvg('pencil') + '</button>')) + '</td>' +
     '</tr>';
   }).join('');
 }
@@ -2399,6 +2484,10 @@ function exportAttendancePDF() {
   const now = new Date();
   const df = document.getElementById('att-date-from').value || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10);
   const dt = document.getElementById('att-date-to').value || new Date().toISOString().slice(0,10);
+  if (window.validateAttendancePdfRange) {
+    const pdfRange = window.validateAttendancePdfRange(df, dt);
+    if (!pdfRange.ok) return showToast(pdfRange.message, 'error');
+  }
   const stamp = now.toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' });
   const escHtml = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const fmtT = (iso) => { try { return new Date(iso).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}); } catch(_) { return iso || '–'; } };
@@ -2451,6 +2540,10 @@ td.num { text-align: right; font-family: monospace; }
   const w = window.open('', '_blank', 'width=900,height=700');
   if (!w) return showToast('Popup diblokir. Izinkan popup untuk save PDF.', 'error');
   w.document.open(); w.document.write(html); w.document.close();
+}
+
+function openAttendanceOvertimeRequest() {
+  showToast('Flow pengajuan lembur ZIP ini belum dihubungkan ke endpoint audited pada checkout lokal.', 'info');
 }
 
 // Summary bulanan modal
@@ -2587,7 +2680,7 @@ function filterLeave() {
 }
 
 function canUserApprove() {
-  return currentUser && ['ADMIN','DIREKTUR','KOORDINATOR'].includes(currentUser.role);
+  return currentUser && ['ADMIN','DIREKSI','KOORDINATOR'].includes(currentUser.role);
 }
 
 async function approveLeave(leaveId, status) {
@@ -2661,6 +2754,51 @@ async function _loadRaosBonusMap(monthYYYY_MM) {
       raosBonusMap = {};
     }
   } catch (_) { raosBonusMap = {}; }
+}
+
+async function initPayrollV2Controls() {
+  if (!window.PayrollV2) return;
+  const monthSel = document.getElementById('pay-v2-month');
+  const yearSel = document.getElementById('pay-v2-year');
+  if (monthSel && !monthSel.options.length) {
+    const months = [
+      ['01', 'Januari'], ['02', 'Februari'], ['03', 'Maret'], ['04', 'April'],
+      ['05', 'Mei'], ['06', 'Juni'], ['07', 'Juli'], ['08', 'Agustus'],
+      ['09', 'September'], ['10', 'Oktober'], ['11', 'November'], ['12', 'Desember']
+    ];
+    months.forEach(([value, label]) => {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = label;
+      monthSel.appendChild(opt);
+    });
+  }
+  if (yearSel && !yearSel.options.length) {
+    for (let y = 2024; y <= 2030; y++) {
+      const opt = document.createElement('option');
+      opt.value = String(y);
+      opt.textContent = String(y);
+      yearSel.appendChild(opt);
+    }
+  }
+  const today = new Date();
+  if (monthSel && !monthSel.value) monthSel.value = String(today.getMonth() + 1).padStart(2, '0');
+  if (yearSel && !yearSel.value) yearSel.value = String(today.getFullYear());
+  window.PayrollV2.setRole(currentUser && currentUser.role);
+  window.PayrollV2.hideWriteActions();
+  await window.PayrollV2.loadBranches();
+}
+
+async function loadPayrollV2FromFilters() {
+  if (!window.PayrollV2) return;
+  const month = document.getElementById('pay-v2-month')?.value || String(new Date().getMonth() + 1).padStart(2, '0');
+  const year = document.getElementById('pay-v2-year')?.value || String(new Date().getFullYear());
+  const branch = document.getElementById('pay-v2-branch')?.value || 'ALL';
+  const period = year + '-' + month;
+  const result = await window.PayrollV2.load(period, branch);
+  if (!result || !result.success) {
+    showToast((result && result.message) || 'Gagal memuat payroll v2.', 'error');
+  }
 }
 
 async function loadPayroll() {

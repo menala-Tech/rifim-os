@@ -6,6 +6,10 @@
 <meta name="theme-color" content="#1A1A1A">
 <title>RIFIM OS — Finance</title>
 <link rel="manifest" href="/manifest.json">
+<script src="/shared/finance-target-cache-first.js"></script>
+<script src="/shared/finance-saldo-cache-first.js"></script>
+<script src="/shared/aist-agent-status.js"></script>
+<script src="/shared/aist-finance-agent-v2.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -133,6 +137,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="/shared/api-cache.js"></script>
+<script src="/shared/master-role-policy.js"></script>
 </head>
 <body>
 
@@ -201,6 +206,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <span class="sink sheet">📊 Sheet: <code>FINANCE</code></span>
         <span class="sink gas">🔧 Backend: GAS endpoint <code>?action=finance_list</code></span>
       </div>
+      <div id="aist-agent-status-host" style="margin:12px 0 10px"></div>
       <div class="roadmap">
         <strong>Kolom sheet:</strong> Timestamp, Tanggal, Sumber, Kategori, Jenis, Jumlah, Cabang, Keterangan.<br>
         <strong>Read path (TODO):</strong> extend GAS di spreadsheet 1AgpEqhpDU4B dengan
@@ -217,6 +223,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <button class="btn info small">📤 Export XLSX</button>
       </div>
 
+      <div id="tc-cache-state" style="font-size:11px;color:#94a3b8;margin:6px 0 10px"></div>
       <table class="tbl">
         <thead><tr>
           <th>Tanggal</th><th>Sumber</th><th>Kategori</th><th>Jenis</th>
@@ -401,6 +408,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
     <div class="panel" data-panel="target-staff">
       <h2>Target Staff + Tier Bonus + THP</h2>
       <div class="desc">Target saldo per staff + realisasi + tier Bonus Saldo/KPI + THP. Data langsung dari <code>raos_payroll</code> + <code>raos_target_tercapai_bulan</code>.</div>
+      <div id="ts-cache-state" style="font-size:11px;color:#94a3b8;margin:6px 0 10px"></div>
       <div class="sinks">
         <span class="sink supabase">🗄️ Supabase: <code>raos_payroll</code> + <code>raos_kpi_targets_staff</code></span>
         <span class="sink raos">👑 Tier hardcoded di RPC <code>raos_compute_payroll_month</code></span>
@@ -567,6 +575,15 @@ const CABANG_LIST = [
 // ═══════════════════════════════════════════════════════════════════════
 // AUTH GATE
 // ═══════════════════════════════════════════════════════════════════════
+function normalizeUiRole(value) {
+  if (window.RifimMasterRolePolicy) return window.RifimMasterRolePolicy.normalizeRole(value);
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'direktur' || raw === 'direktur utama' || raw === 'direktur operasional' || raw === 'direktur keuangan') return 'direksi';
+  if (raw === 'management' || raw === 'manajemen' || raw === 'manager administrasi') return 'management';
+  if (raw === 'koord' || raw === 'coordinator') return 'koordinator';
+  return raw;
+}
+
 function checkAuth() {
   let sess = null;
   try { sess = JSON.parse(localStorage.getItem('rifim_auth') || 'null'); } catch(e) {}
@@ -577,7 +594,7 @@ function checkAuth() {
     localStorage.removeItem('rifim_auth'); showGate(); return null;
   }
   // Finance = admin/management/direksi only
-  const role = (sess.role || '').toLowerCase();
+  const role = normalizeUiRole(sess.role || '');
   if (!['admin','management','direksi'].includes(role)) {
     document.getElementById('gate').innerHTML =
       '<div class="gate-card"><h1>🚫 Akses Ditolak</h1>' +
@@ -588,7 +605,7 @@ function checkAuth() {
   document.getElementById('gate').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('hdr-name').textContent = sess.name || sess.email;
-  document.getElementById('hdr-role').textContent = role.toUpperCase();
+  document.getElementById('hdr-role').textContent = (sess.role_label || role || '').toUpperCase();
   return sess;
 }
 function showGate() {
@@ -673,7 +690,17 @@ async function _finGetAccessToken() {
 }
 
 async function _gasCall(action, extra) {
-  if (action === 'finance_saldo_raos_list' || action === 'finance_saldo_raos_mark_paid') {
+  const postTokenActions = {
+    finance_saldo_raos_list: true,
+    finance_saldo_raos_mark_paid: true,
+    finance_tagihan_add: true,
+    finance_tagihan_mark_paid: true,
+    finance_kpi_target_branch_upsert: true,
+    finance_kpi_target_staff_upsert: true,
+    finance_payroll_compute: true,
+    finance_driver_assign_random: true,
+  };
+  if (postTokenActions[action]) {
     const token = await _finGetAccessToken();
     if (!token) throw new Error('Session token tidak ada. Login ulang melalui Portal.');
     const body = Object.assign({ action, access_token: token }, extra || {});
@@ -889,50 +916,51 @@ function _rekapRenderRows(res) {
 // ═══════════════════════════════════════════════════════════════════════
 // TAB 5 — SALDO RAOS
 // ═══════════════════════════════════════════════════════════════════════
-async function loadSaldoRaos() {
+function renderSaldoRaosRows(data, meta) {
   const tb = document.getElementById('sr-body');
-  tb.innerHTML = '<tr><td colspan="8"><div class="empty">Loading Supabase…</div></td></tr>';
-  try {
-    const data = await _gasCall('finance_saldo_raos_list', {
-      status: document.getElementById('sr-status').value || '',
-    });
-    if (!data.success) throw new Error(data.message || 'Gagal load');
-    if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="8"><div class="empty">Tidak ada request cocok filter</div></td></tr>'; return; }
-    tb.innerHTML = data.rows.map(r => {
-      const statusChip = r.is_processed
-        ? '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(22,163,74,.2);color:#4ade80">Lunas</span>'
-        : r.status === 'approved'
-          ? '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(14,165,233,.2);color:#38bdf8">Approved</span>'
-          : r.status === 'rejected'
-            ? '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(220,38,38,.2);color:#f87171">Rejected</span>'
-            : '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(234,179,8,.2);color:#facc15">Pending</span>';
-      // Poin 1 (2026-08-07): pisahkan kolom Staff vs Driver. Sebelumnya
-      // kolom "Driver" nyatanya render staff_name (bug — screenshot user
-      // 'yudi ultra RIF0144' = staff Bobby bukan driver).
-      const staffCell = `${esc(r.staff_name || '—')}${r.staff_code ? '<br><span style="font-size:11px;color:#facc15">' + esc(r.staff_code) + '</span>' : ''}`;
-      const driverCell = r.driver_name || r.driver_login_id
-        ? `${esc(r.driver_name || '—')}${r.driver_login_id ? '<br><span style="font-size:11px;color:#38bdf8">' + esc(r.driver_login_id) + '</span>' : ''}`
-        : '<span style="font-size:11px;color:#666">—</span>';
-      return `
-        <tr>
-          <td class="key" style="font-family:monospace;font-size:11px;color:#facc15">${esc(r.id.substring(0, 8))}…</td>
-          <td style="font-size:11px">${esc(r.branch_name || '—')}</td>
-          <td>${staffCell}</td>
-          <td>${driverCell}</td>
-          <td style="text-align:right;font-weight:600">${fmtRp(r.nominal)}</td>
-          <td>${statusChip}</td>
-          <td style="font-size:11px">${fmtDateTime(r.created_at)}</td>
-          <td>${r.is_processed ? '—' : (['pending','approved'].includes(r.status) ? '<button class="btn ok small" data-mark-saldo="' + esc(r.id) + '">✓ Lunas</button>' : '<span style="font-size:11px;color:#888">—</span>')}</td>
-        </tr>`;
-    }).join('');
-    tb.querySelectorAll('button[data-mark-saldo]').forEach(btn => {
-      btn.addEventListener('click', () => markSaldoPaid(btn.dataset.markSaldo));
-    });
-  } catch (err) {
-    tb.innerHTML = `<tr><td colspan="8"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
-  }
+  if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="8"><div class="empty">Tidak ada request cocok filter</div></td></tr>'; return; }
+  tb.innerHTML = data.rows.map(r => {
+    const statusChip = r.is_processed
+      ? '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(22,163,74,.2);color:#4ade80">Lunas</span>'
+      : r.status === 'approved'
+        ? '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(14,165,233,.2);color:#38bdf8">Approved</span>'
+        : r.status === 'rejected'
+          ? '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(220,38,38,.2);color:#f87171">Rejected</span>'
+          : '<span style="padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(234,179,8,.2);color:#facc15">Pending</span>';
+    const staffCell = esc(r.staff_name || 'â€”') + (r.staff_code ? '<br><span style="font-size:11px;color:#facc15">' + esc(r.staff_code) + '</span>' : '');
+    const driverCell = (r.driver_name || r.driver_login_id)
+      ? esc(r.driver_name || 'â€”') + (r.driver_login_id ? '<br><span style="font-size:11px;color:#38bdf8">' + esc(r.driver_login_id) + '</span>' : '')
+      : '<span style="font-size:11px;color:#666">â€”</span>';
+    return '<tr>' +
+      '<td class="key" style="font-family:monospace;font-size:11px;color:#facc15">' + esc(r.id.substring(0, 8)) + 'â€¦</td>' +
+      '<td style="font-size:11px">' + esc(r.branch_name || 'â€”') + '</td>' +
+      '<td>' + staffCell + '</td>' +
+      '<td>' + driverCell + '</td>' +
+      '<td style="text-align:right;font-weight:600">' + fmtRp(r.nominal) + '</td>' +
+      '<td>' + statusChip + '</td>' +
+      '<td style="font-size:11px">' + fmtDateTime(r.created_at) + '</td>' +
+      '<td>' + (r.is_processed ? 'â€”' : (['pending','approved'].includes(r.status) ? '<button class="btn ok small" data-mark-saldo="' + esc(r.id) + '">âœ“ Lunas</button>' : '<span style="font-size:11px;color:#888">â€”</span>')) + '</td>' +
+      '</tr>';
+  }).join('');
+  tb.querySelectorAll('button[data-mark-saldo]').forEach(btn => {
+    btn.addEventListener('click', () => markSaldoPaid(btn.dataset.markSaldo));
+  });
 }
 
+async function loadSaldoRaos() {
+  const tb = document.getElementById('sr-body');
+  return FinanceSaldoCacheFirst.load({
+    tbody: tb,
+    status: document.getElementById('sr-status').value || '',
+    branch: document.getElementById('sr-branch') ? (document.getElementById('sr-branch').value || '') : '',
+    fetcher: () => _gasCall('finance_saldo_raos_list', {
+      status: document.getElementById('sr-status').value || '',
+    }),
+    render: renderSaldoRaosRows,
+  }).catch(err => {
+    tb.innerHTML = '<tr><td colspan="8"><div class="empty" style="color:#f87171">âŒ ' + err.message + '</div></td></tr>';
+  });
+}
 async function markSaldoPaid(id) {
   if (!confirm(`Tandai LUNAS pengajuan ${id.substring(0, 8)}…?\nAksi ini akan trigger notif ke staff & post chat RAOS.`)) return;
   showToast('Memproses…');
@@ -952,6 +980,7 @@ async function markSaldoPaid(id) {
       return;
     }
     showToast(`✅ Saldo ${id.substring(0, 8)}… tandai lunas`, 'ok');
+    FinanceSaldoCacheFirst.invalidateAfterMutation();
     await loadSaldoRaos();
   } catch (err) { showToast('❌ ' + err.message, 'err'); }
 }
@@ -1088,44 +1117,49 @@ function _currentMonthISO() {
   })();
   return m + '-01';
 }
+function renderTargetCabang(data) {
+  const tb = document.getElementById('tc-body');
+  if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="6"><div class="empty">Tidak ada cabang</div></td></tr>'; return; }
+  const fmtTarget = (mode, v) => v == null ? '�' : (mode === 'order' ? Number(v).toLocaleString('id-ID') + ' scan' : fmtRp(v));
+  tb.innerHTML = data.rows.map(r => {
+    const staffVal = r.target_staff_effective != null ? r.target_staff_effective : r.target_staff_default;
+    const isAuto = r.target_staff_default == null && r.target_staff_auto_prorated != null;
+    const staffCell = staffVal == null ? '�' : (
+      fmtTarget(r.mode, staffVal) +
+      (isAuto ? ' <span style="font-size:9px;color:#94a3b8;font-weight:400" title="Auto-prorate: ' + fmtTarget(r.mode, r.target_cabang) + ' � ' + r.staff_count + ' staff">auto �' + r.staff_count + '</span>' : '')
+    );
+    return '
+      <tr data-branch="' + esc(r.branch_id) + '">
+        <td>' + esc(r.branch_name) + (r.is_excluded_saldo ? ' <span style="font-size:9px;color:#facc15">(order)</span>' : '') + '</td>
+        <td><span style="padding:2px 8px;border-radius:8px;background:' + (r.mode==='order'?'rgba(234,179,8,.2);color:#facc15':'rgba(14,165,233,.2);color:#38bdf8') + ';font-size:10px;font-weight:600">' + esc(r.mode) + '</span></td>
+        <td style="text-align:right;font-family:monospace">' + fmtTarget(r.mode, r.target_cabang) + '</td>
+        <td style="text-align:right;font-family:monospace">' + staffCell + '</td>
+        <td style="font-size:10px;color:#888">' + fmtDateTime(r.updated_at) + '</td>
+        <td><button class="btn small" onclick="editTargetCabang('' + esc(r.branch_id) + '','' + esc(r.branch_name) + '',' + r.target_cabang + ',' + r.target_staff_default + ','' + esc(r.mode) + '')">?? Edit</button></td>
+      </tr>';
+  }).join('');
+}
 async function loadTargetCabang() {
   const tb = document.getElementById('tc-body');
   const monthEl = document.getElementById('tc-month');
   if (monthEl && !monthEl.value) {
     const d = new Date(); monthEl.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
   }
-  tb.innerHTML = '<tr><td colspan="6"><div class="empty">Loading target cabang…</div></td></tr>';
-  try {
+  if (!window.FinanceTargetCacheFirst) {
     const data = await _gasCall('finance_kpi_target_branch_list', { month: monthEl.value });
     if (!data.success) throw new Error(data.message || 'Gagal load');
-    if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="6"><div class="empty">Tidak ada cabang</div></td></tr>'; return; }
-    // Poin 12 (2026-08-07): Cabang mode='order' (Soeta/Makassar) tampil
-    // Target Cabang + Target Staff sebagai ANGKA scan count, bukan Rupiah.
-    // Bonus tetap Rupiah di tier hardcoded (tidak dipengaruhi mode).
-    const fmtTarget = (mode, v) => v == null ? '—' :
-      (mode === 'order' ? Number(v).toLocaleString('id-ID') + ' scan' : fmtRp(v));
-    // Poin 10 (2026-08-07): tampilkan target_staff_effective (auto-prorate kalau default null).
-    // Kalau auto-prorate, tambah badge "auto" biar user tahu asal angkanya.
-    tb.innerHTML = data.rows.map(r => {
-      const staffVal = r.target_staff_effective != null ? r.target_staff_effective : r.target_staff_default;
-      const isAuto = r.target_staff_default == null && r.target_staff_auto_prorated != null;
-      const staffCell = staffVal == null ? '—' : (
-        fmtTarget(r.mode, staffVal) +
-        (isAuto ? ` <span style="font-size:9px;color:#94a3b8;font-weight:400" title="Auto-prorate: ${fmtTarget(r.mode, r.target_cabang)} ÷ ${r.staff_count} staff">auto ÷${r.staff_count}</span>` : '')
-      );
-      return `
-      <tr data-branch="${esc(r.branch_id)}">
-        <td>${esc(r.branch_name)}${r.is_excluded_saldo ? ' <span style="font-size:9px;color:#facc15">(order)</span>' : ''}</td>
-        <td><span style="padding:2px 8px;border-radius:8px;background:${r.mode==='order'?'rgba(234,179,8,.2);color:#facc15':'rgba(14,165,233,.2);color:#38bdf8'};font-size:10px;font-weight:600">${esc(r.mode)}</span></td>
-        <td style="text-align:right;font-family:monospace">${fmtTarget(r.mode, r.target_cabang)}</td>
-        <td style="text-align:right;font-family:monospace">${staffCell}</td>
-        <td style="font-size:10px;color:#888">${fmtDateTime(r.updated_at)}</td>
-        <td><button class="btn small" onclick="editTargetCabang('${esc(r.branch_id)}','${esc(r.branch_name)}',${r.target_cabang},${r.target_staff_default},'${esc(r.mode)}')">✏️ Edit</button></td>
-      </tr>`;
-    }).join('');
-  } catch (err) {
-    tb.innerHTML = `<tr><td colspan="6"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
+    return renderTargetCabang(data);
   }
+  return FinanceTargetCacheFirst.load({
+    kind: 'target-cabang',
+    params: { month: monthEl.value },
+    fetcher: () => _gasCall('finance_kpi_target_branch_list', { month: monthEl.value }),
+    render: renderTargetCabang,
+    onState: (text) => {
+      const el = document.getElementById('tc-cache-state');
+      if (el) el.textContent = text || '';
+    },
+  }).catch(err => { tb.innerHTML = '<tr><td colspan="6"><div class="empty" style="color:#f87171">? ' + err.message + '</div></td></tr>'; });
 }
 // Generic editable modal — dinamis, terima array field config
 function openEditModal(config) {
@@ -1282,6 +1316,34 @@ async function computePayrollForMonth() {
 // ═══════════════════════════════════════════════════════════════════════
 // TAB TARGET STAFF
 // ═══════════════════════════════════════════════════════════════════════
+function renderTargetStaff(data) {
+  const tb = document.getElementById('ts-body');
+  if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="14"><div class="empty">Tidak ada staff cocok filter</div></td></tr>'; return; }
+  tb.innerHTML = data.rows.map(r => {
+    const stColor = r.status_target === 'ok' ? '#4ade80' : r.status_target === 'warning' ? '#facc15' : r.status_target === 'na' ? '#888' : '#f87171';
+    const stLabel = ({ ok:'Capai', warning:'Warning', cut_off:'Cut Off', na:'N/A' }[r.status_target] || r.status_target);
+    const targetScan = r.target_scan != null ? Number(r.target_scan).toLocaleString('id-ID') + ' scan' : '�';
+    const realScan = r.realisasi_scan != null ? Number(r.realisasi_scan).toLocaleString('id-ID') + ' scan' : '�';
+    const pctScan = r.pct_scan != null ? Number(r.pct_scan).toFixed(1) + '%' : '�';
+    return '
+        <tr>
+          <td>' + esc(r.staff_name) + '<br><span style="font-size:9px;color:#888">' + esc(r.staff_code) + ' � ' + esc(r.role) + '</span></td>
+          <td style="font-size:10px">' + esc(r.branch_name) + (r.is_excluded_saldo ? ' <span style="color:#facc15">(order)</span>' : '') + '</td>
+          <td style="text-align:right;font-family:monospace">' + fmtRp(r.gapok) + '</td>
+          <td style="text-align:right;font-family:monospace">' + (r.is_excluded_saldo ? targetScan : fmtRp(r.target_saldo)) + '</td>
+          <td style="text-align:right;font-family:monospace">' + (r.is_excluded_saldo ? realScan : fmtRp(r.realisasi_saldo)) + '</td>
+          <td style="text-align:right;color:' + stColor + ';font-weight:600">' + (r.is_excluded_saldo ? pctScan : (Number(r.pct).toFixed(1) + '%')) + '</td>
+          <td style="text-align:right;font-family:monospace;color:' + (r.bonus_saldo>0?'#4ade80':'#666') + '">' + fmtRp(r.bonus_saldo) + '</td>
+          <td style="text-align:right;font-family:monospace">' + fmtRp(r.bpjs) + '</td>
+          <td style="text-align:right;font-family:monospace">' + fmtRp(r.paket_data) + '</td>
+          <td style="text-align:right;font-family:monospace">' + fmtRp(r.member_parkir) + '</td>
+          <td style="text-align:right;font-family:monospace;color:' + (r.bonus_kpi>0?'#4ade80':'#666') + '">' + fmtRp(r.bonus_kpi) + '</td>
+          <td style="text-align:right;font-family:monospace;font-weight:700;color:#38bdf8">' + fmtRp(r.thp) + '</td>
+          <td><span style="padding:2px 8px;border-radius:8px;background:' + stColor + ';color:#111;font-size:10px;font-weight:700">' + stLabel + '</span></td>
+          <td><button class="btn small ghost" onclick="editTargetStaff('' + esc(r.staff_id) + '','' + esc(r.staff_name) + '',' + (r.target_saldo_override != null ? r.target_saldo_override : 'null') + ',' + r.member_parkir + ')">??</button></td>
+        </tr>';
+  }).join('');
+}
 async function loadTargetStaff() {
   const tb = document.getElementById('ts-body');
   const monthEl = document.getElementById('ts-month');
@@ -1289,47 +1351,21 @@ async function loadTargetStaff() {
   if (monthEl && !monthEl.value) {
     const d = new Date(); monthEl.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
   }
-  tb.innerHTML = '<tr><td colspan="14"><div class="empty">Loading target staff…</div></td></tr>';
-  try {
-    const data = await _gasCall('finance_kpi_target_staff_list', {
-      month: monthEl.value,
-      branch_id: cabangEl.value || '',
-    });
+  if (!window.FinanceTargetCacheFirst) {
+    const data = await _gasCall('finance_kpi_target_staff_list', { month: monthEl.value, branch_id: cabangEl.value || '' });
     if (!data.success) throw new Error(data.message || 'Gagal load');
-    if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="14"><div class="empty">Tidak ada staff cocok filter</div></td></tr>'; return; }
-    tb.innerHTML = data.rows.map(r => {
-      const stColor = r.status_target === 'ok' ? '#4ade80' :
-                      r.status_target === 'warning' ? '#facc15' :
-                      r.status_target === 'na' ? '#888' : '#f87171';
-      const stLabel = { ok:'Capai', warning:'Warning', cut_off:'Cut Off', na:'N/A' }[r.status_target] || r.status_target;
-      // Poin 12 (2026-08-07): staff di cabang mode='order' (is_excluded_saldo=true,
-      // yaitu Soeta/Makassar) sebelumnya kolom Target/Realisasi/% tampil '—'.
-      // Sekarang tampil ANGKA scan count (target_scan/realisasi_scan bila
-      // backend expose). Fallback ke '—' kalau backend belum kirim field-nya.
-      const targetScan = r.target_scan != null ? Number(r.target_scan).toLocaleString('id-ID') + ' scan' : '—'
-      const realScan = r.realisasi_scan != null ? Number(r.realisasi_scan).toLocaleString('id-ID') + ' scan' : '—'
-      const pctScan = r.pct_scan != null ? Number(r.pct_scan).toFixed(1) + '%' : '—'
-      return `
-        <tr>
-          <td>${esc(r.staff_name)}<br><span style="font-size:9px;color:#888">${esc(r.staff_code)} · ${esc(r.role)}</span></td>
-          <td style="font-size:10px">${esc(r.branch_name)}${r.is_excluded_saldo ? ' <span style="color:#facc15">(order)</span>' : ''}</td>
-          <td style="text-align:right;font-family:monospace">${fmtRp(r.gapok)}</td>
-          <td style="text-align:right;font-family:monospace">${r.is_excluded_saldo ? targetScan : fmtRp(r.target_saldo)}</td>
-          <td style="text-align:right;font-family:monospace">${r.is_excluded_saldo ? realScan : fmtRp(r.realisasi_saldo)}</td>
-          <td style="text-align:right;color:${stColor};font-weight:600">${r.is_excluded_saldo ? pctScan : (Number(r.pct).toFixed(1) + '%')}</td>
-          <td style="text-align:right;font-family:monospace;color:${r.bonus_saldo>0?'#4ade80':'#666'}">${fmtRp(r.bonus_saldo)}</td>
-          <td style="text-align:right;font-family:monospace">${fmtRp(r.bpjs)}</td>
-          <td style="text-align:right;font-family:monospace">${fmtRp(r.paket_data)}</td>
-          <td style="text-align:right;font-family:monospace">${fmtRp(r.member_parkir)}</td>
-          <td style="text-align:right;font-family:monospace;color:${r.bonus_kpi>0?'#4ade80':'#666'}">${fmtRp(r.bonus_kpi)}</td>
-          <td style="text-align:right;font-family:monospace;font-weight:700;color:#38bdf8">${fmtRp(r.thp)}</td>
-          <td><span style="padding:2px 8px;border-radius:8px;background:${stColor};color:#111;font-size:10px;font-weight:700">${stLabel}</span></td>
-          <td><button class="btn small ghost" onclick="editTargetStaff('${esc(r.staff_id)}','${esc(r.staff_name)}',${r.target_saldo_override != null ? r.target_saldo_override : 'null'},${r.member_parkir})">✏️</button></td>
-        </tr>`;
-    }).join('');
-  } catch (err) {
-    tb.innerHTML = `<tr><td colspan="14"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
+    return renderTargetStaff(data);
   }
+  return FinanceTargetCacheFirst.load({
+    kind: 'target-staff',
+    params: { month: monthEl.value, branch_id: cabangEl.value || '' },
+    fetcher: () => _gasCall('finance_kpi_target_staff_list', { month: monthEl.value, branch_id: cabangEl.value || '' }),
+    render: renderTargetStaff,
+    onState: (text) => {
+      const el = document.getElementById('ts-cache-state');
+      if (el) el.textContent = text || '';
+    },
+  }).catch(err => { tb.innerHTML = '<tr><td colspan="14"><div class="empty" style="color:#f87171">? ' + err.message + '</div></td></tr>'; });
 }
 async function editTargetStaff(staffId, staffName, currOverride, currParkir) {
   const monthEl = document.getElementById('ts-month');
@@ -1467,6 +1503,10 @@ function wireFinanceHandlers() {
   document.querySelectorAll('[data-panel="saldo-raos"] .btn.ghost.small').forEach(b => {
     if (b.textContent.indexOf('Refresh') > -1) b.addEventListener('click', loadSaldoRaos);
   });
+  if (window.RifimAistAgentStatus && typeof window.RifimAistAgentStatus.mount === 'function') {
+    const host = document.getElementById('aist-agent-status-host');
+    if (host) window.RifimAistAgentStatus.mount(host);
+  }
   document.getElementById('l-status').addEventListener('change', loadLog);
   document.getElementById('l-search').addEventListener('input', loadLog);
   document.querySelectorAll('[data-panel="log"] .btn.ghost.small').forEach(b => {

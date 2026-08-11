@@ -6,6 +6,8 @@
 <meta name="theme-color" content="#1A1A1A">
 <title>RIFIM OS — Portal</title>
 <link rel="manifest" href="/manifest.json">
+<script src="/shared/master-role-policy.js"></script>
+<script src="/shared/employee-module-sync-rules.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -215,7 +217,7 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
     <div class="section-desc">Klik modul untuk mulai bekerja</div>
     <div class="modules-grid">
 
-      <div class="mod-card active-mod" onclick="goTo('/smart-office')">
+      <div class="mod-card active-mod" data-module="smart_office" data-path="/smart-office" onclick="goToModule(this)">
         <span class="mod-icon">📄</span>
         <div class="mod-name">Smart Office</div>
         <div class="mod-desc">Buat & kelola surat, invoice, kwitansi, dan kontrak resmi</div>
@@ -223,7 +225,7 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
         <div class="mod-arrow">→</div>
       </div>
 
-      <div class="mod-card active-mod" onclick="goTo('/hris')">
+      <div class="mod-card active-mod" data-module="attendance" data-path="/hris" onclick="goToModule(this)">
         <span class="mod-icon">👥</span>
         <div class="mod-name">HRIS</div>
         <div class="mod-desc">Karyawan, kontrak kerja, absensi, cuti, dan penggajian</div>
@@ -231,7 +233,7 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
         <div class="mod-arrow">→</div>
       </div>
 
-      <div class="mod-card active-mod" onclick="window.open('https://raos-menala.vercel.app','_blank','noopener')">
+      <div class="mod-card active-mod" data-module="pwa_raos" data-external-url="https://raos-menala.vercel.app" onclick="goToModule(this)">
         <span class="mod-icon">🚗</span>
         <div class="mod-name">RAOS</div>
         <div class="mod-desc">Armada, monitoring driver, dan operasional rideshare — PWA terpisah</div>
@@ -239,7 +241,7 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
         <div class="mod-arrow">↗</div>
       </div>
 
-      <div class="mod-card active-mod" onclick="goTo('/crm')">
+      <div class="mod-card active-mod" data-module="" data-path="/crm" onclick="goToModule(this)">
         <span class="mod-icon">📇</span>
         <div class="mod-name">CRM</div>
         <div class="mod-desc">Manajemen email login, user Supabase, kontak eksternal, audit log</div>
@@ -247,7 +249,7 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
         <div class="mod-arrow">→</div>
       </div>
 
-      <div class="mod-card active-mod" onclick="goTo('/finance')">
+      <div class="mod-card active-mod" data-module="finance" data-path="/finance" onclick="goToModule(this)">
         <span class="mod-icon">💰</span>
         <div class="mod-name">Finance</div>
         <div class="mod-desc">Lunasi Isi Saldo lintas cabang, laporan keuangan, anggaran</div>
@@ -255,7 +257,7 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
         <div class="mod-arrow">→</div>
       </div>
 
-      <div class="mod-card active-mod" onclick="goTo('/sistem')">
+      <div class="mod-card active-mod" data-module="" data-path="/sistem" onclick="goToModule(this)">
         <span class="mod-icon">⚙️</span>
         <div class="mod-name">Sistem</div>
         <div class="mod-desc">Admin console — sync staff/driver, KPI, backup, system log RAOS</div>
@@ -286,6 +288,14 @@ function _sb() {
 }
 
 const ALLOWED_ROLES = ['admin', 'direksi', 'management', 'koordinator'];
+function normalizeUiRole(value) {
+  if (window.RifimMasterRolePolicy) return window.RifimMasterRolePolicy.normalizeRole(value);
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'direktur' || raw === 'direktur utama' || raw === 'direktur operasional' || raw === 'direktur keuangan') return 'direksi';
+  if (raw === 'management' || raw === 'manajemen' || raw === 'manager administrasi') return 'management';
+  if (raw === 'koord' || raw === 'coordinator') return 'koordinator';
+  return raw;
+}
 
 // ── AUTH ─────────────────────────────────────────────────────────────
 // Pipeline 2-lapis (raos_068 bridge, sesi 2026-08-04):
@@ -351,7 +361,8 @@ async function doLogin() {
       showErr('Akun Anda nonaktif. Hubungi admin.');
       return;
     }
-    if (!ALLOWED_ROLES.includes(profile.role)) {
+    const normalizedRole = normalizeUiRole(profile.role);
+    if (!ALLOWED_ROLES.includes(normalizedRole)) {
       await sb.auth.signOut();
       showErr(`Role "${profile.role}" tidak boleh akses portal.`);
       return;
@@ -359,7 +370,8 @@ async function doLogin() {
     const session = {
       full_name: profile.full_name,
       email,
-      role: profile.role,
+      role: normalizedRole,
+      role_label: profile.role,
       staff_id: profile.staff_id,
       branch_id: profile.branch_id,
       access_token: signData.session?.access_token || '',
@@ -384,11 +396,35 @@ function showErr(msg) {
   el.style.display = 'block';
 }
 
+function applyModuleWiring(user) {
+  const cards = document.querySelectorAll('.mod-card[data-path], .mod-card[data-external-url]');
+  const plan = window.EmployeeModuleSyncRules && typeof window.EmployeeModuleSyncRules.plan === 'function'
+    ? window.EmployeeModuleSyncRules.plan({
+        role: user.role,
+        position: user.role_label || user.role,
+        status: 'AKTIF',
+      })
+    : null;
+  cards.forEach(card => {
+    const moduleKey = card.dataset.module || '';
+    const tag = card.querySelector('.mod-tag');
+    const enabled = !moduleKey || !plan || !plan.modules ? true : !!plan.modules[moduleKey];
+    card.classList.toggle('active-mod', enabled);
+    card.classList.toggle('disabled-mod', !enabled);
+    card.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+    if (tag && !enabled) {
+      tag.textContent = 'Tidak untuk role ini';
+      tag.classList.remove('tag-on');
+    }
+  });
+}
+
 function showPortal(user) {
   document.getElementById('auth-gate').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('user-name').textContent = user.full_name || user.email;
-  document.getElementById('user-role').textContent = user.role || 'USER';
+  document.getElementById('user-role').textContent = user.role_label || user.role || 'USER';
+  applyModuleWiring(user);
   // Restore saved company
   const savedCo = localStorage.getItem('rifim_company') || 'ALL';
   document.querySelectorAll('.company-pill').forEach(p => {
@@ -424,6 +460,17 @@ function goTo(path) {
   window.location.href = path;
 }
 
+function goToModule(card) {
+  if (!card || card.classList.contains('disabled-mod') || card.getAttribute('aria-disabled') === 'true') return;
+  const externalUrl = card.dataset.externalUrl;
+  if (externalUrl) {
+    window.open(externalUrl, '_blank', 'noopener');
+    return;
+  }
+  const path = card.dataset.path;
+  if (path) goTo(path);
+}
+
 ['auth-email','auth-pin'].forEach(id => {
   document.getElementById(id).addEventListener('keydown', e => {
     if (e.key === 'Enter') {
@@ -439,6 +486,7 @@ function goTo(path) {
   if (raw) {
     try {
       const user = JSON.parse(raw);
+      if (user && user.role) user.role = normalizeUiRole(user.role);
       if (user.access_token && user.refresh_token && Date.now() - (user.ts || 0) < 8 * 60 * 60 * 1000) {
         showPortal(user);
         return;
