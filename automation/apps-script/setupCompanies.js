@@ -23,6 +23,7 @@ function setupCompaniesSheet() {
     'code','name','address','phone','email',
     'director_name','director_title','doc_prefix',
     'nib','npwp','city','is_active',
+    'logo_asset_id','letterhead_asset_id','footer_asset_id','signature_asset_id','stamp_asset_id',
     'tpl_surat','tpl_inv','tpl_kwt','tpl_sp','tpl_pkwt','tpl_mou',
   ];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
@@ -36,6 +37,9 @@ function setupCompaniesSheet() {
   var rifimTitle   = config.director_title  || 'Direktur Utama';
   var rifimNIB     = config.nib             || '';
   var rifimNPWP    = config.npwp            || '';
+  var rifimAssets  = _setupCompaniesBranding_('RIFIM', config);
+  var migAssets    = _setupCompaniesBranding_('MIG', config);
+  var lailanAssets = _setupCompaniesBranding_('LAILAN', config);
 
   var rows = [
     // RIFIM — perusahaan utama (tpl_* diisi otomatis oleh createAllTemplates)
@@ -43,6 +47,7 @@ function setupCompaniesSheet() {
       rifimAddress, rifimPhone, rifimEmail,
       rifimDir, rifimTitle, 'RIFIM',
       rifimNIB, rifimNPWP, rifimCity, true,
+      rifimAssets.logo_asset_id, rifimAssets.letterhead_asset_id, rifimAssets.footer_asset_id, rifimAssets.signature_asset_id, rifimAssets.stamp_asset_id,
       '', '', '', '', '', ''],
 
     // MIG — PT. Menala Internasional Gemilang (tpl_* diisi oleh createMenalaTemplates)
@@ -51,6 +56,7 @@ function setupCompaniesSheet() {
       '082170102349', 'menalagemilang@gmail.com',
       'BOBBY RAHMAN M.B', 'Direktur', 'MIG',
       '1106260067028', '10.000.000.0-997.937-4', 'Batam', true,
+      migAssets.logo_asset_id, migAssets.letterhead_asset_id, migAssets.footer_asset_id, migAssets.signature_asset_id, migAssets.stamp_asset_id,
       '', '', '', '', '', ''],
 
     // LAILAN — CV. Lailan Kalilan Indonesia (data sama dg RIFIM)
@@ -58,6 +64,7 @@ function setupCompaniesSheet() {
       rifimAddress, rifimPhone, rifimEmail,
       rifimDir, rifimTitle, 'LAILAN',
       '', '', rifimCity, true,
+      lailanAssets.logo_asset_id, lailanAssets.letterhead_asset_id, lailanAssets.footer_asset_id, lailanAssets.signature_asset_id, lailanAssets.stamp_asset_id,
       '', '', '', '', '', ''],
   ];
 
@@ -66,6 +73,58 @@ function setupCompaniesSheet() {
 
   Logger.log('Sheet companies berhasil dibuat dengan ' + rows.length + ' perusahaan.');
   Logger.log('RIFIM | MIG | LAILAN');
+}
+
+function _setupCompaniesBranding_(companyCode, config) {
+  var code = String(companyCode || 'RIFIM').toUpperCase();
+  var prefix = code.toLowerCase() + '_';
+  var defaults = (typeof HTML_TPL_ASSETS !== 'undefined' && HTML_TPL_ASSETS)
+    ? (HTML_TPL_ASSETS[code] || HTML_TPL_ASSETS.RIFIM || {})
+    : {};
+  return {
+    logo_asset_id: _setupCompaniesPickFirst_([
+      config[prefix + 'logo_asset_id'],
+      code === 'RIFIM' ? config.logo_asset_id : '',
+      defaults.logo_id,
+    ]),
+    letterhead_asset_id: _setupCompaniesPickFirst_([
+      config[prefix + 'letterhead_asset_id'],
+      config[prefix + 'kop_banner_id'],
+      code === 'RIFIM' ? config.letterhead_asset_id : '',
+      code === 'RIFIM' ? config.kop_banner_id : '',
+      defaults.kop_banner_id,
+    ]),
+    footer_asset_id: _setupCompaniesPickFirst_([
+      config[prefix + 'footer_asset_id'],
+      config[prefix + 'footer_banner_id'],
+      code === 'RIFIM' ? config.footer_asset_id : '',
+      code === 'RIFIM' ? config.footer_banner_id : '',
+      defaults.footer_banner_id,
+    ]),
+    signature_asset_id: _setupCompaniesPickFirst_([
+      config[prefix + 'signature_asset_id'],
+      config[prefix + 'ttd_id'],
+      code === 'RIFIM' ? config.signature_asset_id : '',
+      code === 'RIFIM' ? config.ttd_id : '',
+      defaults.ttd_id,
+    ]),
+    stamp_asset_id: _setupCompaniesPickFirst_([
+      config[prefix + 'stamp_asset_id'],
+      config[prefix + 'stempel_id'],
+      code === 'RIFIM' ? config.stamp_asset_id : '',
+      code === 'RIFIM' ? config.stempel_id : '',
+      defaults.stempel_id,
+    ]),
+  };
+}
+
+function _setupCompaniesPickFirst_(values) {
+  for (var i = 0; i < (values || []).length; i++) {
+    var value = values[i];
+    if (value === 0 || value === false) return value;
+    if (value != null && String(value).trim() !== '') return value;
+  }
+  return '';
 }
 
 /**

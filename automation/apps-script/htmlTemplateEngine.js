@@ -65,30 +65,34 @@ var HTML_TPL_ASSETS = {
 // Folder Drive untuk cache PNG composite TTD+stempel (Alternative A image compositing).
 // PNG di-generate sekali per perusahaan via SlidesApp, disimpan di sini,
 // lalu di-reuse untuk semua dokumen berikutnya.
-var HTML_TPL_SIG_CACHE_FOLDER = '19taBn0YXxjXTb-SxqFXGhwOPShZ4VlIt';
+// V4 canonical storage: destination folder IDs MUST come from company_config.
+// Legacy HTML_TPL_FOLDERS hard-codes are intentionally removed.
+var HTML_TPL_FOLDERS = {}; // deprecated compatibility symbol only
 
-var HTML_TPL_FOLDERS = {
-  SURAT: '12xonf6PjSMJRzpcQyIcuYsPzAMwIq_DO',
-  ST:    '12xonf6PjSMJRzpcQyIcuYsPzAMwIq_DO',
-  SIZ:   '12xonf6PjSMJRzpcQyIcuYsPzAMwIq_DO',
-  SKT:   '12xonf6PjSMJRzpcQyIcuYsPzAMwIq_DO',
-  INV:   '1CaihPCFzy_lRyXpJBVaP5MW0GN3NlzGW',
-  KWT:   '15MpOYopdsJMpqz9gWspWrcX7byMTmLpU',
-  PROP:  '1q9J3ib0LP29u5z4ZzmWfc8YsqUaO6w6V',
-  CP:    '1WJevB0auuTuhmWVUHy5HaWaOZuA02Zob',
-  MOU:   '1LBE86oPD9HdbHDoSMMA4M5UXojzm0i1I',
-  PKS:   '1dXFsjTFgIWpSavXuWlKBaThmUfu3GKdP',
-  SP1:   '1M2Nch7tcV-FYpqoh1WpYOHMwLlWL34Bb',
-  SP2:   '1M2Nch7tcV-FYpqoh1WpYOHMwLlWL34Bb',
-  SP3:   '1M2Nch7tcV-FYpqoh1WpYOHMwLlWL34Bb',
-  PHK:   '1M2Nch7tcV-FYpqoh1WpYOHMwLlWL34Bb',
-  PKWT:  '1fj7ccKbJQAjgcgEB23JvwBRlslI2neYU',
-  SPG:   '1fj7ccKbJQAjgcgEB23JvwBRlslI2neYU',
-  SMT:   '1fj7ccKbJQAjgcgEB23JvwBRlslI2neYU',
-  PI:    '1fj7ccKbJQAjgcgEB23JvwBRlslI2neYU',
-  BA:    '1glIeErIjRpYX2zUcAlaWGPPBRPPRqQB3',
-  FCO:   '183ASv9IYr7T0x5LbpR4IQeu4w5xZflI4',
+var HTML_TPL_DOC_FOLDER_NAMES = {
+  SURAT:'Surat', ST:'Surat', SIZ:'Surat', SKT:'Surat',
+  INV:'Invoice', KWT:'Kwitansi', PROP:'Proposal', CP:'Company Profile',
+  MOU:'MOU', PKS:'Perjanjian Kerjasama',
+  PKWT:'Kontrak Karyawan', SPG:'Kontrak Karyawan', SMT:'Kontrak Karyawan', PI:'Kontrak Karyawan',
+  SP1:'Surat Peringatan', SP2:'Surat Peringatan', SP3:'Surat Peringatan', PHK:'Surat Peringatan',
+  BA:'Berita Acara', FCO:'Form Checklist'
 };
+
+function _htmlTplSignatureCacheFolder_() {
+  var cfg = getCompanyConfig();
+  var id = String(cfg.signature_cache_folder_id || '').trim();
+  if (!id) throw new Error('company_config.signature_cache_folder_id belum diisi');
+  return DriveApp.getFolderById(id);
+}
+
+function _htmlTplCanonicalPdfFolder_(docType, when) {
+  if (typeof canonicalDriveGetMonthFolder !== 'function') {
+    throw new Error('canonicalDriveStorage.js belum terpasang — HTML renderer menolak write ke folder legacy');
+  }
+  var base = canonicalDriveGetMonthFolder('smart_office', 'pdf', when || new Date());
+  var typeName = HTML_TPL_DOC_FOLDER_NAMES[String(docType || '').toUpperCase()] || 'Lainnya';
+  return canonicalDriveGetOrCreateFolder_(base, typeName);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SIGNATURE COMPOSITOR (Alternative A — TTD overlay stempel jadi 1 PNG)
@@ -99,7 +103,7 @@ var HTML_TPL_FOLDERS = {
  * Stempel di-place di background, TTD overlay di atasnya (offset kiri-atas)
  * — sama seperti tanda tangan asli.
  *
- * PNG hasil di-cache di Drive folder HTML_TPL_SIG_CACHE_FOLDER, jadi
+ * PNG hasil di-cache di company_config.signature_cache_folder_id, jadi
  * proses composite hanya jalan sekali per perusahaan (~5-8 detik pertama).
  *
  * @param {string} companyCode - 'RIFIM' | 'MIG' | 'LAILAN'
@@ -117,7 +121,7 @@ function _getCombinedSignatureId(companyCode) {
 
   // Version suffix bump kalau spec composite berubah — force re-generate
   var fileName  = 'signature-combined-' + companyCode + '-v2.png';
-  var folder    = DriveApp.getFolderById(HTML_TPL_SIG_CACHE_FOLDER);
+  var folder    = _htmlTplSignatureCacheFolder_();
 
   // Cek apakah file sudah ada di Drive folder
   var existing = folder.getFilesByName(fileName);
@@ -138,7 +142,9 @@ function _getCombinedSignatureId(companyCode) {
  * @private
  */
 function _composeSignatureViaSlides(companyCode, fileName, targetFolder) {
-  var ids = HTML_TPL_ASSETS[companyCode] || HTML_TPL_ASSETS['RIFIM'];
+  var ids = typeof soV2GetCompany_ === 'function'
+    ? soV2GetCompany_(companyCode)
+    : (HTML_TPL_ASSETS[companyCode] || HTML_TPL_ASSETS['RIFIM']);
   // Buat presentation custom size 70x55 mm via Slides API v1
   // SlidesApp.create() tidak support custom page size — harus via advanced service
   var createRes = Slides.Presentations.create({
@@ -203,7 +209,9 @@ function _composeSignatureViaSlides(companyCode, fileName, targetFolder) {
  * @returns {{ logo, ttd, stempel, color }} base64 data URIs
  */
 function _loadCompanyAssets(companyCode) {
-  var ids    = HTML_TPL_ASSETS[companyCode] || HTML_TPL_ASSETS['RIFIM'];
+  var ids    = typeof soV2GetCompany_ === 'function'
+    ? soV2GetCompany_(companyCode)
+    : (HTML_TPL_ASSETS[companyCode] || HTML_TPL_ASSETS['RIFIM']);
   var token  = ScriptApp.getOAuthToken();
   var color  = ids.color || '#C40000';
 
@@ -290,6 +298,7 @@ function _baseCss() {
  * @private
  */
 function _kop(assets, company) {
+  if (assets && assets.native_branding) return '';
   // BANNER MODE: kalau kop_banner PNG tersedia, embed sebagai gambar full-width.
   // Ini support design premium (logo + tagline + badge + background gradient +
   // shape) yang tidak bisa direplikasi via HTML/CSS di Google Docs converter.
@@ -327,6 +336,7 @@ function _kop(assets, company) {
  * @private
  */
 function _footer(assets) {
+  if (assets && assets.native_branding) return '';
   if (!assets.footer_banner) return '';
   return [
     '<div style="margin:24px 0 0 0;">',
@@ -793,7 +803,8 @@ function buildDocumentHtml(docType, d, assets, company, qrDataUri) {
  * @param {string} folderId     - Drive folder ID tujuan
  * @returns {DriveFile} File PDF yang sudah tersimpan
  */
-function htmlToPdf(htmlContent, fileName, folderId) {
+function htmlToPdf(htmlContent, fileName, folderId, docType, options) {
+  options = options || {};
   var htmlBlob = Utilities.newBlob(htmlContent, 'text/html', fileName + '.html');
 
   // Upload HTML → konversi ke Google Doc
@@ -807,6 +818,7 @@ function htmlToPdf(htmlContent, fileName, folderId) {
     { convert: true }
   );
 
+  var preserveNativeDoc = false;
   try {
     // Post-processing via DocumentApp: margin + paksa dimensi logo + hapus border table
     try {
@@ -863,20 +875,38 @@ function htmlToPdf(htmlContent, fileName, folderId) {
       gasDoc.saveAndClose();
     } catch (_) { /* non-fatal */ }
 
+    if (options.native_branding && typeof soV2PreserveDocAndExportPdf_ === 'function') {
+      preserveNativeDoc = true;
+      return soV2PreserveDocAndExportPdf_(
+        tempDoc.id,
+        fileName,
+        folderId,
+        options.companyCode || 'RIFIM'
+      );
+    }
+
     // Export sebagai PDF
     var pdfBlob = DriveApp.getFileById(tempDoc.id)
       .getAs(MimeType.PDF)
       .setName(fileName + '.pdf');
 
-    // Simpan ke folder tujuan
-    var folder  = DriveApp.getFolderById(folderId);
+    // V4: folderId legacy diabaikan. Destination selalu canonical.
+    var folder  = _htmlTplCanonicalPdfFolder_(docType, new Date());
     var pdfFile = folder.createFile(pdfBlob);
 
-    return pdfFile;
+    return {
+      pdfId: pdfFile.getId(),
+      pdfUrl: pdfFile.getUrl(),
+      docId: tempDoc.id,
+      docUrl: '',
+      folderId: folder.getId(),
+    };
 
   } finally {
     // Hapus temp Google Doc — gunakan DriveApp (lebih reliable dari Drive.Files.trash v2)
-    try { DriveApp.getFileById(tempDoc.id).setTrashed(true); } catch (_) {}
+    if (!preserveNativeDoc) {
+      try { DriveApp.getFileById(tempDoc.id).setTrashed(true); } catch (_) {}
+    }
   }
 }
 
@@ -916,9 +946,11 @@ function generateQrBase64(data) {
 function generateDocumentViaHtml(input, config, company, docNumber, placeholderData) {
   var companyCode = (input.company_code || 'RIFIM').toUpperCase();
   var docType     = input.documentType;
+  var nativeBranding = !!input._canonical_document_id;
 
   // 1. Load aset (logo, TTD, stempel → base64)
   var assets = _loadCompanyAssets(companyCode);
+  assets.native_branding = nativeBranding;
 
   // 2. Bangun company info object untuk template
   var co = {
@@ -938,11 +970,12 @@ function generateDocumentViaHtml(input, config, company, docNumber, placeholderD
   // 4. Build HTML
   var htmlContent = buildDocumentHtml(docType, placeholderData, assets, co, qrBase64);
 
-  // 5. Tentukan folder PDF tujuan
-  var folderId = HTML_TPL_FOLDERS[docType] || '1XZDBwNNDrcLquTaKB-1cbegz7rniXdgK';
-
-  // 6. Convert HTML → PDF
-  var pdfFile = htmlToPdf(htmlContent, docNumber, folderId);
+  // 5-6. Convert HTML → PDF. Folder legacy tidak lagi dipakai;
+  // htmlToPdf() resolve canonical Smart Office/Year/Month/PDF/<Jenis>.
+  var exportResult = htmlToPdf(htmlContent, docNumber, '', docType, {
+    native_branding: nativeBranding,
+    companyCode: companyCode,
+  });
 
   // Simpan record ke sheet documents
   try {
@@ -958,8 +991,8 @@ function generateDocumentViaHtml(input, config, company, docNumber, placeholderD
       attachment:       input.attachment || 0,
       body_summary:     (input.body || '').substring(0, 200),
       status:           'FINAL',
-      gdoc_url:         '',
-      pdf_url:          pdfFile.getUrl(),
+      gdoc_url:         exportResult.docUrl || '',
+      pdf_url:          exportResult.pdfUrl || '',
       qr_url:           'qr:' + docNumber,
       created_by:       (input.performed_by && input.performed_by.email) || '',
       pipeline_type:    'html',
@@ -971,9 +1004,9 @@ function generateDocumentViaHtml(input, config, company, docNumber, placeholderD
   return {
     success:        true,
     documentNumber: docNumber,
-    pdfUrl:         pdfFile.getUrl(),
-    pdfFileId:      pdfFile.getId(),
-    gdocUrl:        '',
+    pdfUrl:         exportResult.pdfUrl || '',
+    pdfFileId:      exportResult.pdfId || null,
+    gdocUrl:        exportResult.docUrl || '',
     message:        'Dokumen berhasil dibuat: ' + docNumber,
   };
 }
@@ -997,7 +1030,9 @@ function generateDocumentViaHtml(input, config, company, docNumber, placeholderD
  * @returns {string} HTML preview (siap dimasukkan ke innerHTML)
  */
 function buildDocumentPreviewHtml(docType, d, companyCode, company) {
-  var ids    = HTML_TPL_ASSETS[companyCode] || HTML_TPL_ASSETS['RIFIM'];
+  var ids    = typeof soV2GetCompany_ === 'function'
+    ? soV2GetCompany_(companyCode)
+    : (HTML_TPL_ASSETS[companyCode] || HTML_TPL_ASSETS['RIFIM']);
   var token  = ScriptApp.getOAuthToken();
 
   // Gunakan Drive thumbnail URL (public-safe untuk browser via Bearer token di GAS,

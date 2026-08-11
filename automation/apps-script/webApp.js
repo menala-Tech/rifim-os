@@ -48,6 +48,9 @@ function doPost(e) {
       return _json(_handleHrisPost(input));
     }
 
+    var soV2PostResp = soV2RoutePost(input);
+    if (soV2PostResp) return _json(soV2PostResp);
+
     // ── Smart Office: preview dokumen HTML (browser preview sebelum generate PDF) ─
     if (input.action === 'previewDocument') {
       if (!input.documentType || !input.company_code) {
@@ -56,6 +59,9 @@ function doPost(e) {
       try {
         var pvConfig  = getCompanyConfig();
         var pvCompany = getCompanyByCode(input.company_code);
+        if (pvCompany && typeof soV2ResolveCompanyBranding_ === 'function') {
+          pvCompany = soV2ResolveCompanyBranding_(pvCompany, input.company_code);
+        }
         var pvPrefix  = pvCompany && pvCompany.doc_prefix ? String(pvCompany.doc_prefix) : 'RIFIM';
         var pvNum     = pvPrefix + '-' + input.documentType + '-PREVIEW';
         var pvData    = buildPlaceholderData(input, pvConfig, pvNum);
@@ -77,17 +83,7 @@ function doPost(e) {
 
     // ── Smart Office: generate dokumen via HTML pipeline (HTML → PDF) ──────────
     if (input.action === 'generateDocumentHtml') {
-      input.use_html_pipeline = true;
-      // Re-use flow generateDocument() yang sudah ada route ke HTML pipeline
-      var htmlResult = generateDocument(input);
-      if (htmlResult && htmlResult.success) {
-        var byH = input.performed_by || {};
-        logActivity('Smart Office', 'BUAT DOKUMEN (HTML)',
-          htmlResult.documentNumber || '', input.subject || '',
-          byH.name || '', byH.email || '',
-          'Tipe: ' + (input.documentType || '') + ' · ' + (input.company_code || ''));
-      }
-      return _json(htmlResult);
+      throw new Error('Legacy final generate dinonaktifkan. Gunakan flow approval Smart Office V2.');
     }
 
     // ── Smart Office: update document status ────────────────────────
@@ -153,40 +149,7 @@ function doPost(e) {
       return _json({ success: true });
     }
 
-    // ── Default: Smart Office document generation ──────────────────
-    // Validasi field attachment: harus integer (nomor lampiran), bukan teks bebas
-    if (input.attachment !== undefined && input.attachment !== '-') {
-      var attNum = Number(input.attachment);
-      if (isNaN(attNum) || !Number.isInteger(attNum)) {
-        _gasLogWarn('Smart Office', 'generateDocument',
-          'attachment bukan integer: ' + String(input.attachment),
-          { documentType: input.documentType, subject: input.subject });
-        // Koreksi: paksa ke integer atau default 0
-        input.attachment = Number.isInteger(attNum) ? attNum : 0;
-      } else {
-        input.attachment = attNum; // enforce number type
-      }
-    }
-
-    var docResult = generateDocument(input);
-    if (docResult && docResult.success) {
-      var by = input.performed_by || {};
-      logActivity('Smart Office', 'BUAT DOKUMEN',
-        docResult.documentNumber || '', input.subject || '',
-        by.name || '', by.email || '',
-        'Tipe: ' + (input.documentType || '') + ' · ' + (input.company_code || ''));
-      notifDocumentCreated({
-        documentNumber: docResult.documentNumber || '',
-        documentType:   DOCUMENT_TYPES[input.documentType]
-                          ? DOCUMENT_TYPES[input.documentType].label
-                          : (input.documentType || ''),
-        subject:        input.subject  || '',
-        gdocUrl:        docResult.gdocUrl || '',
-        pdfUrl:         docResult.pdfUrl  || '',
-        createdBy:      by.name || by.email || '',
-      });
-    }
-    return _json(docResult);
+    throw new Error('Direct Smart Office generate via web POST dinonaktifkan. Gunakan flow approval Smart Office V2.');
 
   } catch (err) {
     // Catat ke system_log — bukan hanya console.warn
@@ -320,7 +283,8 @@ function docHandlePost(e) {
     var postParams = (e && e.parameter) || {};
     var ctx = _docAuthContext_(postParams.user || input.user);
     var action = String(input.action || '');
-    _docRequireRole_(ctx, _docWriteRoles_());
+    if (action === 'doc_decide') _docRequireRole_(ctx, ['direksi', 'direktur']);
+    else _docRequireRole_(ctx, _docWriteRoles_());
 
     var data;
     switch (action) {
@@ -429,7 +393,7 @@ function _docRequireRole_(ctx, roles) {
 }
 
 function _docWriteRoles_() {
-  return ['koordinator', 'admin', 'management', 'direksi', 'direktur'];
+  return ['admin', 'direksi', 'direktur'];
 }
 
 function _docAdminRoles_() {
@@ -513,6 +477,9 @@ function doGet(e) {
   var crmResp = crmHandleGet(e);
   if (crmResp) return crmResp;
 
+  var soV2GetResp = soV2RouteGet((e && e.parameter) || {});
+  if (soV2GetResp) return _json(soV2GetResp);
+
   if (action === 'staff_list') {
     try {
       var rawList = hrisGetEmployees({ status: 'AKTIF', limit: 200 });
@@ -543,7 +510,27 @@ function doGet(e) {
   if (action === 'companies') {
     try {
       var list = getCompanies().map(function(c) {
-        return { code: c.code, name: c.name, director_name: c.director_name, director_title: c.director_title, doc_prefix: c.doc_prefix };
+        var resolved = c;
+        if (typeof soV2ResolveCompanyBranding_ === 'function') {
+          resolved = soV2ResolveCompanyBranding_(c, c.code);
+        }
+        return {
+          code: resolved.code,
+          name: resolved.name,
+          director_name: resolved.director_name,
+          director_title: resolved.director_title,
+          doc_prefix: resolved.doc_prefix,
+          logo_asset_id: resolved.logo_asset_id || '',
+          letterhead_asset_id: resolved.letterhead_asset_id || '',
+          footer_asset_id: resolved.footer_asset_id || '',
+          signature_asset_id: resolved.signature_asset_id || '',
+          stamp_asset_id: resolved.stamp_asset_id || '',
+          logo_id: resolved.logo_id || '',
+          kop_banner_id: resolved.kop_banner_id || '',
+          footer_banner_id: resolved.footer_banner_id || '',
+          ttd_id: resolved.ttd_id || '',
+          stempel_id: resolved.stempel_id || '',
+        };
       });
       return ContentService
         .createTextOutput(JSON.stringify({ success: true, companies: list }))

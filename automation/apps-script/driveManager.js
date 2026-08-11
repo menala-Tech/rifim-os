@@ -1,144 +1,74 @@
 /**
- * RIFIM OS — Drive Manager
- * Kelola penyimpanan file di Google Drive.
+ * RIFIM OS — Drive Manager V4
  *
- * Struktur penyimpanan:
- * 📁 Root (RIFIM OS)
- *   └── 📁 Dokumen
- *         └── 📁 [Jenis Dokumen]          ← misal: Surat, Invoice, SP
- *               └── 📁 [Bulan Tahun]      ← misal: Juli 2026
- *                     ├── 001-RIFIM-INV-VII-2026.gdoc
- *                     └── 001-RIFIM-INV-VII-2026.pdf
+ * Semua output Smart Office wajib memakai Canonical Drive Storage:
+ *   02_MODULES_PWA/02_SMART_OFFICE/YYYY/MM_Bulan/03_PDF/<Jenis Dokumen>/
+ *
+ * Folder legacy drive_folder_* tetap ada di company_config hanya untuk
+ * backward compatibility/audit, tetapi TIDAK dipakai untuk write baru.
  */
 
-// ── Mapping kode dokumen → nama folder ───────────────────────
 var _FOLDER_MAP = {
-  SURAT: 'Surat',
-  ST:    'Surat',
-  SIZ:   'Surat',
-  SKT:   'Surat',
-  INV:   'Invoice',
-  KWT:   'Kwitansi',
-  PROP:  'Proposal',
-  CP:    'Company Profile',
-  MOU:   'MOU',
-  PKS:   'Perjanjian Kerjasama',
-  PKWT:  'Kontrak Karyawan',
-  SPG:   'Kontrak Karyawan',
-  SMT:   'Kontrak Karyawan',
-  PI:    'Kontrak Karyawan',
-  SP1:   'Surat Peringatan',
-  SP2:   'Surat Peringatan',
-  SP3:   'Surat Peringatan',
-  PHK:   'Surat Peringatan',
-  BA:    'Berita Acara',
-  FCO:   'Form Checklist',
+  SURAT: 'Surat', ST: 'Surat', SIZ: 'Surat', SKT: 'Surat',
+  INV: 'Invoice', KWT: 'Kwitansi', PROP: 'Proposal', CP: 'Company Profile',
+  MOU: 'MOU', PKS: 'Perjanjian Kerjasama',
+  PKWT: 'Kontrak Karyawan', SPG: 'Kontrak Karyawan', SMT: 'Kontrak Karyawan', PI: 'Kontrak Karyawan',
+  SP1: 'Surat Peringatan', SP2: 'Surat Peringatan', SP3: 'Surat Peringatan', PHK: 'Surat Peringatan',
+  BA: 'Berita Acara', FCO: 'Form Checklist'
 };
 
-var _MONTHS_ID = [
-  'Januari','Februari','Maret','April','Mei','Juni',
-  'Juli','Agustus','September','Oktober','November','Desember',
-];
-
-
-/**
- * Buat salinan template Google Doc.
- * @param {string} templateId  - Google Doc ID dari company_config
- * @param {string} docNumber   - Nomor dokumen (untuk nama file draft)
- * @returns {GoogleAppsScript.Drive.File}
- */
 function getTemplateCopy(templateId, docNumber) {
   var template = DriveApp.getFileById(templateId);
   var draftName = '[DRAFT] ' + docNumber.replace(/\//g, '-');
-
-  // Simpan draft ke root sementara, akan dipindah setelah selesai
-  var copy = template.makeCopy(draftName);
-  return copy;
+  // V4: bahkan draft pertama langsung dibuat di tree canonical; tidak pernah
+  // singgah sebagai writer ke My Drive/root atau folder legacy.
+  var docCode = String(docNumber || '').split('/')[0] || 'LAIN';
+  var folder = _smartOfficeCanonicalOutputFolder_(docCode, new Date());
+  return template.makeCopy(draftName, folder);
 }
 
+function _smartOfficeCanonicalOutputFolder_(docCode, when) {
+  if (typeof canonicalDriveGetMonthFolder !== 'function') {
+    throw new Error('canonicalDriveStorage.js belum terpasang — Smart Office menolak fallback ke folder legacy');
+  }
+  var pdfRoot = canonicalDriveGetMonthFolder('smart_office', 'pdf', when);
+  var typeName = _FOLDER_MAP[String(docCode || '').toUpperCase()] || 'Lainnya';
+  return canonicalDriveGetOrCreateFolder_(pdfRoot, typeName);
+}
 
-/**
- * Pindahkan Google Doc ke folder final yang tepat.
- * Path: Root > Dokumen > [Jenis] > [Bulan Tahun]
- *
- * @param {GoogleAppsScript.Drive.File} docFile
- * @param {string} docCode   - SURAT / INV / SP1 / dll
- * @param {string} docNumber - 001/RIFIM/INV/VII/2026
- * @returns {GoogleAppsScript.Drive.File}
- */
 function saveDocument(docFile, docCode, docNumber) {
-  var folder   = _getMonthFolder(docCode);
+  var folder = _smartOfficeCanonicalOutputFolder_(docCode, new Date());
   var fileName = docNumber.replace(/\//g, '-');
-
   docFile.setName(fileName);
   docFile.moveTo(folder);
-
   return docFile;
 }
 
-
-/**
- * Export Google Doc ke PDF, simpan ke folder yang sama.
- * @param {string} docId    - Google Doc ID (setelah placeholder terisi)
- * @param {string} docCode  - SURAT / INV / dll
- * @param {string} docNumber
- * @returns {GoogleAppsScript.Drive.File} File PDF
- */
 function exportToPDF(docId, docCode, docNumber) {
-  var doc     = DriveApp.getFileById(docId);
-  var folder  = _getMonthFolder(docCode);
+  var doc = DriveApp.getFileById(docId);
+  var folder = _smartOfficeCanonicalOutputFolder_(docCode, new Date());
   var pdfName = docNumber.replace(/\//g, '-') + '.pdf';
-
-  // Export sebagai PDF blob
   var pdfBlob = doc.getAs(MimeType.PDF).setName(pdfName);
-  var pdfFile = folder.createFile(pdfBlob);
-
-  return pdfFile;
+  return folder.createFile(pdfBlob);
 }
 
-
 /**
- * Ambil (atau buat) folder bulan untuk kode dokumen tertentu.
- * Path: Root > Dokumen > [Jenis] > [Bulan Tahun]
- * @private
+ * Compatibility helper. Existing callers that still call _getMonthFolder()
+ * are redirected to the canonical Smart Office PDF tree.
  */
 function _getMonthFolder(docCode) {
-  var config  = getCompanyConfig();
-  var rootId  = config['drive_root_folder_id'] || DRIVE_ROOT_FOLDER_ID;
-  var root    = DriveApp.getFolderById(rootId);
-
-  // Level 1: Dokumen
-  var dokumen = _getOrCreateFolder(root, 'Dokumen');
-
-  // Level 2: Jenis dokumen
-  var typeName   = _FOLDER_MAP[docCode] || 'Lainnya';
-  var typeFolder = _getOrCreateFolder(dokumen, typeName);
-
-  // Level 3: Bulan Tahun (mis. "Juli 2026")
-  var now        = new Date();
-  var monthName  = _MONTHS_ID[now.getMonth()] + ' ' + now.getFullYear();
-  var monthFolder = _getOrCreateFolder(typeFolder, monthName);
-
-  return monthFolder;
+  return _smartOfficeCanonicalOutputFolder_(docCode, new Date());
 }
 
-
-/**
- * Ambil atau buat subfolder dalam parent.
- * @private
- */
 function _getOrCreateFolder(parentFolder, name) {
+  if (typeof canonicalDriveGetOrCreateFolder_ === 'function') {
+    return canonicalDriveGetOrCreateFolder_(parentFolder, name);
+  }
   var it = parentFolder.getFoldersByName(name);
   if (it.hasNext()) return it.next();
   return parentFolder.createFolder(name);
 }
 
-
-/**
- * Buat URL preview Google Drive untuk file.
- * @param {string} fileId
- * @returns {string}
- */
 function getDrivePreviewUrl(fileId) {
   return 'https://drive.google.com/file/d/' + fileId + '/view';
 }

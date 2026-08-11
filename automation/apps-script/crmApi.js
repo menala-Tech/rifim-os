@@ -12,115 +12,157 @@
  *   }
  *
  * Semua endpoint return JSON: { success: bool, ... payload / message }
- * Wajib admin-only untuk write. Auth check via header X-Portal-User atau
- * query param ?user=<email>, dicocokkan ke company_config.allowed_emails
- * + role check via configLoader.
+ * Write hanya Admin/Direksi/Direktur. Actor wajib berasal dari Supabase access token
+ * yang diverifikasi server-side; parameter email browser tidak dipercaya.
  */
 
 // ═══════════════════════════════════════════════════════════════════════
 // Constants
 // ═══════════════════════════════════════════════════════════════════════
-var CRM_WRITE_ROLES = ['admin','management','direksi','direktur'];
+var CRM_READ_ROLES  = ['admin','management','direksi','direktur'];
+var CRM_WRITE_ROLES = ['admin','direksi','direktur'];
+
+var CRM_ACTIONS = {
+  company_config_list: true,
+  company_config_set: true,
+  company_config_drive_audit: true,
+  canonical_drive_audit: true,
+  canonical_drive_prepare_month: true,
+  canonical_drive_backup_master: true,
+  whitelist_list: true,
+  whitelist_add: true,
+  whitelist_remove: true,
+  whitelist_update: true,
+  crm_audit_tail: true,
+  sistem_config_list: true,
+  sistem_config_set: true,
+  sistem_config_audit: true,
+  sistem_config_sync_all: true,
+  raos_users_list: true,
+  raos_users_update: true,
+  raos_users_reset_pin: true,
+  raos_credentials_list: true,
+  raos_credentials_reset_pin: true,
+  raos_ssot_pin_update: true,
+  contacts_list: true,
+  contacts_upsert: true,
+  contacts_delete: true,
+  finance_list: true,
+  finance_cabang_list: true,
+  finance_tagihan_list: true,
+  finance_tagihan_add: true,
+  finance_tagihan_mark_paid: true,
+  finance_rekap_harian: true,
+  finance_rekap_bulanan: true,
+  finance_log_list: true,
+  finance_saldo_raos_list: true,
+  finance_saldo_raos_mark_paid: true,
+  finance_kpi_target_branch_list: true,
+  finance_kpi_target_branch_upsert: true,
+  finance_kpi_target_staff_list: true,
+  finance_kpi_target_staff_upsert: true,
+  finance_payroll_compute: true,
+  finance_payroll_list: true,
+  finance_drivers_list: true,
+  finance_driver_assignment_list: true,
+  finance_driver_assign_random: true,
+  hris_payroll_bonus_list: true,
+  hris_payroll_v2_bundle: true,
+  hris_payroll_v2_branches: true,
+  hris_payroll_v2_manual_kasbon: true,
+  hris_payroll_v2_deposit: true,
+  hris_upload_employee_photo: true,
+  hris_attendance_raos_list: true,
+  hris_attendance_summary_month: true,
+  hris_attendance_edit: true,
+  hris_gapok_proporsional_list: true,
+};
 
 // ═══════════════════════════════════════════════════════════════════════
 // Dispatcher — dipanggil dari webApp.js doGet
 // ═══════════════════════════════════════════════════════════════════════
 function crmHandleGet(e) {
   var action = e && e.parameter && e.parameter.action;
-  if (!action) return null;
-
-  try {
-    // ─── Company Config ──────────────────────────────────
-    if (action === 'company_config_list')   return _crmJson({ success: true, config: _crmReadKV_('company_config') });
-    if (action === 'company_config_set')    return _crmJson(_crmSetKV_('company_config', e.parameter));
-
-    // ─── Whitelist Portal ────────────────────────────────
-    if (action === 'whitelist_list')        return _crmJson({ success: true, whitelist: _crmWhitelistList_() });
-    if (action === 'whitelist_add')         return _crmJson(_crmWhitelistMutate_('add',    e.parameter));
-    if (action === 'whitelist_remove')      return _crmJson(_crmWhitelistMutate_('remove', e.parameter));
-    if (action === 'whitelist_update')      return _crmJson(_crmWhitelistUpdate_(e.parameter));
-
-    // ─── Audit log tail (dari SYSTEM_LOG sheet, cache 60s) ──
-    if (action === 'crm_audit_tail')        return _crmJson({ success: true, logs: _crmAuditTail_(parseInt(e.parameter.limit) || 100) });
-
-    // ─── System Config RAOS: sheet sync only (Supabase mirror di frontend RPC)
-    if (action === 'sistem_config_set')     return _crmJson(_crmSistemConfigSetSheet_(e.parameter));
-
-    // ─── User Supabase RAOS proxy (bypass RLS via service_role, admin-only via GAS auth)
-    if (action === 'raos_users_list')       return _crmJson(_crmRaosUsersList_(e.parameter));
-    if (action === 'raos_users_update')     return _crmJson(_crmRaosUsersUpdate_(e.parameter));
-    if (action === 'raos_users_reset_pin')  return _crmJson(_crmRaosUsersResetPin_(e.parameter));
-
-    // ─── Portal PIN (raos_credentials): admin-only. `list` return map
-    // {user_id: {has_pin, staff_code, updated_at}} untuk merge di UI.
-    if (action === 'raos_credentials_list')       return _crmJson(_crmRaosCredentialsList_(e.parameter));
-    if (action === 'raos_credentials_reset_pin')  return _crmJson(_crmRaosCredentialsResetPin_(e.parameter));
-    // ─── SSOT PIN (kolom H sheet MASTER DATA STAFF) — edit langsung tanpa
-    // buka spreadsheet. Sync harian propagate ke Supabase Auth password.
-    if (action === 'raos_ssot_pin_update')        return _crmJson(_crmRaosSsotPinUpdate_(e.parameter));
-
-    // ─── CRM Kontak Eksternal (tabel Supabase crm_contacts, service_role via GAS)
-    if (action === 'contacts_list')         return _crmJson(_crmContactsList_(e.parameter));
-    if (action === 'contacts_upsert')       return _crmJson(_crmContactsUpsert_(e.parameter));
-    if (action === 'contacts_delete')       return _crmJson(_crmContactsDelete_(e.parameter));
-
-    // ─── Finance module (spreadsheet 1AgpEqhpDU4B... — LIA master + Tagihan + per-cabang)
-    if (action === 'finance_list')          return _crmJson(_finLedgerList_(e.parameter));
-    if (action === 'finance_cabang_list')   return _crmJson(_finCabangList_(e.parameter));
-    if (action === 'finance_tagihan_list')  return _crmJson(_finTagihanList_(e.parameter));
-    if (action === 'finance_tagihan_add')   return _crmJson(_finTagihanAdd_(e.parameter));
-    if (action === 'finance_tagihan_mark_paid') return _crmJson(_finTagihanMarkPaid_(e.parameter));
-    if (action === 'finance_rekap_harian')  return _crmJson(_finRekapHarian_(e.parameter));
-    if (action === 'finance_rekap_bulanan') return _crmJson(_finRekapBulanan_(e.parameter));
-    if (action === 'finance_log_list')      return _crmJson(_finLogList_(e.parameter));
-    if (action === 'finance_saldo_raos_list' || action === 'finance_saldo_raos_mark_paid') {
-      return _crmJson({ success: false, code: 'METHOD_NOT_ALLOWED', message: 'Endpoint saldo Finance wajib POST.' });
-    }
-
-    // ─── KPI Targets V2 (raos_070) — Target Cabang + Target Staff + Payroll
-    if (action === 'finance_kpi_target_branch_list')   return _crmJson(_finKpiTargetBranchList_(e.parameter));
-    if (action === 'finance_kpi_target_branch_upsert') return _crmJson(_finKpiTargetBranchUpsert_(e.parameter));
-    if (action === 'finance_kpi_target_staff_list')    return _crmJson(_finKpiTargetStaffList_(e.parameter));
-    if (action === 'finance_kpi_target_staff_upsert')  return _crmJson(_finKpiTargetStaffUpsert_(e.parameter));
-    if (action === 'finance_payroll_compute')          return _crmJson(_finPayrollCompute_(e.parameter));
-    if (action === 'finance_payroll_list')             return _crmJson(_finPayrollList_(e.parameter));
-
-    // ─── DB Driver + Random Assignment (raos_070) — Fase 5
-    if (action === 'finance_drivers_list')             return _crmJson(_finDriversList_(e.parameter));
-    if (action === 'finance_driver_assignment_list')   return _crmJson(_finDriverAssignmentList_(e.parameter));
-    if (action === 'finance_driver_assign_random')     return _crmJson(_finDriverAssignRandom_(e.parameter));
-
-    // ─── HRIS Payroll bridge — read-only bonus dari Finance
-    if (action === 'hris_payroll_bonus_list')          return _crmJson(_hrisPayrollBonusList_(e.parameter));
-
-    // ─── HRIS foto karyawan upload ke Google Drive
-    if (action === 'hris_upload_employee_photo')       return _crmJson(_hrisUploadEmployeePhoto_(e.parameter));
-
-    // ─── HRIS Absensi (raos_attendance SSOT, bukan tabel attendance lama)
-    if (action === 'hris_attendance_raos_list')        return _crmJson(_hrisAttendanceRaosList_(e.parameter));
-    if (action === 'hris_attendance_summary_month')    return _crmJson(_hrisAttendanceSummaryMonth_(e.parameter));
-    if (action === 'hris_attendance_edit')             return _crmJson(_hrisAttendanceEdit_(e.parameter));
-    if (action === 'hris_gapok_proporsional_list')     return _crmJson(_hrisGapokProporsionalList_(e.parameter));
-
-    return null; // bukan CRM action, delegate ke handler lain di doGet
-  } catch (err) {
-    return _crmJson({ success: false, message: 'CRM API error: ' + err.message });
-  }
+  if (!action || !CRM_ACTIONS[action]) return null;
+  return _crmJson({
+    success: false,
+    code: 'METHOD_NOT_ALLOWED',
+    message: 'Endpoint privileged wajib POST dengan session access token.',
+  });
 }
 
 function crmHandlePost(input) {
   var action = input && input.action;
-  if (action !== 'finance_saldo_raos_list' && action !== 'finance_saldo_raos_mark_paid') return null;
+  if (!action || !CRM_ACTIONS[action]) return null;
   try {
-    if (action === 'finance_saldo_raos_list') return _crmJson(_finSaldoRaosList_(input));
-    return _crmJson(_finSaldoRaosMarkPaid_(input));
+    _crmRequireRead_(input);
+    return _crmJson(_crmDispatch_(action, input));
   } catch (err) {
     return _crmJson({
       success: false,
-      code: err.code || 'FINANCE_SALDO_ERROR',
+      code: err.code || 'CRM_API_ERROR',
       message: err.message || String(err),
     });
   }
+}
+
+function _crmDispatch_(action, params) {
+  if (action === 'company_config_list') return { success: true, config: _crmReadKV_('company_config') };
+  if (action === 'company_config_set') return _crmSetKV_('company_config', params);
+  if (action === 'company_config_drive_audit') return _crmCompanyConfigDriveAudit_(params);
+  if (action === 'canonical_drive_audit') return _crmCanonicalDriveAudit_(params);
+  if (action === 'canonical_drive_prepare_month') return _crmCanonicalDrivePrepareMonth_(params);
+  if (action === 'canonical_drive_backup_master') return _crmCanonicalDriveBackupMaster_(params);
+  if (action === 'whitelist_list') return { success: true, whitelist: _crmWhitelistList_() };
+  if (action === 'whitelist_add') return _crmWhitelistMutate_('add', params);
+  if (action === 'whitelist_remove') return _crmWhitelistMutate_('remove', params);
+  if (action === 'whitelist_update') return _crmWhitelistUpdate_(params);
+  if (action === 'crm_audit_tail') return { success: true, logs: _crmAuditTail_(parseInt(params.limit) || 100) };
+  if (action === 'sistem_config_list') return _crmSistemConfigList_(params);
+  if (action === 'sistem_config_set') return _crmSistemConfigSetSheet_(params);
+  if (action === 'sistem_config_audit') return _crmSistemConfigAudit_(params);
+  if (action === 'sistem_config_sync_all') return _crmSistemConfigSyncAll_(params);
+  if (action === 'raos_users_list') return _crmRaosUsersList_(params);
+  if (action === 'raos_users_update') return _crmRaosUsersUpdate_(params);
+  if (action === 'raos_users_reset_pin') return _crmRaosUsersResetPin_(params);
+  if (action === 'raos_credentials_list') return _crmRaosCredentialsList_(params);
+  if (action === 'raos_credentials_reset_pin') return _crmRaosCredentialsResetPin_(params);
+  if (action === 'raos_ssot_pin_update') {
+    return { success: false, code: 'LEGACY_PIN_OWNED_BY_SSOT', message: 'PIN legacy tidak boleh diubah dari CRM. Gunakan dedicated PIN RAOS.' };
+  }
+  if (action === 'contacts_list') return _crmContactsList_(params);
+  if (action === 'contacts_upsert') return _crmContactsUpsert_(params);
+  if (action === 'contacts_delete') return _crmContactsDelete_(params);
+  if (action === 'finance_list') return _finLedgerList_(params);
+  if (action === 'finance_cabang_list') return _finCabangList_(params);
+  if (action === 'finance_tagihan_list') return _finTagihanList_(params);
+  if (action === 'finance_tagihan_add') return _finTagihanAdd_(params);
+  if (action === 'finance_tagihan_mark_paid') return _finTagihanMarkPaid_(params);
+  if (action === 'finance_rekap_harian') return _finRekapHarian_(params);
+  if (action === 'finance_rekap_bulanan') return _finRekapBulanan_(params);
+  if (action === 'finance_log_list') return _finLogList_(params);
+  if (action === 'finance_saldo_raos_list') return _finSaldoRaosList_(params);
+  if (action === 'finance_saldo_raos_mark_paid') return _finSaldoRaosMarkPaid_(params);
+  if (action === 'finance_kpi_target_branch_list') return _finKpiTargetBranchList_(params);
+  if (action === 'finance_kpi_target_branch_upsert') return _finKpiTargetBranchUpsert_(params);
+  if (action === 'finance_kpi_target_staff_list') return _finKpiTargetStaffList_(params);
+  if (action === 'finance_kpi_target_staff_upsert') return _finKpiTargetStaffUpsert_(params);
+  if (action === 'finance_payroll_compute') return _finPayrollCompute_(params);
+  if (action === 'finance_payroll_list') return _finPayrollList_(params);
+  if (action === 'finance_drivers_list') return _finDriversList_(params);
+  if (action === 'finance_driver_assignment_list') return _finDriverAssignmentList_(params);
+  if (action === 'finance_driver_assign_random') return _finDriverAssignRandom_(params);
+  if (action === 'hris_payroll_bonus_list') return _hrisPayrollBonusList_(params);
+  if (action === 'hris_payroll_v2_bundle') return _payrollV2Bundle_(params);
+  if (action === 'hris_payroll_v2_branches') return _payrollV2BranchList_(params);
+  if (action === 'hris_payroll_v2_manual_kasbon') return _payrollV2ManualKasbon_(params);
+  if (action === 'hris_payroll_v2_deposit') return _payrollV2Deposit_(params);
+  if (action === 'hris_upload_employee_photo') return _hrisUploadEmployeePhoto_(params);
+  if (action === 'hris_attendance_raos_list') return _hrisAttendanceRaosList_(params);
+  if (action === 'hris_attendance_summary_month') return _hrisAttendanceSummaryMonth_(params);
+  if (action === 'hris_attendance_edit') return _hrisAttendanceEdit_(params);
+  if (action === 'hris_gapok_proporsional_list') return _hrisGapokProporsionalList_(params);
+  throw new Error('CRM action tidak dikenal: ' + action);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -137,6 +179,82 @@ function _crmReadKV_(sheetName) {
     out.push({ key: key, value: data[i][1], description: data[i][2] || '' });
   }
   return out;
+}
+
+function _crmCompanyConfigDriveAudit_(params) {
+  _crmRequireRead_(params);
+  var rows = _crmReadKV_('company_config');
+  var items = [];
+  rows.forEach(function(row) {
+    var key = String(row.key || '');
+    var id = String(row.value || '').trim();
+    if (!id) return;
+    var isFolder = (/^drive_.*folder_id$/).test(key) || key === 'signature_cache_folder_id';
+    var isFile = key.indexOf('gdoc_template_') === 0 || key.indexOf('logo_') === 0 || key.indexOf('kop_banner_') === 0 || key.indexOf('footer_banner_') === 0;
+    if (!isFolder && !isFile) return;
+    var legacy = key === 'drive_dokumen_folder_id' || key.indexOf('drive_folder_') === 0;
+    try {
+      var obj = isFolder ? DriveApp.getFolderById(id) : DriveApp.getFileById(id);
+      items.push({ key:key, id:id, type:isFolder ? 'folder' : 'file', ok:true, name:obj.getName(), legacy:legacy });
+    } catch (err) {
+      items.push({ key:key, id:id, type:isFolder ? 'folder' : 'file', ok:false, legacy:legacy, message:err.message || String(err) });
+    }
+  });
+  var bad = items.filter(function(x) { return !x.ok; });
+  var canonical = (typeof canonicalDriveAudit === 'function')
+    ? canonicalDriveAudit()
+    : { success:false, healthy:false, issues:[{code:'CANONICAL_RESOLVER_MISSING',message:'canonicalDriveStorage.js belum terpasang'}] };
+  return {
+    success:true,
+    healthy:bad.length === 0 && canonical.healthy === true,
+    checked:items.length,
+    invalid:bad.length,
+    legacy_count:items.filter(function(x){return x.legacy;}).length,
+    items:items,
+    canonical:canonical
+  };
+}
+
+function _crmCanonicalDriveAudit_(params) {
+  _crmRequireRead_(params);
+  if (typeof canonicalDriveAudit !== 'function') {
+    return { success:false, healthy:false, message:'canonicalDriveStorage.js belum terpasang' };
+  }
+  return canonicalDriveAudit();
+}
+
+function _crmCanonicalDriveDate_(raw) {
+  var value = String(raw || '').trim();
+  if (!value) return new Date();
+  // Accept YYYY-MM or YYYY-MM-DD.
+  if (/^\d{4}-\d{2}$/.test(value)) value += '-01';
+  var d = new Date(value + (value.length === 10 ? 'T12:00:00' : ''));
+  if (isNaN(d.getTime())) throw new Error('month/date tidak valid: ' + raw);
+  return d;
+}
+
+function _crmCanonicalDrivePrepareMonth_(params) {
+  _crmRequireAdmin_(params);
+  if (typeof canonicalDriveEnsureAllModulesMonth !== 'function' || typeof canonicalDriveEnsureAllCompaniesMonth !== 'function') {
+    return { success:false, message:'canonicalDriveStorage.js belum terpasang' };
+  }
+  var when = _crmCanonicalDriveDate_(params.month || params.date);
+  var modules = canonicalDriveEnsureAllModulesMonth(when);
+  var companies = canonicalDriveEnsureAllCompaniesMonth(when);
+  var parts = canonicalDriveMonthParts_(when);
+  _crmAuditWrite_(params, 'prepare_month', 'canonical_drive', parts.year + '/' + parts.month, '', 'modules+companies');
+  return { success:true, year:parts.year, month:parts.month, modules:modules, companies:companies };
+}
+
+function _crmCanonicalDriveBackupMaster_(params) {
+  _crmRequireAdmin_(params);
+  if (typeof canonicalDriveBackupMasterSpreadsheet !== 'function') {
+    return { success:false, message:'canonicalDriveStorage.js belum terpasang' };
+  }
+  var when = _crmCanonicalDriveDate_(params.month || params.date);
+  var file = canonicalDriveBackupMasterSpreadsheet(when);
+  _crmAuditWrite_(params, 'backup_master', 'canonical_drive', file.getId(), '', file.getName());
+  return { success:true, file_id:file.getId(), file_name:file.getName(), url:file.getUrl() };
 }
 
 function _crmSetKV_(sheetName, params) {
@@ -193,8 +311,9 @@ function _crmWhitelistMutate_(op, params) {
   }
 
   // Write balik ke company_config.allowed_emails
-  var result = _crmSetKV_('company_config', {
+  _crmSetKV_('company_config', {
     user:  params.user,
+    access_token: params.access_token || params.token || '',
     key:   'allowed_emails',
     value: next.join(','),
     description: 'Comma-separated emails yang boleh login portal',
@@ -222,6 +341,7 @@ function _crmWhitelistUpdate_(params) {
 
   _crmSetKV_('company_config', {
     user:  params.user,
+    access_token: params.access_token || params.token || '',
     key:   'allowed_emails',
     value: next.join(','),
     description: 'Comma-separated emails yang boleh login portal',
@@ -231,8 +351,7 @@ function _crmWhitelistUpdate_(params) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Audit log — pakai sheet SYSTEM_LOG existing (kolom: timestamp, user, action, target, before, after)
-// Kalau SYSTEM_LOG tidak ada, auto-create dengan header standar.
+// Audit log — durable Sheet trace + best-effort Supabase mirror.
 // ═══════════════════════════════════════════════════════════════════════
 function _crmAuditWrite_(params, action, targetType, targetKey, before, after) {
   var ss = SpreadsheetApp.getActive();
@@ -242,20 +361,42 @@ function _crmAuditWrite_(params, action, targetType, targetKey, before, after) {
     sh.appendRow(['timestamp','actor_email','action','target_type','target_key','before','after','ip','user_agent']);
     sh.setFrozenRows(1);
   }
+  var actorEmail = String(params._crm_actor_email || params.user || 'unknown');
   sh.appendRow([
-    new Date(),
-    String(params.user || 'unknown'),
-    action,
-    targetType,
-    targetKey,
-    before === null ? '' : String(before),
-    after  === null ? '' : String(after),
-    String(params.ip || ''),
-    String(params.ua || ''),
+    new Date(), actorEmail, action, targetType, targetKey,
+    before === null ? '' : String(before), after === null ? '' : String(after),
+    String(params.ip || ''), String(params.ua || ''),
   ]);
+
+  // Best-effort mirror. Sheet logging must never be rolled back because the DB mirror is unavailable.
+  try {
+    _crmSbFetch_('POST', '/rest/v1/crm_audit_log', {
+      actor_id: params._crm_actor_id || null,
+      actor_email: actorEmail,
+      action: String(action || 'unknown'),
+      target_type: String(targetType || 'unknown'),
+      target_key: targetKey == null ? null : String(targetKey),
+      before: before === undefined ? null : before,
+      after: after === undefined ? null : after,
+      metadata: { source:'crm_gas', ip:String(params.ip || ''), user_agent:String(params.ua || '') },
+      created_at: new Date().toISOString(),
+    });
+  } catch (mirrorErr) {
+    console.warn('CRM audit Supabase mirror failed:', mirrorErr.message || mirrorErr);
+  }
 }
 
 function _crmAuditTail_(limit) {
+  // Canonical read: Supabase mirror first; Sheet remains durable fallback / operational trace.
+  try {
+    var sb = _crmSbFetch_('GET', '/rest/v1/crm_audit_log?select=created_at,actor_email,action,target_type,target_key,before,after&order=created_at.desc&limit=' + encodeURIComponent(limit));
+    if (Array.isArray(sb) && sb.length) {
+      return sb.map(function(r) {
+        return { timestamp:r.created_at, actor_email:r.actor_email, action:r.action, target_type:r.target_type, target_key:r.target_key, before:r.before, after:r.after };
+      });
+    }
+  } catch (err) { console.warn('CRM audit Supabase read failed, fallback Sheet:', err.message || err); }
+
   var sh = SpreadsheetApp.getActive().getSheetByName('CRM_AUDIT_LOG');
   if (!sh) return [];
   var lastRow = sh.getLastRow();
@@ -263,28 +404,50 @@ function _crmAuditTail_(limit) {
   var start = Math.max(2, lastRow - limit + 1);
   var rows = sh.getRange(start, 1, lastRow - start + 1, 9).getValues();
   return rows.reverse().map(function(r) {
-    return {
-      timestamp: r[0], actor_email: r[1], action: r[2],
-      target_type: r[3], target_key: r[4], before: r[5], after: r[6],
-    };
+    return { timestamp:r[0], actor_email:r[1], action:r[2], target_type:r[3], target_key:r[4], before:r[5], after:r[6] };
   });
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Role check — email harus ada di whitelist DAN role ∈ CRM_WRITE_ROLES
+// CRM role enforcement — actor derived from verified Supabase access token
 // ═══════════════════════════════════════════════════════════════════════
-function _crmRequireAdmin_(params) {
-  var email = String(params.user || '').toLowerCase().trim();
-  if (!email) throw new Error('Parameter user (email) wajib untuk write action');
+function _crmRequireRole_(params, allowedRoles, mode) {
+  params = params || {};
+  var token = String(params.access_token || params.token || '').trim();
+  if (!token) {
+    var tokenErr = new Error('Session token diperlukan untuk ' + mode + ' CRM');
+    tokenErr.code = 'TOKEN_REQUIRED';
+    throw tokenErr;
+  }
 
-  var verified = authVerifyUser(email);
-  if (!verified.success) throw new Error('Email ' + email + ' tidak diizinkan');
+  var verified = authVerifyAccessToken(token);
+  if (!verified.success) {
+    var authErr = new Error(verified.message || 'Session tidak valid');
+    authErr.code = verified.code || 'UNAUTHORIZED';
+    throw authErr;
+  }
 
   var role = String(verified.user && verified.user.role || '').toLowerCase();
-  if (CRM_WRITE_ROLES.indexOf(role) === -1) {
-    throw new Error('Role ' + role + ' tidak boleh edit CRM (perlu admin/mgmt/direksi)');
+  if (allowedRoles.indexOf(role) === -1) {
+    var roleErr = new Error('Role ' + role + ' tidak boleh ' + mode + ' CRM');
+    roleErr.code = 'ROLE_NOT_ALLOWED';
+    throw roleErr;
   }
+
+  // Canonical actor comes from the verified token, never from a caller-supplied email.
+  params._crm_actor_email = String(verified.user.email || '');
+  params._crm_actor_id = verified.user.id || null;
+  params.user = params._crm_actor_email;
+  params.actor_id = params._crm_actor_id;
   return verified.user;
+}
+
+function _crmRequireRead_(params) {
+  return _crmRequireRole_(params, CRM_READ_ROLES, 'melihat');
+}
+
+function _crmRequireAdmin_(params) {
+  return _crmRequireRole_(params, CRM_WRITE_ROLES, 'mengubah');
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -323,10 +486,33 @@ function _crmSbFetch_(method, path, body) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// #3 System Config RAOS — sheet SISTEM CONFIG di RAOS master spreadsheet
-// (Supabase mirror ditangani frontend via RPC set_system_config)
+// #3 System Config RAOS — Sheet canonical + server-side Supabase mirror
 // ═══════════════════════════════════════════════════════════════════════
 var RAOS_MASTER_SHEET_ID = '1eYS2mM3Sy-BNAVGfp8BUHtsZuLiGDetnJeGw-AWk__8';
+
+function _crmSistemConfigList_(params) {
+  _crmRequireRead_(params);
+  var ss = SpreadsheetApp.openById(RAOS_MASTER_SHEET_ID);
+  var sh = ss.getSheetByName('SISTEM CONFIG');
+  if (!sh) return { success: false, message: 'Tab SISTEM CONFIG tidak ada di RAOS master' };
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return { success: true, config: [] };
+  var rows = sh.getRange(2, 1, lastRow - 1, Math.min(3, sh.getLastColumn())).getValues();
+  var out = rows.map(function(r) {
+    return { key: String(r[0] || '').trim(), value: r[1] == null ? '' : String(r[1]), description: r[2] || '' };
+  }).filter(function(r) { return !!r.key; });
+  return { success: true, config: out };
+}
+
+function _crmSyncSystemConfigMirror_(key, value) {
+  var existing = _crmSbFetch_('GET', '/rest/v1/system_config?key=eq.' + encodeURIComponent(key) + '&select=id');
+  var body = { key: key, value: value, updated_at: new Date().toISOString() };
+  if (Array.isArray(existing) && existing.length > 0) {
+    _crmSbFetch_('PATCH', '/rest/v1/system_config?id=eq.' + encodeURIComponent(existing[0].id), body);
+  } else {
+    _crmSbFetch_('POST', '/rest/v1/system_config', body);
+  }
+}
 
 function _crmSistemConfigSetSheet_(params) {
   _crmRequireAdmin_(params);
@@ -344,23 +530,71 @@ function _crmSistemConfigSetSheet_(params) {
       if (String(data[i][0]).trim() === key) {
         before = data[i][1];
         sh.getRange(i + 1, 2).setValue(value);
+        var mirrorWarning = null;
+        try { _crmSyncSystemConfigMirror_(key, value); } catch (mirrorErr) { mirrorWarning = mirrorErr.message; }
         _crmAuditWrite_(params, 'edit', 'sistem_config_sheet', key, before, value);
-        return { success: true, key: key, value: value, before: before };
+        return { success: true, key: key, value: value, before: before, mirror_warning: mirrorWarning };
       }
     }
     sh.appendRow([key, value, '']);
+    var appendMirrorWarning = null;
+    try { _crmSyncSystemConfigMirror_(key, value); } catch (mirrorErr2) { appendMirrorWarning = mirrorErr2.message; }
     _crmAuditWrite_(params, 'add', 'sistem_config_sheet', key, null, value);
-    return { success: true, key: key, value: value, appended: true };
+    return { success: true, key: key, value: value, appended: true, mirror_warning: appendMirrorWarning };
   } catch (err) {
     return { success: false, message: 'Sheet write gagal: ' + err.message };
   }
+}
+
+function _crmSistemConfigAudit_(params) {
+  _crmRequireRead_(params);
+  var sheetResult = _crmSistemConfigList_(params);
+  if (!sheetResult.success) return sheetResult;
+  var sheetRows = sheetResult.config || [];
+  var sbRows = _crmSbFetch_('GET', '/rest/v1/system_config?select=key,value,updated_at&order=key.asc');
+  if (!Array.isArray(sbRows)) sbRows = [];
+  var sheetMap = {}, sbMap = {};
+  sheetRows.forEach(function(r) { sheetMap[String(r.key)] = String(r.value == null ? '' : r.value); });
+  sbRows.forEach(function(r) { sbMap[String(r.key)] = String(r.value == null ? '' : r.value); });
+  var missing = [], mismatched = [], extra = [];
+  Object.keys(sheetMap).forEach(function(key) {
+    if (!Object.prototype.hasOwnProperty.call(sbMap, key)) missing.push(key);
+    else if (sheetMap[key] !== sbMap[key]) mismatched.push({ key:key, sheet:sheetMap[key], supabase:sbMap[key] });
+  });
+  Object.keys(sbMap).forEach(function(key) {
+    if (!Object.prototype.hasOwnProperty.call(sheetMap, key)) extra.push(key);
+  });
+  return {
+    success: true,
+    healthy: missing.length === 0 && mismatched.length === 0,
+    sheet_count: sheetRows.length,
+    supabase_count: sbRows.length,
+    missing_in_supabase: missing,
+    mismatched: mismatched,
+    extra_in_supabase: extra,
+  };
+}
+
+function _crmSistemConfigSyncAll_(params) {
+  _crmRequireAdmin_(params);
+  var sheetResult = _crmSistemConfigList_(params);
+  if (!sheetResult.success) return sheetResult;
+  var rows = sheetResult.config || [];
+  var synced = 0, failed = [];
+  rows.forEach(function(r) {
+    try { _crmSyncSystemConfigMirror_(r.key, r.value); synced++; }
+    catch (e) { failed.push({ key:r.key, message:e.message || String(e) }); }
+  });
+  _crmAuditWrite_(params, 'sync_all', 'sistem_config', 'sheet_to_supabase', '',
+    'synced=' + synced + '; failed=' + failed.length);
+  return { success: failed.length === 0, synced: synced, failed: failed, total: rows.length };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
 // #4 User Supabase RAOS — proxy ke Supabase (bypass RLS via service_role)
 // ═══════════════════════════════════════════════════════════════════════
 function _crmRaosUsersList_(params) {
-  _crmRequireAdmin_(params);
+  _crmRequireRead_(params);
   // Fetch user_profiles + email dari auth.users via paginate admin API
   var profiles = _crmSbFetch_('GET', '/rest/v1/user_profiles?select=id,staff_id,full_name,role,branch_id,is_active,phone,source,ssot_synced_at&order=full_name.asc');
   if (!Array.isArray(profiles)) profiles = [];
@@ -409,34 +643,38 @@ function _crmRaosUsersUpdate_(params) {
   var id = String(params.id || '').trim();
   if (!id) return { success: false, message: 'Parameter id wajib' };
 
-  var patch = {};
-  if (params.role       !== undefined) patch.role       = String(params.role).toLowerCase();
-  if (params.branch_id  !== undefined) patch.branch_id  = params.branch_id === 'null' || params.branch_id === '' ? null : params.branch_id;
-  if (params.is_active  !== undefined) patch.is_active  = String(params.is_active) === 'true';
-  if (params.full_name  !== undefined) patch.full_name  = String(params.full_name);
-  if (params.phone      !== undefined) patch.phone      = String(params.phone);
-  if (Object.keys(patch).length === 0) return { success: false, message: 'Tidak ada field yang di-update' };
-
   var before = _crmSbFetch_('GET', '/rest/v1/user_profiles?id=eq.' + encodeURIComponent(id) + '&select=*');
   if (!Array.isArray(before) || before.length === 0) return { success: false, message: 'User tidak ditemukan' };
+  var current = before[0];
+  var source = String(current.source || '');
+  var isSsotManaged = source.indexOf('ssot_') === 0;
 
-  // Warn kalau source ssot_master_staff akan ter-overwrite di sync 1 jam
-  var warn = null;
-  if (String(before[0].source || '') === 'ssot_master_staff') {
-    var protectedKeys = ['role','full_name','phone'];
-    for (var k = 0; k < protectedKeys.length; k++) {
-      if (patch[protectedKeys[k]] !== undefined) {
-        warn = 'PERHATIAN: field ' + protectedKeys[k] + ' akan ter-overwrite sync SSOT 1 jam. Update juga di sheet MASTER DATA STAFF.';
-        break;
-      }
-    }
+  var patch = {};
+  // branch_id memang field operasional RAOS dan sengaja dipertahankan oleh
+  // sync Staff/Driver. Karena itu field ini boleh dikelola dari CRM.
+  if (params.branch_id !== undefined) {
+    patch.branch_id = params.branch_id === 'null' || params.branch_id === '' ? null : params.branch_id;
+  }
+  if (!isSsotManaged) {
+    if (params.role      !== undefined) patch.role      = String(params.role).toLowerCase();
+    if (params.is_active !== undefined) patch.is_active = String(params.is_active) === 'true';
+    if (params.full_name !== undefined) patch.full_name = String(params.full_name);
+    if (params.phone     !== undefined) patch.phone     = String(params.phone);
+  }
+  if (Object.keys(patch).length === 0) {
+    return { success: false, code: 'SSOT_MANAGED', message: isSsotManaged
+      ? 'Akun ini dikelola SSOT. Dari CRM hanya Cabang RAOS yang boleh diubah.'
+      : 'Tidak ada field yang di-update' };
   }
 
   var res = _crmSbFetch_('PATCH', '/rest/v1/user_profiles?id=eq.' + encodeURIComponent(id), patch);
-  _crmAuditWrite_(params, 'edit', 'raos_user', id, JSON.stringify(before[0]).substring(0, 200), JSON.stringify(patch));
-  var out = { success: true, user: (Array.isArray(res) && res[0]) || null };
-  if (warn) out.warning = warn;
-  return out;
+  _crmAuditWrite_(params, 'edit', 'raos_user', id, JSON.stringify(current).substring(0, 200), JSON.stringify(patch));
+  return {
+    success: true,
+    user: (Array.isArray(res) && res[0]) || null,
+    ssot_managed: isSsotManaged,
+    message: isSsotManaged ? 'Cabang RAOS diperbarui. Identitas tetap mengikuti SSOT.' : 'User diperbarui.'
+  };
 }
 
 function _crmRaosUsersResetPin_(params) {
@@ -444,16 +682,23 @@ function _crmRaosUsersResetPin_(params) {
   var id  = String(params.id || '').trim();
   var pin = String(params.pin || '').trim();
   if (!id) return { success: false, message: 'Parameter id wajib' };
-  if (!/^\d{6,}$/.test(pin)) return { success: false, message: 'PIN harus minimal 6 digit angka' };
+  if (!/^\d{6,}$/.test(pin)) return { success: false, message: 'Password harus minimal 6 digit angka' };
+
+  var profileRows = _crmSbFetch_('GET', '/rest/v1/user_profiles?id=eq.' + encodeURIComponent(id) + '&select=id,source,role');
+  if (!Array.isArray(profileRows) || !profileRows.length) return { success:false, message:'User tidak ditemukan' };
+  var profile = profileRows[0];
+  if (String(profile.source || '').indexOf('ssot_') === 0) {
+    return { success:false, code:'SSOT_MANAGED', message:'Password Auth akun SSOT tidak boleh diubah dari CRM. Staff gunakan PIN RAOS; Driver mengikuti ID Driver.' };
+  }
 
   var res = _crmSbFetch_('PUT', '/auth/v1/admin/users/' + encodeURIComponent(id), { password: pin });
-  _crmAuditWrite_(params, 'reset_pin', 'raos_user', id, '', 'PIN direset (' + pin.length + ' digit)');
+  _crmAuditWrite_(params, 'reset_auth_password', 'raos_user_manual', id, '', 'Password manual direset (' + pin.length + ' digit)');
   return { success: true, id: id, email: (res && res.email) || '' };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Portal PIN — tabel raos_credentials (PIN untuk login Portal Rifim OS,
-// beda dari SSOT PIN yang jadi Supabase Auth password PWA RAOS).
+// RAOS PIN — tabel raos_credentials. Dedicated credential untuk Portal + PWA RAOS;
+// terpisah dari PIN legacy/SSOT yang dipakai aplikasi lain.
 // PIN plaintext untuk MVP; migrate ke bcrypt kalau sudah stabil.
 // ═══════════════════════════════════════════════════════════════════════
 function _crmRaosCredentialsList_(params) {
@@ -464,7 +709,7 @@ function _crmRaosCredentialsList_(params) {
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
     out[r.user_id] = {
-      has_portal_pin:  true,          // NOT NULL di skema — kalau row ada, pasti punya PIN
+      has_raos_pin:    true,          // NOT NULL di skema — kalau row ada, pasti punya PIN
       staff_code:      r.raos_staff_code || '',
       updated_at:      r.updated_at || null,
       has_ssot_pin:    !!r.ssot_pin,
@@ -475,21 +720,22 @@ function _crmRaosCredentialsList_(params) {
 
 function _crmRaosCredentialsResetPin_(params) {
   _crmRequireAdmin_(params);
-  var id  = String(params.id || '').trim();      // user_profiles.id (uuid)
+  var id  = String(params.id || '').trim();
   var pin = String(params.pin || '').trim();
   if (!id) return { success: false, message: 'Parameter id wajib' };
   if (!/^\d{6,}$/.test(pin)) return { success: false, message: 'PIN Portal harus minimal 6 digit angka' };
+  var actorId = String(params.actor_id || params._crm_actor_id || '').trim();
+  if (!actorId) return { success: false, message: 'Actor terverifikasi tidak ditemukan' };
 
-  // Upsert via PATCH kalau row ada, INSERT kalau tidak
-  var existing = _crmSbFetch_('GET', '/rest/v1/raos_credentials?user_id=eq.' + encodeURIComponent(id) + '&select=user_id');
-  var body = { raos_pin: pin, updated_at: new Date().toISOString() };
-  if (Array.isArray(existing) && existing.length > 0) {
-    _crmSbFetch_('PATCH', '/rest/v1/raos_credentials?user_id=eq.' + encodeURIComponent(id), body);
-  } else {
-    body.user_id = id;
-    _crmSbFetch_('POST', '/rest/v1/raos_credentials', body);
-  }
-  _crmAuditWrite_(params, 'reset_portal_pin', 'raos_credentials', id, '', 'PIN Portal direset (' + pin.length + ' digit)');
+  var res = _crmSbFetch_('POST', '/rest/v1/rpc/raos_admin_reset_login_secret', {
+    p_user_id: id,
+    p_new_pin: pin,
+    p_actor_id: actorId,
+  });
+  if (!res || res.ok !== true) return { success: false, message: 'Reset PIN Portal gagal' };
+
+  _crmAuditWrite_(params, 'reset_portal_pin', 'raos_credentials', id, '',
+    'PIN Portal direset via bcrypt RPC (' + pin.length + ' digit)');
   return { success: true, id: id };
 }
 
@@ -567,7 +813,7 @@ function _crmRaosSsotPinUpdate_(params) {
 // #5 CRM Kontak Eksternal — tabel Supabase crm_contacts
 // ═══════════════════════════════════════════════════════════════════════
 function _crmContactsList_(params) {
-  _crmRequireAdmin_(params);
+  _crmRequireRead_(params);
   var qs = 'select=*&order=updated_at.desc';
   if (params.category && params.category !== '') qs += '&category=eq.' + encodeURIComponent(params.category);
   if (params.search   && params.search   !== '') {
@@ -610,7 +856,9 @@ function _crmContactsUpsert_(params) {
     action = 'add';
   }
   var row = Array.isArray(res) ? res[0] : res;
-  _crmAuditWrite_(params, action, 'contact', (row && row.id) || id || name, id ? name : '', name);
+  var auditName = (row && row.name) || body.name || '';
+  _crmAuditWrite_(params, action, 'contact', (row && row.id) || id || auditName,
+    id ? auditName : '', auditName);
   return { success: true, contact: row };
 }
 
@@ -1419,12 +1667,61 @@ function _finDriverAssignRandom_(params) {
 // HRIS Absensi — source raos_attendance (SSOT dari PWA RAOS)
 // ═══════════════════════════════════════════════════════════════════════
 
+function _hrisNormalizeRole_(role) {
+  var r = String(role || '').trim().toLowerCase();
+  if (r === 'direktur') return 'direksi';
+  if (r === 'koord') return 'koordinator';
+  if (r === 'mgmt') return 'management';
+  return r;
+}
+
+function _hrisAttendanceAccessContext_(params) {
+  var email = String(params.user || '').toLowerCase().trim();
+  if (!email) throw new Error('Parameter user (email) wajib');
+
+  var verified = authVerifyUser(email);
+  if (!verified || !verified.success) throw new Error('Email ' + email + ' tidak diizinkan');
+
+  var user = verified.user || {};
+  var role = _hrisNormalizeRole_(user.role);
+  if (['admin', 'management', 'direksi', 'koordinator'].indexOf(role) === -1) {
+    throw new Error('Role ' + role + ' tidak boleh akses HRIS Absensi');
+  }
+
+  var branchId = String(user.branch_id || user.branchId || '').trim();
+  if (role === 'koordinator' && !branchId) {
+    throw new Error('Koordinator belum memiliki branch_id; akses Absensi ditolak agar tidak bocor lintas cabang');
+  }
+
+  return {
+    user: user,
+    role: role,
+    branch_id: branchId,
+    can_write: role === 'admin' || role === 'direksi',
+    is_branch_scoped: role === 'koordinator'
+  };
+}
+
+function _hrisAttendanceRequireWrite_(params) {
+  var ctx = _hrisAttendanceAccessContext_(params);
+  if (!ctx.can_write) {
+    throw new Error('Role ' + ctx.role + ' hanya boleh melihat Absensi');
+  }
+  return ctx;
+}
+
+function _hrisAttendanceEffectiveBranch_(params, ctx) {
+  var requested = String(params.branch_id || '').trim();
+  if (ctx.is_branch_scoped) return ctx.branch_id;
+  return requested;
+}
+
 // List raos_attendance dalam range tanggal + filter branch/staff, join user_profiles+branches+shifts
 function _hrisAttendanceRaosList_(params) {
-  _finRoleGate_(params);
+  var ctx = _hrisAttendanceAccessContext_(params);
   var dateFrom = String(params.date_from || '').trim();
   var dateTo   = String(params.date_to   || '').trim();
-  var branchId = String(params.branch_id || '').trim();
+  var branchId = _hrisAttendanceEffectiveBranch_(params, ctx);
   var staffId  = String(params.staff_id  || '').trim();
   var search   = String(params.search    || '').toLowerCase();
 
@@ -1515,17 +1812,37 @@ function _hrisAttendanceRaosList_(params) {
     });
   }
 
-  return { success: true, count: out.length, rows: out };
+  return {
+    success: true,
+    count: out.length,
+    rows: out,
+    scope: ctx.is_branch_scoped ? 'branch' : 'permission_data_scope',
+    effective_branch_id: branchId || null
+  };
 }
 
 // Summary bulanan via RPC raos_absensi_summary_month
 function _hrisAttendanceSummaryMonth_(params) {
-  _finRoleGate_(params);
+  var ctx = _hrisAttendanceAccessContext_(params);
   var monthISO = _finMonthNorm_(params.month);
   var staffId = String(params.staff_id || '').trim() || null;
+  var branchId = _hrisAttendanceEffectiveBranch_(params, ctx) || null;
+  if (ctx.is_branch_scoped) {
+    return {
+      success: false,
+      code: 'RPC_BRANCH_SCOPE_REQUIRED',
+      message: 'Summary Koordinator membutuhkan RPC branch-scoped sebelum diaktifkan.'
+    };
+  }
   var body = { p_month: monthISO, p_staff_id: staffId };
   var res = _crmSbFetch_('POST', '/rest/v1/rpc/raos_absensi_summary_month', body);
-  return { success: true, month: monthISO, staff_id: staffId, rows: Array.isArray(res) ? res : [] };
+  return {
+    success: true,
+    month: monthISO,
+    staff_id: staffId,
+    branch_id: branchId,
+    rows: Array.isArray(res) ? res : []
+  };
 }
 
 // Edit raos_attendance row via RPC hris_attendance_edit (migration raos_071).
@@ -1533,7 +1850,7 @@ function _hrisAttendanceSummaryMonth_(params) {
 // potongan override + edit_reason + audit trail (manual_edited_by/_at).
 // Sinkron ke sheet dilakukan via cron sync layer existing (jangan direct write sheet).
 function _hrisAttendanceEdit_(params) {
-  _finRoleGate_(params);
+  var ctx = _hrisAttendanceRequireWrite_(params);
   var id = String(params.id || '').trim();
   if (!id) return { success: false, message: 'id (raos_attendance.id) wajib' };
 
@@ -1553,36 +1870,41 @@ function _hrisAttendanceEdit_(params) {
   var res = _crmSbFetch_('POST', '/rest/v1/rpc/hris_attendance_edit', body);
   _crmAuditWrite_(params, 'edit_via_rpc', 'raos_attendance', id, beforeStr, JSON.stringify(body));
 
-  return { success: true, id: id, rpc: res };
+  return { success: true, id: id, actor_role: ctx.role, rpc: res };
 }
 
 // Gapok proporsional per bulan berdasarkan hari_masuk vs (jml_hari_bulan - MONTHLY_LIBUR_DAYS).
 // Source: view hris_gapok_proporsional_view (migration raos_071).
 function _hrisGapokProporsionalList_(params) {
-  _finRoleGate_(params);
+  var ctx = _hrisAttendanceAccessContext_(params);
   var monthISO = _finMonthNorm_(params.month);
   var staffId  = String(params.staff_id || '').trim();
+  var branchId = _hrisAttendanceEffectiveBranch_(params, ctx);
   var qs = 'select=*&bulan=eq.' + encodeURIComponent(monthISO) + '&order=staff_name.asc&limit=1000';
   if (staffId) qs += '&staff_id=eq.' + encodeURIComponent(staffId);
+  if (branchId) qs += '&branch_id=eq.' + encodeURIComponent(branchId);
   var rows = _crmSbFetch_('GET', '/rest/v1/hris_gapok_proporsional_view?' + qs);
-  return { success: true, month: monthISO, count: (rows || []).length, rows: rows || [] };
+  return {
+    success: true,
+    month: monthISO,
+    count: (rows || []).length,
+    branch_id: branchId || null,
+    rows: rows || []
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// HRIS Foto Karyawan → Google Drive (folder RIFIM OS terpusat)
-// Folder root: 19taBn0YXxjXTb-SxqFXGhwOPShZ4VlIt
-// Struktur: root/Foto Staff/<Nama Staff (RIF****)>/{ktp,2x3}.jpg
+// HRIS Foto Karyawan → Canonical Drive Storage V4
+// Struktur: HRIS/YYYY/MM_Bulan/11_MEDIA_KARYAWAN/Foto Karyawan/<Nama (ID)>/
+// Data pribadi tidak dibuat ANYONE_WITH_LINK.
 // ═══════════════════════════════════════════════════════════════════════
-var HRIS_PHOTO_ROOT_FOLDER_ID = '19taBn0YXxjXTb-SxqFXGhwOPShZ4VlIt';
-var HRIS_PHOTO_SUBFOLDER = 'Foto Staff';
-
 function _hrisFolderGetOrCreate_(parent, name) {
+  if (typeof canonicalDriveGetOrCreateFolder_ === 'function') return canonicalDriveGetOrCreateFolder_(parent, name);
   var it = parent.getFoldersByName(name);
   return it.hasNext() ? it.next() : parent.createFolder(name);
 }
 
 function _hrisSlugStaffFolder_(fullName, employeeId) {
-  // Format: "Nama Staff (RIF0032)" — konsisten dengan struktur user
   var clean = String(fullName || '').trim().replace(/[<>:"\/\\|?*]/g, ' ').replace(/\s+/g, ' ');
   var id = String(employeeId || '').trim().toUpperCase();
   if (!clean) clean = 'UNKNOWN';
@@ -1590,15 +1912,7 @@ function _hrisSlugStaffFolder_(fullName, employeeId) {
 }
 
 function _hrisUploadEmployeePhoto_(params) {
-  // Auth check — admin/mgmt/direksi (sama pattern _finRoleGate_ tapi HRIS scope)
-  var email = String(params.user || '').toLowerCase().trim();
-  if (!email) return { success: false, message: 'Parameter user (email) wajib' };
-  var verified = authVerifyUser(email);
-  if (!verified.success) return { success: false, message: 'Email ' + email + ' tidak diizinkan' };
-  var role = String(verified.user && verified.user.role || '').toLowerCase();
-  if (['admin','management','direksi','direktur','hrd'].indexOf(role) === -1) {
-    return { success: false, message: 'Role ' + role + ' tidak boleh upload foto karyawan' };
-  }
+  _crmRequireAdmin_(params); // Management tetap view-only.
 
   var employeeId = String(params.employee_id || '').trim().toUpperCase();
   var fullName   = String(params.full_name   || '').trim();
@@ -1609,8 +1923,8 @@ function _hrisUploadEmployeePhoto_(params) {
   if (!fullName)   return { success: false, message: 'full_name wajib' };
   if (photoType !== 'ktp' && photoType !== '2x3') return { success: false, message: 'photo_type harus ktp atau 2x3' };
   if (!dataUrl.startsWith('data:')) return { success: false, message: 'data_url harus base64 data URL (data:image/...)' };
+  if (typeof canonicalDriveGetMonthFolder !== 'function') return { success:false, message:'canonicalDriveStorage.js belum terpasang' };
 
-  // Parse data URL
   var match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
   if (!match) return { success: false, message: 'data_url format invalid — harus data:<mime>;base64,<data>' };
   var mimeType = match[1];
@@ -1619,31 +1933,30 @@ function _hrisUploadEmployeePhoto_(params) {
   var fileName = photoType + '.' + ext;
 
   try {
-    var root = DriveApp.getFolderById(HRIS_PHOTO_ROOT_FOLDER_ID);
-    var staffRoot = _hrisFolderGetOrCreate_(root, HRIS_PHOTO_SUBFOLDER);
+    var mediaRoot = canonicalDriveGetMonthFolder('hris', 'media_karyawan', new Date());
+    var staffRoot = _hrisFolderGetOrCreate_(mediaRoot, 'Foto Karyawan');
     var staffFolder = _hrisFolderGetOrCreate_(staffRoot, _hrisSlugStaffFolder_(fullName, employeeId));
 
-    // Kalau file exist, hapus dulu (overwrite)
     var existing = staffFolder.getFilesByName(fileName);
     while (existing.hasNext()) existing.next().setTrashed(true);
 
     var blob = Utilities.newBlob(Utilities.base64Decode(base64), mimeType, fileName);
     var file = staffFolder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-
-    var fileId = file.getId();
-    var publicUrl = 'https://drive.google.com/uc?export=view&id=' + fileId;
+    // Jangan set ANYONE_WITH_LINK: KTP/foto karyawan adalah data pribadi.
+    var driveUrl = file.getUrl();
 
     _crmAuditWrite_(params, 'upload_photo', 'hris_employee_photo',
-      employeeId + '/' + photoType, '', publicUrl);
+      employeeId + '/' + photoType, '', driveUrl);
 
     return {
       success: true,
-      file_id: fileId,
-      url: publicUrl,
+      file_id: file.getId(),
+      url: driveUrl,
+      drive_url: driveUrl,
+      visibility: 'drive_acl',
       folder_id: staffFolder.getId(),
       folder_name: staffFolder.getName(),
-      file_name: fileName,
+      file_name: fileName
     };
   } catch (err) {
     return { success: false, message: 'Drive upload gagal: ' + err.message };
@@ -1682,6 +1995,170 @@ function _hrisPayrollBonusList_(params) {
   });
 
   return { success: true, month: month, rows: out };
+}
+
+function _payrollV2NormalizeMonth_(value) {
+  var month = String(value || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(month)) month = month.slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('month wajib format YYYY-MM');
+  return month;
+}
+
+function _payrollV2PropsKey_(kind, month) {
+  return 'PAYROLL_V2_' + String(kind || '').toUpperCase() + '_' + month;
+}
+
+function _payrollV2OverlayRead_(kind, month) {
+  var raw = PropertiesService.getScriptProperties().getProperty(_payrollV2PropsKey_(kind, month));
+  if (!raw) return [];
+  try {
+    var parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function _payrollV2OverlayUpsert_(kind, month, payload) {
+  var rows = _payrollV2OverlayRead_(kind, month);
+  var employeeId = String(payload.employee_id || '').trim().toUpperCase();
+  rows = rows.filter(function(row) {
+    return String(row.employee_id || '').trim().toUpperCase() !== employeeId;
+  });
+  rows.push(payload);
+  PropertiesService.getScriptProperties().setProperty(_payrollV2PropsKey_(kind, month), JSON.stringify(rows));
+  return rows;
+}
+
+function _payrollV2BranchList_(params) {
+  _crmRequireRead_(params);
+  var rows = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug,branch_type,is_active&is_active=eq.true&order=name.asc');
+  rows = Array.isArray(rows) ? rows : [];
+  var hasHeadOffice = rows.some(function(row) {
+    return String(row.name || '').toLowerCase() === 'head office';
+  });
+  if (!hasHeadOffice) {
+    rows.unshift({ id: 'HEAD_OFFICE', name: 'Head Office', slug: 'head-office', branch_type: 'head_office', is_active: true, virtual: true });
+  }
+  return { success: true, rows: rows };
+}
+
+function _payrollV2Attendance_(month) {
+  var qs = 'select=staff_code,staff_name,branch_id,branch_name,hari_masuk,potongan_terlambat,total_telat_menit,potongan_absen';
+  qs += '&bulan=eq.' + encodeURIComponent(month + '-01') + '&limit=2000';
+  var rows = _crmSbFetch_('GET', '/rest/v1/hris_gapok_proporsional_view?' + qs);
+  return Array.isArray(rows) ? rows : [];
+}
+
+function _payrollV2Target_(month) {
+  try {
+    var rows = _crmSbFetch_('GET', '/rest/v1/raos_payroll?select=staff_id,bonus_saldo,bonus_kpi,branch_id&effective_month=eq.' + encodeURIComponent(month + '-01') + '&limit=2000');
+    return Array.isArray(rows) ? rows : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function _payrollV2Kasbon_(month) {
+  var rows = [];
+  try {
+    rows = _crmSbFetch_('GET', '/rest/v1/finance_staff_cash_advance_view?select=*&month=eq.' + encodeURIComponent(month + '-01') + '&limit=2000');
+  } catch (_) {}
+  rows = Array.isArray(rows) ? rows : [];
+  rows = rows.map(function(row) {
+    var copy = {};
+    Object.keys(row || {}).forEach(function(key) { copy[key] = row[key]; });
+    if (!copy.kasbon_source) copy.kasbon_source = 'finance_canonical';
+    return copy;
+  });
+  return rows.concat(_payrollV2OverlayRead_('MANUAL_KASBON', month).map(function(row) {
+    var copy = {};
+    Object.keys(row || {}).forEach(function(key) { copy[key] = row[key]; });
+    copy.kasbon_source = 'manual_payroll_button';
+    return copy;
+  }));
+}
+
+function _payrollV2Deposits_(month) {
+  return _payrollV2OverlayRead_('DEPOSIT', month);
+}
+
+function _payrollV2Bundle_(params) {
+  _crmRequireRead_(params);
+  var month = _payrollV2NormalizeMonth_(params.month);
+  var branchId = String(params.branch_id || '').trim();
+  var employees = _crmSbFetch_('GET', '/rest/v1/employees?select=employee_id,full_name,system_role,position,department,branch_id,branch,company_code,salary_base,allowances,other_deduction,payroll_document_number,status&status=eq.AKTIF&limit=2000');
+  employees = Array.isArray(employees) ? employees : [];
+  employees = employees.filter(function(row) {
+    var role = String(row.system_role || row.role || '').toLowerCase();
+    return ['staff', 'koordinator', 'admin', 'management'].indexOf(role) !== -1;
+  });
+  if (branchId && branchId !== 'ALL' && branchId !== 'HEAD_OFFICE') {
+    employees = employees.filter(function(row) { return String(row.branch_id || '') === branchId; });
+  }
+  if (branchId === 'HEAD_OFFICE') {
+    employees = employees.filter(function(row) { return String(row.branch || '').toLowerCase() === 'head office'; });
+  }
+
+  var leaves = [];
+  try {
+    leaves = _crmSbFetch_('GET', '/rest/v1/leave_requests?select=employee_id,total_days,approved_days,status,start_date,end_date&status=eq.DISETUJUI&limit=2000');
+  } catch (_) {}
+
+  var overtime = [];
+  try {
+    overtime = _crmSbFetch_('GET', '/rest/v1/employee_overtime?select=employee_id,approved_amount,amount,status,work_date&status=eq.APPROVED&work_date=gte.' + month + '-01&limit=2000');
+  } catch (_) {}
+
+  return {
+    success: true,
+    period: month,
+    employees: employees,
+    attendance: _payrollV2Attendance_(month),
+    targets: _payrollV2Target_(month),
+    leave: Array.isArray(leaves) ? leaves : [],
+    kasbon: _payrollV2Kasbon_(month),
+    deposits: _payrollV2Deposits_(month),
+    overtime: Array.isArray(overtime) ? overtime : []
+  };
+}
+
+function _payrollV2ManualKasbon_(params) {
+  _crmRequireAdmin_(params);
+  var employeeId = String(params.employee_id || '').trim().toUpperCase();
+  var amount = Number(params.amount || 0);
+  var month = _payrollV2NormalizeMonth_(params.month);
+  var note = String(params.note || '').trim();
+  if (!employeeId || amount <= 0) return { success: false, message: 'employee_id + amount wajib' };
+  _payrollV2OverlayUpsert_('MANUAL_KASBON', month, {
+    employee_id: employeeId,
+    amount: amount,
+    outstanding_amount: amount,
+    kasbon_source: 'manual_payroll_button',
+    note: note,
+    updated_at: new Date().toISOString(),
+    updated_by: String(params._crm_actor_email || params.user || '')
+  });
+  _crmAuditWrite_(params, 'payroll_manual_kasbon_overlay', 'payroll_manual_kasbon', employeeId + '@' + month, '', 'Rp ' + amount + (note ? ' · ' + note : ''));
+  return { success: true, overlay: true, employee_id: employeeId, month: month, amount: amount, note: note };
+}
+
+function _payrollV2Deposit_(params) {
+  _crmRequireAdmin_(params);
+  var employeeId = String(params.employee_id || '').trim().toUpperCase();
+  var amount = Number(params.amount || 0);
+  var month = _payrollV2NormalizeMonth_(params.month);
+  var note = String(params.note || '').trim();
+  if (!employeeId || amount <= 0) return { success: false, message: 'employee_id + amount wajib' };
+  _payrollV2OverlayUpsert_('DEPOSIT', month, {
+    employee_id: employeeId,
+    amount: amount,
+    note: note,
+    updated_at: new Date().toISOString(),
+    updated_by: String(params._crm_actor_email || params.user || '')
+  });
+  _crmAuditWrite_(params, 'payroll_deposit_overlay', 'payroll_deposit', employeeId + '@' + month, '', 'Rp ' + amount + (note ? ' · ' + note : ''));
+  return { success: true, overlay: true, employee_id: employeeId, month: month, amount: amount, note: note };
 }
 
 

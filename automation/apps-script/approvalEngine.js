@@ -176,7 +176,11 @@ function _approvalGetRule(companySlug, docType) {
     'limit=1',
   ]));
 
-  if (rows && rows.length) return rows[0];
+  if (rows && rows.length) {
+    var rule = rows[0];
+    _approvalValidateRuleApprovers(rule, companySlug, docType);
+    return rule;
+  }
 
   var fallbackApprover = _approvalGetFallbackApprover();
   _approvalLogSystemWarning('approval_rule_fallback', {
@@ -187,10 +191,34 @@ function _approvalGetRule(companySlug, docType) {
   return { approvers: [fallbackApprover], mode: 'sequential' };
 }
 
+function _approvalValidateRuleApprovers(rule, companySlug, docType) {
+  var approvers = _approvalParseApprovers(rule && rule.approvers);
+  if (!approvers.length) {
+    throw new Error('Aturan approval aktif tidak memiliki approver yang valid untuk ' + companySlug + '/' + docType + '.');
+  }
+
+  for (var i = 0; i < approvers.length; i++) {
+    var approverId = String(approvers[i] || '').trim();
+    if (!approverId) {
+      throw new Error('Aturan approval mengandung approver kosong untuk ' + companySlug + '/' + docType + '.');
+    }
+    var rows = _sbGet(_approvalRestUrl('user_profiles', [
+      'id=eq.' + encodeURIComponent(approverId),
+      'role=in.(direksi,direktur)',
+      'is_active=eq.true',
+      'select=id',
+      'limit=1',
+    ]));
+    if (!rows || !rows.length) {
+      throw new Error('Aturan approval aktif hanya boleh memakai approver Direksi/Direktur yang aktif. Invalid approver: ' + approverId);
+    }
+  }
+}
+
 function _approvalGetFallbackApprover() {
   var rows = _sbGet(_approvalRestUrl('user_profiles', [
     'select=id',
-    'role=in.(direksi,direktur,management,admin)',
+    'role=in.(direksi,direktur)',
     'is_active=eq.true',
     'order=created_at.asc',
     'limit=1',
