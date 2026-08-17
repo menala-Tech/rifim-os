@@ -162,6 +162,7 @@
       'update_employee',
       'add_employee',
       'add_contract',
+      'add_attendance',
       'approve_leave',
       'add_payroll',
       'finalize_payroll',

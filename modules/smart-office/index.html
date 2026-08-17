@@ -938,12 +938,11 @@
         </div>
 
         <div class="settings-card">
-          <div class="settings-card-title">🔒 Email yang Diizinkan</div>
+          <div class="settings-card-title">🔒 Akses Portal</div>
           <div id="emailList"></div>
           <div style="margin-top:12px;font-size:11px;color:#aaa;line-height:1.7">
-            Tambah email: Google Sheets →<br>
-            sheet <b style="color:#666">company_config</b> → key <b style="color:#666">allowed_emails</b><br>
-            (pisah dengan koma)
+            Akses Smart Office mengikuti sesi dan role canonical dari Portal RIFIM OS.
+            Tidak ada whitelist email lokal di modul ini.
           </div>
         </div>
 
@@ -1050,10 +1049,6 @@
 <script>
   // ── CONFIG ───────────────────────────────────────────────────
   const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec';
-  const ALLOWED_EMAILS  = [
-    'rifiminternasionalgemilang@gmail.com',
-    'rifiminternationalgemilang@gmail.com',
-  ];
 
   // ── AUTH ─────────────────────────────────────────────────────
   function checkAuth() {
@@ -1819,12 +1814,11 @@
 
   // ── SETTINGS ─────────────────────────────────────────────────
   function loadSettings() {
-    // Email list
+    // Access is inherited from the validated Portal session.
     const emailListEl = document.getElementById('emailList');
     if (emailListEl) {
-      emailListEl.innerHTML = ALLOWED_EMAILS.map(e =>
-        `<div class="email-chip">✓ ${e}</div>`
-      ).join('');
+      const auth = getPortalAuth();
+      emailListEl.innerHTML = `<div class="email-chip">✓ ${(auth.role || 'role').toUpperCase()} via Portal RIFIM OS</div>`;
     }
 
     // Session info
