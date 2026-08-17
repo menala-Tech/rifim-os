@@ -454,14 +454,14 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div class="panel" data-panel="db-driver">
       <h2>DB Driver + Assignment ke Staff</h2>
-      <div class="desc">Daftar driver per cabang + assignment random ke staff (management-only edit).</div>
+      <div class="desc">Daftar driver per cabang + assignment random ke staff. Admin dan Direksi dapat mengubah assignment; Management dan Koordinator hanya lihat.</div>
       <div class="sinks">
         <span class="sink supabase">🗄️ Supabase: <code>raos_drivers</code> + <code>raos_driver_staff_assignment</code></span>
         <span class="sink raos">👑 Random assign: RPC <code>raos_random_assign_drivers</code></span>
       </div>
       <div class="roadmap">
-        <strong>Aturan:</strong> Assignment driver → staff dilakukan random oleh management/direksi.
-        Admin &amp; koordinator hanya bisa lihat (read-only). Rebalance (p_force=true) akan reset
+        <strong>Aturan:</strong> Assignment driver → staff dilakukan random oleh Admin/Direksi.
+        Management &amp; Koordinator hanya bisa lihat (read-only). Rebalance (p_force=true) akan reset
         semua assignment cabang lalu re-distribute round-robin.
       </div>
 
@@ -469,7 +469,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <select id="dd-cabang" class="grow"><option value="">Pilih cabang…</option></select>
         <input class="grow" placeholder="Cari nama/ID driver/staff…" id="dd-search">
         <button class="btn ghost small" id="dd-refresh">🔄 Refresh</button>
-        <button class="btn small" id="dd-assign">🎲 Random Assign (admin/mgmt/direksi)</button>
+        <button class="btn small" id="dd-assign">🎲 Random Assign (Admin/Direksi)</button>
         <button class="btn info small" id="dd-rebalance">♻️ Rebalance Force</button>
       </div>
 
@@ -1629,6 +1629,11 @@ if (initBtn) initBtn.click();
     redirect: '/portal',
   });
   if (!session || !checkAuth()) return;
+  const canMutate = _finCanMutate();
+  const assignBtn = document.getElementById('dd-assign');
+  const rebalanceBtn = document.getElementById('dd-rebalance');
+  if (assignBtn) assignBtn.style.display = canMutate ? '' : 'none';
+  if (rebalanceBtn) rebalanceBtn.style.display = canMutate ? '' : 'none';
   populateCabang();
   populateBranchDropdowns();
   wireFinanceHandlers();
