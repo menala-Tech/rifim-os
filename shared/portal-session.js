@@ -207,6 +207,42 @@
     }, 50)
   }
 
+  function installFinanceDriverPolicyUi() {
+    if (!/^\/finance(?:\/|$)/.test(global.location.pathname || '')) return
+
+    const apply = () => {
+      const panel = global.document && global.document.querySelector('[data-panel="db-driver"]')
+      if (!panel) return false
+
+      const desc = panel.querySelector('.desc')
+      if (desc) {
+        desc.textContent = 'Daftar driver per cabang + assignment random ke staff. Admin dan Direksi dapat mengubah assignment; Management dan Koordinator hanya lihat.'
+      }
+
+      const roadmap = panel.querySelector('.roadmap')
+      if (roadmap) {
+        roadmap.innerHTML = '<strong>Aturan:</strong> Assignment driver → staff dilakukan random oleh Admin/Direksi. Management &amp; Koordinator hanya bisa lihat (read-only). Rebalance (p_force=true) akan reset semua assignment cabang lalu re-distribute round-robin.'
+      }
+
+      const assignBtn = global.document.getElementById('dd-assign')
+      const rebalanceBtn = global.document.getElementById('dd-rebalance')
+      const allowed = canMutate()
+      if (assignBtn) {
+        assignBtn.textContent = '🎲 Random Assign (Admin/Direksi)'
+        assignBtn.style.display = allowed ? '' : 'none'
+      }
+      if (rebalanceBtn) rebalanceBtn.style.display = allowed ? '' : 'none'
+      return true
+    }
+
+    if (apply()) return
+    let attempts = 0
+    const timer = global.setInterval(() => {
+      attempts += 1
+      if (apply() || attempts >= 100) global.clearInterval(timer)
+    }, 50)
+  }
+
   global.RifimPortalSession = {
     read: readSession,
     clear: clearSession,
@@ -217,4 +253,5 @@
   }
 
   installHrisMutationGuard()
+  installFinanceDriverPolicyUi()
 })(window)
