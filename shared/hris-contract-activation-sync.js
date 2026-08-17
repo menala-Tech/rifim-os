@@ -4,6 +4,8 @@ if(!/\/hris(?:\/|$)/.test(location.pathname))return;
 
 var CACHE='hris_contract_bridge_v1';
 var EMP_SNAPSHOT='hris_employee_table_snapshot_v1';
+var employeeFetchInFlight=null;
+var employeeFetchKey='';
 
 function role(){
   try{return String((global.currentUser&&global.currentUser.role)||JSON.parse(localStorage.getItem('rifim_auth')||'{}').role||'').toLowerCase()}
@@ -116,20 +118,26 @@ function saveEmployeeSnapshot(){
   }catch(_){ }
 }
 
-function restoreEmployeeSnapshotIfLoading(){
+function restoreEmployeeSnapshot(force){
   var tb=document.getElementById('tbody-employees');
-  if(!tb)return;
+  if(!tb)return false;
   var hasReal=Array.from(tb.querySelectorAll('tr')).some(isRealEmployeeRow);
-  if(hasReal)return;
-  if(!tb.querySelector('.loading'))return;
+  if(hasReal&&!force)return true;
   var snap=getEmployeeSnapshot();
-  if(!snap||!snap.html)return;
+  if(!snap||!snap.html)return false;
   tb.innerHTML=snap.html;
   var s=snap.stats||{};
   if(document.getElementById('stat-total')&&s.total!=null)document.getElementById('stat-total').textContent=s.total;
   if(document.getElementById('stat-aktif')&&s.aktif!=null)document.getElementById('stat-aktif').textContent=s.aktif;
   if(document.getElementById('stat-pkwt')&&s.pkwt!=null)document.getElementById('stat-pkwt').textContent=s.pkwt;
-  if(document.getElementById('stat-pkwtt')&&s.pkwtt!=null)document.getElementById('stat-pkwtt').textContent=s.pkwtt
+  if(document.getElementById('stat-pkwtt')&&s.pkwtt!=null)document.getElementById('stat-pkwtt').textContent=s.pkwtt;
+  return true
+}
+
+function restoreEmployeeSnapshotIfLoading(){
+  var tb=document.getElementById('tbody-employees');
+  if(!tb||!tb.querySelector('.loading'))return;
+  restoreEmployeeSnapshot(false)
 }
 
 function cleanInvalidActivationButtons(){
@@ -146,6 +154,35 @@ function stabilizeEmployees(){
   saveEmployeeSnapshot()
 }
 
+function patchEmployeeFetch(){
+  if(typeof global._fetchEmployeesFast!=='function'||global._fetchEmployeesFast.__deduped)return;
+  var origFetch=global._fetchEmployeesFast;
+  var wrapped=async function(){
+    var key=String(global.selectedCompany||'ALL');
+    if(employeeFetchInFlight&&employeeFetchKey===key)return employeeFetchInFlight;
+    employeeFetchKey=key;
+    employeeFetchInFlight=Promise.resolve().then(function(){return origFetch.apply(global,arguments)}).finally(function(){employeeFetchInFlight=null;employeeFetchKey=''}.bind(null));
+    return employeeFetchInFlight
+  };
+  wrapped.__deduped=true;
+  global._fetchEmployeesFast=wrapped
+}
+
+function patchEmployeeLoader(){
+  if(typeof global.loadEmployees!=='function'||global.loadEmployees.__stable)return;
+  var origLoad=global.loadEmployees;
+  var wrapped=function(opts){
+    opts=opts||{};
+    var tb=document.getElementById('tbody-employees');
+    var hasReal=tb&&Array.from(tb.querySelectorAll('tr')).some(isRealEmployeeRow);
+    if(!hasReal)restoreEmployeeSnapshot(false);
+    if(opts.forceRefresh&&hasReal)opts=Object.assign({},opts,{forceRefresh:false});
+    return origLoad.call(this,opts)
+  };
+  wrapped.__stable=true;
+  global.loadEmployees=wrapped
+}
+
 function patch(){
   if(typeof global.loadContracts==='function'&&!global.loadContracts.__bridge){
     var orig=global.loadContracts;
@@ -153,6 +190,9 @@ function patch(){
     f.__bridge=true;
     global.loadContracts=f
   }
+  patchEmployeeFetch();
+  patchEmployeeLoader();
+  restoreEmployeeSnapshot(false);
   stabilizeEmployees();
   var root=document.getElementById('tbody-employees')||document.body;
   new MutationObserver(stabilizeEmployees).observe(root,{childList:true,subtree:true})
