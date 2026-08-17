@@ -304,12 +304,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <span class="sink supabase">🔵 Supabase: <code>auth.users</code> + <code>user_profiles</code></span>
         <span class="sink sheet">📊 Sheet SSOT: <code>MASTER DATA STAFF</code></span>
       </div>
-      <div class="roadmap">
-        <strong>TODO backend:</strong> Perhatian — <code>user_profiles.source='ssot_master_staff'</code>
-        akan ter-overwrite tiap sync 1 jam kalau hanya diubah di Supabase. Perlu 2-way sync: edit di
-        CRM → (a) UPDATE Supabase langsung untuk efek immediate, (b) UPDATE row sheet SSOT MASTER
-        DATA STAFF via GAS supaya sync berikutnya tidak revert.
-      </div>
+      <div class="roadmap"><strong>Ownership canonical:</strong> User RAOS di CRM hanya untuk audit/read. Perubahan identity, role, cabang, status aktif, dan PIN Staff dilakukan melalui MASTER DATA STAFF dan pipeline sync canonical.</div>
       <div class="toolbar">
         <input class="grow" placeholder="Cari email, nama, atau staff_id…" id="ru-search">
         <select id="ru-filter-role">
@@ -354,53 +349,6 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
           <tr><td colspan="8" class="empty" style="padding:20px">Belum di-load. Klik Refresh.</td></tr>
         </tbody>
       </table>
-    </div>
-
-    <!-- Modal edit user RAOS -->
-    <div id="ru-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;padding:20px">
-      <div style="background:var(--dark2);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:24px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto">
-        <h3 style="margin-bottom:4px" id="ru-modal-title">Edit User RAOS</h3>
-        <div class="desc-cell" id="ru-modal-sub" style="margin-bottom:16px;color:#888;font-size:12px"></div>
-        <div id="ru-modal-warn" style="display:none;background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.3);border-radius:6px;padding:10px 12px;margin-bottom:12px;color:#facc15;font-size:12px;line-height:1.5"></div>
-        <div style="display:flex;flex-direction:column;gap:12px">
-          <label style="font-size:12px;color:#aaa">
-            Nama Lengkap
-            <input id="ru-edit-fullname" type="text" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;outline:none">
-          </label>
-          <label style="font-size:12px;color:#aaa">
-            Phone
-            <input id="ru-edit-phone" type="tel" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;outline:none">
-          </label>
-          <label style="font-size:12px;color:#aaa">
-            Role
-            <select id="ru-edit-role" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;outline:none">
-              <option value="direksi">Direksi</option>
-              <option value="management">Management</option>
-              <option value="admin">Admin</option>
-              <option value="koordinator">Koordinator</option>
-              <option value="staff">Staff</option>
-              <option value="driver">Driver</option>
-            </select>
-          </label>
-          <label style="font-size:12px;color:#aaa">
-            Cabang (kolom milik RAOS — aman diedit di CRM, tidak overwrite SSOT)
-            <select id="ru-edit-branch" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;outline:none">
-              <option value="">(kosong / belum ditugaskan)</option>
-            </select>
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#fff;cursor:pointer">
-            <input id="ru-edit-active" type="checkbox" style="width:16px;height:16px;cursor:pointer">
-            Aktif (bisa login PWA RAOS)
-          </label>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;align-items:center">
-          <button class="btn" id="ru-modal-save" style="display:none">💾 Simpan</button>
-          <button class="btn ghost small" id="ru-modal-reset-pin" style="background:rgba(196,0,0,.15);border-color:rgba(196,0,0,.4);color:#ff9999" title="Reset password Supabase Auth (login PWA RAOS) langsung. Akan ter-overwrite next sync SSOT.">🔑 Reset PIN PWA</button>
-          <button class="btn ghost small" id="ru-modal-update-ssot-pin" style="background:rgba(234,179,8,.12);border-color:rgba(234,179,8,.4);color:#facc15" title="Edit kolom H (Pin) di sheet MASTER DATA STAFF. Sumber kanonis — Auth password sync max 6 jam atau via Force Refresh Staff Auth di /sistem.">📝 PIN Sheet SSOT</button>
-          <button class="btn ghost small" id="ru-modal-reset-portal-pin" style="background:rgba(14,165,233,.12);border-color:rgba(14,165,233,.4);color:#7dd3fc" title="Reset PIN untuk login Portal Rifim OS (raos_credentials.raos_pin). Berbeda dari PIN PWA.">🌐 Reset PIN Portal</button>
-          <button class="btn ghost small" id="ru-modal-close" style="margin-left:auto">Batal</button>
-        </div>
-      </div>
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -1094,8 +1042,6 @@ document.getElementById('au-to').addEventListener('change', () => renderAuditRow
 // USER SUPABASE RAOS — wire ke GAS proxy raos_users_list/update/reset_pin
 // ═══════════════════════════════════════════════════════════════════════
 let _ruCache = [];
-let _ruBranches = [];
-let _ruEditing = null;
 let _rcCache = {};   // {user_id: {has_portal_pin, staff_code, updated_at, has_ssot_pin}}
 
 const RAOS_BRANCH_OPTIONS = [
@@ -1166,74 +1112,16 @@ async function loadRaosUsers() {
     if (!data.success) throw new Error(data.message || 'Gagal load');
     _ruCache = data.users || [];
     _rcCache = (credRes && credRes.success && credRes.credentials) || {};
-    // Extract unique branches for edit modal dropdown
-    const seen = new Set();
-    _ruBranches = [];
-    _ruCache.forEach(u => {
-      if (u.branch_id && !seen.has(u.branch_id)) {
-        seen.add(u.branch_id);
-        _ruBranches.push({ id: u.branch_id, name: u.branch_name, slug: u.branch_slug });
-      }
-    });
     renderRaosUsers();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="7" class="empty" style="padding:20px;color:#f87171">❌ ${err.message}</td></tr>`;
   }
 }
 
-function openRaosUserModal(userId) {
-  const u = _ruCache.find(x => x.id === userId);
-  if (!u) return;
-  _ruEditing = u;
-
-  document.getElementById('ru-modal-title').textContent = 'Edit User RAOS';
-  document.getElementById('ru-modal-sub').textContent = u.email + ' · ' + u.staff_id;
-  document.getElementById('ru-edit-fullname').value = u.full_name || '';
-  document.getElementById('ru-edit-phone').value    = u.phone || '';
-  document.getElementById('ru-edit-role').value     = u.role || 'staff';
-  document.getElementById('ru-edit-active').checked = !!u.is_active;
-
-  // Populate branch dropdown from _ruBranches (join dari kolom RAOS branches)
-  const branchSelect = document.getElementById('ru-edit-branch');
-  branchSelect.innerHTML = '<option value="">(kosong / belum ditugaskan)</option>' +
-    _ruBranches.map(b => `<option value="${b.id}" ${b.id === u.branch_id ? 'selected' : ''}>${_escapeHtml(b.name)}</option>`).join('');
-
-  // Warning banner untuk source ssot_master_staff
-  const warn = document.getElementById('ru-modal-warn');
-  if (u.source === 'ssot_master_staff') {
-    warn.style.display = 'block';
-    warn.innerHTML = '<strong>⚠️ SSOT-managed:</strong> field <code>Nama</code>, <code>Role</code>, dan <code>Phone</code> akan ter-overwrite tiap sync 1 jam dari sheet MASTER DATA STAFF. Update juga di sheet supaya perubahan permanen. Field <code>Cabang</code> dan <code>Aktif</code> aman diubah di sini.';
-  } else {
-    warn.style.display = 'none';
-  }
-
-  document.getElementById('ru-modal').style.display = 'flex';
-}
-
-async function saveRaosUser() {
-  showStatus('Mode read-only: perubahan identity/PIN Staff wajib melalui MASTER DATA STAFF dan sync canonical.', 'err');
-}
-
-async function resetRaosPin() {
-  showStatus('Mode read-only: perubahan identity/PIN Staff wajib melalui MASTER DATA STAFF dan sync canonical.', 'err');
-}
-
-async function resetPortalPin() {
-  showStatus('Mode read-only: perubahan identity/PIN Staff wajib melalui MASTER DATA STAFF dan sync canonical.', 'err');
-}
-
-async function updateSsotPin() {
-  showStatus('Mode read-only: update MASTER DATA STAFF dilakukan di SSOT, bukan dari CRM.', 'err');
-}
-
 document.getElementById('ru-refresh').addEventListener('click', loadRaosUsers);
 document.getElementById('ru-search').addEventListener('input', renderRaosUsers);
 document.getElementById('ru-filter-role').addEventListener('change', renderRaosUsers);
 document.getElementById('ru-filter-branch').addEventListener('change', renderRaosUsers);
-document.getElementById('ru-modal-close').addEventListener('click', () => {
-  document.getElementById('ru-modal').style.display = 'none';
-  _ruEditing = null;
-});
 
 // ═══════════════════════════════════════════════════════════════════════
 // KONTAK EKSTERNAL — wire ke GAS proxy contacts_list/upsert/delete
