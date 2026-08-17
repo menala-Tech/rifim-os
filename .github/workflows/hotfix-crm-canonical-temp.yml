@@ -1,0 +1,74 @@
+name: hotfix-crm-canonical-temp
+on:
+  push:
+    branches: [hotfix-crm-canonical-20260817]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hotfix-crm-canonical-20260817
+          fetch-depth: 0
+      - name: Patch CRM canonical residue
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('modules/crm/index.html')
+          s=p.read_text()
+
+          s=s.replace('<button class="tab" data-tab="whitelist">📧 Whitelist Portal</button>\n','')
+
+          a=s.find('    <!-- TAB 3: WHITELIST PORTAL')
+          b=s.find('    <!-- TAB 4: USER SUPABASE RAOS', a)
+          if a < 0 or b < 0:
+              raise SystemExit('whitelist panel markers not found')
+          s=s[:a]+s[b:]
+
+          a=s.find('// WHITELIST PORTAL — wire ke GAS endpoint whitelist_list/add/remove')
+          b=s.find('// AUDIT LOG — wire ke GAS endpoint crm_audit_tail', a)
+          if a < 0 or b < 0:
+              raise SystemExit('whitelist JS markers not found')
+          s=s[:a]+s[b:]
+
+          s=s.replace("const _tabLoaded = { whitelist: false, audit: false, 'raos-users': false, contacts: false };", "const _tabLoaded = { audit: false, 'raos-users': false, contacts: false };")
+          s=s.replace("    if (target === 'whitelist'  && !_tabLoaded.whitelist)   { _tabLoaded.whitelist   = true; loadWhitelist(); }\n",'')
+
+          s=s.replace('Single Source of Truth untuk seluruh konfigurasi & data master RIFIM OS,\n      Smart Office, HRIS, dan PWA RAOS Menala. Edit sekali di sini — otomatis propagate ke Google\n      Sheets, Supabase, dan GitHub (auto-deploy Vercel).',
+                      'Config Center dan audit surface untuk RIFIM OS, Smart Office, HRIS, dan PWA RAOS Menala. Setiap domain mengikuti canonical owner masing-masing; mutation hanya tersedia pada surface yang memang memiliki write path resmi.')
+
+          old='''<strong>Write path (TODO):</strong> extend GAS dengan <code>?action=config_set&amp;key=X&amp;value=Y</code>\n        yang admin-only + audit log ke tab <code>activity_log</code>.<br>'''
+          new='''<strong>Write path:</strong> CRM memanggil GAS <code>company_config_set</code>; mutation dibatasi role canonical Admin/Direksi dan dicatat oleh backend sesuai audit path yang tersedia.<br>'''
+          s=s.replace(old,new)
+
+          old='''<strong>Write path (TODO):</strong> saat user save di CRM →\n        (a) POST GAS <code>?action=sistem_config_set</code> update sheet,\n        (b) Supabase RPC <code>set_system_config(key,value)</code> SECURITY DEFINER admin-only update tabel,\n        (c) trigger <code>notification</code> ke user PWA supaya reload cache (opsional untuk key kritikal).<br>'''
+          new='''<strong>Write path canonical:</strong> CRM → Supabase RPC <code>set_system_config</code> → readback <code>list_system_config</code> → GAS <code>sistem_config_set</code> sebagai mirror Sheet. UI hanya menyatakan sukses bila canonical write dan mirror terverifikasi.<br>'''
+          s=s.replace(old,new)
+
+          s=s.replace('<span class="sink supabase">🔵 Supabase: <code>crm_audit_log</code> (TODO)</span>\n        <span class="sink github">💾 GitHub commit trail (untuk config yg di-bake)</span>', '<span class="sink sheet">📊 Sheet: <code>CRM_AUDIT_LOG</code></span>\n        <span class="sink gas">🔧 GAS action: <code>crm_audit_tail</code></span>')
+          s=re.sub(r'<div class="roadmap">\s*<strong>TODO:</strong> tabel <code>crm_audit_log</code>.*?</div>', '<div class="roadmap"><strong>Read path:</strong> GAS <code>crm_audit_tail</code> membaca audit trail CRM dari backend canonical. Filter tanggal, aktor, aksi, dan target dilakukan di UI.</div>', s, count=1, flags=re.S)
+
+          forbidden=['data-tab="whitelist"','whitelist_list','whitelist_add','whitelist_remove','whitelist_update','loadWhitelist','addWhitelist','removeWhitelist','startEditWhitelist','Email Login Portal Rifim OS','Write path (TODO):']
+          for needle in forbidden:
+              if needle in s:
+                  raise SystemExit('forbidden residue remains: '+needle)
+          p.write_text(s)
+          PY
+      - name: Verify hotfix
+        run: |
+          grep -n 'User Supabase RAOS' modules/crm/index.html
+          grep -n 'Ownership canonical' modules/crm/index.html
+          grep -n 'Write path canonical' modules/crm/index.html
+          ! grep -n 'data-tab="whitelist"\|whitelist_list\|whitelist_add\|whitelist_remove\|whitelist_update\|loadWhitelist\|Email Login Portal Rifim OS\|Write path (TODO):' modules/crm/index.html
+          git diff --check
+      - name: Commit hotfix
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add modules/crm/index.html
+          git commit -m "fix(crm): remove legacy portal whitelist residue"
+          git push origin HEAD:hotfix-crm-canonical-20260817
