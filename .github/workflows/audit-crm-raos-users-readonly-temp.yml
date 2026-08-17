@@ -1,0 +1,70 @@
+name: audit-crm-raos-users-readonly-temp
+on:
+  push:
+    branches: [audit-full-sync-20260817]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit-full-sync-20260817
+          fetch-depth: 0
+      - name: Enforce CRM RAOS users read-only
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('modules/crm/index.html')
+          s=p.read_text()
+          s=s.replace('<div class="desc">CRUD akun <code>auth.users</code> + <code>user_profiles</code> PWA RAOS. Reset PIN, ubah email, ubah role/branch.</div>', '<div class="desc">Read-only audit akun PWA RAOS. Identity Staff tetap dimiliki MASTER DATA STAFF → GAS → Supabase Auth/user_profiles/raos_credentials.</div>')
+          s=s.replace('<td><button class="btn ghost small" data-edit-user="${u.id}">✏️ Edit</button></td>', '<td><span class="cat feature" style="background:rgba(100,116,139,.12);color:#64748b">Read-only</span></td>')
+          s=re.sub(r"\n\s*tbody\.querySelectorAll\('button\[data-edit-user\]'\)\.forEach\(btn => \{\n\s*btn\.addEventListener\('click', \(\) => openRaosUserModal\(btn\.dataset\.editUser\)\);\n\s*\}\);", '', s)
+          # Replace all user-master mutation functions with fail-closed local notices.
+          def replace_func(name, next_name):
+              nonlocal_s = None
+          patterns=[
+            ('saveRaosUser','resetRaosPin'),
+            ('resetRaosPin','resetPortalPin'),
+            ('resetPortalPin','updateSsotPin'),
+          ]
+          for name,nxt in patterns:
+              pat=rf"async function {name}\(\) \{{.*?\n\}}\n\n(?=async function {nxt}\(\))"
+              repl=f"async function {name}() {{\n  showStatus('Mode read-only: perubahan identity/PIN Staff wajib melalui MASTER DATA STAFF dan sync canonical.', 'err');\n}}\n\n"
+              s,n=re.subn(pat,repl,s,flags=re.S)
+              if n!=1: raise SystemExit(f'failed replacing {name}: {n}')
+          # updateSsotPin ends before event bindings
+          pat=r"async function updateSsotPin\(\) \{.*?\n\}\n\n(?=document\.getElementById\('ru-refresh'\))"
+          repl="async function updateSsotPin() {\n  showStatus('Mode read-only: update MASTER DATA STAFF dilakukan di SSOT, bukan dari CRM.', 'err');\n}\n\n"
+          s,n=re.subn(pat,repl,s,flags=re.S)
+          if n!=1: raise SystemExit(f'failed replacing updateSsotPin: {n}')
+          # Remove mutation button bindings; keep close/refresh/filter handlers.
+          for line in [
+            "document.getElementById('ru-modal-save').addEventListener('click', saveRaosUser);\n",
+            "document.getElementById('ru-modal-reset-pin').addEventListener('click', resetRaosPin);\n",
+            "document.getElementById('ru-modal-reset-portal-pin').addEventListener('click', resetPortalPin);\n",
+            "document.getElementById('ru-modal-update-ssot-pin').addEventListener('click', updateSsotPin);\n",
+          ]: s=s.replace(line,'')
+          # Hide mutation buttons in stale modal as defense-in-depth if opened programmatically.
+          for bid in ['ru-modal-save','ru-modal-reset-pin','ru-modal-update-ssot-pin','ru-modal-reset-portal-pin']:
+              s=s.replace(f'id="{bid}"', f'id="{bid}" style="display:none"', 1) if f'id="{bid}" style=' not in s else s
+          # Update visible ownership copy.
+          s=s.replace('CRUD auth.users + user_profiles', 'Read-only auth.users + user_profiles audit')
+          p.write_text(s)
+          PY
+      - name: Verify no CRM Staff second-writer actions
+        run: |
+          ! grep -n "_gasCall('raos_users_update'\|_gasCall('raos_users_reset_pin'\|_gasCall('raos_credentials_reset_pin'\|_gasCall('master_staff_update_pin'" modules/crm/index.html
+          ! grep -n 'data-edit-user=' modules/crm/index.html
+          grep -n 'Read-only audit akun PWA RAOS' modules/crm/index.html
+          git diff --check
+      - name: Commit patch
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add modules/crm/index.html
+          git commit -m "fix(crm): make RAOS user identity audit read-only"
+          git push origin HEAD:audit-full-sync-20260817
