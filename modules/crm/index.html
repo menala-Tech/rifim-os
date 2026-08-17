@@ -299,7 +299,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div class="panel" data-panel="raos-users">
       <h2>User Supabase RAOS</h2>
-      <div class="desc">CRUD akun <code>auth.users</code> + <code>user_profiles</code> PWA RAOS. Reset PIN, ubah email, ubah role/branch.</div>
+      <div class="desc">Read-only audit akun PWA RAOS. Identity Staff tetap dimiliki MASTER DATA STAFF → GAS → Supabase Auth/user_profiles/raos_credentials.</div>
       <div class="sinks">
         <span class="sink supabase">🔵 Supabase: <code>auth.users</code> + <code>user_profiles</code></span>
         <span class="sink sheet">📊 Sheet SSOT: <code>MASTER DATA STAFF</code></span>
@@ -394,7 +394,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
           </label>
         </div>
         <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;align-items:center">
-          <button class="btn" id="ru-modal-save">💾 Simpan</button>
+          <button class="btn" id="ru-modal-save" style="display:none">💾 Simpan</button>
           <button class="btn ghost small" id="ru-modal-reset-pin" style="background:rgba(196,0,0,.15);border-color:rgba(196,0,0,.4);color:#ff9999" title="Reset password Supabase Auth (login PWA RAOS) langsung. Akan ter-overwrite next sync SSOT.">🔑 Reset PIN PWA</button>
           <button class="btn ghost small" id="ru-modal-update-ssot-pin" style="background:rgba(234,179,8,.12);border-color:rgba(234,179,8,.4);color:#facc15" title="Edit kolom H (Pin) di sheet MASTER DATA STAFF. Sumber kanonis — Auth password sync max 6 jam atau via Force Refresh Staff Auth di /sistem.">📝 PIN Sheet SSOT</button>
           <button class="btn ghost small" id="ru-modal-reset-portal-pin" style="background:rgba(14,165,233,.12);border-color:rgba(14,165,233,.4);color:#7dd3fc" title="Reset PIN untuk login Portal Rifim OS (raos_credentials.raos_pin). Berbeda dari PIN PWA.">🌐 Reset PIN Portal</button>
@@ -1147,13 +1147,9 @@ function renderRaosUsers() {
       <td>${u.is_active ? '<span class="cat feature" style="background:rgba(39,174,96,.2);color:#2ecc71">Aktif</span>' : '<span class="cat feature" style="background:rgba(220,38,38,.2);color:#f87171">Off</span>'}</td>
       <td class="desc-cell" style="font-size:11px">${_escapeHtml(u.source)}</td>
       <td>${portalPin}</td>
-      <td><button class="btn ghost small" data-edit-user="${u.id}">✏️ Edit</button></td>
+      <td><span class="cat feature" style="background:rgba(100,116,139,.12);color:#64748b">Read-only</span></td>
     </tr>
   `; }).join('');
-
-  tbody.querySelectorAll('button[data-edit-user]').forEach(btn => {
-    btn.addEventListener('click', () => openRaosUserModal(btn.dataset.editUser));
-  });
 }
 
 async function loadRaosUsers() {
@@ -1215,93 +1211,25 @@ function openRaosUserModal(userId) {
 }
 
 async function saveRaosUser() {
-  if (!_ruEditing) return;
-  const btn = document.getElementById('ru-modal-save');
-  btn.disabled = true;
-  showStatus('Menyimpan…', '');
-  try {
-    const me = _wlCurrentUserEmail();
-    const branchVal = document.getElementById('ru-edit-branch').value;
-    const data = await _gasCall('raos_users_update', {
-      id:        _ruEditing.id,
-      full_name: document.getElementById('ru-edit-fullname').value,
-      phone:     document.getElementById('ru-edit-phone').value,
-      role:      document.getElementById('ru-edit-role').value,
-      branch_id: branchVal === '' ? 'null' : branchVal,
-      is_active: document.getElementById('ru-edit-active').checked ? 'true' : 'false',
-      user:      me,
-    });
-    if (!data.success) throw new Error(data.message || 'Gagal update');
-    showStatus('✅ User ter-update' + (data.warning ? ' (warning: ' + data.warning + ')' : ''), 'ok');
-    document.getElementById('ru-modal').style.display = 'none';
-    await loadRaosUsers();
-  } catch (err) {
-    showStatus('❌ ' + err.message, 'err');
-  } finally {
-    btn.disabled = false;
-  }
+  showStatus('Mode read-only: perubahan identity/PIN Staff wajib melalui MASTER DATA STAFF dan sync canonical.', 'err');
 }
 
 async function resetRaosPin() {
-  if (!_ruEditing) return;
-  const pin = prompt(`Reset PIN PWA untuk ${_ruEditing.email}\n\n⚠️ Ini update Supabase Auth password LANGSUNG. Akan ter-overwrite next sync SSOT (max 6 jam) kalau sheet MASTER DATA STAFF kolom H beda. Untuk permanen pakai "PIN Sheet SSOT".\n\nMasukkan PIN baru (min 6 digit angka):`);
-  if (pin === null) return;
-  if (!/^\d{6,}$/.test(pin.trim())) { showStatus('PIN harus min 6 digit angka', 'err'); return; }
-  showStatus('Reset PIN PWA…', '');
-  try {
-    const me = _wlCurrentUserEmail();
-    const data = await _gasCall('raos_users_reset_pin', { id: _ruEditing.id, pin: pin.trim(), user: me });
-    if (!data.success) throw new Error(data.message || 'Gagal reset');
-    showStatus(`✅ PIN PWA direset untuk ${_ruEditing.email}`, 'ok');
-  } catch (err) {
-    showStatus('❌ ' + err.message, 'err');
-  }
+  showStatus('Mode read-only: perubahan identity/PIN Staff wajib melalui MASTER DATA STAFF dan sync canonical.', 'err');
 }
 
 async function resetPortalPin() {
-  if (!_ruEditing) return;
-  const pin = prompt(`Reset PIN Portal untuk ${_ruEditing.email}\n\nPIN ini untuk login https://rifim-os.vercel.app/portal (bridge via raos_verify_and_bridge). Berbeda dari PIN PWA.\n\nMasukkan PIN Portal baru (min 6 digit angka):`);
-  if (pin === null) return;
-  if (!/^\d{6,}$/.test(pin.trim())) { showStatus('PIN Portal harus min 6 digit angka', 'err'); return; }
-  showStatus('Reset PIN Portal…', '');
-  try {
-    const me = _wlCurrentUserEmail();
-    const data = await _gasCall('raos_credentials_reset_pin', { id: _ruEditing.id, pin: pin.trim(), user: me });
-    if (!data.success) throw new Error(data.message || 'Gagal reset');
-    showStatus(`✅ PIN Portal direset untuk ${_ruEditing.email}`, 'ok');
-    // Refresh credentials cache supaya kolom "PIN Portal" update ke "✓ Terset"
-    await loadRaosUsers();
-  } catch (err) {
-    showStatus('❌ ' + err.message, 'err');
-  }
+  showStatus('Mode read-only: perubahan identity/PIN Staff wajib melalui MASTER DATA STAFF dan sync canonical.', 'err');
 }
 
 async function updateSsotPin() {
-  if (!_ruEditing) return;
-  const staffCode = _ruEditing.staff_id;
-  if (!staffCode) { showStatus('Staff belum punya ID RIF di SSOT — tidak bisa update PIN sheet', 'err'); return; }
-  const pin = prompt(`Update PIN Sheet SSOT untuk ${_ruEditing.email}\n\nStaff ID: ${staffCode}\n\nAksi ini menulis kolom H (Pin) di sheet MASTER DATA STAFF. Sumber kanonis — Supabase Auth password akan sync max 6 jam, atau klik "Force Refresh Staff Auth" di /sistem untuk propagate segera.\n\nMasukkan PIN SSOT baru (min 6 digit angka):`);
-  if (pin === null) return;
-  if (!/^\d{6,}$/.test(pin.trim())) { showStatus('PIN SSOT harus min 6 digit angka', 'err'); return; }
-  showStatus('Update PIN Sheet SSOT…', '');
-  try {
-    const me = _wlCurrentUserEmail();
-    const data = await _gasCall('raos_ssot_pin_update', { staff_id: staffCode, pin: pin.trim(), user: me });
-    if (!data.success) throw new Error(data.message || 'Gagal update sheet');
-    showStatus(`✅ PIN Sheet SSOT diupdate (row ${data.row}). ${data.note || ''}`, 'ok');
-  } catch (err) {
-    showStatus('❌ ' + err.message, 'err');
-  }
+  showStatus('Mode read-only: update MASTER DATA STAFF dilakukan di SSOT, bukan dari CRM.', 'err');
 }
 
 document.getElementById('ru-refresh').addEventListener('click', loadRaosUsers);
 document.getElementById('ru-search').addEventListener('input', renderRaosUsers);
 document.getElementById('ru-filter-role').addEventListener('change', renderRaosUsers);
 document.getElementById('ru-filter-branch').addEventListener('change', renderRaosUsers);
-document.getElementById('ru-modal-save').addEventListener('click', saveRaosUser);
-document.getElementById('ru-modal-reset-pin').addEventListener('click', resetRaosPin);
-document.getElementById('ru-modal-reset-portal-pin').addEventListener('click', resetPortalPin);
-document.getElementById('ru-modal-update-ssot-pin').addEventListener('click', updateSsotPin);
 document.getElementById('ru-modal-close').addEventListener('click', () => {
   document.getElementById('ru-modal').style.display = 'none';
   _ruEditing = null;
