@@ -704,7 +704,7 @@ function renderSystemConfig() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// SAVE HANDLERS (TODO: backend integration)
+// SAVE HANDLERS — canonical write + verified mirror sync
 // ═══════════════════════════════════════════════════════════════════════
 function showStatus(msg, kind) {
   const bar = document.getElementById('status');
@@ -775,19 +775,34 @@ document.getElementById('sc-save').addEventListener('click', async () => {
   const results = { ok: 0, err: 0, errors: [] };
   const me = _wlCurrentUserEmail();
   for (const item of payload) {
-    const { data, error } = await sb.rpc('set_system_config', {
-      p_key: item.key, p_value: item.value,
-    });
-    if (error) { results.err++; results.errors.push(`${item.key}: ${error.message}`); }
-    else { results.ok++; }
-    // Fire-and-forget: sync juga ke sheet SISTEM CONFIG via GAS
-    // (Supabase Row sudah tersimpan; sheet sync boleh gagal tanpa blok user)
-    _gasCall('sistem_config_set', { key: item.key, value: item.value, user: me })
-      .catch(err => console.warn('Sheet sync gagal utk ' + item.key, err));
+    try {
+      const { error } = await sb.rpc('set_system_config', {
+        p_key: item.key, p_value: item.value,
+      });
+      if (error) throw new Error('Supabase write gagal: ' + error.message);
+
+      const { data: verifyRows, error: verifyError } = await sb.rpc('list_system_config');
+      if (verifyError) throw new Error('Supabase verify gagal: ' + verifyError.message);
+      const verified = Array.isArray(verifyRows) && verifyRows.some(row =>
+        String(row.key) === String(item.key) && String(row.value ?? '') === String(item.value ?? '')
+      );
+      if (!verified) throw new Error('Supabase verify mismatch setelah write');
+
+      const mirror = await _gasCall('sistem_config_set', {
+        key: item.key, value: item.value, user: me,
+      });
+      if (!mirror || mirror.success !== true) {
+        throw new Error('Sheet mirror gagal: ' + ((mirror && mirror.message) || 'response tidak valid'));
+      }
+      results.ok++;
+    } catch (err) {
+      results.err++;
+      results.errors.push(`${item.key}: ${err.message}`);
+    }
   }
 
   if (results.err === 0) {
-    showStatus(`✅ ${results.ok} config tersimpan (Supabase + sync sheet fire-and-forget)`, 'ok');
+    showStatus(`✅ ${results.ok} config tersimpan dan mirror Sheet terverifikasi`, 'ok');
     dirty.system.clear();
     document.querySelectorAll('[data-panel="system"] tr').forEach(tr => tr.style.background = '');
   } else {

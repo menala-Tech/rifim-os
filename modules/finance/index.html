@@ -209,10 +209,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
       </div>
       <div class="roadmap">
         <strong>Kolom sheet:</strong> Timestamp, Tanggal, Sumber, Kategori, Jenis, Jumlah, Cabang, Keterangan.<br>
-        <strong>Read path (TODO):</strong> extend GAS di spreadsheet 1AgpEqhpDU4B dengan
-        <code>doGet</code> action <code>finance_list</code> return JSON. Pagination server-side
-        (979 baris → chunk 100).<br>
-        <strong>Filter yang perlu:</strong> range tanggal, kategori, jenis (in/out), cabang, sumber.
+        <strong>Read path aktif:</strong> GAS action <code>finance_list</code> → JSON ledger, dengan filter tanggal, jenis, cabang, dan limit server-side.
       </div>
 
       <div class="toolbar">
@@ -229,7 +226,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
           <th style="text-align:right">Jumlah</th><th>Cabang</th><th>Keterangan</th>
         </tr></thead>
         <tbody id="d-body">
-          <tr><td colspan="7"><div class="empty"><div class="icon">🔌</div>Belum terhubung. GAS endpoint <code>finance_list</code> belum dibuat.</div></td></tr>
+          <tr><td colspan="7"><div class="empty"><div class="icon">🔌</div>Data ledger dimuat dari GAS <code>finance_list</code>.</div></td></tr>
         </tbody>
       </table>
     </div>
@@ -246,7 +243,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
       <div class="roadmap">
         <strong>Kolom per cabang:</strong> Timestamp, Pemasukan, Pengeluaran, Jumlah, Keterangan,
         Nama Staff (Kasbon), Total Pemasukan, Total Pengeluaran.<br>
-        <strong>TODO GAS:</strong> action <code>cabang_list&amp;sheet={nama_tab}</code>.
+        <strong>Read path aktif:</strong> GAS action <code>finance_cabang_list&amp;sheet={nama_tab}</code>.
       </div>
 
       <div class="cabang-grid" id="cab-picker">
@@ -284,8 +281,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         (a) <code>Tagihan</code> = arsip semua tagihan (27 kolom, ada rumus),
         (b) <code>New Tagihan</code> = staging tagihan baru,
         (c) per-bulan (<code>Juli 2026</code>, dst) = filter view bulanan.<br>
-        <strong>TODO GAS:</strong> <code>tagihan_list/add/mark_paid</code>. Add tagihan baru
-        write ke <code>New Tagihan</code>, lalu daily cron pindah ke <code>Tagihan</code> + sheet bulan.
+        <strong>Backend aktif:</strong> <code>finance_tagihan_list</code>, <code>finance_tagihan_add</code>, dan <code>finance_tagihan_mark_paid</code>.
       </div>
 
       <div class="toolbar">
@@ -316,11 +312,9 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <span class="sink sheet">📊 Sheet: <code>TABEL HARIAN</code>, <code>TABEL BULANAN</code></span>
       </div>
       <div class="roadmap">
-        <strong>TODO:</strong> parse pivot sheet (bukan raw ledger). Kalau chart perlu, pakai
-        Chart.js CDN. 2 chart: (a) stacked bar per cabang per bulan, (b) line trend harian
-        30 hari terakhir.
+        <strong>Backend aktif:</strong> <code>finance_rekap_harian</code> + <code>finance_rekap_bulanan</code>; UI merender tabel rekap dari hasil GAS.
       </div>
-      <div class="empty"><div class="icon">📆</div>Belum di-implementasi. Bikin GAS action <code>rekap_harian</code> + <code>rekap_bulanan</code>.</div>
+      <div class="empty"><div class="icon">📆</div>Rekap dimuat dari backend saat tab dibuka.</div>
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -528,8 +522,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
       </div>
       <div class="roadmap">
         <strong>Kolom:</strong> Tanggal, Jam, Fungsi, Status, Pesan.<br>
-        <strong>TODO:</strong> GAS action <code>log_list?limit=200</code>. Filter status
-        (SUCCESS/ERROR/WARN), filter fungsi. Auto-scroll ke terbaru.
+        <strong>Read path aktif:</strong> GAS action <code>finance_log_list</code> dengan filter status/pencarian dan limit 200.
       </div>
       <div class="toolbar">
         <input type="date" id="l-from"> — <input type="date" id="l-to">
