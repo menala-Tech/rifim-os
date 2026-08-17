@@ -155,6 +155,58 @@
     return role === 'admin' || role === 'direksi'
   }
 
+  function installHrisMutationGuard() {
+    if (!/^\/hris(?:\/|$)/.test(global.location.pathname || '')) return
+
+    const guardedPostActions = new Set([
+      'update_employee',
+      'add_employee',
+      'add_contract',
+      'approve_leave',
+      'add_payroll',
+      'finalize_payroll',
+    ])
+    const guardedGetActions = new Set(['hris_attendance_edit'])
+    const denied = () => ({
+      success: false,
+      message: 'Role view-only tidak diizinkan melakukan perubahan HRIS.',
+    })
+
+    let attempts = 0
+    const timer = global.setInterval(() => {
+      attempts += 1
+      let ready = true
+
+      if (typeof global.gasPost === 'function' && !global.gasPost.__rifimP0Guarded) {
+        const originalPost = global.gasPost
+        const wrappedPost = async function (body) {
+          const action = String((body || {}).hrisAction || '')
+          if (guardedPostActions.has(action) && !canMutate()) return denied()
+          return originalPost.apply(this, arguments)
+        }
+        wrappedPost.__rifimP0Guarded = true
+        global.gasPost = wrappedPost
+      } else if (typeof global.gasPost !== 'function') {
+        ready = false
+      }
+
+      if (typeof global.gasGet === 'function' && !global.gasGet.__rifimP0Guarded) {
+        const originalGet = global.gasGet
+        const wrappedGet = async function (params) {
+          const action = String((params || {}).action || '')
+          if (guardedGetActions.has(action) && !canMutate()) return denied()
+          return originalGet.apply(this, arguments)
+        }
+        wrappedGet.__rifimP0Guarded = true
+        global.gasGet = wrappedGet
+      } else if (typeof global.gasGet !== 'function') {
+        ready = false
+      }
+
+      if (ready || attempts >= 100) global.clearInterval(timer)
+    }, 50)
+  }
+
   global.RifimPortalSession = {
     read: readSession,
     clear: clearSession,
@@ -163,4 +215,6 @@
     normalizeRole,
     canMutate,
   }
+
+  installHrisMutationGuard()
 })(window)
