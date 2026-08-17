@@ -1,0 +1,43 @@
+name: hris-fast-token-temp
+on:
+  push:
+    branches:
+      - perf/hris-fast-read-20260817
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: perf/hris-fast-read-20260817
+          fetch-depth: 0
+      - name: Use canonical Portal token
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('modules/hris/index.html')
+          s=p.read_text()
+          old="  const token = getRaosSyncToken();"
+          new="  const portalSession = (window.RifimPortalSession && RifimPortalSession.read) ? RifimPortalSession.read() : null;\n  const token = (portalSession && portalSession.access_token) || getRaosSyncToken();"
+          if s.count(old) < 1: raise SystemExit('token marker missing')
+          # Only first occurrence belongs to _fetchEmployeesFast; syncSsotNow keeps its existing behavior.
+          s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+      - name: Validate
+        run: |
+          grep -q "portalSession && portalSession.access_token" modules/hris/index.html
+          grep -q "return gasGet({ action: 'hris_employees'" modules/hris/index.html
+          test "$(grep -c "const res = await _fetchEmployeesFast()" modules/hris/index.html)" -eq 2
+          node --check api/internal/hris-v2.js
+          git diff --check
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add modules/hris/index.html
+          git commit -m "fix(hris): use canonical portal token for fast read"
+          git push origin HEAD:perf/hris-fast-read-20260817
