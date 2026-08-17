@@ -152,9 +152,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
 
   <main>
     <div class="page-title">CRM &amp; Config Center</div>
-    <div class="page-sub">Single Source of Truth untuk seluruh konfigurasi &amp; data master RIFIM OS,
-      Smart Office, HRIS, dan PWA RAOS Menala. Edit sekali di sini — otomatis propagate ke Google
-      Sheets, Supabase, dan GitHub (auto-deploy Vercel).</div>
+    <div class="page-sub">Config Center dan audit surface untuk RIFIM OS, Smart Office, HRIS, dan PWA RAOS Menala. Setiap domain mengikuti canonical owner masing-masing; mutation hanya tersedia pada surface yang memiliki write path resmi.</div>
 
     <div class="tabs">
       <button class="tab active" data-tab="company">🏢 Company Config</button>
@@ -413,7 +411,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div class="panel" data-panel="audit">
       <h2>Audit Log Perubahan</h2>
-      <div class="desc">Semua perubahan config, whitelist, user Supabase, kontak. Actor + before/after + timestamp.</div>
+      <div class="desc">Audit perubahan config dan kontak CRM. Actor + before/after + timestamp.</div>
       <div class="sinks">
         <span class="sink sheet">📊 Sheet: <code>CRM_AUDIT_LOG</code></span>
         <span class="sink gas">🔧 GAS action: <code>crm_audit_tail</code></span>
@@ -850,7 +848,7 @@ document.getElementById('au-from').addEventListener('change', () => renderAuditR
 document.getElementById('au-to').addEventListener('change', () => renderAuditRows());
 
 // ═══════════════════════════════════════════════════════════════════════
-// USER SUPABASE RAOS — wire ke GAS proxy raos_users_list/update/reset_pin
+// USER SUPABASE RAOS — read-only audit via raos_users_list + raos_credentials_list
 // ═══════════════════════════════════════════════════════════════════════
 let _ruCache = [];
 let _rcCache = {};   // {user_id: {has_portal_pin, staff_code, updated_at, has_ssot_pin}}
