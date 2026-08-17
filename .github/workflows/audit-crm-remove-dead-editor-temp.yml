@@ -1,0 +1,55 @@
+name: audit-crm-remove-dead-editor-temp
+on:
+  push:
+    branches: [audit-full-sync-20260817]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit-full-sync-20260817
+          fetch-depth: 0
+      - name: Remove dead RAOS user editor residue
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('modules/crm/index.html')
+          s=p.read_text()
+          # Remove dead modal markup if present.
+          s,n1=re.subn(r'\n<!-- RAOS USER EDIT MODAL -->.*?</div>\s*</div>\s*(?=\n<!--|\n<div id="status")','\n',s,flags=re.S|re.I)
+          # Fallback: remove modal container by id boundaries if comment changed.
+          if n1==0:
+              s=re.sub(r'\n<div id="ru-modal".*?</div>\s*</div>\s*(?=\n<!--|\n<div id="status")','\n',s,flags=re.S)
+          # Remove editor state no longer used.
+          s=re.sub(r'\nlet _ruEditing = null;','',s)
+          s=re.sub(r'\nlet _ruBranches = \[\];','',s)
+          # Remove branch collection block in loadRaosUsers.
+          s=re.sub(r'\n\s*// Extract unique branches for edit modal dropdown.*?_ruCache\.forEach\(u => \{.*?\n\s*\}\);','',s,flags=re.S)
+          # Remove dead modal/open/mutation stubs and close handler as one region.
+          start=s.find('\nfunction openRaosUserModal(')
+          end=s.find('\n// ═══════════════════════════════════════════════════════════════════════\n// KONTAK EKSTERNAL', start)
+          if start!=-1 and end!=-1:
+              # Preserve list/filter event bindings only.
+              keep="\ndocument.getElementById('ru-refresh').addEventListener('click', loadRaosUsers);\ndocument.getElementById('ru-search').addEventListener('input', renderRaosUsers);\ndocument.getElementById('ru-filter-role').addEventListener('change', renderRaosUsers);\ndocument.getElementById('ru-filter-branch').addEventListener('change', renderRaosUsers);\n"
+              s=s[:start]+keep+s[end:]
+          for needle in ['openRaosUserModal','saveRaosUser','resetRaosPin','resetPortalPin','updateSsotPin','ru-modal-save','ru-modal-reset-pin','ru-modal-update-ssot-pin','ru-modal-reset-portal-pin']:
+              if needle in s: raise SystemExit('dead RAOS editor residue remains: '+needle)
+          p.write_text(s)
+          PY
+      - name: Verify read-only source
+        run: |
+          ! grep -n "raos_users_update\|raos_users_reset_pin\|raos_credentials_reset_pin\|master_staff_update_pin\|openRaosUserModal\|ru-modal-save" modules/crm/index.html
+          grep -n 'Read-only' modules/crm/index.html
+          git diff --check
+      - name: Commit cleanup
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add modules/crm/index.html
+          git commit -m "refactor(crm): remove dead RAOS identity editor"
+          git push origin HEAD:audit-full-sync-20260817
