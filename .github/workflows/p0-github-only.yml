@@ -1,0 +1,365 @@
+name: P0 GitHub-only canonical patch
+
+on:
+  push:
+    branches:
+      - codex/integration-p0-20260817
+    paths:
+      - '.github/workflows/p0-github-only.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/integration-p0-20260817
+          fetch-depth: 0
+
+      - name: Apply canonical P0 patch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          ROOT = Path('.')
+
+          def read(path):
+              return (ROOT / path).read_text(encoding='utf-8')
+
+          def write(path, text):
+              p = ROOT / path
+              p.parent.mkdir(parents=True, exist_ok=True)
+              p.write_text(text, encoding='utf-8', newline='\n')
+
+          def replace_once(text, old, new, label):
+              if old not in text:
+                  raise RuntimeError(f'{label}: source anchor not found')
+              return text.replace(old, new, 1)
+
+          def sub_once(text, pattern, repl, label, flags=re.S):
+              out, n = re.subn(pattern, repl, text, count=1, flags=flags)
+              if n != 1:
+                  raise RuntimeError(f'{label}: expected 1 replacement, got {n}')
+              return out
+
+          PORTAL_SESSION = r'''(function (global) {
+            'use strict'
+
+            const SB_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co'
+            const SB_ANON = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1'
+            const STORAGE_KEY = 'rifim_auth'
+
+            const FALLBACK_ALIASES = {
+              staff: 'staff',
+              'staff konter': 'staff',
+              'pickup point': 'staff',
+              koordinator: 'koordinator',
+              coordinator: 'koordinator',
+              admin: 'admin',
+              administrator: 'admin',
+              management: 'management',
+              manajemen: 'management',
+              direksi: 'direksi',
+              direktur: 'direksi',
+              'direktur utama': 'direksi',
+              driver: 'driver',
+            }
+
+            function normalizeRole(value) {
+              if (global.RifimMasterRolePolicy && typeof global.RifimMasterRolePolicy.normalizeRole === 'function') {
+                return global.RifimMasterRolePolicy.normalizeRole(value)
+              }
+              const raw = String(value || '').trim().toLowerCase()
+              return FALLBACK_ALIASES[raw] || raw
+            }
+
+            function readSession() {
+              try { return JSON.parse(global.localStorage.getItem(STORAGE_KEY) || 'null') }
+              catch (_) { return null }
+            }
+
+            function writeSession(session) {
+              global.localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
+              return session
+            }
+
+            function clearSession() {
+              global.localStorage.removeItem(STORAGE_KEY)
+            }
+
+            function decodeJwt(token) {
+              try {
+                const part = String(token || '').split('.')[1]
+                if (!part) return null
+                const normalized = part.replace(/-/g, '+').replace(/_/g, '/')
+                const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4)
+                return JSON.parse(decodeURIComponent(Array.from(atob(padded)).map(c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('')))
+              } catch (_) { return null }
+            }
+
+            async function refreshToken(refreshToken) {
+              const res = await fetch(SB_URL + '/auth/v1/token?grant_type=refresh_token', {
+                method: 'POST',
+                headers: {
+                  apikey: SB_ANON,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ refresh_token: refreshToken }),
+              })
+              if (!res.ok) throw new Error('Portal session refresh gagal')
+              return res.json()
+            }
+
+            async function fetchProfile(accessToken, userId) {
+              const qs = new URLSearchParams({
+                id: 'eq.' + userId,
+                select: 'id,full_name,role,staff_id,branch_id,is_active',
+              })
+              const res = await fetch(SB_URL + '/rest/v1/user_profiles?' + qs.toString(), {
+                headers: {
+                  apikey: SB_ANON,
+                  Authorization: 'Bearer ' + accessToken,
+                  Accept: 'application/json',
+                },
+              })
+              if (!res.ok) throw new Error('Portal profile validation gagal')
+              const rows = await res.json()
+              return Array.isArray(rows) ? rows[0] || null : null
+            }
+
+            async function validateSession() {
+              const saved = readSession()
+              if (!saved || !saved.access_token) return null
+
+              let accessToken = saved.access_token
+              let refreshTokenValue = saved.refresh_token || ''
+              let expiresAt = Number(saved.expires_at || 0)
+              const now = Math.floor(Date.now() / 1000)
+
+              try {
+                if (!expiresAt || expiresAt <= now + 60) {
+                  if (!refreshTokenValue) throw new Error('Refresh token tidak tersedia')
+                  const refreshed = await refreshToken(refreshTokenValue)
+                  accessToken = refreshed.access_token || ''
+                  refreshTokenValue = refreshed.refresh_token || refreshTokenValue
+                  expiresAt = Number(refreshed.expires_at || (now + Number(refreshed.expires_in || 3600)))
+                  if (!accessToken) throw new Error('Access token kosong setelah refresh')
+                }
+
+                const payload = decodeJwt(accessToken)
+                const userId = payload && payload.sub
+                if (!userId) throw new Error('Token Portal tidak valid')
+
+                const profile = await fetchProfile(accessToken, userId)
+                if (!profile || profile.is_active === false) throw new Error('Profil Portal tidak aktif')
+
+                return writeSession(Object.assign({}, saved, {
+                  id: profile.id,
+                  full_name: profile.full_name || saved.full_name || saved.name || saved.email || 'User',
+                  name: profile.full_name || saved.name || saved.full_name || saved.email || 'User',
+                  role: normalizeRole(profile.role || saved.role),
+                  staff_id: profile.staff_id || saved.staff_id || null,
+                  branch_id: profile.branch_id || saved.branch_id || null,
+                  access_token: accessToken,
+                  refresh_token: refreshTokenValue,
+                  expires_at: expiresAt,
+                  ts: Date.now(),
+                }))
+              } catch (err) {
+                console.warn('[RifimPortalSession]', err && err.message ? err.message : err)
+                clearSession()
+                return null
+              }
+            }
+
+            async function requireSession(options) {
+              options = options || {}
+              const session = await validateSession()
+              const redirect = options.redirect || '/portal'
+              if (!session) {
+                if (options.noRedirect !== true) global.location.href = redirect
+                return null
+              }
+
+              const role = normalizeRole(session.role)
+              const allowed = Array.isArray(options.allowedRoles)
+                ? options.allowedRoles.map(normalizeRole)
+                : null
+              if (allowed && !allowed.includes(role)) {
+                if (options.noRedirect !== true) global.location.href = redirect
+                return null
+              }
+              session.role = role
+              writeSession(session)
+              return session
+            }
+
+            function canMutate(session) {
+              const role = normalizeRole((session || readSession() || {}).role)
+              return role === 'admin' || role === 'direksi'
+            }
+
+            global.RifimPortalSession = {
+              read: readSession,
+              clear: clearSession,
+              validate: validateSession,
+              require: requireSession,
+              normalizeRole,
+              canMutate,
+            }
+          })(window)
+          '''
+          write('shared/portal-session.js', PORTAL_SESSION)
+
+          scripts = '<script src="/shared/master-role-policy.js"></script>\n<script src="/shared/portal-session.js"></script>'
+
+          # HRIS
+          path = 'modules/hris/index.html'
+          text = read(path)
+          if '/shared/portal-session.js' not in text:
+              text = replace_once(text, '<script src="/shared/api-cache.js"></script>', '<script src="/shared/api-cache.js"></script>\n' + scripts, 'HRIS script inject')
+          if 'autofillPotanganFromAbsensi' not in text:
+              raise RuntimeError('HRIS typo anchor not found')
+          text = text.replace('autofillPotanganFromAbsensi', 'autofillPotonganFromAbsensi')
+          text = sub_once(
+              text,
+              r"function canUserApprove\(\) \{.*?\n\}",
+              "function canUserApprove() {\n  if (!currentUser) return false;\n  const role = window.RifimPortalSession\n    ? RifimPortalSession.normalizeRole(currentUser.role)\n    : String(currentUser.role || '').trim().toLowerCase();\n  return ['admin','direksi'].includes(role);\n}",
+              'HRIS approve role gate'
+          )
+          text = sub_once(
+              text,
+              r"async function doLogin\(\) \{.*?\n\}\n\nfunction showAuthError",
+              "async function doLogin() {\n  window.location.href = '/portal';\n}\n\nfunction showAuthError",
+              'HRIS legacy login removal'
+          )
+          text = sub_once(
+              text,
+              r"\(function checkSession\(\) \{.*?\n\}\)\(\);",
+              "(async function checkSession() {\n  const user = await RifimPortalSession.require({\n    allowedRoles: ['admin','management','koordinator','direksi'],\n    redirect: '/portal',\n  });\n  if (!user) return;\n  enterHris(user);\n})();",
+              'HRIS canonical session boot'
+          )
+          write(path, text)
+
+          # Finance
+          path = 'modules/finance/index.html'
+          text = read(path)
+          if '/shared/portal-session.js' not in text:
+              text = replace_once(text, '<script src="/shared/api-cache.js"></script>', '<script src="/shared/api-cache.js"></script>\n' + scripts, 'Finance script inject')
+          guard = """function _finCanMutate() {\n  return window.RifimPortalSession ? RifimPortalSession.canMutate() : false;\n}\nfunction _finActionIsMutation(action) {\n  return /(?:_mark_paid$|_upsert$|_compute$|_assign_random$|_add$|_update$|_delete$|_remove$|_set$)/.test(String(action || ''));\n}\n\n"""
+          if 'function _finCanMutate()' not in text:
+              text = replace_once(text, 'async function _gasCall(action, extra) {', guard + "async function _gasCall(action, extra) {\n  if (_finActionIsMutation(action) && !_finCanMutate()) {\n    throw new Error('Role view-only tidak diizinkan melakukan perubahan Finance.');\n  }", 'Finance mutation fail-closed')
+          old = """if (checkAuth()) {\n  populateCabang();\n  populateBranchDropdowns();\n  wireFinanceHandlers();\n  startSaldoRaosNotifier();\n}"""
+          new = """(async function bootFinanceCanonical() {\n  const session = await RifimPortalSession.require({\n    allowedRoles: ['admin','management','direksi'],\n    redirect: '/portal',\n  });\n  if (!session || !checkAuth()) return;\n  populateCabang();\n  populateBranchDropdowns();\n  wireFinanceHandlers();\n  startSaldoRaosNotifier();\n})();"""
+          text = replace_once(text, old, new, 'Finance canonical session boot')
+          write(path, text)
+
+          # CRM
+          path = 'modules/crm/index.html'
+          text = read(path)
+          if '/shared/portal-session.js' not in text:
+              text = replace_once(text, '<script src="/shared/api-cache.js"></script>', '<script src="/shared/api-cache.js"></script>\n' + scripts, 'CRM script inject')
+          guard = """function _crmCanMutate() {\n  return window.RifimPortalSession ? RifimPortalSession.canMutate() : false;\n}\nfunction _crmActionIsMutation(action) {\n  return /(?:_set$|_add$|_update$|_remove$|_delete$|_create$|_upsert$)/.test(String(action || ''));\n}\n\n"""
+          if 'function _crmCanMutate()' not in text:
+              text = replace_once(text, 'async function _gasCall(action, extra) {', guard + "async function _gasCall(action, extra) {\n  if (_crmActionIsMutation(action) && !_crmCanMutate()) {\n    throw new Error('Role view-only tidak diizinkan melakukan perubahan CRM.');\n  }", 'CRM mutation fail-closed')
+          text = replace_once(
+              text,
+              "document.getElementById('sc-save').addEventListener('click', async () => {\n  const sb = getSb();",
+              "document.getElementById('sc-save').addEventListener('click', async () => {\n  if (!_crmCanMutate()) { showStatus('❌ Role view-only tidak diizinkan mengubah System Config', 'err'); return; }\n  const sb = getSb();",
+              'CRM direct Supabase write gate'
+          )
+          old = """if (checkAuth()) {\n  renderCompanyConfig();\n  renderSystemConfig();\n}"""
+          new = """(async function bootCrmCanonical() {\n  const session = await RifimPortalSession.require({\n    allowedRoles: ['admin','management','koordinator','direksi'],\n    redirect: '/portal',\n  });\n  if (!session || !checkAuth()) return;\n  renderCompanyConfig();\n  renderSystemConfig();\n})();"""
+          text = replace_once(text, old, new, 'CRM canonical session boot')
+          write(path, text)
+
+          # Smart Office
+          path = 'modules/smart-office/index.html'
+          text = read(path)
+          if '/shared/portal-session.js' not in text:
+              text = replace_once(text, '</head>', '  ' + scripts.replace('\n', '\n  ') + '\n</head>', 'Smart Office script inject')
+          text = sub_once(
+              text,
+              r"  async function doLogin\(\) \{.*?\n  \}\n\n  function storeAuth",
+              "  async function doLogin() {\n    window.location.href = '/portal';\n  }\n\n  function storeAuth",
+              'Smart Office legacy login removal'
+          )
+          text = replace_once(
+              text,
+              '  // ── BOOT ─────────────────────────────────────────────────────\n  checkAuth();',
+              "  // ── BOOT ─────────────────────────────────────────────────────\n  (async function bootSmartOfficeCanonical() {\n    const session = await RifimPortalSession.require({\n      allowedRoles: ['admin','management','koordinator','direksi'],\n      redirect: '/portal',\n    });\n    if (!session) return;\n    checkAuth();\n  })();",
+              'Smart Office canonical session boot'
+          )
+          write(path, text)
+
+          # Static regression assertions
+          checks = {
+              'modules/hris/index.html': [
+                  ('autofillPotanganFromAbsensi', False),
+                  ("['ADMIN','DIREKTUR','KOORDINATOR']", False),
+                  ('/shared/portal-session.js', True),
+              ],
+              'modules/finance/index.html': [
+                  ('12 * 3600 * 1000', True),  # legacy function may remain, but boot refreshes ts before it runs
+                  ('function _finCanMutate()', True),
+                  ('bootFinanceCanonical', True),
+              ],
+              'modules/crm/index.html': [
+                  ('function _crmCanMutate()', True),
+                  ('bootCrmCanonical', True),
+              ],
+              'modules/smart-office/index.html': [
+                  ('bootSmartOfficeCanonical', True),
+                  ("window.location.href = '/portal';", True),
+              ],
+          }
+          for p, rules in checks.items():
+              body = read(p)
+              for needle, should_exist in rules:
+                  exists = needle in body
+                  if exists != should_exist:
+                      raise RuntimeError(f'{p}: regression assertion failed for {needle!r}')
+
+          print('P0 patch assertions: PASS')
+          PY
+
+      - name: Syntax and diff checks
+        shell: bash
+        run: |
+          git diff --check
+          node --check shared/portal-session.js
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess, tempfile
+          for p in ['modules/hris/index.html','modules/crm/index.html','modules/smart-office/index.html']:
+              text = Path(p).read_text(encoding='utf-8')
+              scripts = re.findall(r'<script(?:\s[^>]*)?>([\s\S]*?)</script>', text, re.I)
+              for i, js in enumerate(scripts):
+                  if not js.strip():
+                      continue
+                  with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False, encoding='utf-8') as f:
+                      f.write(js)
+                      name = f.name
+                  r = subprocess.run(['node','--check',name], capture_output=True, text=True)
+                  if r.returncode:
+                      raise SystemExit(f'{p} inline script #{i} parse failed:\n{r.stderr}')
+          print('Inline JS parse checks: PASS')
+          PY
+
+      - name: Commit patch to branch
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add shared/portal-session.js modules/hris/index.html modules/finance/index.html modules/crm/index.html modules/smart-office/index.html
+          git commit -m "fix canonical portal session and P0 role gates"
+          git push origin HEAD:codex/integration-p0-20260817
