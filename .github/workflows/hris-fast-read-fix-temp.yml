@@ -1,0 +1,41 @@
+name: hris-fast-read-fix-temp
+on:
+  push:
+    branches:
+      - perf/hris-fast-read-20260817
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: perf/hris-fast-read-20260817
+          fetch-depth: 0
+      - name: Fix GAS fallback recursion
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('modules/hris/index.html')
+          s=p.read_text()
+          old="  return _fetchEmployeesFast();\n}\n\nasync function loadEmployees(opts) {"
+          new="  return gasGet({ action: 'hris_employees', company_code: selectedCompany, status: 'ALL' });\n}\n\nasync function loadEmployees(opts) {"
+          if old not in s: raise SystemExit('recursive fallback marker missing')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+      - name: Validate
+        run: |
+          node --check api/internal/hris-v2.js
+          grep -q "return gasGet({ action: 'hris_employees'" modules/hris/index.html
+          test "$(grep -c "const res = await _fetchEmployeesFast()" modules/hris/index.html)" -eq 2
+          git diff --check
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add modules/hris/index.html
+          git commit -m "fix(hris): preserve GAS fallback in fast employee read"
+          git push origin HEAD:perf/hris-fast-read-20260817
