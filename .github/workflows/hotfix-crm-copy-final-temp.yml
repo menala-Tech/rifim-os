@@ -1,0 +1,43 @@
+name: hotfix-crm-copy-final-temp
+on:
+  push:
+    branches: [hotfix-crm-copy-final-20260817]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hotfix-crm-copy-final-20260817
+          fetch-depth: 0
+      - name: Clean final stale CRM copy
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('modules/crm/index.html')
+          s=p.read_text()
+          s=re.sub(r'<div class="page-sub">Single Source of Truth untuk seluruh konfigurasi &amp; data master RIFIM OS,\s*Smart Office, HRIS, dan PWA RAOS Menala\. Edit sekali di sini — otomatis propagate ke Google\s*Sheets, Supabase, dan GitHub \(auto-deploy Vercel\)\.</div>', '<div class="page-sub">Config Center dan audit surface untuk RIFIM OS, Smart Office, HRIS, dan PWA RAOS Menala. Setiap domain mengikuti canonical owner masing-masing; mutation hanya tersedia pada surface yang memiliki write path resmi.</div>', s, count=1)
+          s=s.replace('Semua perubahan config, whitelist, user Supabase, kontak. Actor + before/after + timestamp.','Audit perubahan config dan kontak CRM. Actor + before/after + timestamp.')
+          s=s.replace('// USER SUPABASE RAOS — wire ke GAS proxy raos_users_list/update/reset_pin','// USER SUPABASE RAOS — read-only audit via raos_users_list + raos_credentials_list')
+          forbidden=['otomatis propagate ke Google','config, whitelist, user Supabase','raos_users_list/update/reset_pin']
+          for needle in forbidden:
+              if needle in s: raise SystemExit('stale copy remains: '+needle)
+          p.write_text(s)
+          PY
+      - name: Verify
+        run: |
+          grep -n 'Config Center dan audit surface' modules/crm/index.html
+          grep -n 'Audit perubahan config dan kontak CRM' modules/crm/index.html
+          grep -n 'read-only audit via raos_users_list' modules/crm/index.html
+          git diff --check
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add modules/crm/index.html
+          git commit -m "docs(crm): align final canonical copy"
+          git push origin HEAD:hotfix-crm-copy-final-20260817
