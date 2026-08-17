@@ -254,6 +254,8 @@ tr:last-child td{border-bottom:none}
 }
 </style>
 <script src="/shared/api-cache.js"></script>
+<script src="/shared/master-role-policy.js"></script>
+<script src="/shared/portal-session.js"></script>
 </head>
 <body>
 
@@ -1139,24 +1141,7 @@ let selectedCompany = localStorage.getItem('rifim_company') || 'ALL';
 // AUTH
 // ════════════════════════════════════════════════════════════
 async function doLogin() {
-  const email = document.getElementById('auth-email').value.trim();
-  if (!email) return showAuthError('Masukkan email Anda.');
-
-  try {
-    const res  = await gasGet({ action: 'auth', email, source: 'HRIS' });
-    if (res.success) {
-      currentUser = res.user;
-      document.getElementById('auth-gate').style.display = 'none';
-      document.getElementById('app').style.display       = 'flex';
-      document.getElementById('user-badge').textContent  = res.user.full_name + ' (' + res.user.role + ')';
-      sessionStorage.setItem('hris_user', JSON.stringify(res.user));
-      initApp();
-    } else {
-      showAuthError(res.message || 'Akses ditolak.');
-    }
-  } catch (e) {
-    showAuthError('Gagal terhubung ke server.');
-  }
+  window.location.href = '/portal';
 }
 
 function showAuthError(msg) {
@@ -1200,24 +1185,13 @@ document.getElementById('auth-email').addEventListener('keydown', e => {
 });
 
 // Auto-login: HRIS ikut session Portal. Kalau belum login Portal, balik ke /portal.
-(function checkSession() {
-  const saved = sessionStorage.getItem('hris_user') || localStorage.getItem('rifim_auth');
-  if (!saved) {
-    window.location.href = '/portal';
-    return;
-  }
-
-  try {
-    if (!enterHris(JSON.parse(saved))) {
-      sessionStorage.removeItem('hris_user');
-      window.location.href = '/portal';
-    }
-  } catch(e) {
-    sessionStorage.removeItem('hris_user');
-    localStorage.removeItem('rifim_auth');
-    window.location.href = '/portal';
-  }
-
+(async function checkSession() {
+  const user = await RifimPortalSession.require({
+    allowedRoles: ['admin','management','koordinator','direksi'],
+    redirect: '/portal',
+  });
+  if (!user) return;
+  enterHris(user);
 })();
 
 // ════════════════════════════════════════════════════════════
@@ -2587,7 +2561,11 @@ function filterLeave() {
 }
 
 function canUserApprove() {
-  return currentUser && ['ADMIN','DIREKTUR','KOORDINATOR'].includes(currentUser.role);
+  if (!currentUser) return false;
+  const role = window.RifimPortalSession
+    ? RifimPortalSession.normalizeRole(currentUser.role)
+    : String(currentUser.role || '').trim().toLowerCase();
+  return ['admin','direksi'].includes(role);
 }
 
 async function approveLeave(leaveId, status) {
@@ -2712,7 +2690,7 @@ async function loadPayroll() {
 }
 
 // Auto-fill Potongan dari raos_absensi_summary_month (late + absent deduction)
-async function autofillPotanganFromAbsensi() {
+async function autofillPotonganFromAbsensi() {
   const empId = (document.getElementById('pay-emp-id').value || '').trim().toUpperCase();
   const month = document.getElementById('pay-month').value;
   const year = document.getElementById('pay-year').value;

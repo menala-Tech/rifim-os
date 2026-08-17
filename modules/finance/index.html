@@ -137,6 +137,8 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="/shared/api-cache.js"></script>
+<script src="/shared/master-role-policy.js"></script>
+<script src="/shared/portal-session.js"></script>
 </head>
 <body>
 
@@ -677,7 +679,17 @@ async function _finGetAccessToken() {
   return saved.access_token || '';
 }
 
+function _finCanMutate() {
+  return window.RifimPortalSession ? RifimPortalSession.canMutate() : false;
+}
+function _finActionIsMutation(action) {
+  return /(?:_mark_paid$|_upsert$|_compute$|_assign_random$|_add$|_update$|_delete$|_remove$|_set$)/.test(String(action || ''));
+}
+
 async function _gasCall(action, extra) {
+  if (_finActionIsMutation(action) && !_finCanMutate()) {
+    throw new Error('Role view-only tidak diizinkan melakukan perubahan Finance.');
+  }
   if (action === 'finance_saldo_raos_list' || action === 'finance_saldo_raos_mark_paid') {
     const token = await _finGetAccessToken();
     if (!token) throw new Error('Session token tidak ada. Login ulang melalui Portal.');
@@ -1611,12 +1623,17 @@ const initTab = location.hash.replace('#', '') || 'dashboard';
 const initBtn = document.querySelector(`.tab[data-tab="${initTab}"]`);
 if (initBtn) initBtn.click();
 
-if (checkAuth()) {
+(async function bootFinanceCanonical() {
+  const session = await RifimPortalSession.require({
+    allowedRoles: ['admin','management','direksi'],
+    redirect: '/portal',
+  });
+  if (!session || !checkAuth()) return;
   populateCabang();
   populateBranchDropdowns();
   wireFinanceHandlers();
   startSaldoRaosNotifier();
-}
+})();
 </script>
 
 </body>

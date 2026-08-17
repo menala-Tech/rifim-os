@@ -121,6 +121,8 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
 .dirty-badge{display:inline-block;width:8px;height:8px;background:var(--warn);border-radius:50%;margin-left:6px}
 </style>
 <script src="/shared/api-cache.js"></script>
+<script src="/shared/master-role-policy.js"></script>
+<script src="/shared/portal-session.js"></script>
 </head>
 <body>
 
@@ -757,6 +759,7 @@ function getSb() {
 }
 
 document.getElementById('sc-save').addEventListener('click', async () => {
+  if (!_crmCanMutate()) { showStatus('❌ Role view-only tidak diizinkan mengubah System Config', 'err'); return; }
   const sb = getSb();
   if (!sb) return;
   const keys = [...dirty.system];
@@ -845,7 +848,17 @@ function _wlCurrentUserEmail() {
   } catch (e) { return ''; }
 }
 
+function _crmCanMutate() {
+  return window.RifimPortalSession ? RifimPortalSession.canMutate() : false;
+}
+function _crmActionIsMutation(action) {
+  return /(?:_set$|_add$|_update$|_remove$|_delete$|_create$|_upsert$)/.test(String(action || ''));
+}
+
 async function _gasCall(action, extra) {
+  if (_crmActionIsMutation(action) && !_crmCanMutate()) {
+    throw new Error('Role view-only tidak diizinkan melakukan perubahan CRM.');
+  }
   // Sesi 2026-08-05: delegate ke RifimAPI shared (retry HTML throttled).
   // CRM tidak inject user email di semua call — tetap forward extras apa adanya.
   if (window.RifimAPI) {
@@ -1453,10 +1466,15 @@ const initTab = location.hash.replace('#', '') || 'company';
 const initBtn = document.querySelector(`.tab[data-tab="${initTab}"]`);
 if (initBtn) initBtn.click();
 
-if (checkAuth()) {
+(async function bootCrmCanonical() {
+  const session = await RifimPortalSession.require({
+    allowedRoles: ['admin','management','koordinator','direksi'],
+    redirect: '/portal',
+  });
+  if (!session || !checkAuth()) return;
   renderCompanyConfig();
   renderSystemConfig();
-}
+})();
 </script>
 
 </body>

@@ -490,6 +490,8 @@
     }
     .arsip-cpill.active { background:rgba(196,0,0,0.07);border-color:#C40000;color:#C40000;font-weight:800; }
   </style>
+  <script src="/shared/master-role-policy.js"></script>
+  <script src="/shared/portal-session.js"></script>
 </head>
 <body>
 
@@ -1094,39 +1096,7 @@
   }
 
   async function doLogin() {
-    const emailRaw = document.getElementById('loginEmail').value || '';
-    const email    = emailRaw.trim().toLowerCase();
-    if (!email) { setLoginErr('Masukkan alamat email Anda.'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setLoginErr('Format email tidak valid.'); return; }
-
-    const btn = document.getElementById('loginBtn');
-    btn.disabled    = true;
-    btn.textContent = 'Memverifikasi...';
-    document.getElementById('loginError').textContent = '';
-
-    const localAllowed = ALLOWED_EMAILS.includes(email);
-
-    try {
-      const res  = await fetch(`${GAS_WEB_APP_URL}?action=auth&source=Smart+Office&email=${encodeURIComponent(email)}`);
-      const data = await res.json();
-      if (data.success) {
-        storeAuth({ email, name: data.user.full_name || data.user.name || email, role: data.user.role });
-      } else if (localAllowed) {
-        // GAS menolak tapi email ada di daftar lokal — izinkan masuk
-        storeAuth({ email, name: 'Bobby Rahman M.B', role: 'Direktur Utama' });
-      } else {
-        setLoginErr(data.message || 'Email tidak diizinkan untuk mengakses sistem ini.');
-      }
-    } catch (_) {
-      // Jaringan gagal — pakai daftar lokal
-      if (localAllowed) {
-        storeAuth({ email, name: 'Bobby Rahman M.B', role: 'Direktur Utama' });
-      } else {
-        setLoginErr('Email tidak diizinkan. Hubungi administrator RIFIM OS.');
-      }
-    }
-    btn.disabled    = false;
-    btn.textContent = 'Masuk ke RIFIM OS';
+    window.location.href = '/portal';
   }
 
   function storeAuth(user) {
@@ -2023,7 +1993,14 @@
   }
 
   // ── BOOT ─────────────────────────────────────────────────────
-  checkAuth();
+  (async function bootSmartOfficeCanonical() {
+    const session = await RifimPortalSession.require({
+      allowedRoles: ['admin','management','koordinator','direksi'],
+      redirect: '/portal',
+    });
+    if (!session) return;
+    checkAuth();
+  })();
 </script>
 </body>
 </html>
