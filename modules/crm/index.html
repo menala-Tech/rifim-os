@@ -159,8 +159,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
     <div class="tabs">
       <button class="tab active" data-tab="company">🏢 Company Config</button>
       <button class="tab" data-tab="system">⚙️ System Config (RAOS)</button>
-      <button class="tab" data-tab="whitelist">📧 Whitelist Portal</button>
-      <button class="tab" data-tab="raos-users">👥 User Supabase RAOS</button>
+            <button class="tab" data-tab="raos-users">👥 User Supabase RAOS</button>
       <button class="tab" data-tab="contacts">📇 Kontak Eksternal</button>
       <button class="tab" data-tab="audit">📋 Audit Log</button>
     </div>
@@ -179,8 +178,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <strong>Sumber data:</strong> Sheet <code>company_config</code> di spreadsheet
         <code>1jHeA-w1bM32S3-AU-ENN2UjiaCb4iLzRhaf4G7y4ozM</code> (RIFIM OS — Smart Office Database).<br>
         <strong>Read path:</strong> GAS endpoint Smart Office (existing) → JSON key-value.<br>
-        <strong>Write path (TODO):</strong> extend GAS dengan <code>?action=config_set&amp;key=X&amp;value=Y</code>
-        yang admin-only + audit log ke tab <code>activity_log</code>.<br>
+        <strong>Write path:</strong> CRM memanggil GAS <code>company_config_set</code>; mutation dibatasi role canonical Admin/Direksi dan dicatat oleh backend sesuai audit path yang tersedia.<br>
         <strong>Konsumer:</strong> Smart Office document generator (setiap kali generate surat, baca
         <code>company_name</code>, <code>director_name</code>, <code>drive_folder_*</code>, dst).
       </div>
@@ -231,10 +229,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <strong>Sumber data:</strong> Sheet <code>SISTEM CONFIG</code> di spreadsheet
         <code>1eYS2mM3Sy-BNAVGfp8BUHtsZuLiGDetnJeGw-AWk__8</code> (RAOS master), sekaligus mirror ke
         tabel Supabase <code>public.system_config</code> untuk konsumsi cepat oleh PWA.<br>
-        <strong>Write path (TODO):</strong> saat user save di CRM →
-        (a) POST GAS <code>?action=sistem_config_set</code> update sheet,
-        (b) Supabase RPC <code>set_system_config(key,value)</code> SECURITY DEFINER admin-only update tabel,
-        (c) trigger <code>notification</code> ke user PWA supaya reload cache (opsional untuk key kritikal).<br>
+        <strong>Write path canonical:</strong> CRM → Supabase RPC <code>set_system_config</code> → readback <code>list_system_config</code> → GAS <code>sistem_config_set</code> sebagai mirror Sheet. UI hanya menyatakan sukses bila canonical write dan mirror terverifikasi.<br>
         <strong>Konsumer:</strong> RAOS PWA (KPI engine, geofence check, reminder cron), GAS (KPI update,
         reminder dispatcher).
       </div>
@@ -262,36 +257,6 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <thead><tr><th style="width:260px">Key</th><th style="width:340px">Value</th><th>Description</th><th style="width:100px">Kategori</th></tr></thead>
         <tbody id="sc-integration"></tbody>
       </table>
-    </div>
-
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- TAB 3: WHITELIST PORTAL                                         -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div class="panel" data-panel="whitelist">
-      <h2>Email Login Portal Rifim OS</h2>
-      <div class="desc">Daftar email yang diizinkan login ke <code>rifim-os.vercel.app/portal</code>. Auth email-only via GAS <code>authVerifyUser</code>.</div>
-      <div class="sinks">
-        <span class="sink sheet">📊 Sheet: <code>company_config.allowed_emails</code> (comma-separated)</span>
-        <span class="sink gas">🔧 GAS action: <code>whitelist_list / _add / _remove</code></span>
-      </div>
-      <div class="toolbar">
-        <input class="grow" placeholder="admin@example.com" id="wl-new-email" type="email">
-        <button class="btn" id="wl-add-btn">+ Tambah Email</button>
-        <button class="btn ghost small" id="wl-refresh">🔄 Refresh</button>
-      </div>
-      <table class="cfg-table">
-        <thead><tr><th>Email</th><th>Sumber</th><th style="width:120px">Aksi</th></tr></thead>
-        <tbody id="wl-body">
-          <tr><td colspan="3" class="empty" style="padding:20px">Loading…</td></tr>
-        </tbody>
-      </table>
-      <div style="margin-top:12px;font-size:11px;color:#888;line-height:1.6">
-        <strong style="color:#facc15">Catatan:</strong> Emergency admin (<code>admin@menala.com</code>,
-        <code>rifiminternationalgemilang@gmail.com</code>) di-hardcode di
-        <code>authEngine.js</code> dan selalu aktif — tidak muncul di list ini kalau belum
-        ditambah ke <code>allowed_emails</code>. Hapus dari hardcode dulu kalau mau non-aktifkan
-        via panel ini.
-      </div>
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -450,14 +415,10 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
       <h2>Audit Log Perubahan</h2>
       <div class="desc">Semua perubahan config, whitelist, user Supabase, kontak. Actor + before/after + timestamp.</div>
       <div class="sinks">
-        <span class="sink supabase">🔵 Supabase: <code>crm_audit_log</code> (TODO)</span>
-        <span class="sink github">💾 GitHub commit trail (untuk config yg di-bake)</span>
+        <span class="sink sheet">📊 Sheet: <code>CRM_AUDIT_LOG</code></span>
+        <span class="sink gas">🔧 GAS action: <code>crm_audit_tail</code></span>
       </div>
-      <div class="roadmap">
-        <strong>TODO:</strong> tabel <code>crm_audit_log</code> — id, actor_email, action, target_type
-        (company_config/system_config/whitelist/raos_user/contact), target_key, before jsonb, after
-        jsonb, ip, user_agent, github_commit_sha (nullable), created_at. Retensi ≥90 hari.
-      </div>
+      <div class="roadmap"><strong>Read path:</strong> GAS <code>crm_audit_tail</code> membaca audit trail CRM dari backend canonical. Filter tanggal, aktor, aksi, dan target dilakukan di UI.</div>
       <div class="toolbar">
         <input type="date" id="au-from"> — <input type="date" id="au-to">
         <input class="grow" placeholder="Cari aktor atau target key…" id="au-search">
@@ -800,156 +761,6 @@ document.getElementById('sc-refresh').addEventListener('click', async () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// WHITELIST PORTAL — wire ke GAS endpoint whitelist_list/add/remove
-// ═══════════════════════════════════════════════════════════════════════
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec';
-
-function _wlCurrentUserEmail() {
-  try {
-    const s = JSON.parse(localStorage.getItem('rifim_auth') || 'null');
-    return s && s.email ? s.email : '';
-  } catch (e) { return ''; }
-}
-
-function _crmCanMutate() {
-  return window.RifimPortalSession ? RifimPortalSession.canMutate() : false;
-}
-function _crmActionIsMutation(action) {
-  return /(?:_set$|_add$|_update$|_remove$|_delete$|_create$|_upsert$)/.test(String(action || ''));
-}
-
-async function _gasCall(action, extra) {
-  if (_crmActionIsMutation(action) && !_crmCanMutate()) {
-    throw new Error('Role view-only tidak diizinkan melakukan perubahan CRM.');
-  }
-  // Sesi 2026-08-05: delegate ke RifimAPI shared (retry HTML throttled).
-  // CRM tidak inject user email di semua call — tetap forward extras apa adanya.
-  if (window.RifimAPI) {
-    return RifimAPI.get(action, extra || {});
-  }
-  const qs = new URLSearchParams(Object.assign({ action }, extra || {}));
-  const res = await fetch(GAS_URL + '?' + qs.toString());
-  return res.json();
-}
-
-async function loadWhitelist() {
-  const tbody = document.getElementById('wl-body');
-  tbody.innerHTML = '<tr><td colspan="3" class="empty" style="padding:20px">Loading…</td></tr>';
-  try {
-    const me = _wlCurrentUserEmail();
-    if (!me) throw new Error('Session portal tidak ditemukan');
-    const data = await _gasCall('whitelist_list', { user: me });
-    if (!data.success) throw new Error(data.message || 'Gagal load');
-    const emails = data.whitelist || [];
-    if (emails.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="3" class="empty" style="padding:20px">Belum ada email di whitelist</td></tr>';
-      return;
-    }
-    tbody.innerHTML = emails.map(email => `
-      <tr data-row="${email}">
-        <td class="key">${email}</td>
-        <td class="desc-cell">company_config.allowed_emails</td>
-        <td style="white-space:nowrap">
-          <button class="btn ghost small" data-edit="${email}">✏️ Edit</button>
-          <button class="btn ghost small" data-remove="${email}">🗑️ Hapus</button>
-        </td>
-      </tr>
-    `).join('');
-    tbody.querySelectorAll('button[data-remove]').forEach(btn => {
-      btn.addEventListener('click', () => removeWhitelist(btn.dataset.remove));
-    });
-    tbody.querySelectorAll('button[data-edit]').forEach(btn => {
-      btn.addEventListener('click', () => startEditWhitelist(btn.dataset.edit));
-    });
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="3" class="empty" style="padding:20px;color:#f87171">❌ ${err.message}</td></tr>`;
-  }
-}
-
-async function addWhitelist() {
-  const input = document.getElementById('wl-new-email');
-  const email = String(input.value || '').trim().toLowerCase();
-  if (!email || email.indexOf('@') === -1) {
-    showStatus('Email tidak valid', 'err');
-    input.focus();
-    return;
-  }
-  const btn = document.getElementById('wl-add-btn');
-  btn.disabled = true;
-  showStatus('Menambah email…', '');
-  try {
-    const me = _wlCurrentUserEmail();
-    const data = await _gasCall('whitelist_add', { email, user: me });
-    if (!data.success) throw new Error(data.message || 'Gagal tambah');
-    input.value = '';
-    showStatus(`✅ ${email} ditambahkan ke whitelist`, 'ok');
-    await loadWhitelist();
-  } catch (err) {
-    showStatus('❌ ' + err.message, 'err');
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-function startEditWhitelist(oldEmail) {
-  const tr = document.querySelector(`tr[data-row="${oldEmail}"]`);
-  if (!tr) return;
-  tr.innerHTML = `
-    <td><input type="email" value="${oldEmail}" style="width:100%;padding:5px 8px;background:rgba(0,0,0,.3);border:1px solid var(--red);border-radius:5px;color:#fff;font-family:'Consolas',monospace;font-size:12px;outline:none"></td>
-    <td class="desc-cell" style="color:#facc15">Enter untuk simpan · Esc batal</td>
-    <td style="white-space:nowrap">
-      <button class="btn small" data-save>💾 Simpan</button>
-      <button class="btn ghost small" data-cancel>Batal</button>
-    </td>
-  `;
-  const input = tr.querySelector('input');
-  input.focus();
-  input.select();
-  const doSave = async () => {
-    const newEmail = String(input.value || '').trim().toLowerCase();
-    if (!newEmail || newEmail.indexOf('@') === -1) { showStatus('Email tidak valid', 'err'); return; }
-    if (newEmail === oldEmail) { loadWhitelist(); return; }
-    showStatus('Menyimpan…', '');
-    try {
-      const me = _wlCurrentUserEmail();
-      const data = await _gasCall('whitelist_update', { email: oldEmail, new_email: newEmail, user: me });
-      if (!data.success) throw new Error(data.message || 'Gagal update');
-      showStatus(`✅ ${oldEmail} → ${newEmail}`, 'ok');
-      await loadWhitelist();
-    } catch (err) {
-      showStatus('❌ ' + err.message, 'err');
-      loadWhitelist();
-    }
-  };
-  tr.querySelector('[data-save]').addEventListener('click', doSave);
-  tr.querySelector('[data-cancel]').addEventListener('click', () => loadWhitelist());
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Enter') doSave();
-    if (e.key === 'Escape') loadWhitelist();
-  });
-}
-
-async function removeWhitelist(email) {
-  if (!confirm(`Hapus ${email} dari whitelist portal?`)) return;
-  showStatus('Menghapus…', '');
-  try {
-    const me = _wlCurrentUserEmail();
-    const data = await _gasCall('whitelist_remove', { email, user: me });
-    if (!data.success) throw new Error(data.message || 'Gagal hapus');
-    showStatus(`✅ ${email} dihapus`, 'ok');
-    await loadWhitelist();
-  } catch (err) {
-    showStatus('❌ ' + err.message, 'err');
-  }
-}
-
-document.getElementById('wl-add-btn').addEventListener('click', addWhitelist);
-document.getElementById('wl-refresh').addEventListener('click', loadWhitelist);
-document.getElementById('wl-new-email').addEventListener('keydown', e => {
-  if (e.key === 'Enter') addWhitelist();
-});
-
-// ═══════════════════════════════════════════════════════════════════════
 // AUDIT LOG — wire ke GAS endpoint crm_audit_tail (baca sheet CRM_AUDIT_LOG)
 // ═══════════════════════════════════════════════════════════════════════
 let _auCache = [];
@@ -1279,14 +1090,13 @@ document.getElementById('ct-modal-close').addEventListener('click', () => {
 // ═══════════════════════════════════════════════════════════════════════
 // TAB ROUTER
 // ═══════════════════════════════════════════════════════════════════════
-const _tabLoaded = { whitelist: false, audit: false, 'raos-users': false, contacts: false };
+const _tabLoaded = { audit: false, 'raos-users': false, contacts: false };
 document.querySelectorAll('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const target = btn.dataset.tab;
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === btn));
     document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.dataset.panel === target));
     history.replaceState(null, '', '/crm#' + target);
-    if (target === 'whitelist'  && !_tabLoaded.whitelist)   { _tabLoaded.whitelist   = true; loadWhitelist(); }
     if (target === 'audit'      && !_tabLoaded.audit)       { _tabLoaded.audit       = true; loadAuditLog(); }
     if (target === 'raos-users' && !_tabLoaded['raos-users']) { _tabLoaded['raos-users'] = true; loadRaosUsers(); }
     if (target === 'contacts'   && !_tabLoaded.contacts)    { _tabLoaded.contacts    = true; loadContacts(); }
