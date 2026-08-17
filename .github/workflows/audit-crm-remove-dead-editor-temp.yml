@@ -20,31 +20,31 @@ jobs:
           import re
           p=Path('modules/crm/index.html')
           s=p.read_text()
-          # Remove dead modal markup if present.
-          s,n1=re.subn(r'\n<!-- RAOS USER EDIT MODAL -->.*?</div>\s*</div>\s*(?=\n<!--|\n<div id="status")','\n',s,flags=re.S|re.I)
-          # Fallback: remove modal container by id boundaries if comment changed.
-          if n1==0:
-              s=re.sub(r'\n<div id="ru-modal".*?</div>\s*</div>\s*(?=\n<!--|\n<div id="status")','\n',s,flags=re.S)
-          # Remove editor state no longer used.
-          s=re.sub(r'\nlet _ruEditing = null;','',s)
-          s=re.sub(r'\nlet _ruBranches = \[\];','',s)
-          # Remove branch collection block in loadRaosUsers.
+          # Replace stale two-way-writer roadmap with canonical read-only ownership statement.
+          s=re.sub(r'<div class="roadmap">\s*<strong>TODO backend:</strong> Perhatian — <code>user_profiles\.source=.*?</div>', '<div class="roadmap"><strong>Ownership canonical:</strong> User RAOS di CRM hanya untuk audit/read. Perubahan identity, role, cabang, status aktif, dan PIN Staff dilakukan melalui MASTER DATA STAFF dan pipeline sync canonical.</div>', s, count=1, flags=re.S)
+          # Remove exact dead modal markup between its comment and TAB 5 marker.
+          a=s.find('    <!-- Modal edit user RAOS -->')
+          b=s.find('    <!-- ═══════════════════════════════════════════════════════════════ -->\n    <!-- TAB 5: KONTAK EKSTERNAL', a)
+          if a==-1 or b==-1: raise SystemExit('dead modal boundaries not found')
+          s=s[:a]+s[b:]
+          # Remove editor-only state.
+          s=s.replace('\nlet _ruEditing = null;','').replace('\nlet _ruBranches = [];','')
+          # Remove branch collection block used only by editor modal.
           s=re.sub(r'\n\s*// Extract unique branches for edit modal dropdown.*?_ruCache\.forEach\(u => \{.*?\n\s*\}\);','',s,flags=re.S)
-          # Remove dead modal/open/mutation stubs and close handler as one region.
+          # Remove all dead editor functions/stubs and modal close binding, preserve list/filter handlers.
           start=s.find('\nfunction openRaosUserModal(')
           end=s.find('\n// ═══════════════════════════════════════════════════════════════════════\n// KONTAK EKSTERNAL', start)
-          if start!=-1 and end!=-1:
-              # Preserve list/filter event bindings only.
-              keep="\ndocument.getElementById('ru-refresh').addEventListener('click', loadRaosUsers);\ndocument.getElementById('ru-search').addEventListener('input', renderRaosUsers);\ndocument.getElementById('ru-filter-role').addEventListener('change', renderRaosUsers);\ndocument.getElementById('ru-filter-branch').addEventListener('change', renderRaosUsers);\n"
-              s=s[:start]+keep+s[end:]
-          for needle in ['openRaosUserModal','saveRaosUser','resetRaosPin','resetPortalPin','updateSsotPin','ru-modal-save','ru-modal-reset-pin','ru-modal-update-ssot-pin','ru-modal-reset-portal-pin']:
+          if start==-1 or end==-1: raise SystemExit('dead editor function boundaries not found')
+          keep="\ndocument.getElementById('ru-refresh').addEventListener('click', loadRaosUsers);\ndocument.getElementById('ru-search').addEventListener('input', renderRaosUsers);\ndocument.getElementById('ru-filter-role').addEventListener('change', renderRaosUsers);\ndocument.getElementById('ru-filter-branch').addEventListener('change', renderRaosUsers);\n"
+          s=s[:start]+keep+s[end:]
+          for needle in ['openRaosUserModal','saveRaosUser','resetRaosPin','resetPortalPin','updateSsotPin','ru-modal-save','ru-modal-reset-pin','ru-modal-update-ssot-pin','ru-modal-reset-portal-pin','CRM → (a) UPDATE Supabase']:
               if needle in s: raise SystemExit('dead RAOS editor residue remains: '+needle)
           p.write_text(s)
           PY
       - name: Verify read-only source
         run: |
           ! grep -n "raos_users_update\|raos_users_reset_pin\|raos_credentials_reset_pin\|master_staff_update_pin\|openRaosUserModal\|ru-modal-save" modules/crm/index.html
-          grep -n 'Read-only' modules/crm/index.html
+          grep -n 'Ownership canonical' modules/crm/index.html
           git diff --check
       - name: Commit cleanup
         run: |
