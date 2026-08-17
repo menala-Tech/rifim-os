@@ -1484,7 +1484,8 @@ function _hrisCacheGetAny(key) {
 }
 
 async function _fetchEmployeesFast() {
-  const token = getRaosSyncToken();
+  const portalSession = (window.RifimPortalSession && RifimPortalSession.read) ? RifimPortalSession.read() : null;
+  const token = (portalSession && portalSession.access_token) || getRaosSyncToken();
   if (token) {
     try {
       const qs = new URLSearchParams({ mode: 'employees', company_code: selectedCompany || 'ALL', status: 'ALL' });
