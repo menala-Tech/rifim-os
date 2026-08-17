@@ -17,11 +17,9 @@ async function payroll(req,p){
   const mr=monthRange(req.query.month);
   let branchId=String(req.query.branch_id||'');
   if(p.role==='koordinator')branchId=String(p.branch_id||'');
-
   const profiles=await sbFetch('/rest/v1/user_profiles?is_active=eq.true&select=id,staff_id,full_name,role,branch_id,gaji,email');
   const profileByCode=Object.fromEntries((profiles||[]).filter(x=>x.staff_id).map(x=>[String(x.staff_id).toUpperCase(),x]));
   let emps=await sbFetch('/rest/v1/employees?status=eq.AKTIF&select=employee_id,full_name,company_code,department,position,branch,status,salary_base,bank_name,bank_account&order=full_name.asc&limit=500');
-
   if(branchId==='HEAD_OFFICE'){
     emps=(emps||[]).filter(e=>['HEAD OFFICE','ADMIN'].includes(String(e.branch||'').toUpperCase()));
   }else if(branchId){
@@ -34,34 +32,30 @@ async function payroll(req,p){
       return eb===String(b.slug||'').toLowerCase()||eb===String(b.name||'').toLowerCase();
     });
   }
-
   const empIds=[...new Set((emps||[]).map(x=>String(x.employee_id||'').toUpperCase()).filter(Boolean))];
   if(!empIds.length)return{rows:[],summary:{count:0,total:0,late:0,leave:0},meta:{month:req.query.month,roster_source:'employees_active',missing_salary_count:0,kasbon_source:false,overtime_source:false}};
-
   const snaps=await sbFetch(`/rest/v1/payroll?period_year=eq.${mr.year}&period_month=eq.${mr.month}&select=*`);
   const raos=await sbFetch(`/rest/v1/raos_payroll?effective_month=eq.${mr.start}&select=staff_id,gapok,bonus_saldo,bpjs,paket_data,member_parkir,bonus_kpi,target_pct,status_target,late_deduction_total,thp`);
   const att=await sbFetch(`/rest/v1/hris_attendance_view?date=gte.${mr.start}&date=lte.${mr.end}&select=employee_code,date,status,late_minutes,late_deduction_idr`);
   const leave=await sbFetch(`/rest/v1/leave_requests?start_date=lte.${mr.end}&end_date=gte.${mr.start}&status=eq.DISETUJUI&select=employee_id,total_days,leave_type,start_date,end_date`);
-
   const eMap=Object.fromEntries((emps||[]).map(x=>[String(x.employee_id).toUpperCase(),x]));
   const pMap=Object.fromEntries((snaps||[]).map(x=>[String(x.employee_id).toUpperCase(),x]));
   const codeByProfile=Object.fromEntries((profiles||[]).filter(x=>x.id&&x.staff_id).map(x=>[String(x.id).toUpperCase(),String(x.staff_id).toUpperCase()]));
   const rMap={};for(const x of (raos||[])){const raw=String(x.staff_id||'').toUpperCase(),code=codeByProfile[raw]||(eMap[raw]?raw:null);if(code)rMap[code]=x}
   const aMap={};for(const a of (att||[])){const k=String(a.employee_code||'').toUpperCase();if(!aMap[k])aMap[k]={present:0,late_minutes:0,late_deduction:0};if(String(a.status||'').toUpperCase()==='HADIR')aMap[k].present++;aMap[k].late_minutes+=Number(a.late_minutes||0);aMap[k].late_deduction+=Number(a.late_deduction_idr||0)}
   const lMap={};for(const l of (leave||[])){const k=String(l.employee_id||'').toUpperCase();lMap[k]=(lMap[k]||0)+Number(l.total_days||0)}
-
   const rows=(emps||[]).map(e=>{
     const k=String(e.employee_id||'').toUpperCase(),up=profileByCode[k]||{},snap=pMap[k]||null,r=rMap[k]||{},a=aMap[k]||{present:0,late_minutes:0,late_deduction:0};
     const frozen=!!snap&&['FINAL','PAID'].includes(String(snap.status||'').toUpperCase());
     const base=frozen?Number(snap.salary_base||0):Number(e.salary_base||up.gaji||r.gapok||0);
-    const liveAllowance=Number(r.bonus_saldo||0)+Number(r.bonus_kpi||0)+Number(r.paket_data||0)+Number(r.member_parkir||0);
+    const paketData=Number(r.paket_data||0),memberParkir=Number(r.member_parkir||0),bpjs=Number(r.bpjs||0);
+    const liveAllowance=Number(r.bonus_saldo||0)+Number(r.bonus_kpi||0)+paketData+memberParkir+bpjs;
     const allowance=frozen?Number(snap.allowances||0):liveAllowance;
-    const liveDeduction=Number(a.late_deduction||r.late_deduction_total||0)+Number(r.bpjs||0);
+    const liveDeduction=Number(a.late_deduction||r.late_deduction_total||0);
     const deductions=frozen?Number(snap.deductions||0):liveDeduction;
     const total=frozen?Number(snap.total_salary||0):Math.max(0,base+allowance-deductions);
-    return{id:snap?.id||null,employee_id:k,name:e.full_name||up.full_name||k,position:e.position||'',department:e.department||'',branch:e.branch||'',branch_id:up.branch_id||null,company_code:e.company_code||'RIFIM',salary_base:base,allowances:allowance,bonus_saldo:Number(r.bonus_saldo||0),bonus_kpi:Number(r.bonus_kpi||0),late_deduction:Number(a.late_deduction||r.late_deduction_total||0),bpjs:Number(r.bpjs||0),deductions,total_salary:total,target_pct:Number(r.target_pct||0),target_status:r.status_target||'',attendance_days:a.present,late_minutes:a.late_minutes,leave_days:Number(lMap[k]||0),kasbon:0,overtime:0,document_number:snap?.document_number||'',status:snap?.status||'DRAFT',pdf_url:snap?.pdf_url||'',gdoc_url:snap?.gdoc_url||'',snapshot:frozen,bank_name:e.bank_name||'',bank_account:e.bank_account||''}
+    return{id:snap?.id||null,employee_id:k,name:e.full_name||up.full_name||k,position:e.position||'',department:e.department||'',branch:e.branch||'',branch_id:up.branch_id||null,company_code:e.company_code||'RIFIM',salary_base:base,allowances:allowance,bonus_saldo:Number(r.bonus_saldo||0),bonus_kpi:Number(r.bonus_kpi||0),paket_data:paketData,member_parkir:memberParkir,bpjs,late_deduction:Number(a.late_deduction||r.late_deduction_total||0),deductions,total_salary:total,target_pct:Number(r.target_pct||0),target_status:r.status_target||'',attendance_days:a.present,late_minutes:a.late_minutes,leave_days:Number(lMap[k]||0),kasbon:0,overtime:0,document_number:snap?.document_number||'',status:snap?.status||'DRAFT',pdf_url:snap?.pdf_url||'',gdoc_url:snap?.gdoc_url||'',snapshot:frozen,bank_name:e.bank_name||'',bank_account:e.bank_account||''}
   }).sort((a,b)=>a.name.localeCompare(b.name));
-
   const missingSalaryCount=rows.filter(x=>!x.snapshot&&Number(x.salary_base||0)<=0).length;
   return{rows,summary:{count:rows.length,total:rows.reduce((s,x)=>s+x.total_salary,0),late:rows.reduce((s,x)=>s+x.late_deduction,0),leave:rows.reduce((s,x)=>s+x.leave_days,0)},meta:{month:req.query.month,roster_source:'employees_active',missing_salary_count:missingSalaryCount,kasbon_source:false,overtime_source:false}}
 }
