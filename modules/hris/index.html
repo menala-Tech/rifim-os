@@ -1499,7 +1499,7 @@ async function _fetchEmployeesFast() {
       console.warn('[HRIS] Fast employee read gagal, fallback GAS:', e.message);
     }
   }
-  return _fetchEmployeesFast();
+  return gasGet({ action: 'hris_employees', company_code: selectedCompany, status: 'ALL' });
 }
 
 async function loadEmployees(opts) {
