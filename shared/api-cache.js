@@ -9,6 +9,7 @@
   if(/\/hris(?:\/|$)/.test(p)) {
     load('/shared/hris-contract-activation-sync.js');
     load('/shared/hris-attendance-payroll-v2.js');
+    load('/shared/hris-payroll-income-branch-fix.js');
     load('/shared/hris-hotfix.js');
   }
   if(/\/smart-office(?:\/|$)/.test(p)) load('/shared/smart-office-hris-sync.js');
