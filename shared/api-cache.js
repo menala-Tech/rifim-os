@@ -1,5 +1,5 @@
 /** RIFIM OS shared bootstrap. Core preserved in api-cache-core.js. */
-/* hotfix production redeploy marker 2026-08-10 */
+/* finance session-gate cache bust 2026-08-18 */
 (function(){
   'use strict';
   function load(src){document.write('<script src="'+src+'"></'+'script>');}
@@ -13,5 +13,5 @@
     load('/shared/hris-hotfix.js');
   }
   if(/\/smart-office(?:\/|$)/.test(p)) load('/shared/smart-office-hris-sync.js');
-  if(/\/finance(?:\/|$)/.test(p)) load('/shared/finance-data-router.js');
+  if(/\/finance(?:\/|$)/.test(p)) load('/shared/finance-data-router.js?v=20260818-session-gate-1');
 })();
