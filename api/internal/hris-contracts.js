@@ -1,3 +1,25 @@
+/**
+ * NAMING NOTE (2026-08-18 audit): this file is named hris-contracts.js but
+ * has grown into the shared backend for HRIS contracts AND Finance
+ * (saldo, KPI targets, payroll compute, driver assignment). Documenting the
+ * full endpoint list here so a future grep for e.g. "finance_saldo_mark_paid"
+ * finds this file even though the filename doesn't suggest it — before
+ * adding a new endpoint, check this list first to avoid creating a
+ * duplicate route elsewhere for logic that already lives here.
+ *
+ * GET  ?mode=<omitted>                    -> listContracts (HRIS contracts)
+ * POST ?mode=validate                     -> validateContract
+ * GET  ?mode=finance_saldo_list            -> listSaldo
+ * POST ?mode=finance_saldo_mark_paid       -> markSaldo
+ * GET  ?mode=finance_branches              -> listFinanceBranches
+ * GET  ?mode=finance_branch_targets        -> listBranchTargets
+ * POST ?mode=finance_branch_target_upsert  -> upsertBranchTarget
+ * GET  ?mode=finance_staff_targets         -> listStaffTargets
+ * POST ?mode=finance_staff_target_upsert   -> upsertStaffTarget
+ * POST ?mode=finance_payroll_compute       -> computePayroll
+ * GET  ?mode=finance_drivers               -> listDrivers
+ * POST ?mode=finance_driver_assign         -> assignDrivers
+ */
 function env(n){return String(process.env[n]||'').trim()}
 async function read(res){const t=await res.text();try{return t?JSON.parse(t):{}}catch(_){return{message:t||`HTTP ${res.status}`}}}
 function out(res,s,b){res.status(s).setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(b))}

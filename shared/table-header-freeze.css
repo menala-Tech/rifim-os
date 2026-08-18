@@ -6,11 +6,12 @@
 
 :where(table) thead th { background-clip: padding-box; }
 
-/* FINANCE — fixed module header + fixed tab bar. */
+/* FINANCE — fixed module header + fixed tab bar, calc(58+46)px fallback;
+   see table-header-freeze-sync.js for the real-measured value. */
 body:has(#app .module-badge) #app main .tbl thead th,
 body:has(#app .module-badge) #app main table.tbl thead th {
   position: sticky !important;
-  top: calc(var(--rifim-head, 58px) + var(--rifim-tabs, 46px)) !important;
+  top: var(--rifim-table-freeze-offset, calc(var(--rifim-head, 58px) + var(--rifim-tabs, 46px))) !important;
   z-index: 220 !important;
   background: #f8fafc !important;
   color: #111827 !important;
@@ -23,7 +24,8 @@ body:has(#app .module-badge) #app main table.tbl thead th {
   }
 }
 
-/* HRIS — header 56px + nav ~48px = 104px.
+/* HRIS — header 56px + nav ~48px = 104px (fallback; see
+   table-header-freeze-sync.js for the real-measured value).
    Ordinary page tables use viewport freeze. Payroll V2 is explicitly restored
    to its own vertical scroll container with top:0. */
 @media (min-width: 901px) {
@@ -32,7 +34,7 @@ body:has(#app .module-badge) #app main table.tbl thead th {
   }
   body:has(#app .header-module) #app main table thead th {
     position: sticky !important;
-    top: 104px !important;
+    top: var(--rifim-table-freeze-offset, 104px) !important;
     z-index: 220 !important;
     background: #fff !important;
     color: #111827 !important;
@@ -53,24 +55,27 @@ body:has(#app .header-module) div[style*="position:fixed"] div[style*="overflow"
   top: 0 !important;
 }
 
-/* CRM — native sticky module header (~107px) + sticky tab row (~48px). */
+/* CRM — native sticky module header (~107px) + sticky tab row (~48px),
+   155px fallback; see table-header-freeze-sync.js for the real-measured
+   value. */
 body:has(#app .cfg-table) #app main .cfg-table thead th {
   position: sticky !important;
-  top: 155px !important;
+  top: var(--rifim-table-freeze-offset, 155px) !important;
   z-index: 220 !important;
   background: #f8fafc !important;
   color: #334155 !important;
   box-shadow: 0 1px 0 rgba(15,23,42,.12), 0 5px 12px rgba(15,23,42,.05) !important;
 }
 
-/* RAOS — native header 54px + nav ~43px. */
+/* RAOS — native header 54px + nav ~43px, 97px fallback; see
+   table-header-freeze-sync.js for the real-measured value. */
 @media (min-width: 901px) {
   body:has(#app .hdr-logo-img) #app main .table-wrap {
     overflow: visible !important;
   }
   body:has(#app .hdr-logo-img) #app main table thead th {
     position: sticky !important;
-    top: 97px !important;
+    top: var(--rifim-table-freeze-offset, 97px) !important;
     z-index: 220 !important;
     background: #f8fafc !important;
     color: #374151 !important;
@@ -78,10 +83,11 @@ body:has(#app .cfg-table) #app main .cfg-table thead th {
   }
 }
 
-/* SMART OFFICE — topnav fixed; content tabs stick at the top of .main. */
+/* SMART OFFICE — topnav fixed, 52px fallback; see
+   table-header-freeze-sync.js for the real-measured value. */
 body:has(.topnav) .main table thead th {
   position: sticky !important;
-  top: 52px !important;
+  top: var(--rifim-table-freeze-offset, 52px) !important;
   z-index: 220 !important;
   background: #fff !important;
   color: #111827 !important;
@@ -91,10 +97,12 @@ body:has(.topnav) .main :is(.table-wrap,.table-scroll,[style*="overflow-y:auto"]
   top: 0 !important;
 }
 
-/* SISTEM — fixed 86px module header. Log panel is a local vertical scroller. */
+/* SISTEM — fixed 86px module header (fallback; see
+   table-header-freeze-sync.js for the real-measured value). Log panel is
+   a local vertical scroller. */
 body:has(#app .log-panel) #app main table thead th {
   position: sticky !important;
-  top: 86px !important;
+  top: var(--rifim-table-freeze-offset, 86px) !important;
   z-index: 220 !important;
   background: #f8fafc !important;
   color: #111827 !important;
@@ -107,12 +115,14 @@ body:has(#app .log-panel) #app .log-panel th {
   background: #f8fafc !important;
 }
 
-/* DOCUMENT ENGINE — topbar sticky at 0; table-shell is horizontal-only. */
+/* DOCUMENT ENGINE — topbar sticky at 0, 64px fallback; see
+   table-header-freeze-sync.js for the real-measured value. table-shell is
+   horizontal-only. */
 @media (min-width: 901px) {
   body:has(.doc-main) .table-shell { overflow: visible !important; }
   body:has(.doc-main) .doc-table thead th {
     position: sticky !important;
-    top: 64px !important;
+    top: var(--rifim-table-freeze-offset, 64px) !important;
     z-index: 220 !important;
     background: #111827 !important;
     color: #cbd5e1 !important;

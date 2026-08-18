@@ -11,6 +11,20 @@ function ensureTableHeaderCss(){
   l.dataset.rifimTableFreeze='1';
   document.head.appendChild(l);
 }
+function ensureTableFreezeSync(){
+  // 2026-08-18 fix: table-header-freeze.css now reads its `top` offset from
+  // --rifim-table-freeze-offset (falling back to the same hard-coded number
+  // as before if this script hasn't measured yet). This script sets that
+  // var to the ACTUAL rendered header/nav/tabs height per module, so the
+  // sticky table header can't drift out of sync the way the old hard-coded
+  // top:104px (etc.) did whenever a module's header height changed.
+  if(document.querySelector('script[data-rifim-table-freeze-sync]'))return;
+  var s=document.createElement('script');
+  s.src='/shared/table-header-freeze-sync.js?v=20260818-sync-1';
+  s.async=false;
+  s.dataset.rifimTableFreezeSync='1';
+  document.head.appendChild(s);
+}
 function ensureModuleRuntimeHotfix(){
   if(document.querySelector('script[data-rifim-module-runtime-hotfix]'))return;
   var s=document.createElement('script');
@@ -31,7 +45,7 @@ function ensureFinanceAutoRecompute(){
 function css(t){var s=document.createElement('style');s.id='rifim-fixed-module-shell';s.textContent=t;document.head.appendChild(s)}
 function install(){
   if(document.getElementById('rifim-fixed-module-shell')){
-    ensureTableHeaderCss();ensureModuleRuntimeHotfix();ensureFinanceAutoRecompute();return;
+    ensureTableHeaderCss();ensureTableFreezeSync();ensureModuleRuntimeHotfix();ensureFinanceAutoRecompute();return;
   }
   if(/^\/finance(?:\/|$)/.test(p))css(`
  :root{--rifim-head:58px;--rifim-tabs:46px}
@@ -55,9 +69,10 @@ function install(){
  #app>main{padding-top:110px!important}
  `);
   ensureTableHeaderCss();
+  ensureTableFreezeSync();
   ensureModuleRuntimeHotfix();
   ensureFinanceAutoRecompute();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
-global.RifimFixedModuleShell={version:'1.3.0-runtime-hotfix-freeze4',install:install};
+global.RifimFixedModuleShell={version:'1.4.0-table-freeze-sync',install:install};
 })(window);
