@@ -1,8 +1,16 @@
 (function(global){
 'use strict';
 var p=String(location.pathname||'');
+function ensureTableHeaderCss(){
+  if(document.querySelector('link[data-rifim-table-freeze]'))return;
+  var l=document.createElement('link');
+  l.rel='stylesheet';
+  l.href='/shared/table-header-freeze.css?v=20260818-freeze-1';
+  l.dataset.rifimTableFreeze='1';
+  document.head.appendChild(l);
+}
 function css(t){var s=document.createElement('style');s.id='rifim-fixed-module-shell';s.textContent=t;document.head.appendChild(s)}
-function install(){if(document.getElementById('rifim-fixed-module-shell'))return;
+function install(){if(document.getElementById('rifim-fixed-module-shell')){ensureTableHeaderCss();return;}
  if(/^\/finance(?:\/|$)/.test(p))css(`
  :root{--rifim-head:58px;--rifim-tabs:46px}
  #app>header{position:fixed!important;top:0!important;left:0!important;right:0!important;width:100%!important;z-index:9990!important;height:var(--rifim-head)!important;min-height:var(--rifim-head)!important}
@@ -24,7 +32,8 @@ function install(){if(document.getElementById('rifim-fixed-module-shell'))return
  body>header,header{position:fixed!important;top:0!important;left:0!important;right:0!important;width:100%!important;z-index:9990!important;height:86px!important;min-height:86px!important;padding-top:4px!important;padding-bottom:4px!important}
  body>main,main{padding-top:110px!important}
  `);
+ ensureTableHeaderCss();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
-global.RifimFixedModuleShell={version:'1.0.0',install:install};
+global.RifimFixedModuleShell={version:'1.1.0-table-freeze',install:install};
 })(window);
