@@ -13,5 +13,5 @@
     load('/shared/hris-hotfix.js');
   }
   if(/\/smart-office(?:\/|$)/.test(p)) load('/shared/smart-office-hris-sync.js');
-  if(/\/finance(?:\/|$)/.test(p)) load('/shared/finance-saldo-fast.js');
+  if(/\/finance(?:\/|$)/.test(p)) load('/shared/finance-data-router.js');
 })();
