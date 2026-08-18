@@ -679,9 +679,23 @@ function _finActionIsMutation(action) {
   return /(?:_mark_paid$|_upsert$|_compute$|_assign_random$|_add$|_update$|_delete$|_remove$|_set$)/.test(String(action || ''));
 }
 
+// ARCHITECT REVIEW (2026-08-18): the 6 legacy GAS "read" actions must have
+// exactly ONE transport path — browser -> finance-data-router.js's canonical
+// wrapper -> same-origin authenticated /api/internal/hris-contracts (mode=
+// finance_legacy_gas) -> GAS server-side. This base _gasCall is the pre-
+// router function that finance-data-router.js wraps; it must NEVER be the
+// one actually executing for these 6 actions. In normal operation it isn't
+// (finance-data-router.js's wrapper intercepts them before this runs), but
+// this guard makes that fail loud instead of silently falling through to
+// RifimAPI.get() -> gas-fetch-proxy.js -> direct browser->GAS as a parallel/
+// alternate path if the canonical router script ever fails to install.
+var _FIN_LEGACY_READ_ACTIONS = ['finance_list', 'finance_cabang_list', 'finance_tagihan_list', 'finance_rekap_harian', 'finance_rekap_bulanan', 'finance_log_list'];
 async function _gasCall(action, extra) {
   if (_finActionIsMutation(action) && !_finCanMutate()) {
     throw new Error('Role view-only tidak diizinkan melakukan perubahan Finance.');
+  }
+  if (_FIN_LEGACY_READ_ACTIONS.indexOf(action) !== -1) {
+    throw new Error('Finance data router belum aktif (canonical server-side transport tidak terpasang). Muat ulang halaman; jangan retry manual ke GAS.');
   }
   if (action === 'finance_saldo_raos_list' || action === 'finance_saldo_raos_mark_paid') {
     const token = await _finGetAccessToken();

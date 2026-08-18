@@ -21,18 +21,8 @@
   'use strict';
   if(!/\/finance(?:\/|$)/.test(String(global.location&&global.location.pathname||''))) return;
 
-  var SUPABASE_URL='https://vlievtojpmrbsmzlqswl.supabase.co';
-  var SUPABASE_PUBLISHABLE_KEY='sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
   var GAS_HOST='script.google.com';
   var GAS_GAP_MS=1400;
-  var CACHE_FRESH_MS=5*60*1000;
-  var CACHE_STALE_MS=24*60*60*1000;
-  var CACHE_PREFIX='rifim_finance_runtime_cache_v1:';
-  var legacyActions=new Set([
-    'finance_list','finance_cabang_list','finance_tagihan_list',
-    'finance_rekap_harian','finance_rekap_bulanan','finance_log_list'
-  ]);
-
   var nativeFetch=global.fetch.bind(global);
   var gasTail=Promise.resolve();
   var gasNextAt=0;
@@ -60,28 +50,6 @@
     return task;
   };
 
-  function sessionScope(){
-    try{
-      var s=JSON.parse(global.localStorage.getItem('rifim_auth')||'{}')||{};
-      return String(s.id||s.user_id||s.email||'anonymous').replace(/[^a-zA-Z0-9@._-]/g,'_');
-    }catch(_){return'anonymous';}
-  }
-  function cacheKey(action,params){return CACHE_PREFIX+sessionScope()+':'+action+':'+JSON.stringify(params||{});}
-  function readCache(action,params){
-    try{
-      var raw=global.localStorage.getItem(cacheKey(action,params));
-      if(!raw)return null;
-      var x=JSON.parse(raw);
-      if(!x||!x.at||!x.payload)return null;
-      var age=Date.now()-x.at;
-      if(age>CACHE_STALE_MS)return null;
-      return {age:age,at:x.at,payload:x.payload};
-    }catch(_){return null;}
-  }
-  function writeCache(action,params,payload){
-    try{global.localStorage.setItem(cacheKey(action,params),JSON.stringify({at:Date.now(),payload:payload}));}catch(_){}
-  }
-
   async function validatedToken(){
     if(global.RifimPortalSession&&typeof global.RifimPortalSession.validate==='function'){
       var s=await global.RifimPortalSession.validate();
@@ -94,61 +62,27 @@
     throw new Error('Session Finance berakhir. Login ulang melalui Portal.');
   }
 
-  async function markPaidAsCurrentUser(params){
-    var requestId=String(params&&(params.id||params.request_id)||'').trim();
-    if(!requestId)throw new Error('id request wajib');
-    var token=await validatedToken();
-    var payload=null;
-    try{
-      var part=token.split('.')[1]||'';
-      part=part.replace(/-/g,'+').replace(/_/g,'/');
-      while(part.length%4)part+='=';
-      payload=JSON.parse(decodeURIComponent(Array.from(atob(part)).map(function(c){return '%'+c.charCodeAt(0).toString(16).padStart(2,'0');}).join('')));
-    }catch(_){}
-    var processorId=payload&&payload.sub;
-    if(!processorId)throw new Error('Identity Admin tidak valid');
-    var res=await nativeFetch(SUPABASE_URL+'/rest/v1/rpc/raos_saldo_mark_paid',{
-      method:'POST',
-      headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+token,'Content-Type':'application/json'},
-      body:JSON.stringify({p_request_id:requestId,p_processor_id:processorId})
-    });
-    var data=await res.json().catch(function(){return{};});
-    if(!res.ok)throw new Error(data.message||data.error||('Supabase HTTP '+res.status));
-    var row=Array.isArray(data)?(data[0]||{}):data;
-    return Object.assign({success:true},row||{});
-  }
-
-  var runtimeInstalled=false;
-  function installGasCallFix(){
-    if(runtimeInstalled)return true;
-    if(typeof global._gasCall!=='function'||!global._gasCall.__financeCanonicalRouter)return false;
-    var original=global._gasCall;
-    var wrapped=async function(action,params){
-      params=params||{};
-      if(action==='finance_saldo_raos_mark_paid')return markPaidAsCurrentUser(params);
-      if(legacyActions.has(action)){
-        var cached=readCache(action,params);
-        if(cached&&cached.age<=CACHE_FRESH_MS)return cached.payload;
-        try{
-          var fresh=await original.apply(this,arguments);
-          if(fresh&&fresh.success!==false){writeCache(action,params,fresh);return fresh;}
-          if(cached)return Object.assign({},cached.payload,{_stale:true,_stale_at:cached.at,message:'Menampilkan data terakhir dari workbook karena transport Google sedang sibuk.'});
-          return fresh;
-        }catch(err){
-          if(cached)return Object.assign({},cached.payload,{_stale:true,_stale_at:cached.at,message:'Menampilkan data terakhir dari workbook karena transport Google sedang sibuk.'});
-          throw err;
-        }
-      }
-      return original.apply(this,arguments);
-    };
-    wrapped.__financeCanonicalRouter=true;
-    wrapped.__financeRuntimeFix=true;
-    global._gasCall=wrapped;
-    runtimeInstalled=true;
-    return true;
-  }
-  var installTry=0;
-  var installTimer=setInterval(function(){installTry++;if(installGasCallFix()||installTry>400)clearInterval(installTimer);},25);
+  // P0.4 fix (2026-08-18): this IIFE used to wrap global._gasCall a SECOND
+  // time (finance-data-router.js already installs the canonical wrapper —
+  // marked __financeCanonicalRouter) with its own separate legacy-read cache
+  // (rifim_finance_runtime_cache_v1, distinct from the router's
+  // rifim_finance_legacy_cache_v2) AND its own markPaidAsCurrentUser() that
+  // decoded the JWT client-side to derive the processor identity. Because
+  // this double-wrap ran its finance_saldo_raos_mark_paid branch BEFORE
+  // falling through to original(), markPaidAsCurrentUser was the one
+  // actually executing in production -- not finance-data-router's
+  // server-derived DIRECT_POST -> api/internal/hris-contracts.js markSaldo()
+  // path, which is more secure (processor id comes from the authenticated
+  // actor server-side, never from a client-decoded token). Per the "SATU
+  // canonical Finance fetch layer" directive both the duplicate legacy-read
+  // wrapping and the duplicate mark-paid path are removed: finance-data-
+  // router.js's single wrapper (and its finance_legacy_gas server passthrough)
+  // is now the only _gasCall wrapper installed. The GAS_GAP_MS fetch
+  // rate-limiter above is left in place as a defensive no-op safety net for
+  // any residual direct browser->GAS traffic, but legacy reads no longer hit
+  // GAS from the browser at all -- they run server-side via
+  // api/internal/hris-contracts.js?mode=finance_legacy_gas.
+  function isRouterInstalled(){return typeof global._gasCall==='function'&&!!global._gasCall.__financeCanonicalRouter;}
 
   var agentState={at:0,online:false,ready:false,detail:''};
   async function getAgentState(force){
@@ -191,5 +125,5 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',startAgentGuard,{once:true});
   else startAgentGuard();
 
-  global.FinanceRuntimeFix={version:'1.0.1-workbook-aist',getAgentState:getAgentState,isInstalled:function(){return runtimeInstalled;}};
+  global.FinanceRuntimeFix={version:'2.0.0-single-transport-p0.4',getAgentState:getAgentState,isInstalled:isRouterInstalled};
 })(window);

@@ -70,10 +70,25 @@ async function apiPost(mode,params){
 
 function dateKey(v){var s=String(v||'').trim(),m;if((m=s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/)))return m[3]+'-'+m[2]+'-'+m[1];if((m=s.match(/^(\d{4})-(\d{2})-(\d{2})/)))return m[1]+'-'+m[2]+'-'+m[3];var d=new Date(s);return isNaN(d.getTime())?'':d.toISOString().slice(0,10)}
 function filterLog(data,params){if(!data||!Array.isArray(data.rows))return data;var from=String(params.from||''),to=String(params.to||'');if(!from&&!to)return data;var copy=Object.assign({},data);copy.rows=data.rows.filter(function(r){var k=dateKey(r.tanggal||r.date||r.timestamp);if(!k)return true;if(from&&k<from)return false;if(to&&k>to)return false;return true});return copy}
+// P0.4 fix (2026-08-18): used to call original(action,params) here, which is
+// the pre-router browser _gasCall -- a direct client-side fetch to GAS via
+// api-cache-core.js's RifimAPI, itself wrapped a SECOND time by api-cache.js's
+// FinanceRuntimeFix (its own cache + its own rate limiter). Three independent
+// layers, one fragile 1-retry client fetch underneath. Now calls the server
+// -side passthrough (api/internal/hris-contracts.js mode=finance_legacy_gas)
+// directly, which retries up to 3x server-side before giving up. This is now
+// the ONE canonical Finance transport for these 6 actions; the stale-cache
+// fallback below is unchanged so "Menampilkan data terakhir" still works if
+// even the server-side retries are exhausted.
 async function legacyRead(action,params){
   params=Object.assign({},params||{});if(action==='finance_log_list'){if(!params.from)params.from=val('l-from');if(!params.to)params.to=val('l-to')}
   var cached=readCache(action,params);
-  try{var fresh=await original(action,params);if(fresh&&fresh.success!==false){writeCache(action,params,fresh);return action==='finance_log_list'?filterLog(fresh,params):fresh}if(cached){var stale=Object.assign({},cached.payload);stale._stale=true;stale._stale_at=cached.at;stale.message='Menampilkan data terakhir karena GAS sedang tidak tersedia.';return action==='finance_log_list'?filterLog(stale,params):stale}return fresh}
+  try{
+    var fresh=await apiPost('finance_legacy_gas',Object.assign({gas_action:action},params));
+    if(fresh&&fresh.success!==false){writeCache(action,params,fresh);return action==='finance_log_list'?filterLog(fresh,params):fresh}
+    if(cached){var stale=Object.assign({},cached.payload);stale._stale=true;stale._stale_at=cached.at;stale.message='Menampilkan data terakhir karena GAS sedang tidak tersedia.';return action==='finance_log_list'?filterLog(stale,params):stale}
+    return fresh;
+  }
   catch(e){if(cached){var stale2=Object.assign({},cached.payload);stale2._stale=true;stale2._stale_at=cached.at;stale2.message='Menampilkan data terakhir karena GAS sedang tidak tersedia.';return action==='finance_log_list'?filterLog(stale2,params):stale2}throw e}
 }
 

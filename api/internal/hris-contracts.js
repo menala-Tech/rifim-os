@@ -19,6 +19,7 @@
  * POST ?mode=finance_payroll_compute       -> computePayroll
  * GET  ?mode=finance_drivers               -> listDrivers
  * POST ?mode=finance_driver_assign         -> assignDrivers
+ * POST ?mode=finance_legacy_gas             -> financeLegacyGas (P0.4 2026-08-18)
  */
 function env(n){return String(process.env[n]||'').trim()}
 async function read(res){const t=await res.text();try{return t?JSON.parse(t):{}}catch(_){return{message:t||`HTTP ${res.status}`}}}
@@ -133,6 +134,94 @@ async function listDrivers(req,p){
 }
 async function assignDrivers(req,p){financeWrite(p);const branchId=String(req.body?.branch_id||'').trim();if(!branchId)throw new Error('branch_id wajib');const force=String(req.body?.force||'false').toLowerCase()==='true'||req.body?.force===true;const r=await sb('/rest/v1/rpc/raos_random_assign_drivers',{method:'POST',body:JSON.stringify({p_branch_id:branchId,p_force:force})});return {assigned:num(r),branch_id:branchId,force}}
 
+// P0.4 fix (2026-08-18): server-side passthrough for the 6 legacy GAS "read"
+// actions that Finance still sources from the Google Sheet workbook (no
+// Supabase-side canonical table exists for them yet). Root cause of the
+// production "GAS backend sedang throttled" message: the browser called GAS
+// directly (fetch from the client) through a stack of THREE independent
+// wrapper layers (finance-data-router.js -> api-cache.js FinanceRuntimeFix
+// -> api-cache-core.js RifimAPI), each with its own cache/retry, all still
+// bottoming out in a single client-side fetch(GAS_URL) with only 1 retry and
+// a 900ms backoff -- a transient Apps Script cold-start/quota HTML response
+// had a real chance of surfacing directly to the user. Moving the call
+// server-side lets a single canonical layer retry harder (this function) and
+// lets finance-data-router.js's existing stale-cache fallback keep working
+// exactly as before, just against one transport instead of three.
+const LEGACY_GAS_ACTIONS=new Set(['finance_list','finance_cabang_list','finance_tagihan_list','finance_rekap_harian','finance_rekap_bulanan','finance_log_list']);
+const LEGACY_GAS_TIMEOUT_MS=Number(env('FINANCE_LEGACY_GAS_TIMEOUT_MS'))||9000; // override only used by local tests
+const LEGACY_GAS_MAX_ATTEMPTS=3; // architect requirement F.E: bounded retry, no unbounded loop
+async function fetchWithTimeout(url,opts,timeoutMs){
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+  try{return await fetch(url,{...opts,signal:ctrl.signal})}
+  finally{clearTimeout(timer)}
+}
+async function financeLegacyGas(req,p){
+  // ARCHITECT REVIEW (2026-08-18): financeRead() gates this to
+  // admin/direksi/management only (see function def above) -- koordinator/
+  // staff/driver/anon cannot reach this mode. actor() (called before this
+  // function, in handler()) already requires a valid Supabase bearer + an
+  // is_active profile, so there is no unauthenticated path into this code.
+  financeRead(p);
+  const gasAction=String(req.body?.gas_action||'').trim();
+  // A. Whitelist-only -- reject any action outside the 6 canonical legacy
+  // reads. No arbitrary gas_action is ever forwarded to Apps Script.
+  if(!LEGACY_GAS_ACTIONS.has(gasAction))throw new Error('gas_action tidak dikenali: '+gasAction);
+  const gasUrl=env('GAS_URL')||'https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec';
+  const bearer=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'').trim();
+  // ARCHITECT FIX: previous version spread ...extra AFTER action/access_token,
+  // so a client body containing its own "action" or "access_token" key would
+  // silently override the validated gas_action / server-derived bearer --
+  // i.e. the whitelist check above could be bypassed by a same-request field
+  // override, and a caller could smuggle an arbitrary access_token to GAS.
+  // Extra params are now spread FIRST and the two trusted fields are set
+  // last, so they always win regardless of what the client body contains.
+  // D. No secret leak: only the CALLER's OWN bearer token (already validated
+  // by actor()) is forwarded as access_token -- never SUPABASE_SERVICE_ROLE_KEY
+  // or any other server secret.
+  const extra={...(req.body||{})};
+  delete extra.mode;delete extra.gas_action;delete extra.action;delete extra.access_token;
+  const payload={...extra,action:gasAction,access_token:bearer};
+  let lastMsg='';
+  for(let attempt=0;attempt<LEGACY_GAS_MAX_ATTEMPTS;attempt++){
+    let r;
+    try{
+      // F. Bounded per-attempt timeout so a hung GAS request can't pin the
+      // Vercel function open indefinitely.
+      r=await fetchWithTimeout(gasUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)},LEGACY_GAS_TIMEOUT_MS);
+    }catch(e){
+      lastMsg=(e&&e.name==='AbortError')?'Timeout setelah '+LEGACY_GAS_TIMEOUT_MS+'ms':(e instanceof Error?e.message:String(e));
+      if(attempt<LEGACY_GAS_MAX_ATTEMPTS-1){await new Promise(res=>setTimeout(res,600*(attempt+1)));continue}
+      break;
+    }
+    if(r.status===429||r.status>=500){
+      // E. HTTP-level throttle/server-error from GAS is a transient
+      // transport failure, not a canonical response -- retry, don't surface.
+      lastMsg='GAS HTTP '+r.status;
+      if(attempt<LEGACY_GAS_MAX_ATTEMPTS-1){await new Promise(res=>setTimeout(res,600*(attempt+1)));continue}
+      break;
+    }
+    const txt=await r.text();
+    if(txt.trim().startsWith('<')){
+      // E. Apps Script cold-start/quota responses come back as an HTML error
+      // page, not JSON -- treated as a temporary transport failure and
+      // retried; NEVER forwarded raw to the UI (G).
+      lastMsg='GAS balas HTML (kemungkinan cold-start/quota), percobaan '+(attempt+1);
+      if(attempt<LEGACY_GAS_MAX_ATTEMPTS-1){await new Promise(res=>setTimeout(res,600*(attempt+1)));continue}
+      break;
+    }
+    // G. Response normalization -- pass through GAS's own canonical JSON
+    // shape ({success:true,...} or {success:false,message:...}) as-is; if it
+    // isn't parseable JSON at all, normalize into the same canonical shape
+    // rather than leaking the raw body.
+    try{const parsed=JSON.parse(txt);return (parsed&&typeof parsed==='object')?parsed:{success:false,message:'Response GAS bukan objek JSON'}}
+    catch(e){return {success:false,message:'Response GAS bukan JSON: '+txt.substring(0,200)}}
+  }
+  // G. Canonical error JSON -- never HTML, never an unhandled throw reaching
+  // the client as a raw 500 with stack trace.
+  return {success:false,message:'GAS backend sedang tidak tersedia setelah '+LEGACY_GAS_MAX_ATTEMPTS+'x percobaan server-side: '+lastMsg,_gas_throttled:true};
+}
+
 module.exports=async function handler(req,res){
   try{
     const p=await actor(req),mode=String(req.query.mode||req.body?.mode||'');
@@ -146,6 +235,7 @@ module.exports=async function handler(req,res){
     if(req.method==='POST'&&mode==='finance_payroll_compute')return out(res,200,{success:true,...await computePayroll(req,p)});
     if(req.method==='GET'&&mode==='finance_drivers')return out(res,200,{success:true,rows:await listDrivers(req,p),source:'supabase'});
     if(req.method==='POST'&&mode==='finance_driver_assign')return out(res,200,{success:true,...await assignDrivers(req,p)});
+    if(req.method==='POST'&&mode==='finance_legacy_gas')return out(res,200,await financeLegacyGas(req,p));
     if(req.method==='GET')return out(res,200,{success:true,rows:await listContracts(req,p)});
     if(req.method==='POST'&&mode==='validate')return out(res,200,{success:true,result:await validateContract(req,p)});
     return out(res,405,{success:false,message:'Method not allowed'});

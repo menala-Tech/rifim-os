@@ -60,12 +60,20 @@
     }
     .nav.scrolled .nav-brand-logo { filter: none; }
     .nav-brand-logo-right {
-      width: 56px; height: auto; object-fit: contain;
-      filter: brightness(0) invert(1);
-      transition: filter .3s;
+      /* P0.1 fix (2026-08-18): was 56px of a source PNG whose actual visible
+         logo content only fills ~45% of its own canvas (huge transparent
+         padding) -- rendered far smaller than 56px in practice, and the
+         brightness(0) invert(1) filter flattened its handful of soft-edge/
+         antialiasing pixels into a fuzzy white smudge ("white box") at that
+         scale. Fixed at the source: branding/logo/logo-rifim-nav-
+         transparent.png is a tight crop of the same original asset's alpha
+         bounding box (no re-render, no recolor) so the full width below is
+         actual visible logo, not padding. Filter dropped entirely -- shown
+         in its real red/white colors, which reads clearly against the dark
+         hero without needing to be flattened to silhouette. */
+      width: clamp(90px, 8vw, 120px); height: auto; object-fit: contain;
     }
-    .nav.scrolled .nav-brand-logo-right { filter: none; }
-    @media (max-width: 900px) { .nav-brand-logo-right { display: none; } }
+    @media (max-width: 768px) { .nav-brand-logo-right { display: none; } }
     .nav-brand-logo-fallback {
       width: 36px; height: 36px; background: var(--red);
       border-radius: 8px; display: flex; align-items: center; justify-content: center;
@@ -481,7 +489,7 @@
     <a class="nav-link" href="#layanan">Layanan</a>
     <a class="nav-link" href="#keunggulan">Keunggulan</a>
     <a class="nav-link" href="#kontak">Kontak</a>
-    <img src="/branding/logo/logo-rifim-transparent.png" class="nav-brand-logo-right" alt="RIFIM">
+    <img src="/branding/logo/logo-rifim-nav-transparent.png" class="nav-brand-logo-right" alt="RIFIM">
     <a class="nav-link nav-cta" href="/portal">⚡ RIFIM OS</a>
   </div>
 

@@ -20,7 +20,14 @@ function installHrisActions(){
     var tb=document.getElementById('tbody-employees');if(!tb)return;
     Array.from(tb.querySelectorAll('tr')).forEach(function(tr){
       if(!tr.cells||tr.cells.length<10||tr.querySelector('.loading,.empty-state'))return;
-      var id=String(tr.cells[0].textContent||'').trim();if(!id||/MEMUAT|LOADING|GAGAL|BELUM ADA/i.test(id))return;
+      // P0.3 fix (2026-08-18): id used to come from tr.cells[0].textContent
+      // -- unsafe, since rendered text can carry whitespace/line-wrap
+      // artifacts (e.g. "MIG-\nSOETA0039") that fail an exact-match lookup
+      // against allEmployees' canonical employee_id ("MIG-SOETA0039"),
+      // silently breaking Edit for wrapped IDs. The canonical renderer
+      // (modules/hris/index.html renderEmployees) now stamps the row with
+      // data-employee-id straight from r.employee_id; read that instead.
+      var id=String(tr.dataset.employeeId||'').trim();if(!id||/MEMUAT|LOADING|GAGAL|BELUM ADA/i.test(id))return;
       var cell=tr.cells[tr.cells.length-1];if(!cell)return;
       if(!cell.querySelector('[data-hris-detail]')){
         var detail=cell.querySelector('button[onclick*="viewEmployee"]');
@@ -28,12 +35,10 @@ function installHrisActions(){
         else{detail=document.createElement('button');detail.type='button';detail.className='btn btn-ghost btn-sm';detail.dataset.hrisDetail='1';detail.textContent='Detail';detail.onclick=function(){if(typeof global.viewEmployee==='function')global.viewEmployee(id)};cell.appendChild(detail)}
       }
       if(canWrite()&&!cell.querySelector('[data-hris-edit]')){
-        // 2026-08-18 fix: was viewEmployee(id) then openEditModal() via
-        // setTimeout(...,0) — an unnecessary async gap between the two
-        // synchronous calls (viewEmployee has no internal await, so it
-        // always finishes before returning). Calling both back-to-back
-        // removes the gap entirely; simpler and nothing can race it.
-        var edit=document.createElement('button');edit.type='button';edit.className='btn btn-ghost btn-sm';edit.dataset.hrisEdit='1';edit.textContent='✏️ Edit';edit.style.marginLeft='5px';edit.onclick=function(){if(typeof global.viewEmployee==='function')global.viewEmployee(id);if(typeof global.openEditModal==='function')global.openEditModal()};cell.appendChild(edit)
+        // Canonical standalone entrypoint (modules/hris/index.html
+        // openEditEmployee) -- exact allEmployees lookup by id, no
+        // dependency on viewEmployee() having run first.
+        var edit=document.createElement('button');edit.type='button';edit.className='btn btn-ghost btn-sm';edit.dataset.hrisEdit='1';edit.textContent='✏️ Edit';edit.style.marginLeft='5px';edit.onclick=function(){if(typeof global.openEditEmployee==='function')global.openEditEmployee(id);else{if(typeof global.viewEmployee==='function')global.viewEmployee(id);if(typeof global.openEditModal==='function')global.openEditModal()}};cell.appendChild(edit)
       }
       // 2026-08-18: PKWT-from-HRIS auto-deep-link removed per user decision
       // (it froze the Smart Office tab — see shared/smart-office-hris-

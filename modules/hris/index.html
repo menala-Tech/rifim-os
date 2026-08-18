@@ -1588,7 +1588,7 @@ function renderEmployees(rows) {
     return;
   }
   tbody.innerHTML = rows.map(r => `
-    <tr>
+    <tr data-employee-id="${r.employee_id}">
       <td><strong>${r.employee_id}</strong></td>
       <td>${r.full_name}</td>
       <td>${r.position || '–'}</td>
@@ -1819,9 +1819,16 @@ async function viewEmployee(empId) {
   openModal('modal-employee-detail');
 }
 
-function openEditModal() {
-  const emp = currentViewEmp;
+// P0.3 fix (2026-08-18): openEditModal() used to only read the
+// currentViewEmp global, so Edit could ONLY work as a side effect of
+// viewEmployee() having run first. Now accepts an explicit emp — the
+// canonical, self-sufficient entrypoint is openEditEmployee(empId) below,
+// which does an exact lookup by canonical employee_id (never by parsed
+// DOM text) and doesn't depend on the Detail modal having opened at all.
+function openEditModal(emp) {
+  emp = emp || currentViewEmp;
   if (!emp) return;
+  currentViewEmp = emp;
   closeModal('modal-employee-detail');
   document.getElementById('edit-emp-title').textContent = 'Edit — ' + emp.full_name;
   document.getElementById('edit-emp-id').value       = emp.employee_id;
@@ -1851,6 +1858,18 @@ function openEditModal() {
 
   onEditTypeChange();
   openModal('modal-edit-employee');
+}
+
+// P0.3 fix (2026-08-18): canonical standalone Edit entrypoint. Exact
+// lookup against allEmployees by employee_id (the same array/key the
+// canonical Detail button already uses via viewEmployee('${r.employee_id}')
+// baked directly into the row template — never derived from rendered DOM
+// text, which can carry whitespace/line-wrap artifacts that break exact
+// string matching, e.g. "MIG-\nSOETA0039" vs "MIG-SOETA0039").
+function openEditEmployee(empId) {
+  const emp = allEmployees.find(r => r.employee_id === empId);
+  if (!emp) { console.warn('[HRIS] openEditEmployee: employee not found for id', empId); return; }
+  openEditModal(emp);
 }
 
 function onEditTypeChange() {

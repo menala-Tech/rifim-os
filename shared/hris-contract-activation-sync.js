@@ -2,7 +2,18 @@
 'use strict';
 if(!/\/hris(?:\/|$)/.test(location.pathname))return;
 var CACHE='hris_contract_bridge_v2';
-var EMP_SNAPSHOT='hris_employee_table_snapshot_v1';
+// 2026-08-18 P0.2 fix: bumped v1 -> v2 and legacy key is actively purged
+// below. Root cause of the PKWT button reappearing after the button
+// injector was removed: this file caches tbody-employees' raw innerHTML
+// (saveEmployeeSnapshot) and replays it verbatim on load
+// (restoreEmployeeSnapshot -> tb.innerHTML = snap.html). Any browser that
+// had loaded the page BEFORE the PKWT injector was removed already has a
+// v1 snapshot with [data-create-pkwt] buttons baked into the cached HTML
+// -- replaying it resurrects the button regardless of what the current
+// source does. cleanInvalidActivationButtons() only stripped it for
+// INVALID rows, so on real employees it survived indefinitely.
+var EMP_SNAPSHOT='hris_employee_table_snapshot_v2';
+try{ localStorage.removeItem('hris_employee_table_snapshot_v1'); }catch(_){}
 var employeeFetchInFlight=null,employeeFetchKey='';
 function session(){try{return JSON.parse(localStorage.getItem('rifim_auth')||'{}')||{}}catch(_){return{}}}
 function token(){var a=session();return String(a.access_token||a.accessToken||'')}
@@ -27,8 +38,16 @@ async function activateEmployee(id,btn){if(!id||/MEMUAT|LOADING/i.test(id))retur
 function decorateEmployees(){document.querySelectorAll('#tbody-employees tr').forEach(function(tr){if(!isRealEmployeeRow(tr))return;var cell=tr.lastElementChild;if(!cell)return;var id=String(tr.cells[0].textContent||'').trim(),st=String(tr.cells[7].textContent||'').trim().toUpperCase();if(canWrite()&&st!=='AKTIF'){var b=cell.querySelector('[data-activate-employee]');if(!b){b=document.createElement('button');b.type='button';b.className='btn btn-success btn-sm';b.dataset.activateEmployee=id;b.textContent='✓ Aktifkan';cell.appendChild(document.createTextNode(' '));cell.appendChild(b)}b.onclick=function(){activateEmployee(id,b)}}})}
 function getEmployeeSnapshot(){try{return JSON.parse(localStorage.getItem(EMP_SNAPSHOT)||'null')}catch(_){return null}}
 function saveEmployeeSnapshot(){var tb=document.getElementById('tbody-employees');if(!tb)return;var realRows=Array.from(tb.querySelectorAll('tr')).filter(isRealEmployeeRow);if(!realRows.length)return;try{localStorage.setItem(EMP_SNAPSHOT,JSON.stringify({at:Date.now(),html:tb.innerHTML,stats:{total:document.getElementById('stat-total')&&document.getElementById('stat-total').textContent,aktif:document.getElementById('stat-aktif')&&document.getElementById('stat-aktif').textContent,pkwt:document.getElementById('stat-pkwt')&&document.getElementById('stat-pkwt').textContent,pkwtt:document.getElementById('stat-pkwtt')&&document.getElementById('stat-pkwtt').textContent}}))}catch(_){}}
-function restoreEmployeeSnapshot(force){var tb=document.getElementById('tbody-employees');if(!tb)return false;var hasReal=Array.from(tb.querySelectorAll('tr')).some(isRealEmployeeRow);if(hasReal&&!force)return true;var snap=getEmployeeSnapshot();if(!snap||!snap.html)return false;tb.innerHTML=snap.html;var s=snap.stats||{};if(document.getElementById('stat-total')&&s.total!=null)document.getElementById('stat-total').textContent=s.total;if(document.getElementById('stat-aktif')&&s.aktif!=null)document.getElementById('stat-aktif').textContent=s.aktif;if(document.getElementById('stat-pkwt')&&s.pkwt!=null)document.getElementById('stat-pkwt').textContent=s.pkwt;if(document.getElementById('stat-pkwtt')&&s.pkwtt!=null)document.getElementById('stat-pkwtt').textContent=s.pkwtt;decorateEmployees();return true}
-function cleanInvalidActivationButtons(){document.querySelectorAll('#tbody-employees [data-activate-employee],[data-create-pkwt]').forEach(function(btn){var tr=btn.closest('tr');if(!isRealEmployeeRow(tr))btn.remove()})}
+function restoreEmployeeSnapshot(force){var tb=document.getElementById('tbody-employees');if(!tb)return false;var hasReal=Array.from(tb.querySelectorAll('tr')).some(isRealEmployeeRow);if(hasReal&&!force)return true;var snap=getEmployeeSnapshot();if(!snap||!snap.html)return false;tb.innerHTML=snap.html;cleanInvalidActivationButtons();var s=snap.stats||{};if(document.getElementById('stat-total')&&s.total!=null)document.getElementById('stat-total').textContent=s.total;if(document.getElementById('stat-aktif')&&s.aktif!=null)document.getElementById('stat-aktif').textContent=s.aktif;if(document.getElementById('stat-pkwt')&&s.pkwt!=null)document.getElementById('stat-pkwt').textContent=s.pkwt;if(document.getElementById('stat-pkwtt')&&s.pkwtt!=null)document.getElementById('stat-pkwtt').textContent=s.pkwtt;decorateEmployees();return true}
+function cleanInvalidActivationButtons(){
+  // [data-create-pkwt] removed UNCONDITIONALLY (not just on invalid rows)
+  // -- see EMP_SNAPSHOT note above. This button is never created by this
+  // file (or any other) anymore; any instance found here only exists
+  // because a stale cached snapshot HTML resurrected it, so it is always
+  // safe to strip on sight regardless of row validity.
+  document.querySelectorAll('#tbody-employees [data-create-pkwt]').forEach(function(btn){btn.remove()});
+  document.querySelectorAll('#tbody-employees [data-activate-employee]').forEach(function(btn){var tr=btn.closest('tr');if(!isRealEmployeeRow(tr))btn.remove()});
+}
 function stabilizeEmployees(){cleanInvalidActivationButtons();var tb=document.getElementById('tbody-employees');if(tb&&tb.querySelector('.loading'))restoreEmployeeSnapshot(false);decorateEmployees();saveEmployeeSnapshot()}
 function patchEmployeeFetch(){if(typeof global._fetchEmployeesFast!=='function'||global._fetchEmployeesFast.__deduped)return;var orig=global._fetchEmployeesFast;var wrapped=async function(){var key=String(global.selectedCompany||'ALL');if(employeeFetchInFlight&&employeeFetchKey===key)return employeeFetchInFlight;employeeFetchKey=key;employeeFetchInFlight=Promise.resolve().then(function(){return orig.apply(global,arguments)}).finally(function(){employeeFetchInFlight=null;employeeFetchKey=''});return employeeFetchInFlight};wrapped.__deduped=true;global._fetchEmployeesFast=wrapped}
 function patchEmployeeLoader(){if(typeof global.loadEmployees!=='function'||global.loadEmployees.__stable)return;var orig=global.loadEmployees;var wrapped=function(opts){opts=opts||{};var tb=document.getElementById('tbody-employees'),hasReal=tb&&Array.from(tb.querySelectorAll('tr')).some(isRealEmployeeRow);if(!hasReal)restoreEmployeeSnapshot(false);if(opts.forceRefresh&&hasReal)opts=Object.assign({},opts,{forceRefresh:false});return orig.call(this,opts)};wrapped.__stable=true;global.loadEmployees=wrapped}
