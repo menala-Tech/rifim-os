@@ -59,6 +59,13 @@
       transition: filter .3s;
     }
     .nav.scrolled .nav-brand-logo { filter: none; }
+    .nav-brand-logo-right {
+      width: 56px; height: auto; object-fit: contain;
+      filter: brightness(0) invert(1);
+      transition: filter .3s;
+    }
+    .nav.scrolled .nav-brand-logo-right { filter: none; }
+    @media (max-width: 900px) { .nav-brand-logo-right { display: none; } }
     .nav-brand-logo-fallback {
       width: 36px; height: 36px; background: var(--red);
       border-radius: 8px; display: flex; align-items: center; justify-content: center;
@@ -122,8 +129,10 @@
     }
     .hero-bg {
       position: absolute; inset: 0;
-      background: radial-gradient(ellipse 80% 60% at 70% 50%, #3A0000 0%, transparent 70%),
-                  linear-gradient(135deg, #1A0000 0%, #111111 60%);
+      background:
+        radial-gradient(ellipse 80% 60% at 70% 50%, rgba(58,0,0,.55) 0%, transparent 70%),
+        linear-gradient(135deg, rgba(20,0,0,.88) 0%, rgba(10,10,10,.92) 60%),
+        url('/branding/logo/Bagroun Maxim.png') center/cover no-repeat;
     }
     /* Red geometric accent */
     .hero-accent {
@@ -459,7 +468,7 @@
 ══════════════════════════════════════════════ -->
 <nav class="nav" id="navbar">
   <a class="nav-brand" href="/">
-    <img src="/branding/logo/logo-rifim-transparent.png" class="nav-brand-logo" alt="RIFIM"
+    <img src="/branding/logo/Maxim Logo transparan.png" class="nav-brand-logo" alt="Maxim"
       onerror="this.style.display='none';document.getElementById('navLogoFallback').style.display='flex'">
     <div id="navLogoFallback" class="nav-brand-logo-fallback" style="display:none">
       <svg width="20" height="20" viewBox="0 0 34 34"><rect width="34" height="34" rx="7" fill="#C40000"/><text x="17" y="24" text-anchor="middle" fill="white" font-family="Arial Black,Arial" font-weight="900" font-size="18">R</text></svg>
@@ -472,6 +481,7 @@
     <a class="nav-link" href="#layanan">Layanan</a>
     <a class="nav-link" href="#keunggulan">Keunggulan</a>
     <a class="nav-link" href="#kontak">Kontak</a>
+    <img src="/branding/logo/logo-rifim-transparent.png" class="nav-brand-logo-right" alt="RIFIM">
     <a class="nav-link nav-cta" href="/portal">⚡ RIFIM OS</a>
   </div>
 
