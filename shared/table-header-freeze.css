@@ -1,45 +1,64 @@
 /* RIFIM OS — Freeze table column headers below fixed module chrome. */
 
-/* Finance: fixed module header 58px + tab bar 46px */
-body:has(#app) .tbl thead th,
-body:has(#app) table.tbl thead th {
+/* Finance only: fixed module header + Finance tab bar. */
+body:has(#app .module-badge) #app main .tbl thead th,
+body:has(#app .module-badge) #app main table.tbl thead th {
   position: sticky !important;
   top: calc(var(--rifim-head, 58px) + var(--rifim-tabs, 46px)) !important;
-  z-index: 120 !important;
+  z-index: 220 !important;
   background: #f8fafc !important;
+  color: #111827 !important;
   box-shadow: 0 1px 0 rgba(15,23,42,.12), 0 5px 12px rgba(15,23,42,.06) !important;
 }
 
-/* HRIS: fixed header + fixed nav */
-body:has(#app) #app main table thead th {
-  position: sticky !important;
-  top: 104px !important;
-  z-index: 120 !important;
-  background: #fff !important;
-  box-shadow: 0 1px 0 rgba(15,23,42,.12) !important;
+/* HRIS desktop: .table-wrap overflow-x:auto becomes a sticky scroll ancestor.
+   Remove that ancestor vertically/horizontally on desktop so the column header
+   freezes against the viewport directly below fixed HRIS header + nav. */
+@media (min-width: 901px) {
+  body:has(#app .header-module) #app main .table-wrap {
+    overflow: visible !important;
+  }
+  body:has(#app .header-module) #app main table thead th {
+    position: sticky !important;
+    top: 104px !important;
+    z-index: 220 !important;
+    background: #fff !important;
+    color: #111827 !important;
+    box-shadow: 0 1px 0 rgba(15,23,42,.14), 0 5px 12px rgba(15,23,42,.05) !important;
+  }
 }
 
-/* Smart Office tables under fixed topnav. */
-body .main table thead th {
+/* HRIS mobile keeps horizontal scrolling; do not force a viewport-sticky header
+   inside the horizontal scroll ancestor because it causes the header to float
+   through body rows. */
+@media (max-width: 900px) {
+  body:has(#app .header-module) #app main table thead th {
+    position: static !important;
+    background: #f8f9fa !important;
+    color: #111827 !important;
+  }
+  body:has(#app .module-badge) #app main .tbl thead th,
+  body:has(#app .module-badge) #app main table.tbl thead th {
+    top: calc(var(--rifim-head, 54px) + var(--rifim-tabs, 44px)) !important;
+  }
+}
+
+/* Smart Office tables live inside .main below the fixed top navigation. */
+body:has(.topnav) .main table thead th {
   position: sticky !important;
   top: 0 !important;
-  z-index: 120 !important;
+  z-index: 220 !important;
   background: #fff !important;
+  color: #111827 !important;
   box-shadow: 0 1px 0 rgba(15,23,42,.12) !important;
 }
 
-/* Sistem tables under fixed 86px header. */
+/* Sistem tables: main is a direct body child below the fixed 86px header. */
 body > main table thead th {
   position: sticky !important;
   top: 86px !important;
-  z-index: 120 !important;
+  z-index: 220 !important;
   background: #f8fafc !important;
+  color: #111827 !important;
   box-shadow: 0 1px 0 rgba(15,23,42,.12) !important;
-}
-
-@media (max-width: 900px) {
-  body:has(#app) .tbl thead th,
-  body:has(#app) table.tbl thead th {
-    top: calc(var(--rifim-head, 54px) + var(--rifim-tabs, 44px)) !important;
-  }
 }
