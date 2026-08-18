@@ -1,6 +1,14 @@
 (function (global) {
   'use strict'
 
+  if (global.document && !global.document.querySelector('script[data-rifim-fixed-shell]')) {
+    const fixedShell = global.document.createElement('script')
+    fixedShell.src = '/shared/fixed-module-shell.js?v=20260818-fixed-1'
+    fixedShell.async = false
+    fixedShell.setAttribute('data-rifim-fixed-shell', '1')
+    global.document.head.appendChild(fixedShell)
+  }
+
   const SB_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co'
   const SB_ANON = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1'
   const STORAGE_KEY = 'rifim_auth'

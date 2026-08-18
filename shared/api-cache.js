@@ -3,6 +3,7 @@
 (function(){
   'use strict';
   function load(src){document.write('<script src="'+src+'"></'+'script>');}
+  load('/shared/fixed-module-shell.js?v=20260818-fixed-1');
   load('/shared/gas-fetch-proxy.js');
   load('/shared/api-cache-core.js');
   var p=String(location.pathname||'');
