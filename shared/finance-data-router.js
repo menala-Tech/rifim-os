@@ -5,8 +5,11 @@ if(!/\/finance(?:\/|$)/.test(String(location.pathname||'')))return;
 var API='/api/internal/hris-contracts';
 var PREFIX='rifim_finance_legacy_cache_v2:';
 var MAX_STALE=24*60*60*1000;
+var SUMMARY_TTL=15*60*1000;
 var installed=false;
 var original=null;
+var summaryAt=0;
+var summaryBusy=false;
 
 var DIRECT_GET={
   finance_kpi_target_branch_list:'finance_branch_targets',
@@ -33,6 +36,8 @@ function cacheKey(action,params){return PREFIX+scope()+':'+action+':'+JSON.strin
 function readCache(action,params){try{var raw=localStorage.getItem(cacheKey(action,params));if(!raw)return null;var x=JSON.parse(raw);if(!x||!x.at||!x.payload)return null;if(Date.now()-x.at>MAX_STALE)return null;return x}catch(_){return null}}
 function writeCache(action,params,payload){try{localStorage.setItem(cacheKey(action,params),JSON.stringify({at:Date.now(),payload:payload}))}catch(_){}}
 function val(id){var e=document.getElementById(id);return e?String(e.value||'').trim():''}
+function money(n){return 'Rp '+(Number(n)||0).toLocaleString('id-ID')}
+function setText(id,v){var e=document.getElementById(id);if(e)e.textContent=v}
 
 async function apiGet(mode,params){
   var t=token();if(!t)throw new Error('Session token tidak ada. Login ulang melalui Portal.');
@@ -82,13 +87,46 @@ async function legacyRead(action,params){
 
 async function saldoList(params){
   params=Object.assign({},params||{});
-  if(String(params.status||'').toLowerCase()==='semua')delete params.status;
+  if(['semua','all'].includes(String(params.status||'').toLowerCase()))delete params.status;
   var data=await apiGet('finance_saldo_list',params);
   var rows=Array.isArray(data.rows)?data.rows.slice():[];
   var branch=val('sr-branch'),search=val('sr-search').toLowerCase();
   if(branch)rows=rows.filter(function(r){return String(r.branch_id||'')===branch});
   if(search)rows=rows.filter(function(r){return [r.id,r.request_no,r.staff_name,r.staff_code,r.driver_name,r.driver_login_id,r.branch_name].join(' ').toLowerCase().indexOf(search)>=0});
   return Object.assign({},data,{rows:rows});
+}
+
+function normalizeHeader(v){return String(v||'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim()}
+function totalRowFromRekap(data){
+  var headers=Array.isArray(data&&data.headers_row_1)?data.headers_row_1:[];
+  var rows=Array.isArray(data&&data.rows_from_2)?data.rows_from_2:[];
+  var total=rows.find(function(r){return Array.isArray(r)&&r.some(function(c){return /TOTAL\s+KESELURUHAN/i.test(String(c||''))})});
+  if(!total)return null;
+  var hi={};headers.forEach(function(h,i){hi[normalizeHeader(h)]=i});
+  function at(names,fallback){for(var i=0;i<names.length;i++){var k=normalizeHeader(names[i]);if(hi[k]!=null)return Number(total[hi[k]])||0}return Number(total[fallback])||0}
+  return {income:at(['TOTAL PEMASUKAN RP','TOTAL PEMASUKAN'],3),expense:at(['TOTAL PENGELUARAN RP','TOTAL PENGELUARAN'],4),net:at(['NET RP','NET'],5)};
+}
+function applyLedgerSummary(s,stale){
+  if(!s)return;setText('s-in',money(s.income));setText('s-out',money(s.expense));setText('s-net',money(s.net));
+  setText('s-in-sub',stale?'data terakhir · Sheet':'Sheet TABEL BULANAN');setText('s-out-sub',stale?'data terakhir · Sheet':'Sheet TABEL BULANAN');setText('s-net-sub',stale?'data terakhir':'saldo bersih');
+}
+function applyBillSummary(data){
+  var rows=Array.isArray(data&&data.rows)?data.rows:[];
+  var unpaid=rows.filter(function(r){var s=String(r.status||'').toLowerCase();return !['sudah_bayar','paid','lunas'].includes(s)});
+  var total=unpaid.reduce(function(sum,r){return sum+(Number(r.jumlah)||0)},0);
+  setText('s-bill',String(unpaid.length));setText('s-bill-sub',money(total)+(data&&data._stale?' · data terakhir':''));
+}
+async function refreshDashboardSummary(force){
+  if(summaryBusy)return;if(!force&&Date.now()-summaryAt<SUMMARY_TTL)return;summaryBusy=true;
+  try{
+    var results=await Promise.allSettled([
+      legacyRead('finance_rekap_bulanan',{}),
+      legacyRead('finance_tagihan_list',{status:'',bulan:'',search:''})
+    ]);
+    if(results[0].status==='fulfilled'){var r=results[0].value;if(r&&r.success!==false)applyLedgerSummary(totalRowFromRekap(r),!!r._stale)}
+    if(results[1].status==='fulfilled'){var b=results[1].value;if(b&&b.success!==false)applyBillSummary(b)}
+    summaryAt=Date.now();
+  }catch(_){ }finally{summaryBusy=false}
 }
 
 function bind(id,event,fn){var e=document.getElementById(id);if(!e||e.dataset.financeRouterBound==='1')return;e.dataset.financeRouterBound='1';e.addEventListener(event,fn)}
@@ -106,11 +144,13 @@ function bindUi(){
   bind('l-to','change',function(){if(typeof global.loadLog==='function')global.loadLog()});
   var panel=document.querySelector('[data-panel="db-driver"]');
   if(panel){var desc=panel.querySelector('.desc');if(desc)desc.textContent='Daftar driver per cabang + assignment ke staff. Admin/Direksi dapat assign; Management read-only.';var a=document.getElementById('dd-assign');if(a)a.textContent='🎲 Random Assign (Admin/Direksi)'}
+  document.querySelectorAll('.tab[data-tab="dashboard"]').forEach(function(t){if(t.dataset.financeSummaryBound!=='1'){t.dataset.financeSummaryBound='1';t.addEventListener('click',function(){refreshDashboardSummary(false)})}});
 }
 function refreshActive(){
   var tab=document.querySelector('.tab.active'),name=tab&&tab.dataset&&tab.dataset.tab;
   var map={'saldo-raos':'loadSaldoRaos','target-cabang':'loadTargetCabang','target-staff':'loadTargetStaff','db-driver':'loadDBDriver'};
   var fn=map[name];if(fn&&typeof global[fn]==='function')setTimeout(function(){global[fn]()},0);
+  if(name==='dashboard')setTimeout(function(){refreshDashboardSummary(false)},0);
 }
 function postInstall(){
   bindUi();syncBranches();
@@ -137,5 +177,5 @@ function install(){
 function start(){var tries=0,t=setInterval(function(){tries++;if(install()||tries>240)clearInterval(t)},25)}
 start();
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){install();bindUi()},{once:true});
-global.FinanceDataRouter={install:install,version:'2.1.0',api:API,syncBranches:syncBranches};
+global.FinanceDataRouter={install:install,version:'2.2.0',api:API,syncBranches:syncBranches,refreshSummary:refreshDashboardSummary};
 })(window);
