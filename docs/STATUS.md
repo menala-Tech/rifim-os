@@ -2,7 +2,66 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-08-07 (Sesi 3 chat migration + Saldo P0 fixes — merged + deployed prod)
+> Last updated: 2026-08-18 (P0 HRIS/branding audit — local sync-recovery + minimal fix, belum di-commit)
+
+## Sesi 2026-08-18 — P0 HRIS/PKWT/Branding: audit ulang setelah temuan stale checkout
+
+**PENTING — insiden yang terjadi sesi ini**: local checkout repo ini sempat
+**107 commit ketinggalan** dari `origin/main` tanpa disadari di awal sesi.
+Pekerjaan P0 (sticky table header, PKWT deep-link, RBAC action button) yang
+sempat saya kerjakan dari nol ternyata **sudah dikerjakan sesi lain**
+(commit `cae536a` dan rangkaian sebelumnya, sejak 11 Agustus) — dengan
+pendekatan berbeda (runtime-patch layer: `shared/table-header-freeze.css`,
+`shared/module-runtime-hotfix.js`, `shared/smart-office-hris-sync.js`
+`applyDeepLink()`) tapi fungsinya sama/lebih lengkap. **Tidak jadi di-push**
+supaya tidak menimpa/duplikat kerjaan itu. Proses recovery:
+`git stash` kerjaan saya → `git reset --hard origin/main` (3 commit
+local-only ternyata sudah aman di branch `origin/codex/smart-office-
+runtime-20260811`, tidak hilang) → re-audit dari nol terhadap kondisi
+production yang sebenarnya.
+
+**Hasil re-audit — sudah PASS di production (tidak disentuh lagi):**
+- Sticky table header — `shared/table-header-freeze.css`, live. Catatan:
+  implementasinya pakai `top:104px !important` dkk hardcoded per-modul
+  (`body:has(...)` selector hack) — secara teknis anti-pattern yang sama
+  yang tadinya ingin dihindari, tapi sudah ada mobile fallback
+  (`position:static` di bawah 900px) dan sudah di-iterasi beberapa kali
+  (`freeze-4`). Berfungsi, cukup rapuh secara desain — tidak saya utak-atik
+  krn sudah live & battle-tested oleh sesi lain.
+- HRIS action buttons Detail/Edit/PKWT RBAC — `shared/module-runtime-
+  hotfix.js` `installHrisActions()`, inject via MutationObserver.
+- PKWT deep-link (`?doc=PKWT&employee_id=`) + signer autofill — `shared/
+  smart-office-hris-sync.js` `applyDeepLink()`/`scheduleDeepLink()`, lebih
+  robust dari versi saya (retry loop + MutationObserver guard).
+- PKWT → employee_contracts sync — sudah dikonfirmasi sebelumnya
+  (`soV2ReconcilePkwtContract_` server-side), masih valid.
+- Finance & Smart Office — **sudah dikonversi ke light theme** (commit
+  `013560c`, 11 Agustus) — kekhawatiran saya sebelumnya soal "re-theme
+  terlalu berisiko" ternyata sudah selesai duluan, badge sudah pakai pola
+  canonical `color:#9f1239;background:#fff5f5;border:#fecaca`.
+- Sistem `--red` — sudah `#C40000` di versi terbaru (file-nya di-rewrite
+  total oleh sesi lain, bukan versi yang saya edit sebelumnya).
+
+**Masih genuinely bolong — diperbaiki ulang sesi ini (minimal, height-safe):**
+- **HRIS header** — masih navy gelap (`var(--primary) #1a1a2e`) + badge
+  merah salah (`var(--accent) #e94560`) + **bug nyata**: logo `height:60px`
+  di dalam header `height:56px` (overflow). Fix: warna diganti ke light
+  canonical + badge disamakan persis dgn Finance/SmartOffice
+  (`#9f1239`/`#fff5f5`/`#fecaca`) + logo diperkecil ke 38px. **Height
+  header SENGAJA tidak diubah** (tetap 56px) karena
+  `table-header-freeze.css` hardcode `top:104px` untuk HRIS (asumsi header
+  56px + nav 48px) — ubah tinggi header akan merusak fix sticky-header yang
+  sudah live.
+- **Documents** — header masih sama sekali tidak ada logo/badge RIFIM.
+  Ditambah logo 36px + badge "DOCUMENTS" (gaya dark-translucent, sesuai
+  tema module ini sendiri yang tetap dark, bukan dipaksa ikut Finance/
+  SmartOffice yang sudah light).
+
+**File yang berubah sesi ini** (3 file, semua minimal/color-only, tidak
+menyentuh file yang dipegang sesi lain): `modules/hris/index.html`,
+`modules/documents/index.html`, `modules/documents/styles/docs.css`.
+
+**Belum di-commit/push** — menunggu konfirmasi.
 
 ## Sesi 2026-08-07 — Skip Approval Flow Saldo (poin 2+6)
 

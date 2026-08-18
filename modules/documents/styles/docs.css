@@ -12,7 +12,24 @@ a{color:inherit;text-decoration:none}.mono{font-family:'Consolas','Menlo',monosp
 .gate-card h1{font-size:22px;margin-bottom:8px}.gate-card p{color:#666;font-size:13px;line-height:1.5;margin-bottom:20px}.gate-card a{display:inline-block;background:var(--red);color:#fff;border-radius:9px;padding:11px 18px;font-weight:700}
 .app-shell{display:none;min-height:100vh;flex-direction:column;background:radial-gradient(circle at top left,rgba(26,77,122,.32),transparent 36%),linear-gradient(145deg,rgba(26,26,26,.96),rgba(11,34,56,.9) 55%,rgba(58,0,0,.78))}
 .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 28px;background:rgba(0,0,0,.34);border-bottom:1px solid var(--line);backdrop-filter:blur(10px)}
+/* P0 branding fix 2026-08-18 (re-applied after sync with origin/main):
+   this header had NO logo and no module badge at all. Kept the existing
+   brand-name/brand-sub text (not redundant enough elsewhere to justify
+   removing) and added logo+badge alongside, matching the [logo][badge]
+   pattern every other module uses. Dark/translucent-pill styling matches
+   this module's own theme (same family as Portal/Finance/Smart Office),
+   consistent with shared/table-header-freeze.css's `.doc-table thead th
+   {top:64px}` assumption — logo height kept well under the topbar's
+   existing ~64px row height so this doesn't change it. */
+.topbar-brand{display:flex;align-items:center;gap:12px}
+.topbar-logo{height:36px;width:auto;object-fit:contain;flex-shrink:0}
+/* Documents keeps its own dark theme (unlike HRIS/Finance/Smart Office
+   which are all light) so the badge stays translucent-white-on-dark to
+   stay legible against this module's dark body — the light red-tint pill
+   (#9f1239/#fff5f5) used elsewhere would be nearly invisible here. */
+.topbar-badge{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:5px 11px;white-space:nowrap}
 .brand-name{font-size:16px;font-weight:800;letter-spacing:.4px}.brand-sub{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-top:2px}.topbar-right{display:flex;align-items:center;gap:12px}.user-chip{font-size:12px;padding:6px 10px;border-radius:999px;background:rgba(26,77,122,.32);border:1px solid rgba(26,77,122,.55);color:#d8ecff}.btn-back{font-size:12px;border:1px solid rgba(255,255,255,.22);border-radius:8px;padding:7px 12px}.btn-back:hover{background:rgba(255,255,255,.08)}
+@media(max-width:760px){.topbar-logo{height:28px}.topbar-badge{display:none}}
 .doc-main{width:100%;max-width:1280px;margin:0 auto;padding:24px}.hero-card{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px;padding:22px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,rgba(26,77,122,.34),rgba(196,0,0,.12));box-shadow:0 18px 60px rgba(0,0,0,.18)}
 .hero-card h1{font-size:28px;margin-bottom:5px}.hero-card p{font-size:13px;color:var(--muted);line-height:1.5}.doc-tabs{display:flex;gap:5px;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:18px}.doc-tabs a{padding:12px 16px;color:#b9c4d0;font-size:13px;font-weight:700;border-bottom:2px solid transparent;white-space:nowrap}.doc-tabs a:hover,.doc-tabs a.active{color:#fff;border-bottom-color:var(--red)}
 .page-card,.section-card,.form-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}.page-head,.section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}.page-head h2,.section-card h3{font-size:18px}.page-head p{font-size:13px;color:var(--muted);margin-top:4px}.section-card{margin-top:16px}.detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding-bottom:14px;border-bottom:1px solid var(--line)}.detail-header h2{font-size:24px;margin-bottom:5px}
