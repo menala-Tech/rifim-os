@@ -1,6 +1,12 @@
-/* RIFIM OS — Freeze table column headers below fixed module chrome. */
+/* RIFIM OS — canonical table header freeze layer.
+   Two modes only:
+   1) viewport freeze for normal page tables;
+   2) container freeze (top:0) for tables inside their own vertical scroller.
+*/
 
-/* Finance only: fixed module header + Finance tab bar. */
+:where(table) thead th { background-clip: padding-box; }
+
+/* FINANCE — fixed module header + fixed tab bar. */
 body:has(#app .module-badge) #app main .tbl thead th,
 body:has(#app .module-badge) #app main table.tbl thead th {
   position: sticky !important;
@@ -10,10 +16,16 @@ body:has(#app .module-badge) #app main table.tbl thead th {
   color: #111827 !important;
   box-shadow: 0 1px 0 rgba(15,23,42,.12), 0 5px 12px rgba(15,23,42,.06) !important;
 }
+@media (min-width: 901px) {
+  body:has(#app .module-badge) #app main div[style*="overflow-x:auto"]:has(> table.tbl),
+  body:has(#app .module-badge) #app main div[style*="overflow-x: auto"]:has(> table.tbl) {
+    overflow: visible !important;
+  }
+}
 
-/* HRIS desktop: .table-wrap overflow-x:auto becomes a sticky scroll ancestor.
-   Remove that ancestor vertically/horizontally on desktop so the column header
-   freezes against the viewport directly below fixed HRIS header + nav. */
+/* HRIS — header 56px + nav ~48px = 104px.
+   Ordinary page tables use viewport freeze. Payroll V2 is explicitly restored
+   to its own vertical scroll container with top:0. */
 @media (min-width: 901px) {
   body:has(#app .header-module) #app main .table-wrap {
     overflow: visible !important;
@@ -26,39 +38,102 @@ body:has(#app .module-badge) #app main table.tbl thead th {
     color: #111827 !important;
     box-shadow: 0 1px 0 rgba(15,23,42,.14), 0 5px 12px rgba(15,23,42,.05) !important;
   }
-}
-
-/* HRIS mobile keeps horizontal scrolling; do not force a viewport-sticky header
-   inside the horizontal scroll ancestor because it causes the header to float
-   through body rows. */
-@media (max-width: 900px) {
-  body:has(#app .header-module) #app main table thead th {
-    position: static !important;
-    background: #f8f9fa !important;
-    color: #111827 !important;
+  body:has(#app .header-module) #app main .hv2-desktop .table-wrap {
+    overflow: auto !important;
   }
-  body:has(#app .module-badge) #app main .tbl thead th,
-  body:has(#app .module-badge) #app main table.tbl thead th {
-    top: calc(var(--rifim-head, 54px) + var(--rifim-tabs, 44px)) !important;
+  body:has(#app .header-module) #app main .hv2-desktop .hv2-pay-table thead th,
+  body:has(#app .header-module) #app main .hv2-desktop .table-wrap table thead th {
+    top: 0 !important;
+    z-index: 8 !important;
+    background: #f8fafc !important;
   }
 }
+body:has(#app .header-module) .modal-overlay table thead th,
+body:has(#app .header-module) div[style*="position:fixed"] div[style*="overflow"] table thead th {
+  top: 0 !important;
+}
 
-/* Smart Office tables live inside .main below the fixed top navigation. */
+/* CRM — native sticky module header (~107px) + sticky tab row (~48px). */
+body:has(#app .cfg-table) #app main .cfg-table thead th {
+  position: sticky !important;
+  top: 155px !important;
+  z-index: 220 !important;
+  background: #f8fafc !important;
+  color: #334155 !important;
+  box-shadow: 0 1px 0 rgba(15,23,42,.12), 0 5px 12px rgba(15,23,42,.05) !important;
+}
+
+/* RAOS — native header 54px + nav ~43px. */
+@media (min-width: 901px) {
+  body:has(#app .hdr-logo-img) #app main .table-wrap {
+    overflow: visible !important;
+  }
+  body:has(#app .hdr-logo-img) #app main table thead th {
+    position: sticky !important;
+    top: 97px !important;
+    z-index: 220 !important;
+    background: #f8fafc !important;
+    color: #374151 !important;
+    box-shadow: 0 1px 0 rgba(15,23,42,.12), 0 5px 12px rgba(15,23,42,.05) !important;
+  }
+}
+
+/* SMART OFFICE — topnav fixed; content tabs stick at the top of .main. */
 body:has(.topnav) .main table thead th {
   position: sticky !important;
-  top: 0 !important;
+  top: 52px !important;
   z-index: 220 !important;
   background: #fff !important;
   color: #111827 !important;
   box-shadow: 0 1px 0 rgba(15,23,42,.12) !important;
 }
+body:has(.topnav) .main :is(.table-wrap,.table-scroll,[style*="overflow-y:auto"],[style*="overflow:auto"]):has(> table) table thead th {
+  top: 0 !important;
+}
 
-/* Sistem tables: main is a direct body child below the fixed 86px header. */
-body > main table thead th {
+/* SISTEM — fixed 86px module header. Log panel is a local vertical scroller. */
+body:has(#app .log-panel) #app main table thead th {
   position: sticky !important;
   top: 86px !important;
   z-index: 220 !important;
   background: #f8fafc !important;
   color: #111827 !important;
   box-shadow: 0 1px 0 rgba(15,23,42,.12) !important;
+}
+body:has(#app .log-panel) #app .log-panel table thead th,
+body:has(#app .log-panel) #app .log-panel th {
+  top: 0 !important;
+  z-index: 8 !important;
+  background: #f8fafc !important;
+}
+
+/* DOCUMENT ENGINE — topbar sticky at 0; table-shell is horizontal-only. */
+@media (min-width: 901px) {
+  body:has(.doc-main) .table-shell { overflow: visible !important; }
+  body:has(.doc-main) .doc-table thead th {
+    position: sticky !important;
+    top: 64px !important;
+    z-index: 220 !important;
+    background: #111827 !important;
+    color: #cbd5e1 !important;
+    box-shadow: 0 1px 0 rgba(255,255,255,.10), 0 5px 12px rgba(0,0,0,.18) !important;
+  }
+}
+
+/* Responsive safety: keep horizontal scrolling and avoid floating headers
+   inside horizontal-scroll ancestors on phones/tablets. */
+@media (max-width: 900px) {
+  body:has(#app .header-module) #app main table thead th,
+  body:has(#app .hdr-logo-img) #app main table thead th,
+  body:has(.doc-main) .doc-table thead th,
+  body:has(#app .cfg-table) #app main .cfg-table thead th {
+    position: static !important;
+  }
+  body:has(#app .module-badge) #app main .tbl thead th,
+  body:has(#app .module-badge) #app main table.tbl thead th {
+    top: calc(var(--rifim-head, 54px) + var(--rifim-tabs, 44px)) !important;
+  }
+  body:has(#app .header-module) #app main .hv2-desktop .hv2-pay-table thead th {
+    top: 0 !important;
+  }
 }
