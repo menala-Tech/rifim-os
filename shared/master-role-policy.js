@@ -5,20 +5,15 @@
     staff: 'staff',
     'staff konter': 'staff',
     'pickup point': 'staff',
-
     koordinator: 'koordinator',
     coordinator: 'koordinator',
-
     admin: 'admin',
     administrator: 'admin',
-
     management: 'management',
     manajemen: 'management',
-
     direksi: 'direksi',
     direktur: 'direksi',
     'direktur utama': 'direksi',
-
     driver: 'driver',
   }
 
@@ -66,6 +61,14 @@
     return PAYROLL_INCLUDED.has(normalizeRole(role))
   }
 
+  function currentUserEmail() {
+    try {
+      const raw = global.localStorage && global.localStorage.getItem('rifim_auth')
+      const session = raw ? JSON.parse(raw) : null
+      return String((session && session.email) || '').trim()
+    } catch (_) { return '' }
+  }
+
   function applyCrudToDom(role, root) {
     const policy = accessFor(role)
     root = root || document
@@ -95,7 +98,13 @@
     departmentFor,
     inOperationalTarget,
     inHrisPayroll,
+    currentUserEmail,
     applyCrudToDom,
     ACCESS,
+  }
+
+  // Legacy CRM compatibility. Several CRM handlers still call this name.
+  if (typeof global._wlCurrentUserEmail !== 'function') {
+    global._wlCurrentUserEmail = currentUserEmail
   }
 })(window)
