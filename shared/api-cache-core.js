@@ -275,7 +275,9 @@
 })(typeof window!=='undefined'?window:globalThis);
 
 if(typeof window!=='undefined'&&/\/finance(?:\/|$)/.test(window.location.pathname)){
-  ['/shared/aist-finance.js','/shared/finance-light-ui.js','/shared/finance-saldo-cache-first.js','/shared/finance-target-cache-first.js','/shared/finance-p7-compat.js','/shared/aist-finance-agent-v2.js','/shared/aist-agent-status.js'].forEach(function(src){
+  // FinanceDataRouter is the single transport/cache owner for Finance RAOS data.
+  // Keep UI/AIST helpers, but retire the older saldo _gasCall wrapper to avoid double-wrapping.
+  ['/shared/aist-finance.js','/shared/finance-light-ui.js','/shared/finance-target-cache-first.js','/shared/finance-p7-compat.js','/shared/aist-finance-agent-v2.js','/shared/aist-agent-status.js'].forEach(function(src){
     var s=document.createElement('script');
     s.src=src;
     s.async=false;
