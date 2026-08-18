@@ -79,7 +79,8 @@ function install(){
   installed=true;
   return true;
 }
-function start(){var tries=0,t=setInterval(function(){tries++;if(install()||tries>200)clearInterval(t)},25)}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
-global.FinanceDataRouter={install:install,version:'2.0.0',api:API};
+function start(){var tries=0,t=setInterval(function(){tries++;if(install()||tries>240)clearInterval(t)},25)}
+start();
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});
+global.FinanceDataRouter={install:install,version:'2.0.1',api:API};
 })(window);
