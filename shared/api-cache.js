@@ -32,8 +32,6 @@
     'finance_rekap_harian','finance_rekap_bulanan','finance_log_list'
   ]);
 
-  // One Finance page used to fire Dashboard + monthly summary + bills concurrently.
-  // Apps Script then answers HTML throttle pages. Serialize only GAS traffic; Supabase remains parallel.
   var nativeFetch=global.fetch.bind(global);
   var gasTail=Promise.resolve();
   var gasNextAt=0;
@@ -96,7 +94,7 @@
   }
 
   async function markPaidAsCurrentUser(params){
-    var requestId=String(params&& (params.id||params.request_id) ||'').trim();
+    var requestId=String(params&&(params.id||params.request_id)||'').trim();
     if(!requestId)throw new Error('id request wajib');
     var token=await validatedToken();
     var payload=null;
@@ -110,11 +108,7 @@
     if(!processorId)throw new Error('Identity Admin tidak valid');
     var res=await nativeFetch(SUPABASE_URL+'/rest/v1/rpc/raos_saldo_mark_paid',{
       method:'POST',
-      headers:{
-        apikey:SUPABASE_PUBLISHABLE_KEY,
-        Authorization:'Bearer '+token,
-        'Content-Type':'application/json'
-      },
+      headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+token,'Content-Type':'application/json'},
       body:JSON.stringify({p_request_id:requestId,p_processor_id:processorId})
     });
     var data=await res.json().catch(function(){return{};});
@@ -137,10 +131,10 @@
         try{
           var fresh=await original.apply(this,arguments);
           if(fresh&&fresh.success!==false){writeCache(action,params,fresh);return fresh;}
-          if(cached){var stale=Object.assign({},cached.payload,{_stale:true,_stale_at:cached.at,message:'Menampilkan data terakhir dari workbook karena transport Google sedang sibuk.'});return stale;}
+          if(cached)return Object.assign({},cached.payload,{_stale:true,_stale_at:cached.at,message:'Menampilkan data terakhir dari workbook karena transport Google sedang sibuk.'});
           return fresh;
         }catch(err){
-          if(cached){var stale2=Object.assign({},cached.payload,{_stale:true,_stale_at:cached.at,message:'Menampilkan data terakhir dari workbook karena transport Google sedang sibuk.'});return stale2;}
+          if(cached)return Object.assign({},cached.payload,{_stale:true,_stale_at:cached.at,message:'Menampilkan data terakhir dari workbook karena transport Google sedang sibuk.'});
           throw err;
         }
       }
@@ -163,42 +157,38 @@
       var res=await nativeFetch('/api/internal/aist-agent/status',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
       var data=await res.json().catch(function(){return{};});
       var a=data&&data.agent;
-      agentState={
-        at:Date.now(),
-        online:!!a,
-        ready:!!(a&&a.aist_ready&&a.finance_ready&&a.status!=='error'),
-        detail:a?(String(a.machine_name||a.device_id||'Agent')+(a.last_error?' · '+a.last_error:'')):'Tidak ada MENALA AIST Agent yang heartbeat'
-      };
+      agentState={at:Date.now(),online:!!a,ready:!!(a&&a.aist_ready&&a.finance_ready&&a.status!=='error'),detail:a?(String(a.machine_name||a.device_id||'Agent')+(a.last_error?' · '+a.last_error:'')):'Tidak ada MENALA AIST Agent yang heartbeat'};
     }catch(err){agentState={at:Date.now(),online:false,ready:false,detail:err&&err.message?err.message:'Agent tidak tersedia'};}
     return agentState;
   }
-  function updateAistButtons(){
-    getAgentState(false).then(function(state){
-      document.querySelectorAll('button[data-aist-saldo]').forEach(function(btn){
-        if(!btn.dataset.runtimeOriginalText)btn.dataset.runtimeOriginalText=btn.textContent||'▶ Auto-Fill AIST';
-        if(!btn.dataset.runtimeDriverState)btn.dataset.runtimeDriverState=btn.disabled?'disabled':'enabled';
-        var processing=/queued|processing/i.test(String(btn.textContent||''));
-        if(processing)return;
-        if(!state.ready){
-          btn.disabled=true;
-          btn.textContent=state.online?'🟠 AIST Belum Ready':'🔴 AIST Offline';
-          btn.title=state.detail+' — jalankan MENALA AIST Agent di laptop admin.';
-        }else{
-          btn.disabled=btn.dataset.runtimeDriverState==='disabled';
-          btn.textContent=btn.dataset.runtimeOriginalText;
-          btn.title=btn.disabled?'ID Driver belum tersedia':'Kirim ke MENALA AIST Agent ('+state.detail+')';
-        }
-      });
+  function applyAistState(state){
+    document.querySelectorAll('button[data-aist-saldo]').forEach(function(btn){
+      if(!btn.dataset.runtimeOriginalText)btn.dataset.runtimeOriginalText=btn.textContent||'▶ Auto-Fill AIST';
+      if(!btn.dataset.runtimeDriverState)btn.dataset.runtimeDriverState=btn.disabled?'disabled':'enabled';
+      if(/queued|processing/i.test(String(btn.textContent||'')))return;
+      var nextText,nextTitle,nextDisabled;
+      if(!state.ready){
+        nextDisabled=true;
+        nextText=state.online?'🟠 AIST Belum Ready':'🔴 AIST Offline';
+        nextTitle=state.detail+' — jalankan MENALA AIST Agent di laptop admin.';
+      }else{
+        nextDisabled=btn.dataset.runtimeDriverState==='disabled';
+        nextText=btn.dataset.runtimeOriginalText;
+        nextTitle=nextDisabled?'ID Driver belum tersedia':'Kirim ke MENALA AIST Agent ('+state.detail+')';
+      }
+      if(btn.disabled!==nextDisabled)btn.disabled=nextDisabled;
+      if(btn.textContent!==nextText)btn.textContent=nextText;
+      if(btn.title!==nextTitle)btn.title=nextTitle;
     });
   }
+  function updateAistButtons(force){getAgentState(!!force).then(applyAistState);}
   function startAgentGuard(){
-    updateAistButtons();
-    var obs=new MutationObserver(updateAistButtons);
-    if(document.body)obs.observe(document.body,{childList:true,subtree:true});
-    setInterval(function(){getAgentState(true).then(updateAistButtons);},10000);
+    updateAistButtons(true);
+    setInterval(function(){updateAistButtons(false);},2000);
+    setInterval(function(){updateAistButtons(true);},10000);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',startAgentGuard,{once:true});
   else startAgentGuard();
 
-  global.FinanceRuntimeFix={version:'1.0.0-workbook-aist',getAgentState:getAgentState,isInstalled:function(){return runtimeInstalled;}};
+  global.FinanceRuntimeFix={version:'1.0.1-workbook-aist',getAgentState:getAgentState,isInstalled:function(){return runtimeInstalled;}};
 })(window);
