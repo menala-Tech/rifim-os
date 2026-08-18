@@ -28,11 +28,20 @@ function installHrisActions(){
         else{detail=document.createElement('button');detail.type='button';detail.className='btn btn-ghost btn-sm';detail.dataset.hrisDetail='1';detail.textContent='Detail';detail.onclick=function(){if(typeof global.viewEmployee==='function')global.viewEmployee(id)};cell.appendChild(detail)}
       }
       if(canWrite()&&!cell.querySelector('[data-hris-edit]')){
-        var edit=document.createElement('button');edit.type='button';edit.className='btn btn-ghost btn-sm';edit.dataset.hrisEdit='1';edit.textContent='✏️ Edit';edit.style.marginLeft='5px';edit.onclick=function(){if(typeof global.viewEmployee==='function')global.viewEmployee(id);setTimeout(function(){if(typeof global.openEditModal==='function')global.openEditModal()},0)};cell.appendChild(edit)
+        // 2026-08-18 fix: was viewEmployee(id) then openEditModal() via
+        // setTimeout(...,0) — an unnecessary async gap between the two
+        // synchronous calls (viewEmployee has no internal await, so it
+        // always finishes before returning). Calling both back-to-back
+        // removes the gap entirely; simpler and nothing can race it.
+        var edit=document.createElement('button');edit.type='button';edit.className='btn btn-ghost btn-sm';edit.dataset.hrisEdit='1';edit.textContent='✏️ Edit';edit.style.marginLeft='5px';edit.onclick=function(){if(typeof global.viewEmployee==='function')global.viewEmployee(id);if(typeof global.openEditModal==='function')global.openEditModal()};cell.appendChild(edit)
       }
-      if(canWrite()&&!cell.querySelector('[data-create-pkwt]')){
-        var pk=document.createElement('button');pk.type='button';pk.className='btn btn-secondary btn-sm';pk.dataset.createPkwt=id;pk.textContent='📝 PKWT';pk.style.marginLeft='5px';pk.title='Buat PKWT dari data HRIS';pk.onclick=function(ev){ev.preventDefault();ev.stopPropagation();location.href='/smart-office?doc=PKWT&employee_id='+encodeURIComponent(id)};cell.appendChild(pk)
-      }
+      // 2026-08-18: PKWT-from-HRIS auto-deep-link removed per user decision
+      // (it froze the Smart Office tab — see shared/smart-office-hris-
+      // sync.js history). PKWT documents are now created manually from
+      // within Smart Office itself: admin opens Smart Office, picks the
+      // PKWT card, and picks the employee by name/ID — every mapped field
+      // auto-fills from that manual selection (still handled by
+      // smart-office-hris-sync.js's bind()/fill()). No button here anymore.
     });
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',decorate,{once:true});else decorate();
@@ -43,7 +52,7 @@ function installHrisActions(){
 
 function installSmartOfficeBridge(){
   if(!/^\/smart-office(?:\/|$)/.test(path))return;
-  loadScript('/shared/smart-office-hris-sync.js?v=20260818-deeplink-2','data-smart-office-hris-sync').catch(function(e){console.warn('[SmartOffice bridge]',e.message||e)});
+  loadScript('/shared/smart-office-hris-sync.js?v=20260818-manual-3','data-smart-office-hris-sync').catch(function(e){console.warn('[SmartOffice bridge]',e.message||e)});
 }
 
 async function repairSystem(){
@@ -79,5 +88,5 @@ installCrmCompat();
 installHrisActions();
 installSmartOfficeBridge();
 scheduleSystemRepair();
-global.RifimModuleRuntimeHotfix={version:'1.0.1',repairSystem:repairSystem};
+global.RifimModuleRuntimeHotfix={version:'1.1.0-manual-pkwt',repairSystem:repairSystem};
 })(window);
