@@ -2,9 +2,20 @@
 'use strict';
 if(!/\/smart-office(?:\/|$)/.test(location.pathname))return;
 var KEY='smart_office_hris_employees_v3',rows=[];
-var deepLinkDone=false,deepLinkTimer=null;
-var CANONICAL_DIRECTOR_NAME='Bobby Rahman M.B';
-var CANONICAL_DIRECTOR_TITLE='Direktur Utama';
+var deepLinkDone=false,deepLinkTimer=null,deepLinkAttempts=0;
+// 2026-08-18 fix: was unbounded — scheduleDeepLink() retried forever on
+// failure (setTimeout chain) AND was re-triggered by the MutationObserver
+// on every single DOM mutation with no debounce, with no cap on either.
+// If applyDeepLink() never succeeded (e.g. doc-card lookup racing the
+// page's own init, or a field id mismatch), the two triggers fed each
+// other in a tight loop that pegged the main thread until the tab had to
+// be closed — this is the "halaman smart office nge bug, gak bisa
+// ditekan apapun" bug. DEEP_LINK_MAX_ATTEMPTS bounds it; once exceeded we
+// give up loudly (console.error) instead of spinning silently forever.
+var DEEP_LINK_MAX_ATTEMPTS=40; // ~40 * 180ms ≈ 7s of retrying, generous
+                                 // enough for async employee data to load.
+var enforceSignerTimer=null;
+var mutationDebounce=null;
 
 function gas(){return (global.RifimAPI&&global.RifimAPI._gasUrl)||global.GAS_WEB_APP_URL||''}
 function auth(){try{return JSON.parse(localStorage.getItem('rifim_auth')||'{}')||{}}catch(_){return{}}}
@@ -20,17 +31,74 @@ function find(v){var x=id(v);return rows.find(function(e){return id(e.employee_i
 function set(i,v,ro){var el=document.getElementById(i);if(!el||v==null)return false;el.value=String(v);if(ro)el.readOnly=true;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return true}
 function rupiah(v){return new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(v||0))}
 function fillSigner(){var title=document.getElementById('signerTitle'),name=document.getElementById('signerName');if(title)title.value=CANONICAL_DIRECTOR_TITLE;if(name){name.value=CANONICAL_DIRECTOR_NAME;name.readOnly=true;name.dispatchEvent(new Event('input',{bubbles:true}))}return !!(title&&name)}
+var CANONICAL_DIRECTOR_NAME='Bobby Rahman M.B';
+var CANONICAL_DIRECTOR_TITLE='Direktur Utama';
 function installSignerOverride(){global._onSignerTitleChange=function(){var title=document.getElementById('signerTitle'),name=document.getElementById('signerName');if(!title||!name)return;if(String(title.value||'').trim().toLowerCase()===CANONICAL_DIRECTOR_TITLE.toLowerCase()){name.value=CANONICAL_DIRECTOR_NAME;name.readOnly=true;name.dispatchEvent(new Event('input',{bubbles:true}));return}name.readOnly=false};fillSigner()}
-function enforceSigner(){var tries=0;var timer=setInterval(function(){tries++;installSignerOverride();fillSigner();if(tries>=32)clearInterval(timer)},250)}
+function enforceSigner(){
+  // 2026-08-18 fix: this used to start a NEW setInterval every time
+  // enforceSigner() was called (from start(), fill(), applyDeepLink() —
+  // each retry cycle). With no cap on retries, that meant many overlapping
+  // intervals accumulating over time, each doing DOM reads/writes every
+  // 250ms — a second contributor to the CPU-pegging freeze alongside the
+  // deep-link retry loop. Now a single shared timer, restarted (not
+  // stacked) on each call.
+  if(enforceSignerTimer)clearInterval(enforceSignerTimer);
+  var tries=0;
+  enforceSignerTimer=setInterval(function(){tries++;installSignerOverride();fillSigner();if(tries>=32){clearInterval(enforceSignerTimer);enforceSignerTimer=null}},250)
+}
 function fill(e){if(!e)return false;var ok=false;ok=set('employee_name',e.full_name||'',true)||ok;ok=set('employee_id',e.employee_id||'',true)||ok;ok=set('employee_position',e.position||'',true)||ok;ok=set('employee_dept',dep(e),true)||ok;set('salary',rupiah(e.salary_base||0),true);if(e.join_date){set('join_date',e.join_date,true);set('contract_start',e.join_date,true)}if(e.end_date)set('contract_end',e.end_date,true);installSignerOverride();fillSigner();enforceSigner();return ok}
 function dl(){var d=document.getElementById('soEmpMaster');if(!d){d=document.createElement('datalist');d.id='soEmpMaster';document.body.appendChild(d)}d.innerHTML=rows.filter(function(e){return String(e.status||'').toUpperCase()==='AKTIF'}).map(function(e){return '<option value="'+String(e.employee_id||'').replace(/"/g,'&quot;')+'">'+String(e.full_name||'')+' — '+String(e.position||'')+' — '+String(e.branch||'')+'</option>'}).join('')}
 function bind(){['employee_id','employee_name'].forEach(function(i){var el=document.getElementById(i);if(!el||el.dataset.hrisBound)return;el.dataset.hrisBound='1';el.setAttribute('list','soEmpMaster');var run=async function(){var e=find(el.value);if(!e){await refresh().catch(function(){});e=find(el.value)}if(e)fill(e)};el.addEventListener('change',run);el.addEventListener('blur',run)});dl();installSignerOverride();fillSigner()}
 function findDocCard(doc){doc=String(doc||'').trim().toUpperCase();return Array.from(document.querySelectorAll('.doc-card')).find(function(c){var oc=String(c.getAttribute('onclick')||'').toUpperCase();var code=String(c.querySelector('.doc-card-code')&&c.querySelector('.doc-card-code').textContent||'').trim().toUpperCase();var txt=String(c.textContent||'').replace(/\s+/g,' ').trim().toUpperCase();return code===doc||oc.indexOf("'"+doc+"'")>=0||txt===doc||txt.indexOf(doc)>=0})||null}
-function ensureDocSelected(doc){if(!doc)return true;doc=String(doc).toUpperCase();var card=findDocCard(doc);if(!card)return false;try{if(typeof global.selectDoc==='function'){var label=doc==='PKWT'?'Kontrak PKWT':doc;global.selectDoc(card,doc,label,'📝')}else card.click()}catch(_){try{card.click()}catch(__){return false}}if(doc==='PKWT'){return !!(document.getElementById('contract_start')&&document.getElementById('employee_id'))}return !!document.getElementById('dynFields')}
+function ensureDocSelected(doc){if(!doc)return true;doc=String(doc).toUpperCase();var card=findDocCard(doc);if(!card){console.warn('[SmartOffice deep-link] doc-card not found for',doc);return false}try{if(typeof global.selectDoc==='function'){var label=doc==='PKWT'?'Kontrak PKWT':doc;global.selectDoc(card,doc,label,'📝')}else card.click()}catch(err){console.warn('[SmartOffice deep-link] selectDoc threw',err&&err.message);try{card.click()}catch(__){return false}}if(doc==='PKWT'){var ready=!!(document.getElementById('contract_start')&&document.getElementById('employee_id'));if(!ready)console.warn('[SmartOffice deep-link] PKWT fields not present after selectDoc');return ready}return !!document.getElementById('dynFields')}
 function showDeepLinkForm(){var panel=document.getElementById('formPanel'),grid=document.getElementById('docTypeSection'),back=document.getElementById('mobileBack');if(grid)grid.style.display='none';if(panel){panel.classList.add('show');panel.style.display='block'}if(back)back.style.display='flex';setTimeout(function(){var anchor=document.getElementById('employee_name')||document.getElementById('contract_start')||panel;if(anchor)anchor.scrollIntoView({behavior:'auto',block:'start'});else window.scrollTo({top:0,behavior:'auto'})},60)}
 async function applyDeepLink(){var p=new URLSearchParams(location.search),doc=String(p.get('doc')||'').trim().toUpperCase(),emp=String(p.get('employee_id')||'').trim();if(!doc&&!emp)return true;if(doc&&!ensureDocSelected(doc))return false;installSignerOverride();bind();if(emp){var e=find(emp);if(!e){await refresh().catch(function(){});dl();e=find(emp)}if(!e)return false;if(doc==='PKWT'&&!document.getElementById('contract_start'))return false;if(!fill(e))return false}installSignerOverride();fillSigner();enforceSigner();showDeepLinkForm();deepLinkDone=true;return true}
-function scheduleDeepLink(){if(deepLinkDone)return;clearTimeout(deepLinkTimer);deepLinkTimer=setTimeout(function(){applyDeepLink().then(function(ok){if(!ok&&!deepLinkDone)setTimeout(scheduleDeepLink,180)}).catch(function(e){console.warn('[SmartOffice deep-link]',e.message||e);if(!deepLinkDone)setTimeout(scheduleDeepLink,180)})},80)}
+function giveUpDeepLink(){
+  deepLinkDone=true; // stop all further retries — see DEEP_LINK_MAX_ATTEMPTS note above.
+  console.error('[SmartOffice deep-link] gave up after '+DEEP_LINK_MAX_ATTEMPTS+' attempts — doc/employee_id params could not be applied. URL:',location.href);
+  try{
+    if(typeof global.showToast==='function'){
+      global.showToast('Gagal auto-buka form dari HRIS. Pilih dokumen secara manual.',false);
+    }
+  }catch(_){}
+}
+function scheduleDeepLink(){
+  if(deepLinkDone)return;
+  if(deepLinkAttempts>=DEEP_LINK_MAX_ATTEMPTS){giveUpDeepLink();return}
+  clearTimeout(deepLinkTimer);
+  deepLinkTimer=setTimeout(function(){
+    deepLinkAttempts++;
+    applyDeepLink().then(function(ok){
+      if(!ok&&!deepLinkDone){
+        if(deepLinkAttempts>=DEEP_LINK_MAX_ATTEMPTS)giveUpDeepLink();
+        else setTimeout(scheduleDeepLink,180)
+      }
+    }).catch(function(e){
+      console.warn('[SmartOffice deep-link]',e.message||e);
+      if(!deepLinkDone){
+        if(deepLinkAttempts>=DEEP_LINK_MAX_ATTEMPTS)giveUpDeepLink();
+        else setTimeout(scheduleDeepLink,180)
+      }
+    })
+  },80)
+}
 async function syncPKWT(){try{var empEl=document.getElementById('employee_id'),startEl=document.getElementById('contract_start'),endEl=document.getElementById('contract_end');if(!empEl||!startEl||!endEl)return;var emp=String(empEl.value||'').trim();if(!emp)return;var t=token();if(!t)return;var num=String((document.getElementById('resultDocNum')||{}).textContent||'').trim();if(!num)return;var body={employee_id:emp,contract_type:'PKWT',document_number:num,gdoc_url:String((document.getElementById('resultGdocBtn')||{}).href||''),pdf_url:String((document.getElementById('resultPdfBtn')||{}).href||''),start_date:startEl.value||null,end_date:endEl.value||null,payload:{employee_name:(document.getElementById('employee_name')||{}).value||'',employee_position:(document.getElementById('employee_position')||{}).value||'',employee_dept:(document.getElementById('employee_dept')||{}).value||'',salary:(document.getElementById('salary')||{}).value||'',branch:(find(emp)||{}).branch||'',director_name:(document.getElementById('signerName')||{}).value||'',director_title:(document.getElementById('signerTitle')||{}).value||''}};var r=await fetch('/api/internal/hris-contract-sync',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+t},body:JSON.stringify(body)});var d=await r.json().catch(function(){return{}});if(!r.ok||d.success!==true)throw new Error(d.message||'Sync PKWT ke HRIS gagal');if(typeof global.showToast==='function')global.showToast('PKWT tersinkron ke HRIS Kontrak.','success')}catch(e){console.warn('[SmartOffice->HRIS]',e.message||e)}}
-function start(){readCache();installSignerOverride();fillSigner();enforceSigner();bind();scheduleDeepLink();refresh().then(function(){dl();bind();scheduleDeepLink()}).catch(function(){});new MutationObserver(function(){installSignerOverride();bind();fillSigner();if(new URLSearchParams(location.search).get('doc'))showDeepLinkForm();scheduleDeepLink();var ov=document.getElementById('resultOverlay');if(ov&&ov.style.display&&ov.style.display!=='none')syncPKWT()}).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style']})}
+function onBodyMutated(){
+  // 2026-08-18 fix: this observer used to call scheduleDeepLink() directly
+  // on every single mutation — combined with applyDeepLink() itself
+  // mutating the DOM (via bind()/fill()/enforceSigner()), that formed a
+  // tight feedback loop with the retry timer above. Now debounced to one
+  // pass per 120ms of quiet, and scheduleDeepLink() itself is a no-op once
+  // deepLinkDone (success OR give-up) — so this can no longer spin forever.
+  clearTimeout(mutationDebounce);
+  mutationDebounce=setTimeout(function(){
+    installSignerOverride();bind();fillSigner();
+    if(new URLSearchParams(location.search).get('doc'))showDeepLinkForm();
+    scheduleDeepLink();
+    var ov=document.getElementById('resultOverlay');
+    if(ov&&ov.style.display&&ov.style.display!=='none')syncPKWT();
+  },120)
+}
+function start(){readCache();installSignerOverride();fillSigner();enforceSigner();bind();scheduleDeepLink();refresh().then(function(){dl();bind();scheduleDeepLink()}).catch(function(){});new MutationObserver(onBodyMutated).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style']})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })(window);
