@@ -14,7 +14,10 @@
     load('/shared/hris-hotfix.js');
   }
   if(/\/smart-office(?:\/|$)/.test(p)) load('/shared/smart-office-hris-sync.js');
-  if(/\/finance(?:\/|$)/.test(p)) load('/shared/finance-data-router.js?v=20260818-session-gate-1');
+  if(/\/finance(?:\/|$)/.test(p)) {
+    load('/shared/finance-data-router.js?v=20260818-session-gate-1');
+    load('/shared/finance-target-mode-labels.js?v=20260819-mode-labels-1');
+  }
 })();
 
 (function(global){
