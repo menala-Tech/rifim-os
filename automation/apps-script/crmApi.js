@@ -353,6 +353,61 @@ function _crmSbFetch_(method, path, body) {
   try { return JSON.parse(txt); } catch (e) { return txt; }
 }
 
+// P0 hotfix (2026-08-20): variant of _crmSbFetch_ that authenticates AS
+// the calling user (their own verified Supabase access token) instead of
+// the service_role Script Property key. Required for any RPC whose SQL
+// body derives caller identity from auth.uid()/request.jwt.claim.role and
+// rejects when that identity doesn't match a passed actor/processor id --
+// e.g. raos_saldo_mark_paid: `caller := auth.uid()` then
+// `if jwtrole <> 'service_role' and caller is distinct from
+// p_processor_id then raise 'processor_mismatch'`. Calling that RPC via
+// _crmSbFetch_ (service_role Authorization) makes auth.uid() resolve to
+// NULL/service context while p_processor_id is the real verified actor's
+// id -- caller is distinct from p_processor_id is TRUE, jwtrole isn't
+// 'service_role' either (it's the JWT's own claim, service key doesn't
+// magically set it), so the RPC's own guard rejects every call. Confirmed
+// reproducible in production (request SLD-20260819-154732-D34C0F: DB
+// state proven untouched -- is_processed=false, processed_at=NULL,
+// processed_by=NULL, aist_jobs.status=queued -- failure was safe).
+//
+// accessToken MUST be a token that has ALREADY passed
+// authVerifyAccessToken() (i.e. _crmRequireRoleToken_ /
+// _finWriteRoleGate_ / _finRoleGate_ already validated it and derived
+// actor.id from it) -- never pass an arbitrary/unverified caller-supplied
+// token here; this function does not itself verify the token, it only
+// forwards one the caller has already verified.
+//
+// apikey stays the configured Supabase key (cfg.key, same as every other
+// call in this file) -- that's the Gateway's own key requirement, not an
+// identity claim. Only Authorization changes, to the user's own JWT, so
+// PostgREST/Postgres derive auth.uid()/request.jwt.claims from that JWT
+// (the standard Supabase "act as this user from a trusted backend"
+// pattern) instead of from the service key -- this does NOT bypass RLS or
+// widen access; it makes the RPC see the SAME identity GAS already
+// verified, nothing more.
+function _crmSbFetchAsActor_(method, path, body, accessToken) {
+  var token = String(accessToken || '').trim();
+  if (!token) throw new Error('_crmSbFetchAsActor_: accessToken wajib (token user yang sudah diverifikasi authVerifyAccessToken)');
+  var cfg = _getSupabaseConfig();
+  var opts = {
+    method: method,
+    headers: {
+      'apikey':        cfg.key,
+      'Authorization': 'Bearer ' + token,
+      'Content-Type':  'application/json',
+      'Prefer':        'return=representation',
+    },
+    muteHttpExceptions: true,
+  };
+  if (body !== undefined && body !== null) opts.payload = JSON.stringify(body);
+  var res = UrlFetchApp.fetch(cfg.url + path, opts);
+  var code = res.getResponseCode();
+  var txt  = res.getContentText();
+  if (code >= 400) throw new Error('Supabase ' + method + ' ' + path + ' → ' + code + ': ' + txt.substring(0, 200));
+  if (!txt) return null;
+  try { return JSON.parse(txt); } catch (e) { return txt; }
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // #3 System Config RAOS — sheet SISTEM CONFIG di RAOS master spreadsheet
 // (Supabase mirror ditangani frontend via RPC set_system_config)
@@ -980,10 +1035,16 @@ function _finSaldoRaosMarkPaid_(params) {
   if (!id) return { success: false, code: 'INVALID_INPUT', message: 'Parameter id wajib' };
   if (!actor.id) return { success: false, code: 'PROCESSOR_NOT_FOUND', message: 'UUID processor tidak ditemukan.' };
 
-  var result = _crmSbFetch_('POST', '/rest/v1/rpc/raos_saldo_mark_paid', {
+  // P0 hotfix (2026-08-20): raos_saldo_mark_paid's guard requires
+  // auth.uid() = p_processor_id (unless service_role). Call AS the
+  // already-verified actor (same token _finWriteRoleGate_ validated above
+  // via authVerifyAccessToken) so auth.uid() == actor.id == p_processor_id
+  // inside the RPC -- see _crmSbFetchAsActor_ for full root-cause detail.
+  var accessToken = params.access_token || params.token;
+  var result = _crmSbFetchAsActor_('POST', '/rest/v1/rpc/raos_saldo_mark_paid', {
     p_request_id: id,
     p_processor_id: actor.id,
-  });
+  }, accessToken);
   var status = result && result.status;
   if (['updated', 'already_processed', 'not_processable', 'not_approved', 'not_found'].indexOf(status) === -1) {
     return { success: false, code: 'RPC_RESPONSE_INVALID', message: 'Response mark-paid tidak valid.' };
