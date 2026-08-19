@@ -913,7 +913,9 @@ function _finLogList_(params) {
 // ─── Saldo RAOS (proxy Supabase raos_saldo_requests, bypass RLS via service_role)
 function _finSaldoRaosList_(params) {
   _finRoleGate_(params);
-  var qs = 'select=id,staff_id,branch_id,nominal,status,is_processed,processed_at,processed_by,created_at,driver_id,driver_login_id,driver_name&order=created_at.desc&limit=200';
+  // Finding 3 fix (2026-08-19): +request_no -- Finance manual UX confirm
+  // dialog needs it (previously not selected, so unavailable client-side).
+  var qs = 'select=id,request_no,staff_id,branch_id,nominal,status,is_processed,processed_at,processed_by,created_at,driver_id,driver_login_id,driver_name&order=created_at.desc&limit=200';
   var status = String(params.status || '');
   var branchId = String(params.branch_id || '');
   if (status === 'pending')   qs += '&is_processed=eq.false&status=eq.pending';
@@ -952,6 +954,7 @@ function _finSaldoRaosList_(params) {
     var b = r.branch_id ? branchMap[r.branch_id]: null;
     return {
       id:            r.id,
+      request_no:    r.request_no || '',
       staff_name:    s ? s.full_name : '',
       staff_code:    s ? s.staff_id : '',
       branch_name:   b ? b.name : '',
