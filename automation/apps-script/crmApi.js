@@ -1007,6 +1007,43 @@ function _finSaldoRaosMarkPaid_(params) {
 // view raos_target_tercapai_bulan, RPC raos_compute_payroll_month
 // ═══════════════════════════════════════════════════════════════════════
 
+// Bug 1 fix (2026-08-19): canonical branch scope untuk staff-count
+// auto-prorate. Sebelumnya staffCountByBranch dihitung exact-match per
+// branch_id saja, tanpa parent/child (SOETA -> T1/T2/T3) -- production
+// hanya punya 1 raos_kpi_targets_branch row untuk SOETA (parent), jadi
+// staff di T1/T2/T3 (kalau ada nanti) tidak pernah ikut ke-hitung dan
+// staff yang branch_id-nya langsung T1/T2/T3 tidak pernah dapat target
+// (tidak ada own row). ownerOf() resolve "branch pemilik target" (diri
+// sendiri kalau punya own row, kalau tidak dan parent-nya punya row maka
+// parent), scopeMembers() kumpulkan diri + semua child (parent_branch_id
+// match) untuk dijumlah staff count-nya. Data source parent_branch_id
+// sama persis dengan branches.parent_branch_id yang dipakai
+// is_branch_in_scope()/raos_branch_geofence_scope() di RAOS Postgres --
+// TIDAK reimplementasi rule SOETA yang berbeda, hanya baca kolom yang sama.
+function _finBuildCanonicalScope_(branches, targetRowsByBranch) {
+  var byId = {};
+  (branches || []).forEach(function(b) { byId[b.id] = b; });
+  var childrenOf = {};
+  (branches || []).forEach(function(b) {
+    if (b.parent_branch_id) {
+      (childrenOf[b.parent_branch_id] = childrenOf[b.parent_branch_id] || []).push(b.id);
+    }
+  });
+  return {
+    ownerOf: function(branchId) {
+      if (targetRowsByBranch[branchId]) return branchId;
+      var b = byId[branchId];
+      if (b && b.parent_branch_id && targetRowsByBranch[b.parent_branch_id]) return b.parent_branch_id;
+      return branchId;
+    },
+    scopeMembers: function(ownerBranchId) {
+      var members = [ownerBranchId];
+      (childrenOf[ownerBranchId] || []).forEach(function(c) { members.push(c); });
+      return members;
+    },
+  };
+}
+
 // Helper: normalize p_month = 'YYYY-MM' or 'YYYY-MM-01' → 'YYYY-MM-01'
 function _finMonthNorm_(m) {
   var s = String(m || '').trim();
@@ -1024,7 +1061,7 @@ function _finKpiTargetBranchList_(params) {
   _finRoleGate_(params);
   var month = _finMonthNorm_(params.month);
 
-  var branches = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug&order=name.asc');
+  var branches = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug,parent_branch_id&order=name.asc');
   if (!Array.isArray(branches)) branches = [];
 
   var rows = _crmSbFetch_('GET', '/rest/v1/raos_kpi_targets_branch?select=id,branch_id,target_cabang,target_staff_default,mode,updated_at&effective_month=eq.' + encodeURIComponent(month));
@@ -1033,13 +1070,17 @@ function _finKpiTargetBranchList_(params) {
   var byBranch = {};
   rows.forEach(function(r) { byBranch[r.branch_id] = r; });
 
-  // Poin 10 (2026-08-07): count staff aktif per cabang untuk auto-prorate.
-  var allStaffLite = _crmSbFetch_('GET', '/rest/v1/user_profiles?select=branch_id&is_active=eq.true&role=in.(staff,koordinator)');
+  // Bug 1 fix (2026-08-19): "canonical active staff" = role=staff SAJA
+  // (koordinator dikeluarkan dari denominator prorate -- itu penyebab
+  // 5.000/12 padahal UPG active Staff cuma 10, 2 sisanya koordinator).
+  var allStaffLite = _crmSbFetch_('GET', '/rest/v1/user_profiles?select=branch_id&is_active=eq.true&role=eq.staff');
   var staffCountByBranch = {};
   (allStaffLite || []).forEach(function(s) {
     if (!s.branch_id) return;
     staffCountByBranch[s.branch_id] = (staffCountByBranch[s.branch_id] || 0) + 1;
   });
+
+  var scope = _finBuildCanonicalScope_(branches, byBranch);
 
   var out = branches.map(function(b) {
     var t = byBranch[b.id] || {};
@@ -1047,7 +1088,13 @@ function _finKpiTargetBranchList_(params) {
     var isExcluded = /soeta|makassar/.test(slugLower);
     var targetCabang = Number(t.target_cabang) || 0;
     var branchDefault = t.target_staff_default != null ? Number(t.target_staff_default) : null;
-    var staffCount = staffCountByBranch[b.id] || 0;
+    // Bug 1 fix: staffCount = jumlah canonical scope (diri sendiri + child
+    // branch, mis. SOETA otomatis include T1/T2/T3), bukan exact-match
+    // branch_id doang -- match RAOS canonical scope, bukan hitung ulang
+    // aturan baru.
+    var staffCount = (scope.scopeMembers(b.id) || []).reduce(function(sum, id) {
+      return sum + (staffCountByBranch[id] || 0);
+    }, 0);
     var autoProrated = null;
     if (branchDefault == null && targetCabang > 0 && staffCount > 0) {
       autoProrated = Math.round(targetCabang / staffCount);
@@ -1134,20 +1181,21 @@ function _finKpiTargetStaffList_(params) {
   var branchTargetMap = {};
   (branchTargets || []).forEach(function(b) { branchTargetMap[b.branch_id] = b; });
 
-  // Poin 10+11 (2026-08-07): auto-prorate target_staff_default kalau null.
-  // Hitung count staff aktif per cabang (semua cabang, tidak dibatasi branchId
-  // filter, karena Target Cabang page butuh angka semua cabang).
-  var allStaffLite = _crmSbFetch_('GET', '/rest/v1/user_profiles?select=branch_id&is_active=eq.true&role=in.(staff,koordinator)');
+  // Bug 1 fix (2026-08-19): "canonical active staff" = role=staff SAJA,
+  // sama seperti _finKpiTargetBranchList_ (koordinator dikeluarkan dari
+  // denominator prorate).
+  var allStaffLite = _crmSbFetch_('GET', '/rest/v1/user_profiles?select=branch_id&is_active=eq.true&role=eq.staff');
   var staffCountByBranch = {};
   (allStaffLite || []).forEach(function(s) {
     if (!s.branch_id) return;
     staffCountByBranch[s.branch_id] = (staffCountByBranch[s.branch_id] || 0) + 1;
   });
 
-  // Ambil branch info
-  var branches = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug');
+  // Ambil branch info (+parent_branch_id untuk canonical scope SOETA/T1/T2/T3)
+  var branches = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug,parent_branch_id');
   var branchMap = {};
   (branches || []).forEach(function(b) { branchMap[b.id] = b; });
+  var scope = _finBuildCanonicalScope_(branches, branchTargetMap);
 
   // Ambil payroll bulan ini
   var payroll = _crmSbFetch_('GET', '/rest/v1/raos_payroll?select=staff_id,gapok,bonus_saldo,bpjs,paket_data,member_parkir,bonus_kpi,thp,target_pct,driver_active_pct,status_target,computed_at&effective_month=eq.' + encodeURIComponent(month));
@@ -1157,14 +1205,22 @@ function _finKpiTargetStaffList_(params) {
   var out = staffs.map(function(s) {
     var override = overrideMap[s.id] || {};
     var r = realisasiMap[s.id] || {};
-    var bt = branchTargetMap[s.branch_id] || {};
+    // Bug 1 fix (2026-08-19): resolve "branch pemilik target" dulu (own
+    // row, atau parent kalau staff ini fisik di T1/T2/T3 dan parent SOETA
+    // yang punya row) -- sebelumnya staff dengan branch_id = T1/T2/T3
+    // langsung tidak pernah dapat target sama sekali (branchTargetMap
+    // lookup by s.branch_id apa adanya, T1/T2/T3 tidak punya own row).
+    var targetOwnerBranchId = scope.ownerOf(s.branch_id);
+    var bt = branchTargetMap[targetOwnerBranchId] || {};
     var b = branchMap[s.branch_id] || {};
     var p = payrollMap[s.id] || {};
-    // Poin 10+11: chain fallback — override > branch default > auto-prorate (target_cabang / count staff aktif)
+    // Poin 10+11: chain fallback — override > branch default > auto-prorate (target_cabang / canonical count staff aktif)
     var branchDefault = bt.target_staff_default != null ? Number(bt.target_staff_default) : null;
     var autoProrated = null;
     if (branchDefault == null && bt.target_cabang) {
-      var cnt = staffCountByBranch[s.branch_id] || 0;
+      var cnt = (scope.scopeMembers(targetOwnerBranchId) || []).reduce(function(sum, id) {
+        return sum + (staffCountByBranch[id] || 0);
+      }, 0);
       if (cnt > 0) autoProrated = Math.round(Number(bt.target_cabang) / cnt);
     }
     var target = override.target_saldo != null
