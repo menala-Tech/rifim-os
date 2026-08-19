@@ -734,7 +734,11 @@ const fmtDateTime = (s) => {
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const showToast = (msg, kind) => {
   const t = document.createElement('div');
-  const bg = kind === 'err' ? 'var(--err,#dc2626)' : kind === 'ok' ? 'var(--ok,#16a34a)' : 'var(--dark2,#2B2B2B)';
+  // 'warn' (2026-08-19, Finding 3): amber, distinct dari 'err' merah --
+  // dipakai untuk kondisi BLOCKED (mis. aist_job_in_progress) yang bukan
+  // error/kegagalan, tapi guard yang sengaja mencegah aksi manual. Additive
+  // -- semua call site existing pakai 'ok'/'err'/default, tidak berubah.
+  const bg = kind === 'err' ? 'var(--err,#dc2626)' : kind === 'ok' ? 'var(--ok,#16a34a)' : kind === 'warn' ? 'var(--warn,#d97706)' : 'var(--dark2,#2B2B2B)';
   t.style.cssText = `position:fixed;bottom:20px;right:20px;padding:12px 18px;background:${bg};color:#fff;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:400px`;
   t.textContent = msg;
   document.body.appendChild(t);
@@ -946,19 +950,53 @@ async function loadSaldoRaos() {
           <td style="text-align:right;font-weight:600">${fmtRp(r.nominal)}</td>
           <td>${statusChip}</td>
           <td style="font-size:11px">${fmtDateTime(r.created_at)}</td>
-          <td>${r.is_processed ? '—' : (['pending','approved'].includes(r.status) ? '<button class="btn ok small" data-mark-saldo="' + esc(r.id) + '">✓ Lunas</button>' : '<span style="font-size:11px;color:#888">—</span>')}</td>
+          <td>${r.is_processed ? '—' : (['pending','approved'].includes(r.status) ? '<button class="btn ok small" data-mark-saldo="' + esc(r.id) + '"' +
+            ' data-request-no="' + esc(r.request_no || '-') + '"' +
+            ' data-driver-name="' + esc(r.driver_name || '-') + '"' +
+            ' data-driver-login="' + esc(r.driver_login_id || '-') + '"' +
+            ' data-nominal="' + esc(String(r.nominal || 0)) + '"' +
+            '>✓ Konfirmasi AIST Berhasil</button>' : '<span style="font-size:11px;color:#888">—</span>')}</td>
         </tr>`;
     }).join('');
     tb.querySelectorAll('button[data-mark-saldo]').forEach(btn => {
-      btn.addEventListener('click', () => markSaldoPaid(btn.dataset.markSaldo));
+      btn.addEventListener('click', () => markSaldoPaid(btn));
     });
   } catch (err) {
     tb.innerHTML = `<tr><td colspan="8"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
   }
 }
 
-async function markSaldoPaid(id) {
-  if (!confirm(`Tandai LUNAS pengajuan ${id.substring(0, 8)}…?\nAksi ini akan trigger notif ke staff & post chat RAOS.`)) return;
+// Finding 3 fix (2026-08-19): manual-mode UX. "LUNAS" generik diganti jadi
+// "Konfirmasi AIST Berhasil" -- ini bukan sekadar tandai status, tapi
+// klaim eksplisit bahwa Finance sudah verifikasi posting AIST manual
+// selesai (raos_saldo_mark_paid mencatat ini sebagai aist_jobs mode
+// 'manual'/MANUAL_FINANCE_CONFIRM). Confirm dialog sekarang tampilkan
+// Request No/Driver/Login ID/Nominal dari row (data-* attribute, sudah
+// tersedia sejak render row di atas) + wording eksplisit AIST. Tombol
+// di-disable begitu diklik untuk cegah double-click submit RPC 2x
+// (RPC sendiri sudah idempotent lewat already_processed, ini defense
+// tambahan di UI supaya tidak spam network call / race di UI state).
+async function markSaldoPaid(btn) {
+  const id = btn.dataset.markSaldo;
+  const requestNo = btn.dataset.requestNo || '-';
+  const driverName = btn.dataset.driverName || '-';
+  const driverLogin = btn.dataset.driverLogin || '-';
+  const nominal = fmtRp(Number(btn.dataset.nominal || 0));
+
+  const confirmMsg = 'Pastikan saldo sudah benar-benar berhasil diposting di AIST sebelum mengonfirmasi.\n\n' +
+    `Request No: ${requestNo}\n` +
+    `Driver: ${driverName}\n` +
+    `Login ID: ${driverLogin}\n` +
+    `Nominal: ${nominal}\n\n` +
+    'Lanjutkan Konfirmasi AIST Berhasil?';
+  if (!confirm(confirmMsg)) return;
+
+  // Double-click guard.
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Memproses…';
+
   showToast('Memproses…');
   try {
     const data = await _gasCall('finance_saldo_raos_mark_paid', { id });
@@ -971,6 +1009,8 @@ async function markSaldoPaid(id) {
     if (data.status === 'not_found') throw new Error('Pengajuan tidak ditemukan.');
     if (!data.success) throw new Error(data.message);
     if (data.status === 'already_processed') {
+      // Tetap idempotent/aman -- bukan error, hanya info. Row akan hilang
+      // dari daftar pending setelah reload karena is_processed sudah true.
       _srStopLoop(id);
       showToast(`Info: saldo ${id.substring(0, 8)}... sudah pernah diproses`, 'ok');
       await loadSaldoRaos();
@@ -979,7 +1019,25 @@ async function markSaldoPaid(id) {
     _srStopLoop(id);
     showToast(`✅ Saldo ${id.substring(0, 8)}… tandai lunas`, 'ok');
     await loadSaldoRaos();
-  } catch (err) { showToast('❌ ' + err.message, 'err'); }
+  } catch (err) {
+    // aist_job_in_progress: backend (raos_saldo_mark_paid) SUDAH memblokir
+    // manual Finance kalau job AIST Worker sedang claimed/running/
+    // verifying -- tidak diubah di sini (backend guard tetap otoritas).
+    // Ini BUKAN error/kegagalan generik -- ditampilkan sebagai BLOCK
+    // (toast 'warn' amber + wording eksplisit "DIBLOKIR"), berbeda dari
+    // error biasa (toast 'err' merah) supaya Finance tidak salah baca ini
+    // sebagai bug yang perlu di-retry sembarangan.
+    const isAistBlock = /aist_job_in_progress/i.test(err.message);
+    if (isAistBlock) {
+      showToast('🚫 DIBLOKIR — Job AIST untuk request ini masih diproses oleh AIST Worker (claimed/running/verifying). Tidak bisa dikonfirmasi manual sekarang. Coba lagi nanti atau cek status AIST Worker.', 'warn');
+    } else {
+      showToast('❌ ' + err.message, 'err');
+    }
+    // Re-enable supaya bisa retry -- hanya path gagal, sukses/already_processed
+    // sudah return lebih dulu lewat reload table (row hilang dari daftar pending).
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
 }
 
 // ─── Realtime notifier pengajuan baru Isi Saldo RAOS
