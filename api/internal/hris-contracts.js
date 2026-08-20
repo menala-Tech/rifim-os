@@ -68,7 +68,8 @@ async function listBranchTargets(req,p){
     const t=tm[String(b.id)]||{},r=rm[String(b.id)]||{};
     const staffCount=num(r.ready_people||r.active_target_people,0);
     const targetCabang=t.target_cabang==null?0:num(t.target_cabang);
-    const auto=t.target_staff_default==null&&staffCount>0?Math.floor(targetCabang/staffCount):null;
+    // Canonical equal-share rule: CEIL, matching RAOS saldo/order KPI snapshots.
+    const auto=t.target_staff_default==null&&staffCount>0?Math.ceil(targetCabang/staffCount):null;
     const effective=t.target_staff_default==null?auto:num(t.target_staff_default);
     const mode=t.mode||((/soekarno|makassar|soeta/i.test(String(b.name)+' '+String(b.code)))?'order':'saldo');
     return {branch_id:b.id,branch_code:b.code,branch_name:b.name,branch_slug:b.slug,mode,target_cabang:targetCabang,target_staff_default:t.target_staff_default==null?null:num(t.target_staff_default),target_staff_auto_prorated:auto,target_staff_effective:effective,staff_count:staffCount,sync_issue_people:num(r.sync_issue_people,0),is_excluded_saldo:mode==='order',updated_at:t.updated_at||null,effective_month:month};
@@ -107,7 +108,8 @@ async function listStaffTargets(req,p){
   return roster.map(r=>{
     const sid=String(r.user_id),bt=bm[String(r.branch_id)]||{},st=sm[sid]||{},real=rm[sid]||{},pay=pm[sid]||{};
     const mode=bt.mode||'saldo',cnt=counts[String(r.branch_id)]||0;
-    const auto=bt.target_staff_default==null&&cnt>0?Math.floor(num(bt.target_cabang)/cnt):null;
+    // Canonical equal-share rule: CEIL, matching RAOS saldo/order KPI snapshots.
+    const auto=bt.target_staff_default==null&&cnt>0?Math.ceil(num(bt.target_cabang)/cnt):null;
     const effective=st.target_saldo!=null?num(st.target_saldo):(bt.target_staff_default!=null?num(bt.target_staff_default):auto);
     const realSaldo=num(real.realisasi_saldo),realCount=num(real.request_count);
     const pct=effective>0?((mode==='order'?realCount:realSaldo)/effective*100):num(pay.target_pct,0);
