@@ -6,7 +6,8 @@
  * Sumber : Spreadsheet "DATABASE STAFF" (ID hardcoded di bawah), tab
  *          "MASTER DATA STAFF". Kolom relevan:
  *            A Email · B Nama · C Gaji Staff · D ID CABANG · E ID Staff
- *            F Jabatan · G No WA Staff · H Pin
+ *            F Jabatan · G No WA Staff · H Pin · L Status Aktif
+ *            N Sync Status
  *
  * Target : Supabase table `employees` (dipakai UI HRIS `/hris`).
  *
@@ -20,18 +21,18 @@
  *      position        = kolom F
  *      salary_base     = kolom C
  *      pin             = kolom H
+ *      status          = kolom L (TRUE → AKTIF, FALSE → NONAKTIF)
  *      company_code    = 'RIFIM'  (default; edit manual di HRIS untuk MIG/LAILAN)
  *      employment_type = 'PKWT'
  *      join_date       = today
- *      status          = 'AKTIF'
  *
  *  • Baris EXISTING (ID Staff sudah ada):
  *      full_name / email / phone / branch / position / salary_base / pin
  *      → refresh dari sheet.
+ *      status → SELALU mengikuti kolom L SSOT. Row berstatus CONFLICT pada
+ *      kolom N dipaksa NONAKTIF agar identity lama/duplikat tidak hidup lagi.
  *      company_code / employment_type / join_date / department
  *      → JANGAN diubah (ini kolom yang di-manage HRIS admin).
- *      status → kalau baris HRIS `NONAKTIF/RESIGN/PHK` sebelumnya
- *      dan sekarang muncul lagi di sheet → set 'AKTIF'.
  *
  *  • Baris HILANG dari sheet SSOT (employee_id ada di Supabase tapi
  *    tidak ada di sheet lagi): set status='NONAKTIF' (soft-delete
@@ -48,14 +49,16 @@ var MASTER_STAFF_TAB     = 'MASTER DATA STAFF';
 
 // 0-based column index sheet SSOT
 var _SSOT_COL = {
-  EMAIL:    0,  // A
-  NAMA:     1,  // B
-  GAJI:     2,  // C
-  CABANG:   3,  // D
-  ID_STAFF: 4,  // E
-  JABATAN:  5,  // F
-  WA:       6,  // G
-  PIN:      7,  // H
+  EMAIL:        0,  // A
+  NAMA:         1,  // B
+  GAJI:         2,  // C
+  CABANG:       3,  // D
+  ID_STAFF:     4,  // E
+  JABATAN:      5,  // F
+  WA:           6,  // G
+  PIN:          7,  // H
+  STATUS_AKTIF: 11, // L — canonical lifecycle flag
+  SYNC_STATUS:  13, // N — conflict guard / audit status
 };
 
 /**
@@ -74,7 +77,8 @@ function syncEmployeesFromMasterStaff() {
     return { upserted: 0, deactivated: 0, skipped: 0, errors: [] };
   }
 
-  var range = sh.getRange(2, 1, lastRow - 1, 8).getValues();
+  // A:N wajib dibaca karena lifecycle canonical berada di L dan conflict guard di N.
+  var range = sh.getRange(2, 1, lastRow - 1, 14).getValues();
   var sheetById = {};   // employee_id → row payload dari sheet
   var skipped = 0;
   var errors  = [];
@@ -83,6 +87,23 @@ function syncEmployeesFromMasterStaff() {
     var empId = String(row[_SSOT_COL.ID_STAFF] || '').trim().toUpperCase();
     var nama  = String(row[_SSOT_COL.NAMA]     || '').trim();
     if (!empId || !nama) { skipped++; return; }
+
+    var syncStatus = String(row[_SSOT_COL.SYNC_STATUS] || '').trim();
+    var activeFlag = _parseActiveFlag(row[_SSOT_COL.STATUS_AKTIF]);
+
+    // Identity conflict di SSOT tidak boleh dihidupkan oleh sync HRIS.
+    if (/CONFLICT/i.test(syncStatus)) activeFlag = false;
+
+    // Fail closed per-row: jangan menebak lifecycle bila nilai L tidak dikenali.
+    if (activeFlag === null) {
+      skipped++;
+      errors.push({
+        row: i + 2,
+        employee_id: empId,
+        error: 'Status Aktif tidak valid/kosong; row tidak disinkronkan',
+      });
+      return;
+    }
 
     sheetById[empId] = {
       employee_id : empId,
@@ -93,6 +114,7 @@ function syncEmployeesFromMasterStaff() {
       position    : String(row[_SSOT_COL.JABATAN] || '').trim() || null,
       salary_base : _parseSalary(row[_SSOT_COL.GAJI]),
       pin         : _normalizePin(row[_SSOT_COL.PIN]),
+      _active     : activeFlag,
       _sheet_row  : i + 2,
     };
   });
@@ -114,21 +136,25 @@ function syncEmployeesFromMasterStaff() {
   Object.keys(sheetById).forEach(function(empId) {
     var payload   = sheetById[empId];
     var sheetRow  = payload._sheet_row;
+    var isActive  = payload._active;
     delete payload._sheet_row;
+    delete payload._active;
 
     var current = existingById[empId];
     try {
       if (!current) {
-        // INSERT baru
+        // INSERT baru — status mengikuti SSOT, bukan otomatis AKTIF.
         payload.company_code    = 'RIFIM';
         payload.employment_type = 'PKWT';
         payload.join_date       = todayStr;
-        payload.status          = 'AKTIF';
+        payload.status          = isActive ? 'AKTIF' : 'NONAKTIF';
         payload.created_at      = new Date().toISOString();
         payload.updated_at      = payload.created_at;
         _sbPost('employees', payload);
       } else {
-        // UPDATE — hanya field SSoT + reaktivasi kalau perlu
+        // UPDATE — field SSOT + lifecycle canonical dari kolom L.
+        var curStatus = String(current.status || '').toUpperCase();
+        var nextStatus = isActive ? 'AKTIF' : 'NONAKTIF';
         var patch = {
           full_name  : payload.full_name,
           email      : payload.email,
@@ -137,14 +163,11 @@ function syncEmployeesFromMasterStaff() {
           position   : payload.position,
           salary_base: payload.salary_base,
           pin        : payload.pin,
+          status     : nextStatus,
           updated_at : new Date().toISOString(),
         };
-        // Reaktivasi kalau sebelumnya NONAKTIF/RESIGN/PHK
-        var curStatus = String(current.status || '').toUpperCase();
-        if (curStatus === 'NONAKTIF' || curStatus === 'RESIGN' || curStatus === 'PHK') {
-          patch.status = 'AKTIF';
-        }
         _sbPatch('employees', 'employee_id=eq.' + encodeURIComponent(empId), patch);
+        if (!isActive && curStatus !== 'NONAKTIF') deactivated++;
       }
       upserted++;
     } catch (err) {
@@ -216,6 +239,22 @@ function setupEmployeesFromMasterStaffTrigger() {
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────
+
+/**
+ * Parse lifecycle flag SSOT. Return true / false / null (invalid/unknown).
+ * getValues() biasanya mengembalikan boolean asli untuk checkbox, tetapi
+ * string variants tetap diterima agar migrasi/import sheet aman.
+ */
+function _parseActiveFlag(raw) {
+  if (raw === true || raw === 1) return true;
+  if (raw === false || raw === 0) return false;
+  if (raw === null || raw === undefined || raw === '') return null;
+
+  var s = String(raw).trim().toUpperCase();
+  if (['TRUE', 'AKTIF', 'ACTIVE', 'YA', 'YES', '1'].indexOf(s) >= 0) return true;
+  if (['FALSE', 'NONAKTIF', 'INACTIVE', 'TIDAK', 'NO', '0'].indexOf(s) >= 0) return false;
+  return null;
+}
 
 /**
  * Normalisasi nomor WA ke format 62xxxxxxxx.
