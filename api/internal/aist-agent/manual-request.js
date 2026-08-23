@@ -1,4 +1,4 @@
-const { env, json, sbRpc, readJson } = require('./_shared')
+const { env, json, sbRpc, readJson, roleOf } = require('./_shared')
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return json(res, 405, { success:false, message:'Method not allowed' })
@@ -19,8 +19,8 @@ module.exports = async function handler(req, res) {
     })
     const profiles = await readJson(profRes)
     const profile = profiles?.[0]
-    const role = String(profile?.role || '').toLowerCase()
-    if (!profile?.is_active || !['admin','direksi','direktur'].includes(role)) throw new Error('Role tidak diizinkan')
+    const role = roleOf(profile?.role)
+    if (!profile?.is_active || !['admin','direksi'].includes(role)) throw new Error('Role tidak diizinkan')
 
     const requestId = String(req.body?.request_id || '').trim()
     if (!requestId) throw new Error('request_id wajib')

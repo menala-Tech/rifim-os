@@ -1,4 +1,4 @@
-const { env, json, readJson } = require('./_shared')
+const { env, json, readJson, roleOf } = require('./_shared')
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'GET') return json(res, 405, { success:false, message:'Method not allowed' })
@@ -18,8 +18,8 @@ module.exports = async function handler(req, res) {
     headers:{ apikey:service, Authorization:`Bearer ${service}` },
   })
   const profiles = await readJson(profRes)
-  const role = String(profiles?.[0]?.role || '').toLowerCase()
-  if (!profiles?.[0]?.is_active || !['admin','management','direksi','direktur'].includes(role)) {
+  const role = roleOf(profiles?.[0]?.role)
+  if (!profiles?.[0]?.is_active || !['admin','management','direksi'].includes(role)) {
     return json(res, 403, { success:false, message:'Role not allowed' })
   }
 

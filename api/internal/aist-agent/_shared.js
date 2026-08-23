@@ -1,6 +1,7 @@
 const crypto = require('crypto')
 
 function env(name) { return String(process.env[name] || '').trim() }
+function roleOf(v) { v = String(v || '').toLowerCase(); return v === 'direktur' ? 'direksi' : v === 'koord' ? 'koordinator' : v === 'mgmt' ? 'management' : v }
 function json(res, status, body) {
   res.status(status).setHeader('Content-Type', 'application/json; charset=utf-8')
   return res.end(JSON.stringify(body))
@@ -45,11 +46,12 @@ async function getOperatorByEmail(email) {
   })
   const rows = await readJson(res)
   if (!res.ok || !Array.isArray(rows) || !rows[0]) throw new Error('operator_not_found')
-  const role = String(rows[0].role || '').toLowerCase()
-  if (!['admin','direksi','direktur'].includes(role)) throw new Error('operator_role_not_allowed')
+  const role = roleOf(rows[0].role)
+  if (!['admin','direksi'].includes(role)) throw new Error('operator_role_not_allowed')
+  rows[0].role = role
   return rows[0]
 }
 async function markPaidWithService(requestId, processorId) {
   return sbRpc('raos_saldo_mark_paid', { p_request_id: requestId, p_processor_id: processorId })
 }
-module.exports = { env, json, verifyAgent, sbRpc, getOperatorByEmail, markPaidWithService, readJson }
+module.exports = { env, json, verifyAgent, sbRpc, getOperatorByEmail, markPaidWithService, readJson, roleOf }
