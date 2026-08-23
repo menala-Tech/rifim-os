@@ -1107,7 +1107,7 @@ if (initBtn) initBtn.click();
 
 (async function bootCrmCanonical() {
   const session = await RifimPortalSession.require({
-    allowedRoles: ['admin','management','koordinator','direksi'],
+    allowedRoles: ['admin','management','direksi'],
     redirect: '/portal',
   });
   if (!session || !checkAuth()) return;
