@@ -697,7 +697,14 @@ async function _gasCall(action, extra) {
   if (_FIN_LEGACY_READ_ACTIONS.indexOf(action) !== -1) {
     throw new Error('Finance data router belum aktif (canonical server-side transport tidak terpasang). Muat ulang halaman; jangan retry manual ke GAS.');
   }
-  if (action === 'finance_saldo_raos_list' || action === 'finance_saldo_raos_mark_paid') {
+  // P0.5 (2026-08-22): all Finance mutations are POST-only and must go through
+  // the canonical server-side router. Fail closed if this base _gasCall is ever
+  // reached for a mutation, so the browser never sends access_token directly to
+  // GAS for add/mark-paid/saldo-mark/upsert/compute/assign-random actions.
+  if (_finActionIsMutation(action)) {
+    throw new Error('Aksi mutasi Finance memerlukan router kanonik yang tidak aktif. Muat ulang halaman.');
+  }
+  if (action === 'finance_saldo_raos_list') {
     const token = await _finGetAccessToken();
     if (!token) throw new Error('Session token tidak ada. Login ulang melalui Portal.');
     const body = Object.assign({ action, access_token: token }, extra || {});

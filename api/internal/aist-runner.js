@@ -1,4 +1,5 @@
-const ALLOWED_ROLES = new Set(['admin', 'direksi', 'direktur'])
+const ALLOWED_ROLES = new Set(['admin', 'direksi'])
+function roleOf(v){v=String(v||'').toLowerCase();return v==='direktur'?'direksi':v==='koord'?'koordinator':v==='mgmt'?'management':v}
 
 function env(name) { return String(process.env[name] || '').trim() }
 function json(res, status, body) {
@@ -34,7 +35,7 @@ async function verifyActor(token, supabaseUrl, publishableKey) {
   const profiles = await readJson(profileRes)
   if (!profileRes.ok || !Array.isArray(profiles) || !profiles[0]) throw new Error('Profil user tidak ditemukan')
   const profile = profiles[0]
-  const role = String(profile.role || '').toLowerCase()
+  const role = roleOf(profile.role)
   if (profile.is_active === false) throw new Error('Akun tidak aktif')
   if (!ALLOWED_ROLES.has(role)) throw new Error('Akses AIST mutation hanya admin/direksi')
   return { id:authUser.id, role }

@@ -22,6 +22,8 @@ var DIRECT_GET={
 };
 var DIRECT_POST={
   finance_saldo_raos_mark_paid:'finance_saldo_mark_paid',
+  finance_tagihan_add:'finance_tagihan_add',
+  finance_tagihan_mark_paid:'finance_tagihan_mark_paid',
   finance_kpi_target_branch_upsert:'finance_branch_target_upsert',
   finance_kpi_target_staff_upsert:'finance_staff_target_upsert',
   finance_payroll_compute:'finance_payroll_compute',
