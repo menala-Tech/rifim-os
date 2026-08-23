@@ -173,12 +173,14 @@ tr:last-child td{border-bottom:none}
 /* ─── MODAL ─── */
 .modal-overlay{
   position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;
-  display:none;align-items:center;justify-content:center;padding:20px;
+  display:none;align-items:flex-start;justify-content:center;padding:20px;
+  overflow-y:auto;
 }
 .modal-overlay.open{display:flex}
 .modal{
   background:#fff;border-radius:16px;width:100%;max-width:640px;
-  max-height:90vh;display:flex;flex-direction:column;
+  max-height:calc(100vh - 40px);display:flex;flex-direction:column;
+  margin:auto 0;
   box-shadow:0 20px 60px rgba(0,0,0,.4);
 }
 .modal-header{
@@ -2962,7 +2964,11 @@ function _hrisCacheClear(key) {
 // MODAL
 // ════════════════════════════════════════════════════════════
 function openModal(id) {
-  document.getElementById(id).classList.add('open');
+  const modal = document.getElementById(id);
+  modal.classList.add('open');
+  modal.scrollTop = 0;
+  const body = modal.querySelector('.modal-body');
+  if (body) body.scrollTop = 0;
 }
 
 function closeModal(id) {
