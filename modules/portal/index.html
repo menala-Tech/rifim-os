@@ -357,7 +357,7 @@ footer{text-align:center;padding:20px;opacity:.3;font-size:11px}
         <div class="mod-arrow">↗</div>
       </div>
 
-      <div class="mod-card active-mod" onclick="goTo('/crm')">
+      <div class="mod-card active-mod" data-module="crm" data-roles="admin,direksi,management" onclick="goTo('/crm')">
         <span class="mod-icon">📇</span>
         <div class="mod-name">CRM</div>
         <div class="mod-desc">Manajemen email login, user Supabase, kontak eksternal, audit log</div>
@@ -403,6 +403,13 @@ function _sb() {
 }
 
 const ALLOWED_ROLES = ['admin', 'direksi', 'management', 'koordinator'];
+function roleOf(v) {
+  v = String(v || '').trim().toLowerCase();
+  if (v === 'direktur' || v === 'direktur utama') return 'direksi';
+  if (v === 'mgmt' || v === 'manajemen') return 'management';
+  if (v === 'koord' || v === 'coordinator') return 'koordinator';
+  return v;
+}
 
 async function doLogin() {
   const loginId = document.getElementById('auth-email').value.trim();
@@ -418,21 +425,17 @@ async function doLogin() {
   if (!sb) { btn.textContent = 'Masuk ke RIFIM OS'; btn.disabled = false; return showErr('Supabase SDK belum load — refresh halaman.'); }
 
   try {
-    const { data: bridge, error: bridgeErr } = await sb.rpc('raos_verify_and_bridge', {
-      p_login_id: loginId, p_raos_pin: pin,
+    const { data: exchange, error: exchangeErr } = await sb.functions.invoke('raos-login-exchange', {
+      body: { login_id: loginId, raos_pin: pin },
     });
-    let email = loginId.toLowerCase();
-    let signInPassword = pin;
-    if (!bridgeErr && bridge && bridge.ok) {
-      email = bridge.email;
-      signInPassword = bridge.ssot_pin;
-    } else if (bridge && bridge.ok === false && bridge.reason === 'bad_pin') {
-      showErr(bridge.message || 'RAOS PIN salah.');
+    if (exchangeErr || !exchange?.ok || !exchange?.token_hash) {
+      showErr(exchange?.message || exchangeErr?.message || 'Email/ID atau PIN salah.');
       return;
     }
 
-    const { data: signData, error: signErr } = await sb.auth.signInWithPassword({
-      email, password: signInPassword,
+    const { data: signData, error: signErr } = await sb.auth.verifyOtp({
+      token_hash: exchange.token_hash,
+      type: 'email',
     });
     if (signErr || !signData?.user) {
       showErr('Email/ID atau PIN salah. Admin perlu isi kolom I "RAOS PIN" di sheet SSOT lalu run "Sync RAOS Credentials".');
@@ -452,7 +455,8 @@ async function doLogin() {
       showErr('Akun Anda nonaktif. Hubungi admin.');
       return;
     }
-    if (!ALLOWED_ROLES.includes(profile.role)) {
+    const role = roleOf(profile.role);
+    if (!ALLOWED_ROLES.includes(role)) {
       await sb.auth.signOut();
       showErr(`Role "${profile.role}" tidak boleh akses portal.`);
       return;
@@ -460,7 +464,7 @@ async function doLogin() {
     const session = {
       full_name: profile.full_name,
       email,
-      role: profile.role,
+      role,
       staff_id: profile.staff_id,
       branch_id: profile.branch_id,
       access_token: signData.session?.access_token || '',
@@ -490,6 +494,11 @@ function showPortal(user) {
   document.getElementById('app').style.display = 'flex';
   document.getElementById('user-name').textContent = user.full_name || user.email;
   document.getElementById('user-role').textContent = user.role || 'USER';
+  document.querySelectorAll('[data-roles]').forEach(card => {
+    const allowed = String(card.dataset.roles || '').split(',').map(s => s.trim()).filter(Boolean);
+    const ok = !allowed.length || allowed.includes(roleOf(user.role));
+    card.style.display = ok ? '' : 'none';
+  });
   const savedCo = localStorage.getItem('rifim_company') || 'ALL';
   document.querySelectorAll('.company-pill').forEach(p => {
     p.classList.toggle('active', p.dataset.code === savedCo);
@@ -499,7 +508,7 @@ function showPortal(user) {
 function doLogout() {
   try {
     const u = JSON.parse(localStorage.getItem('rifim_auth') || '{}');
-    fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+    fetch('/api/gas-proxy?url=' + encodeURIComponent(GAS_URL), { method: 'POST', headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ action: 'log_activity', module: 'Portal',
         action_type: 'LOGOUT', target_id: '', target_name: '',
         performed_by: { name: u.full_name || u.name || '', email: u.email || '' }, detail: '' })
