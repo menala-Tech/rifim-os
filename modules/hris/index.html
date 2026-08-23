@@ -1498,6 +1498,32 @@ function _hrisCacheGetAny(key) {
   } catch (e) { return null; }
 }
 
+function _safeEmpText(value) {
+  return String(value == null ? '' : value).trim();
+}
+
+function _safeEmpClass(value) {
+  return _safeEmpText(value).toLowerCase().replace(/[^a-z0-9_-]+/g, '-') || 'missing';
+}
+
+function _normalizeEmployeeRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map(r => Object.assign({}, r || {}, {
+    employee_id:     _safeEmpText(r && r.employee_id),
+    full_name:       _safeEmpText(r && r.full_name),
+    employment_type: _safeEmpText(r && r.employment_type),
+    status:          _safeEmpText(r && r.status),
+  }));
+}
+
+function _showEmployeeLoadError(err) {
+  const tbody = document.getElementById('tbody-employees');
+  const msg = err && err.message ? err.message : 'Gagal memuat data karyawan.';
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><p style="color:#dc2626">❌ Gagal menampilkan data karyawan.</p><p>' + escH(msg) + '</p></td></tr>';
+  }
+  try { showToast('Gagal menampilkan data karyawan.', 'error'); } catch (_) {}
+}
+
 async function _fetchEmployeesFast() {
   const portalSession = (window.RifimPortalSession && RifimPortalSession.read) ? RifimPortalSession.read() : null;
   const token = (portalSession && portalSession.access_token) || getRaosSyncToken();
@@ -1528,11 +1554,16 @@ async function loadEmployees(opts) {
     const stale = _hrisCacheGetAny(cacheKey);
     const fresh = _hrisCacheGet(cacheKey);
     if (!fresh && stale && stale.employees) {
-      allEmployees = stale.employees;
-      _buildEmpDatalist();
-      renderEmployees(allEmployees);
-      updateEmpStats(allEmployees);
-      _backgroundRefreshEmployees(cacheKey);
+      try {
+        allEmployees = _normalizeEmployeeRows(stale.employees);
+        _buildEmpDatalist();
+        renderEmployees(allEmployees);
+        updateEmpStats(allEmployees);
+        _backgroundRefreshEmployees(cacheKey);
+      } catch (err) {
+        console.error('[HRIS] Cached employee render gagal:', err);
+        _showEmployeeLoadError(err);
+      }
       return;
     }
   }
@@ -1541,35 +1572,45 @@ async function loadEmployees(opts) {
   if (!opts.forceRefresh) {
     const cached = _hrisCacheGet(cacheKey);
     if (cached && cached.employees) {
-      allEmployees = cached.employees;
-      _buildEmpDatalist();
-      renderEmployees(allEmployees);
-      updateEmpStats(allEmployees);
-      // Kick background refresh diam-diam — jangan block UI
-      _backgroundRefreshEmployees(cacheKey);
+      try {
+        allEmployees = _normalizeEmployeeRows(cached.employees);
+        _buildEmpDatalist();
+        renderEmployees(allEmployees);
+        updateEmpStats(allEmployees);
+        // Kick background refresh diam-diam — jangan block UI
+        _backgroundRefreshEmployees(cacheKey);
+      } catch (err) {
+        console.error('[HRIS] Cached employee render gagal:', err);
+        _showEmployeeLoadError(err);
+      }
       return;
     }
   }
 
   // Tidak ada cache atau force refresh: fetch + tampilkan loading tipis
   tbody.innerHTML = '<tr><td colspan="10" class="loading">Memuat data karyawan…</td></tr>';
-  const res = await _fetchEmployeesFast();
-  if (!res.success) {
-    tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><p style="color:#dc2626">❌ ' + (res.message || 'Gagal memuat data.') + '</p></td></tr>';
-    return;
+  try {
+    const res = await _fetchEmployeesFast();
+    if (!res.success) {
+      tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><p style="color:#dc2626">❌ ' + (res.message || 'Gagal memuat data.') + '</p></td></tr>';
+      return;
+    }
+    allEmployees = _normalizeEmployeeRows(res.employees);
+    _buildEmpDatalist();
+    renderEmployees(allEmployees);
+    updateEmpStats(allEmployees);
+    _hrisCacheSet(cacheKey, Object.assign({}, res, { employees: allEmployees }));
+  } catch (err) {
+    console.error('[HRIS] Employee load/render gagal:', err);
+    _showEmployeeLoadError(err);
   }
-  allEmployees = res.employees || [];
-  _buildEmpDatalist();
-  renderEmployees(allEmployees);
-  updateEmpStats(allEmployees);
-  _hrisCacheSet(cacheKey, res);
 }
 
 async function _backgroundRefreshEmployees(cacheKey) {
   // Fire-and-forget update UI kalau data berubah
   const res = await _fetchEmployeesFast();
   if (!res.success) { console.warn('[HRIS] Background refresh employees gagal:', res.message); return; }
-  const newRows = res.employees || [];
+  const newRows = _normalizeEmployeeRows(res.employees);
   // Only re-render kalau count/hash beda dari cache (skip flicker)
   if (newRows.length !== (allEmployees || []).length ||
       JSON.stringify(newRows.slice(0, 5)) !== JSON.stringify((allEmployees || []).slice(0, 5))) {
@@ -1583,23 +1624,24 @@ async function _backgroundRefreshEmployees(cacheKey) {
 
 function renderEmployees(rows) {
   const tbody = document.getElementById('tbody-employees');
+  rows = _normalizeEmployeeRows(rows);
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><p>Belum ada karyawan.</p></td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(r => `
-    <tr data-employee-id="${r.employee_id}">
-      <td><strong>${r.employee_id}</strong></td>
-      <td>${r.full_name}</td>
-      <td>${r.position || '–'}</td>
-      <td style="font-size:12px">${r.branch || '–'}</td>
+    <tr data-employee-id="${escAttr(r.employee_id)}">
+      <td><strong>${escH(r.employee_id) || '–'}</strong></td>
+      <td>${escH(r.full_name) || '–'}</td>
+      <td>${escH(r.position || '–')}</td>
+      <td style="font-size:12px">${escH(r.branch || '–')}</td>
       <td style="text-align:right;font-family:monospace">Rp ${fmtNum(r.salary_base || 0)}</td>
-      <td><span class="badge badge-aktif">${r.company_code}</span></td>
-      <td><span class="badge badge-${r.employment_type.toLowerCase()}">${r.employment_type}</span></td>
-      <td><span class="badge badge-${r.status.toLowerCase()}">${r.status}</span></td>
+      <td><span class="badge badge-aktif">${escH(r.company_code || '–')}</span></td>
+      <td><span class="badge badge-${_safeEmpClass(r.employment_type)}">${escH(r.employment_type) || '–'}</span></td>
+      <td><span class="badge badge-${_safeEmpClass(r.status)}">${escH(r.status) || '–'}</span></td>
       <td>${fmtDate(r.join_date)}</td>
       <td>
-        <button class="btn btn-ghost btn-sm" onclick="viewEmployee('${r.employee_id}')">Detail</button>
+        <button class="btn btn-ghost btn-sm" onclick="viewEmployee(${escAttr(JSON.stringify(r.employee_id))})">Detail</button>
       </td>
     </tr>
   `).join('');
@@ -1780,6 +1822,7 @@ td.num { text-align: right; font-family: 'Consolas', monospace; }
 }
 
 function updateEmpStats(rows) {
+  rows = _normalizeEmployeeRows(rows);
   document.getElementById('stat-total').textContent = rows.length;
   document.getElementById('stat-aktif').textContent = rows.filter(r => r.status === 'AKTIF').length;
   document.getElementById('stat-pkwt').textContent  = rows.filter(r => r.employment_type === 'PKWT').length;
@@ -1794,11 +1837,11 @@ async function viewEmployee(empId) {
   document.getElementById('modal-detail-body').innerHTML = `
     <div class="detail-grid">
       ${dRow('ID Karyawan', emp.employee_id)}
-      ${dRow('Status', `<span class="badge badge-${emp.status.toLowerCase()}">${emp.status}</span>`)}
+      ${dRow('Status', `<span class="badge badge-${_safeEmpClass(emp.status)}">${escH(emp.status) || '–'}</span>`)}
       ${dRow('Jabatan', emp.position || '–')}
       ${dRow('Departemen', emp.department || '–')}
       ${dRow('Perusahaan', emp.company_code)}
-      ${dRow('Tipe Kontrak', `<span class="badge badge-${emp.employment_type.toLowerCase()}">${emp.employment_type}</span>`)}
+      ${dRow('Tipe Kontrak', `<span class="badge badge-${_safeEmpClass(emp.employment_type)}">${escH(emp.employment_type) || '–'}</span>`)}
       ${dRow('Bergabung', fmtDate(emp.join_date))}
       ${dRow('Berakhir', emp.end_date ? fmtDate(emp.end_date) : '–')}
       ${dRow('Email', emp.email || '–')}
