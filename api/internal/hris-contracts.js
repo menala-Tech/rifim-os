@@ -196,6 +196,24 @@ async function financeLegacyGas(req,p){
   delete extra.mode;delete extra.gas_action;delete extra.action;delete extra.access_token;
   const payload={...extra,action:gasAction,access_token:bearer};
   let lastMsg='';
+  // Diagnostic logging (2026-08-19, round 2): action/status/content-type/
+  // final-URL-host/attempt only -- never the bearer, never payload values.
+  // GAS response was consistently HTML even though server-side retry runs
+  // (confirmed 3x in production, per round-2 report), which per item H means
+  // this is a CONFIG/AUTH/TRANSPORT failure, not a transient cold-start --
+  // most likely causes: (1) the deployed GAS Web App version predates
+  // crmApi.js's finance_* action handlers (source has them; whether the
+  // *active* deployment version does is unverifiable from here -- no clasp/
+  // GAS Editor access in this session), or (2) UrlFetchApp is being redirected
+  // to a Google login page because the deployment's access level changed.
+  // This log is what lets a human confirm which, without guessing.
+  function diag(attempt,status,contentType,finalUrl,note){
+    try{
+      const finalHost=finalUrl?(new URL(finalUrl)).hostname:null;
+      const pathClass=finalUrl?((new URL(finalUrl)).pathname.startsWith('/ServiceLogin')||(new URL(finalUrl)).hostname.indexOf('accounts.google.com')!==-1?'google-login-redirect':((new URL(finalUrl)).pathname.startsWith('/macros/')?'apps-script-exec':'other')):null;
+      console.error('[finance_legacy_gas]',JSON.stringify({action:gasAction,attempt:attempt+1,status,contentType,finalHost,pathClass,note}));
+    }catch(_){}
+  }
   for(let attempt=0;attempt<LEGACY_GAS_MAX_ATTEMPTS;attempt++){
     let r;
     try{
@@ -204,22 +222,28 @@ async function financeLegacyGas(req,p){
       r=await fetchWithTimeout(gasUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)},LEGACY_GAS_TIMEOUT_MS);
     }catch(e){
       lastMsg=(e&&e.name==='AbortError')?'Timeout setelah '+LEGACY_GAS_TIMEOUT_MS+'ms':(e instanceof Error?e.message:String(e));
+      diag(attempt,null,null,null,'fetch_error:'+lastMsg);
       if(attempt<LEGACY_GAS_MAX_ATTEMPTS-1){await new Promise(res=>setTimeout(res,600*(attempt+1)));continue}
       break;
     }
+    const ct=r.headers.get('content-type')||'';
     if(r.status===429||r.status>=500){
       // E. HTTP-level throttle/server-error from GAS is a transient
       // transport failure, not a canonical response -- retry, don't surface.
       lastMsg='GAS HTTP '+r.status;
+      diag(attempt,r.status,ct,r.url,'http_error');
       if(attempt<LEGACY_GAS_MAX_ATTEMPTS-1){await new Promise(res=>setTimeout(res,600*(attempt+1)));continue}
       break;
     }
     const txt=await r.text();
     if(txt.trim().startsWith('<')){
-      // E. Apps Script cold-start/quota responses come back as an HTML error
-      // page, not JSON -- treated as a temporary transport failure and
-      // retried; NEVER forwarded raw to the UI (G).
-      lastMsg='GAS balas HTML (kemungkinan cold-start/quota), percobaan '+(attempt+1);
+      // H. An HTML body back from what should be a JSON API is a CONFIG/
+      // AUTH/TRANSPORT failure (wrong/stale deployment version, or GAS
+      // redirecting to a Google login page), NOT an automatic "cold start"
+      // assumption -- classification and diagnostic logging only, per
+      // architect round-2 review; retry budget unchanged (still bounded 3x).
+      lastMsg='GAS balas HTML (config/auth/transport failure -- lihat diagnostic log), percobaan '+(attempt+1);
+      diag(attempt,r.status,ct,r.url,'html_response:'+txt.slice(0,120).replace(/\s+/g,' '));
       if(attempt<LEGACY_GAS_MAX_ATTEMPTS-1){await new Promise(res=>setTimeout(res,600*(attempt+1)));continue}
       break;
     }
@@ -228,7 +252,7 @@ async function financeLegacyGas(req,p){
     // isn't parseable JSON at all, normalize into the same canonical shape
     // rather than leaking the raw body.
     try{const parsed=JSON.parse(txt);return (parsed&&typeof parsed==='object')?parsed:{success:false,message:'Response GAS bukan objek JSON'}}
-    catch(e){return {success:false,message:'Response GAS bukan JSON: '+txt.substring(0,200)}}
+    catch(e){diag(attempt,r.status,ct,r.url,'json_parse_error');return {success:false,message:'Response GAS bukan JSON: '+txt.substring(0,200)}}
   }
   // G. Canonical error JSON -- never HTML, never an unhandled throw reaching
   // the client as a raw 500 with stack trace.
