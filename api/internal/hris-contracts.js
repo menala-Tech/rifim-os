@@ -20,6 +20,8 @@
  * GET  ?mode=finance_drivers               -> listDrivers
  * POST ?mode=finance_driver_assign         -> assignDrivers
  * POST ?mode=finance_legacy_gas             -> financeLegacyGas (P0.4 2026-08-18)
+ * POST ?mode=finance_tagihan_add            -> financeTagihan
+ * POST ?mode=finance_tagihan_mark_paid      -> financeTagihan
  */
 function env(n){return String(process.env[n]||'').trim()}
 async function read(res){const t=await res.text();try{return t?JSON.parse(t):{}}catch(_){return{message:t||`HTTP ${res.status}`}}}
@@ -259,6 +261,61 @@ async function financeLegacyGas(req,p){
   return {success:false,message:'GAS backend sedang tidak tersedia setelah '+LEGACY_GAS_MAX_ATTEMPTS+'x percobaan server-side: '+lastMsg,_gas_throttled:true};
 }
 
+// P0.5 fix (2026-08-22): tagihan add/mark-paid used to bypass the canonical
+// server boundary and call GAS directly from the browser. Now they are
+// handled exactly like finance_legacy_gas: actor() + financeWrite() on the
+// server, caller's own verified Bearer forwarded as access_token to GAS,
+// client-supplied action/token fields removed, bounded retry, and the same
+// diagnostic logging. The GAS crmApi.js write-role gate still runs, but the
+// browser no longer sends the token across the network.
+const TAGIHAN_GAS_ACTIONS=new Set(['finance_tagihan_add','finance_tagihan_mark_paid']);
+async function financeTagihan(req,p,mode){
+  financeWrite(p);
+  const gasAction=String(mode||'');
+  if(!TAGIHAN_GAS_ACTIONS.has(gasAction))throw new Error('mode tagihan tidak dikenali: '+gasAction);
+  const gasUrl=env('GAS_URL')||'https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec';
+  const bearer=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'').trim();
+  const extra={...(req.body||{})};
+  delete extra.mode;delete extra.gas_action;delete extra.action;delete extra.access_token;
+  const payload={...extra,action:gasAction,access_token:bearer};
+  let lastMsg='';
+  function diag(attempt,status,contentType,finalUrl,note){
+    try{
+      const finalHost=finalUrl?(new URL(finalUrl)).hostname:null;
+      const pathClass=finalUrl?((new URL(finalUrl)).pathname.startsWith('/ServiceLogin')||(new URL(finalUrl)).hostname.indexOf('accounts.google.com')!==-1?'google-login-redirect':((new URL(finalUrl)).pathname.startsWith('/macros/')?'apps-script-exec':'other')):null;
+      console.error('[finance_tagihan]',JSON.stringify({action:gasAction,attempt:attempt+1,status,contentType,finalHost,pathClass,note}));
+    }catch(_){}
+  }
+  for(let attempt=0;attempt<LEGACY_GAS_MAX_ATTEMPTS;attempt++){
+    let r;
+    try{
+      r=await fetchWithTimeout(gasUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)},LEGACY_GAS_TIMEOUT_MS);
+    }catch(e){
+      lastMsg=(e&&e.name==='AbortError')?'Timeout setelah '+LEGACY_GAS_TIMEOUT_MS+'ms':(e instanceof Error?e.message:String(e));
+      diag(attempt,null,null,null,'fetch_error:'+lastMsg);
+      if(attempt<LEGACY_GAS_MAX_ATTEMPTS-1){await new Promise(res=>setTimeout(res,600*(attempt+1)));continue}
+      break;
+    }
+    const ct=r.headers.get('content-type')||'';
+    if(r.status===429||r.status>=500){
+      lastMsg='GAS HTTP '+r.status;
+      diag(attempt,r.status,ct,r.url,'http_error');
+      if(attempt<LEGACY_GAS_MAX_ATTEMPTS-1){await new Promise(res=>setTimeout(res,600*(attempt+1)));continue}
+      break;
+    }
+    const txt=await r.text();
+    if(txt.trim().startsWith('<')){
+      lastMsg='GAS balas HTML (config/auth/transport failure -- lihat diagnostic log), percobaan '+(attempt+1);
+      diag(attempt,r.status,ct,r.url,'html_response:'+txt.slice(0,120).replace(/\s+/g,' '));
+      if(attempt<LEGACY_GAS_MAX_ATTEMPTS-1){await new Promise(res=>setTimeout(res,600*(attempt+1)));continue}
+      break;
+    }
+    try{const parsed=JSON.parse(txt);return (parsed&&typeof parsed==='object')?parsed:{success:false,message:'Response GAS bukan objek JSON'}}
+    catch(e){diag(attempt,r.status,ct,r.url,'json_parse_error');return {success:false,message:'Response GAS bukan JSON: '+txt.substring(0,200)}}
+  }
+  return {success:false,message:'GAS backend sedang tidak tersedia setelah '+LEGACY_GAS_MAX_ATTEMPTS+'x percobaan server-side: '+lastMsg,_gas_throttled:true};
+}
+
 module.exports=async function handler(req,res){
   try{
     const p=await actor(req),mode=String(req.query.mode||req.body?.mode||'');
@@ -273,6 +330,8 @@ module.exports=async function handler(req,res){
     if(req.method==='GET'&&mode==='finance_drivers')return out(res,200,{success:true,rows:await listDrivers(req,p),source:'supabase'});
     if(req.method==='POST'&&mode==='finance_driver_assign')return out(res,200,{success:true,...await assignDrivers(req,p)});
     if(req.method==='POST'&&mode==='finance_legacy_gas')return out(res,200,await financeLegacyGas(req,p));
+    if(req.method==='POST'&&mode==='finance_tagihan_add')return out(res,200,await financeTagihan(req,p,mode));
+    if(req.method==='POST'&&mode==='finance_tagihan_mark_paid')return out(res,200,await financeTagihan(req,p,mode));
     if(req.method==='GET')return out(res,200,{success:true,rows:await listContracts(req,p)});
     if(req.method==='POST'&&mode==='validate')return out(res,200,{success:true,result:await validateContract(req,p)});
     return out(res,405,{success:false,message:'Method not allowed'});
