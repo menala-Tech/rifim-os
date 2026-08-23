@@ -1218,11 +1218,13 @@ function initApp() {
   if (coSel) coSel.value = selectedCompany;
   // Set tahun di filter payroll
   const yearSel = document.getElementById('filter-payroll-year');
-  for (let y = 2024; y <= 2030; y++) {
-    const opt = document.createElement('option');
-    opt.value = y; opt.textContent = y;
-    if (y === new Date().getFullYear()) opt.selected = true;
-    yearSel.appendChild(opt);
+  if (yearSel) {
+    for (let y = 2024; y <= 2030; y++) {
+      const opt = document.createElement('option');
+      opt.value = y; opt.textContent = y;
+      if (y === new Date().getFullYear()) opt.selected = true;
+      yearSel.appendChild(opt);
+    }
   }
   // Set tanggal default absensi
   const today = new Date().toISOString().split('T')[0];
