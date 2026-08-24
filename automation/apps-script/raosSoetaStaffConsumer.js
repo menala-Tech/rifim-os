@@ -12,10 +12,12 @@
  *   - View already filters is_activated = true; this consumer also re-checks.
  *
  * Sync strategy:
- *   - Single atomic POST per chunk using PostgREST upsert:
- *       POST /employees?on_conflict=employee_id
- *       Prefer: resolution=merge-duplicates,return=minimal
- *   - This makes repeated sync idempotent and avoids GET-then-POST race conditions.
+ *   - Single atomic POST per chunk to a dedicated RAOS HRIS RPC:
+ *       POST /rest/v1/rpc/raos_hris_upsert_employees
+ *       Payload: { p_records: [...] }
+ *   - The RPC updates only RAOS-owned fields on existing employees and looks up
+ *     HRIS defaults for new employees. This keeps sync idempotent and avoids
+ *     GET-then-POST race conditions.
  *
  * Trigger: manual menu RIFIM → HRIS → 🔄 Sync Staff dari RAOS.
  */
@@ -62,18 +64,22 @@ function _raosConsumerPost_(url, data) {
 }
 
 /**
- * Atomic upsert into employees using POST ... ON CONFLICT (employee_id).
+ * Atomic RAOS -> HRIS upsert using dedicated RPC raos_hris_upsert_employees.
+ * Existing employees: only RAOS-owned fields updated.
+ * New employees: HRIS defaults (company_code, join_date) are looked up.
  */
 function _raosConsumerUpsert_(payload) {
   var cfg = _raosConsumerConfig_();
-  var url = cfg.url + '/rest/v1/employees?on_conflict=employee_id';
+  var url = cfg.url + '/rest/v1/rpc/raos_hris_upsert_employees';
   var res = UrlFetchApp.fetch(url, {
     method:             'POST',
-    headers:            _raosConsumerHeaders_(cfg, 'resolution=merge-duplicates,return=minimal'),
-    payload:            JSON.stringify(payload),
+    headers:            _raosConsumerHeaders_(cfg),
+    payload:            JSON.stringify({ p_records: payload }),
     muteHttpExceptions: true,
   });
-  _raosConsumerCheck_(res, 'UPSERT employees (count=' + payload.length + ')');
+  _raosConsumerCheck_(res, 'RPC raos_hris_upsert_employees (count=' + payload.length + ')');
+  var text = res.getContentText();
+  return text ? JSON.parse(text) : { inserted: 0, updated: 0, skipped: 0, errors: [] };
 }
 
 function _raosConsumerCheck_(res, ctx) {
@@ -127,13 +133,18 @@ function syncSoetaStaffFromRaosMaster() {
     });
   });
 
-  // Send in chunks to stay within PostgREST payload limits.
+  // Send in chunks via dedicated RPC; each call is an atomic transaction.
   var chunkSize = 200;
   for (var i = 0; i < payload.length; i += chunkSize) {
     var chunk = payload.slice(i, i + chunkSize);
     try {
-      _raosConsumerUpsert_(chunk);
-      upserted += chunk.length;
+      var result = _raosConsumerUpsert_(chunk);
+      upserted += (result.inserted || 0) + (result.updated || 0);
+      if (result.errors && result.errors.length) {
+        result.errors.forEach(function(err) {
+          errors.push({ chunk_start: i, employee_id: err.employee_id, error: err.error });
+        });
+      }
     } catch (e) {
       errors.push({ chunk_start: i, error: e.message });
     }
