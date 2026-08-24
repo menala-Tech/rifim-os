@@ -102,13 +102,13 @@ async function listStaffTargets(req,p){
     sb(`/rest/v1/raos_kpi_targets_staff?effective_month=eq.${month}&select=staff_id,target_saldo,member_parkir_amount,updated_at`),
     sb(`/rest/v1/raos_target_tercapai_bulan?effective_month=eq.${month}&select=staff_id,realisasi_saldo`),
     sb(`/rest/v1/raos_payroll?effective_month=eq.${month}&select=staff_id,gapok,bonus_saldo,bpjs,paket_data,member_parkir,bonus_kpi,target_pct,driver_active_pct,status_target,late_deduction_total,thp,computed_at`),
-    sb(`/rest/v1/scan_orders?status=eq.valid&scanned_at=gte.${q(month)}&scanned_at=lt.${q(monthNext(month))}&select=staff_id,branch_id`)
+    sb(`/rest/v1/scan_orders?status=eq.valid&scanned_at=gte.${q(month)}&scanned_at=lt.${q(monthNext(month))}&select=staff_id`)
   ]);
   const bm=Object.fromEntries((branchTargets||[]).map(x=>[String(x.branch_id),x]));
   const sm=Object.fromEntries((staffTargets||[]).map(x=>[String(x.staff_id),x]));
   const rm=Object.fromEntries((realisasi||[]).map(x=>[String(x.staff_id),x]));
   const pm=Object.fromEntries((payroll||[]).map(x=>[String(x.staff_id),x]));
-  const scanCounts={};for(const s of (scans||[])){if(!s?.staff_id)continue;const k=String(s.staff_id)+'|'+String(s.branch_id||'');scanCounts[k]=(scanCounts[k]||0)+1;}
+  const scanCounts={};for(const s of (scans||[])){if(!s?.staff_id)continue;const sid2=String(s.staff_id);scanCounts[sid2]=(scanCounts[sid2]||0)+1;}
   const counts={};for(const r of roster)counts[String(r.branch_id)]=(counts[String(r.branch_id)]||0)+1;
   return roster.map(r=>{
     const sid=String(r.user_id),bt=bm[String(r.branch_id)]||{},st=sm[sid]||{},real=rm[sid]||{},pay=pm[sid]||{};
@@ -117,7 +117,7 @@ async function listStaffTargets(req,p){
     const auto=bt.target_staff_default==null&&cnt>0?Math.ceil(num(bt.target_cabang)/cnt):null;
     const effective=st.target_saldo!=null?num(st.target_saldo):(bt.target_staff_default!=null?num(bt.target_staff_default):auto);
     const realSaldo=num(real.realisasi_saldo);
-    const realCount=mode==='order'?(scanCounts[sid+'|'+String(r.branch_id)]||0):0;
+    const realCount=mode==='order'?(scanCounts[sid]||0):0;
     const pct=effective>0?((mode==='order'?realCount:realSaldo)/effective*100):num(pay.target_pct,0);
     return {staff_id:sid,staff_code:r.employee_id,staff_name:r.full_name,role:roleOf(r.resolved_role||r.system_role),branch_id:r.branch_id,branch_name:r.branch_name,is_excluded_saldo:mode==='order',mode,gapok:pay.gapok==null?num(r.salary_base):num(pay.gapok),target_saldo:effective,target_saldo_override:st.target_saldo==null?null:num(st.target_saldo),realisasi_saldo:realSaldo,pct:pay.target_pct==null?pct:num(pay.target_pct),target_scan:mode==='order'?effective:null,realisasi_scan:mode==='order'?realCount:null,pct_scan:mode==='order'?pct:null,bonus_saldo:num(pay.bonus_saldo),bpjs:num(pay.bpjs),paket_data:num(pay.paket_data),member_parkir:pay.member_parkir==null?num(st.member_parkir_amount):num(pay.member_parkir),bonus_kpi:num(pay.bonus_kpi),thp:num(pay.thp),status_target:pay.status_target||'na',driver_active_pct:num(pay.driver_active_pct),late_deduction_total:num(pay.late_deduction_total),computed_at:pay.computed_at||null};
   });

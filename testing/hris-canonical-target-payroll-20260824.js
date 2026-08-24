@@ -32,7 +32,7 @@ const FIXTURES = {
   employees: [{ employee_id: 'E001', full_name: 'Staff A', company_code: 'RIFIM', department: 'Ops', position: 'Staff', branch: 'bth', status: 'AKTIF', salary_base: 3000000, bank_name: 'BCA', bank_account: '123' }],
   hrisPayroll: [],
   raosPayroll: [
-    { staff_id: 'u1', gapok: 3000000, bonus_saldo: 100000, bpjs: 100000, paket_data: 50000, member_parkir: 20000, bonus_kpi: 50000, target_pct: 20, status_target: 'ok', late_deduction_total: 0, thp: 3500000 },
+    { staff_id: 'u1', gapok: 3000000, bonus_saldo: 100000, bpjs: 100000, paket_data: 50000, member_parkir: 20000, bonus_kpi: 50000, target_pct: 30, status_target: 'ok', late_deduction_total: 0, thp: 3500000 },
     { staff_id: 'orphan-uuid', bonus_saldo: 10000, bonus_kpi: 0, thp: 0, target_pct: 0, status_target: 'na', late_deduction_total: 0 }
   ],
   attendance: [
@@ -164,10 +164,11 @@ async function runPayroll(params) {
   assert.strictEqual(orderRows.length, 1, 'one staff in Soeta roster');
   const soeta = orderRows[0];
   assert.strictEqual(soeta.mode, 'order', 'Soeta branch mode is order');
-  assert.strictEqual(soeta.realisasi_scan, 2, 'order realisasi counts only valid Soeta scans for staff u1');
-  assert.strictEqual(soeta.pct, 20, 'order pct is computed from realisasi_scan / target (2/10*100)');
+  assert.strictEqual(soeta.realisasi_scan, 3, 'order realisasi counts all valid scans for staff u1 regardless of scan_orders.branch_id');
+  assert.strictEqual(soeta.pct, 30, 'order pct is computed from realisasi_scan / target (3/10*100)');
   assert.ok(orderResult.log.some(u => u.includes('scan_orders') && u.includes('status=eq.valid')), 'scan_orders query must filter status=valid');
   assert.ok(orderResult.log.some(u => u.includes('scan_orders') && u.includes('scanned_at=gte.2026-08-01') && u.includes('scanned_at=lt.2026-09-01')), 'scan_orders query must filter the selected month window');
+  assert.ok(!orderResult.log.some(u => u.includes('scan_orders') && u.includes('branch_id')), 'scan_orders query must not select or filter by branch_id');
 
   // 1. saldo mode: realisasi_saldo unchanged; scan orders do not inflate it
   const saldoResult = await runContracts({ mode: 'finance_staff_targets', month: '2026-08', branch_id: 'b-bth' });
@@ -177,12 +178,12 @@ async function runPayroll(params) {
   assert.strictEqual(batam.realisasi_saldo, 500000, 'saldo realisasi uses raos_target_tercapai_bulan unchanged');
   assert.strictEqual(batam.realisasi_scan, null, 'saldo realisasi_scan is null');
 
-  // 3-8. exclusion evidence is encoded in the scan_orders query filter and the per-staff/branch count
-  // Wrong staff: only u1 is in Soeta roster; u2 scan does not leak into u1 count
-  // Wrong branch: u1 scan at b-other does not leak into b-soeta count
+  // 3-8. exclusion evidence
+  // No scan_orders.branch_id dependency: u1 scan at b-other still counts because u1's canonical branch is Soeta (roster/profile)
+  // Wrong staff: u2 is not in Soeta roster, so u2 scan does not leak into Soeta result
   // Wrong month: 2026-09-01 scan filtered out by the scanned_at window
   // Pending/rejected: filtered out by status=eq.valid
-  assert.strictEqual(soeta.realisasi_scan, 2, 'pending/rejected/invalid/wrong month/branch/staff scans excluded from count');
+  assert.strictEqual(soeta.realisasi_scan, 3, 'pending/rejected/invalid/wrong month/wrong staff excluded; scan_orders.branch_id is not required');
 
   // ---------------------------------------------------------------------------
   // Fix B: UUID -> employee mapping + orphan surfacing
