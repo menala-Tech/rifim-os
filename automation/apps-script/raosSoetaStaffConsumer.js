@@ -1,13 +1,23 @@
 /**
- * RIFIM OS — SOETA staff master consumer from RAOS canonical table.
+ * RIFIM OS — RAOS staff master consumer.
  *
  * Flow:
  *   1. RAOS migration raos_116 creates public.raos_staff_master.
- *   2. RAOS GAS 23_soeta_master_import.gs imports xlsx and links auth.
- *   3. RIFIM GAS reads public.raos_staff_master_hris view and upserts
- *      into employees for HRIS/Finance/Payroll consumption.
+ *   2. RAOS GAS imports XLSX and links auth.
+ *   3. RIFIM GAS reads public.raos_staff_master_hris view and atomically
+ *      upserts into employees for HRIS/Finance/Payroll consumption.
  *
- * Trigger: manual menu RIFIM → HRIS → 🔄 Sync SOETA Staff dari RAOS.
+ * Security:
+ *   - raos_staff_master_hris is only accessible by service_role (RIFIM GAS).
+ *   - View already filters is_activated = true; this consumer also re-checks.
+ *
+ * Sync strategy:
+ *   - Single atomic POST per chunk using PostgREST upsert:
+ *       POST /employees?on_conflict=employee_id
+ *       Prefer: resolution=merge-duplicates,return=minimal
+ *   - This makes repeated sync idempotent and avoids GET-then-POST race conditions.
+ *
+ * Trigger: manual menu RIFIM → HRIS → 🔄 Sync Staff dari RAOS.
  */
 
 function _raosConsumerConfig_() {
@@ -51,15 +61,19 @@ function _raosConsumerPost_(url, data) {
   _raosConsumerCheck_(res, 'POST ' + url);
 }
 
-function _raosConsumerPatch_(url, data) {
+/**
+ * Atomic upsert into employees using POST ... ON CONFLICT (employee_id).
+ */
+function _raosConsumerUpsert_(payload) {
   var cfg = _raosConsumerConfig_();
+  var url = cfg.url + '/rest/v1/employees?on_conflict=employee_id';
   var res = UrlFetchApp.fetch(url, {
-    method:             'PATCH',
-    headers:            _raosConsumerHeaders_(cfg, 'return=minimal'),
-    payload:            JSON.stringify(data),
+    method:             'POST',
+    headers:            _raosConsumerHeaders_(cfg, 'resolution=merge-duplicates,return=minimal'),
+    payload:            JSON.stringify(payload),
     muteHttpExceptions: true,
   });
-  _raosConsumerCheck_(res, 'PATCH ' + url);
+  _raosConsumerCheck_(res, 'UPSERT employees (count=' + payload.length + ')');
 }
 
 function _raosConsumerCheck_(res, ctx) {
@@ -74,14 +88,13 @@ function _raosConsumerUrl_(table, params) {
 }
 
 /**
- * Sync activated SOETA staff from RAOS master into RIFIM employees.
+ * Sync activated RAOS staff into RIFIM employees atomically.
  * Returns { upserted, skipped, errors }.
  */
 function syncSoetaStaffFromRaosMaster() {
   var startTs = new Date();
-  var warnings = [];
 
-  // Read activated SOETA staff from the RAOS view.
+  // Read activated staff from the RAOS view.
   var url = _raosConsumerUrl_('raos_staff_master_hris', ['select=*', 'limit=5000']);
   var rows;
   try {
@@ -90,59 +103,46 @@ function syncSoetaStaffFromRaosMaster() {
     throw new Error('Gagal membaca raos_staff_master_hris: ' + e.message);
   }
 
-  // Fetch existing employees to avoid overwriting join_date.
-  var existing = _raosConsumerGet_(_raosConsumerUrl_('employees', [
-    'select=employee_id',
-    'limit=5000'
-  ])) || [];
-  var existingById = {};
-  existing.forEach(function(r) {
-    if (r.employee_id) existingById[String(r.employee_id).toUpperCase()] = true;
-  });
-
   var upserted = 0;
   var skipped = 0;
   var errors = [];
   var todayStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
+  var nowStr = new Date().toISOString();
 
+  // Build payload for atomic upsert; only activated rows are included.
+  var payload = [];
   rows.forEach(function(r) {
     var empId = String(r.employee_id || '').toUpperCase().trim();
     if (!empId) { skipped++; return; }
     if (r.is_activated !== true) { skipped++; return; }
 
-    var basePayload = {
-      full_name:    r.full_name,
-      email:        r.email || null,
-      phone:        r.phone || null,
-      branch:       r.branch,
-      position:     r.position,
-      status:       r.status,
-      updated_at:   new Date().toISOString(),
-    };
-
-    try {
-      if (existingById[empId]) {
-        // Update only — do not touch join_date or company_code.
-        _raosConsumerPatch_(
-          _raosConsumerUrl_('employees', ['employee_id=eq.' + encodeURIComponent(empId)]),
-          basePayload
-        );
-      } else {
-        // New employee — set defaults for HRIS-managed fields.
-        var insertPayload = Object.assign({}, basePayload, {
-          employee_id:     empId,
-          company_code:    'RIFIM',
-          employment_type: 'PKWT',
-          join_date:       todayStr,
-          created_at:      new Date().toISOString(),
-        });
-        _raosConsumerPost_(_raosConsumerUrl_('employees', []), insertPayload);
-      }
-      upserted++;
-    } catch (e) {
-      errors.push({ employee_id: empId, error: e.message });
-    }
+    payload.push({
+      employee_id:     empId,
+      full_name:       r.full_name,
+      email:           r.email || null,
+      phone:           r.phone || null,
+      branch:          r.branch,
+      position:        r.position,
+      status:          r.status,
+      company_code:    'RIFIM',
+      employment_type: 'PKWT',
+      join_date:       todayStr,
+      created_at:      nowStr,
+      updated_at:      nowStr,
+    });
   });
+
+  // Send in chunks to stay within PostgREST payload limits.
+  var chunkSize = 200;
+  for (var i = 0; i < payload.length; i += chunkSize) {
+    var chunk = payload.slice(i, i + chunkSize);
+    try {
+      _raosConsumerUpsert_(chunk);
+      upserted += chunk.length;
+    } catch (e) {
+      errors.push({ chunk_start: i, error: e.message });
+    }
+  }
 
   var duration = new Date().getTime() - startTs.getTime();
   Logger.log('syncSoetaStaffFromRaosMaster: upserted=' + upserted + ' skipped=' + skipped + ' errors=' + errors.length + ' duration=' + duration + 'ms');
@@ -156,7 +156,7 @@ function syncSoetaStaffFromRaosMaster() {
 function syncSoetaStaffFromRaosMaster_MENU() {
   try {
     var r = syncSoetaStaffFromRaosMaster();
-    var msg = '✅ Sync SOETA Staff dari RAOS selesai.\n\n' +
+    var msg = '✅ Sync Staff dari RAOS selesai.\n\n' +
               'Upserted : ' + r.upserted + '\n' +
               'Skipped  : ' + r.skipped + '\n' +
               'Errors   : ' + r.errors.length + '\n' +
@@ -166,7 +166,7 @@ function syncSoetaStaffFromRaosMaster_MENU() {
     }
     SpreadsheetApp.getUi().alert(msg);
   } catch (e) {
-    SpreadsheetApp.getUi().alert('❌ Sync SOETA Staff gagal:\n' + e.message);
+    SpreadsheetApp.getUi().alert('❌ Sync Staff dari RAOS gagal:\n' + e.message);
     throw e;
   }
 }
