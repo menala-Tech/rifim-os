@@ -24,7 +24,7 @@ async function payroll(req,p){
     emps=(emps||[]).filter(e=>['HEAD OFFICE','ADMIN'].includes(String(e.branch||'').toUpperCase()));
   }else if(branchId){
     const br=await sbFetch(`/rest/v1/branches?id=eq.${q(branchId)}&select=id,name,slug&limit=1`),b=br?.[0];
-    if(!b)return{rows:[],summary:{count:0,total:0,late:0,leave:0},meta:{month:req.query.month,roster_source:'employees_active',missing_salary_count:0,kasbon_source:false,overtime_source:false}};
+    if(!b)return{rows:[],summary:{count:0,total:0,late:0,leave:0},meta:{month:req.query.month,roster_source:'employees_active',missing_salary_count:0,kasbon_source:false,overtime_source:false},unmapped:{count:0,rows:[]}};
     emps=(emps||[]).filter(e=>{
       const k=String(e.employee_id||'').toUpperCase(),up=profileByCode[k];
       if(up?.branch_id)return String(up.branch_id)===branchId;
@@ -33,7 +33,7 @@ async function payroll(req,p){
     });
   }
   const empIds=[...new Set((emps||[]).map(x=>String(x.employee_id||'').toUpperCase()).filter(Boolean))];
-  if(!empIds.length)return{rows:[],summary:{count:0,total:0,late:0,leave:0},meta:{month:req.query.month,roster_source:'employees_active',missing_salary_count:0,kasbon_source:false,overtime_source:false}};
+  if(!empIds.length)return{rows:[],summary:{count:0,total:0,late:0,leave:0},meta:{month:req.query.month,roster_source:'employees_active',missing_salary_count:0,kasbon_source:false,overtime_source:false},unmapped:{count:0,rows:[]}};
   const snaps=await sbFetch(`/rest/v1/payroll?period_year=eq.${mr.year}&period_month=eq.${mr.month}&select=*`);
   const raos=await sbFetch(`/rest/v1/raos_payroll?effective_month=eq.${mr.start}&select=staff_id,gapok,bonus_saldo,bpjs,paket_data,member_parkir,bonus_kpi,target_pct,status_target,late_deduction_total,thp`);
   const att=await sbFetch(`/rest/v1/hris_attendance_view?date=gte.${mr.start}&date=lte.${mr.end}&select=employee_code,date,status,late_minutes,late_deduction_idr`);
@@ -41,7 +41,17 @@ async function payroll(req,p){
   const eMap=Object.fromEntries((emps||[]).map(x=>[String(x.employee_id).toUpperCase(),x]));
   const pMap=Object.fromEntries((snaps||[]).map(x=>[String(x.employee_id).toUpperCase(),x]));
   const codeByProfile=Object.fromEntries((profiles||[]).filter(x=>x.id&&x.staff_id).map(x=>[String(x.id).toUpperCase(),String(x.staff_id).toUpperCase()]));
-  const rMap={};for(const x of (raos||[])){const raw=String(x.staff_id||'').toUpperCase(),code=codeByProfile[raw]||(eMap[raw]?raw:null);if(code)rMap[code]=x}
+  const rMap={};
+  const orphans=[];
+  for(const x of (raos||[])){
+    const raw=String(x.staff_id||'').toUpperCase();
+    const profileStaffId=codeByProfile[raw];
+    let code=null;
+    if(profileStaffId){const t=String(profileStaffId).toUpperCase();if(eMap[t])code=t;}
+    if(!code&&eMap[raw])code=raw;
+    if(code){rMap[code]=x;}
+    else{orphans.push({staff_id:x.staff_id,staff_uuid:/^[0-9a-fA-F-]{36}$/.test(raw)?x.staff_id:null,bonus_saldo:x.bonus_saldo,bonus_kpi:x.bonus_kpi,thp:x.thp,status_target:x.status_target});}
+  }
   const aMap={};for(const a of (att||[])){const k=String(a.employee_code||'').toUpperCase();if(!aMap[k])aMap[k]={present:0,late_minutes:0,late_deduction:0};if(String(a.status||'').toUpperCase()==='HADIR')aMap[k].present++;aMap[k].late_minutes+=Number(a.late_minutes||0);aMap[k].late_deduction+=Number(a.late_deduction_idr||0)}
   const lMap={};for(const l of (leave||[])){const k=String(l.employee_id||'').toUpperCase();lMap[k]=(lMap[k]||0)+Number(l.total_days||0)}
   const rows=(emps||[]).map(e=>{
@@ -53,11 +63,12 @@ async function payroll(req,p){
     const allowance=frozen?Number(snap.allowances||0):liveAllowance;
     const liveDeduction=Number(a.late_deduction||r.late_deduction_total||0);
     const deductions=frozen?Number(snap.deductions||0):liveDeduction;
-    const total=frozen?Number(snap.total_salary||0):Math.max(0,base+allowance-deductions);
-    return{id:snap?.id||null,employee_id:k,name:e.full_name||up.full_name||k,position:e.position||'',department:e.department||'',branch:e.branch||'',branch_id:up.branch_id||null,company_code:e.company_code||'RIFIM',salary_base:base,allowances:allowance,bonus_saldo:Number(r.bonus_saldo||0),bonus_kpi:Number(r.bonus_kpi||0),paket_data:paketData,member_parkir:memberParkir,bpjs,late_deduction:Number(a.late_deduction||r.late_deduction_total||0),deductions,total_salary:total,target_pct:Number(r.target_pct||0),target_status:r.status_target||'',attendance_days:a.present,late_minutes:a.late_minutes,leave_days:Number(lMap[k]||0),kasbon:0,overtime:0,document_number:snap?.document_number||'',status:snap?.status||'DRAFT',pdf_url:snap?.pdf_url||'',gdoc_url:snap?.gdoc_url||'',snapshot:frozen,bank_name:e.bank_name||'',bank_account:e.bank_account||''}
+    const liveTotal=r.thp!=null?Number(r.thp):Math.max(0,base+allowance-deductions);
+    const total=frozen?Number(snap.total_salary||0):liveTotal;
+    return{id:snap?.id||null,employee_id:k,name:e.full_name||up.full_name||k,position:e.position||'',department:e.department||'',branch:e.branch||'',branch_id:up.branch_id||null,company_code:e.company_code||'RIFIM',salary_base:base,allowances:allowance,bonus_saldo:Number(r.bonus_saldo||0),bonus_kpi:Number(r.bonus_kpi||0),paket_data:paketData,member_parkir:memberParkir,bpjs,late_deduction:Number(a.late_deduction||r.late_deduction_total||0),deductions,total_salary:total,thp:Number(r.thp||0),target_pct:Number(r.target_pct||0),target_status:r.status_target||'',attendance_days:a.present,late_minutes:a.late_minutes,leave_days:Number(lMap[k]||0),kasbon:0,overtime:0,document_number:snap?.document_number||'',status:snap?.status||'DRAFT',pdf_url:snap?.pdf_url||'',gdoc_url:snap?.gdoc_url||'',snapshot:frozen,bank_name:e.bank_name||'',bank_account:e.bank_account||''}
   }).sort((a,b)=>a.name.localeCompare(b.name));
   const missingSalaryCount=rows.filter(x=>!x.snapshot&&Number(x.salary_base||0)<=0).length;
-  return{rows,summary:{count:rows.length,total:rows.reduce((s,x)=>s+x.total_salary,0),late:rows.reduce((s,x)=>s+x.late_deduction,0),leave:rows.reduce((s,x)=>s+x.leave_days,0)},meta:{month:req.query.month,roster_source:'employees_active',missing_salary_count:missingSalaryCount,kasbon_source:false,overtime_source:false}}
+  return{rows,summary:{count:rows.length,total:rows.reduce((s,x)=>s+x.total_salary,0),late:rows.reduce((s,x)=>s+x.late_deduction,0),leave:rows.reduce((s,x)=>s+x.leave_days,0)},meta:{month:req.query.month,roster_source:'employees_active',missing_salary_count:missingSalaryCount,kasbon_source:false,overtime_source:false},unmapped:{count:orphans.length,rows:orphans}}
 }
 async function editAttendance(req,a){if(!canWrite(a.profile.role))throw new Error('Hanya Admin/Direksi boleh edit Absensi');const pub=env('SUPABASE_PUBLISHABLE_KEY'),url=env('SUPABASE_URL'),b=req.body||{};if(!b.id)throw new Error('id wajib');if(String(b.reason||'').trim().length<5)throw new Error('Alasan edit minimal 5 karakter');const r=await fetch(`${url}/rest/v1/rpc/hris_attendance_edit`,{method:'POST',headers:{apikey:pub,Authorization:a.bearer,'Content-Type':'application/json'},body:JSON.stringify({p_attendance_id:b.id,p_check_in_override:b.check_in_at_override||null,p_check_out_override:b.check_out_at_override||null,p_late_deduction_idr:b.late_deduction_idr==null?null:Number(b.late_deduction_idr),p_reason:String(b.reason).trim()})});const body=await read(r);if(!r.ok)throw new Error(body.message||'Gagal edit absensi');return body}
 module.exports=async function handler(req,res){try{const a=await actor(req),mode=String(req.query.mode||req.body?.mode||'');if(req.method==='GET'&&mode==='branches')return out(res,200,{success:true,rows:await branches(a.profile),scope:a.profile.role==='koordinator'?'own_branch':'global'});if(req.method==='GET'&&mode==='employees')return out(res,200,{success:true,rows:await employees(req,a.profile),scope:a.profile.role==='koordinator'?'own_branch':'global'});if(req.method==='GET'&&mode==='attendance')return out(res,200,{success:true,rows:await attendance(req,a.profile),can_write:canWrite(a.profile.role)});if(req.method==='GET'&&mode==='payroll')return out(res,200,{success:true,...await payroll(req,a.profile),can_write:canWrite(a.profile.role)});if(req.method==='POST'&&mode==='attendance_edit')return out(res,200,{success:true,result:await editAttendance(req,a)});return out(res,404,{success:false,message:'Mode tidak dikenal'})}catch(e){return out(res,400,{success:false,message:e instanceof Error?e.message:String(e)})}}
