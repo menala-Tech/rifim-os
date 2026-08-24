@@ -36,6 +36,7 @@ WHERE is_activated = true;
 COMMENT ON VIEW public.raos_staff_master_hris IS
   'HRIS-facing view of activated staff master in RAOS. Restricted to service_role. RIFIM GAS reads and writes to employees.';
 
--- Only service role (RIFIM GAS) and admin roles already allowed by RLS may read.
--- Authenticated/PWA users are explicitly not granted.
+-- Explicitly revoke from any default or previously granted roles before granting
+-- to service_role only. This prevents authenticated PWA users from reading HRIS data.
+REVOKE ALL ON public.raos_staff_master_hris FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.raos_staff_master_hris TO service_role;

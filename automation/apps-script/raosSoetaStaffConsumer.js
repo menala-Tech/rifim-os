@@ -106,10 +106,10 @@ function syncSoetaStaffFromRaosMaster() {
   var upserted = 0;
   var skipped = 0;
   var errors = [];
-  var todayStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
-  var nowStr = new Date().toISOString();
 
   // Build payload for atomic upsert; only activated rows are included.
+  // IMPORTANT: do not overwrite HR-managed fields (company_code, employment_type,
+  // join_date, created_at). Sync only RAOS-owned identity + status fields.
   var payload = [];
   rows.forEach(function(r) {
     var empId = String(r.employee_id || '').toUpperCase().trim();
@@ -117,18 +117,13 @@ function syncSoetaStaffFromRaosMaster() {
     if (r.is_activated !== true) { skipped++; return; }
 
     payload.push({
-      employee_id:     empId,
-      full_name:       r.full_name,
-      email:           r.email || null,
-      phone:           r.phone || null,
-      branch:          r.branch,
-      position:        r.position,
-      status:          r.status,
-      company_code:    'RIFIM',
-      employment_type: 'PKWT',
-      join_date:       todayStr,
-      created_at:      nowStr,
-      updated_at:      nowStr,
+      employee_id: empId,
+      full_name:   r.full_name,
+      email:       r.email || null,
+      phone:       r.phone || null,
+      branch:      r.branch,
+      position:    r.position,
+      status:      r.status,
     });
   });
 
