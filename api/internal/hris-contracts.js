@@ -99,7 +99,7 @@ async function listStaffTargets(req,p){
   roster=(roster||[]).filter(r=>r.user_id&&['staff','koordinator'].includes(roleOf(r.resolved_role||r.system_role)));
   const [branchTargets,staffTargets,realisasi,payroll,scans]=await Promise.all([
     sb(`/rest/v1/raos_kpi_targets_branch?effective_month=eq.${month}&select=branch_id,target_cabang,target_staff_default,mode`),
-    sb(`/rest/v1/raos_kpi_targets_staff?effective_month=eq.${month}&select=staff_id,target_saldo,member_parkir_amount,updated_at`),
+    sb(`/rest/v1/raos_kpi_targets_staff?effective_month=eq.${month}&select=staff_id,target_saldo,target_order,member_parkir_amount,updated_at`),
     sb(`/rest/v1/raos_target_tercapai_bulan?effective_month=eq.${month}&select=staff_id,realisasi_saldo`),
     sb(`/rest/v1/raos_payroll?effective_month=eq.${month}&select=staff_id,gapok,bonus_saldo,bpjs,paket_data,member_parkir,bonus_kpi,target_pct,driver_active_pct,status_target,late_deduction_total,thp,computed_at`),
     sb(`/rest/v1/scan_orders?status=eq.valid&scanned_at=gte.${q(month)}&scanned_at=lt.${q(monthNext(month))}&select=staff_id`)
@@ -115,23 +115,27 @@ async function listStaffTargets(req,p){
     const mode=bt.mode||'saldo',cnt=counts[String(r.branch_id)]||0;
     // Canonical equal-share rule: CEIL, matching RAOS saldo/order KPI snapshots.
     const auto=bt.target_staff_default==null&&cnt>0?Math.ceil(num(bt.target_cabang)/cnt):null;
-    const effective=st.target_saldo!=null?num(st.target_saldo):(bt.target_staff_default!=null?num(bt.target_staff_default):auto);
+    const saldoOverride=st.target_saldo==null?null:num(st.target_saldo);
+    const orderOverride=st.target_order==null?null:num(st.target_order);
+    const effective=mode==='order'
+      ?(orderOverride!=null?orderOverride:(bt.target_staff_default!=null?num(bt.target_staff_default):auto))
+      :(saldoOverride!=null?saldoOverride:(bt.target_staff_default!=null?num(bt.target_staff_default):auto));
     const realSaldo=num(real.realisasi_saldo);
     const realCount=mode==='order'?(scanCounts[sid]||0):0;
     const pct=effective>0?((mode==='order'?realCount:realSaldo)/effective*100):num(pay.target_pct,0);
-    return {staff_id:sid,staff_code:r.employee_id,staff_name:r.full_name,role:roleOf(r.resolved_role||r.system_role),branch_id:r.branch_id,branch_name:r.branch_name,is_excluded_saldo:mode==='order',mode,gapok:pay.gapok==null?num(r.salary_base):num(pay.gapok),target_saldo:effective,target_saldo_override:st.target_saldo==null?null:num(st.target_saldo),realisasi_saldo:realSaldo,pct:pay.target_pct==null?pct:num(pay.target_pct),target_scan:mode==='order'?effective:null,realisasi_scan:mode==='order'?realCount:null,pct_scan:mode==='order'?pct:null,bonus_saldo:num(pay.bonus_saldo),bpjs:num(pay.bpjs),paket_data:num(pay.paket_data),member_parkir:pay.member_parkir==null?num(st.member_parkir_amount):num(pay.member_parkir),bonus_kpi:num(pay.bonus_kpi),thp:num(pay.thp),status_target:pay.status_target||'na',driver_active_pct:num(pay.driver_active_pct),late_deduction_total:num(pay.late_deduction_total),computed_at:pay.computed_at||null};
+    return {staff_id:sid,staff_code:r.employee_id,staff_name:r.full_name,role:roleOf(r.resolved_role||r.system_role),branch_id:r.branch_id,branch_name:r.branch_name,is_excluded_saldo:mode==='order',mode,gapok:pay.gapok==null?num(r.salary_base):num(pay.gapok),target_saldo:mode==='saldo'?effective:null,target_saldo_override:mode==='saldo'?saldoOverride:null,target_order:mode==='order'?effective:null,target_order_override:mode==='order'?orderOverride:null,realisasi_saldo:realSaldo,pct:pay.target_pct==null?pct:num(pay.target_pct),target_scan:mode==='order'?effective:null,realisasi_scan:mode==='order'?realCount:null,pct_scan:mode==='order'?pct:null,bonus_saldo:num(pay.bonus_saldo),bpjs:num(pay.bpjs),paket_data:num(pay.paket_data),member_parkir:pay.member_parkir==null?num(st.member_parkir_amount):num(pay.member_parkir),bonus_kpi:num(pay.bonus_kpi),thp:num(pay.thp),status_target:pay.status_target||'na',driver_active_pct:num(pay.driver_active_pct),late_deduction_total:num(pay.late_deduction_total),computed_at:pay.computed_at||null};
   });
 }
 
 async function upsertStaffTarget(req,p){
   financeWrite(p);
   const staffId=String(req.body?.staff_id||'').trim(),month=monthDate(req.body?.month);if(!staffId)throw new Error('staff_id wajib');
-  const raw=req.body?.target_saldo,parkir=num(req.body?.member_parkir_amount,0);
-  if((raw===''||raw==null)&&parkir===0){
+  const raw=req.body?.target_saldo,rawOrder=req.body?.target_order,parkir=num(req.body?.member_parkir_amount,0);
+  if((raw===''||raw==null)&&(rawOrder===''||rawOrder==null)&&parkir===0){
     await sb(`/rest/v1/raos_kpi_targets_staff?staff_id=eq.${q(staffId)}&effective_month=eq.${month}`,{method:'DELETE',headers:{Prefer:'return=minimal'}});
     return {deleted:true,staff_id:staffId,effective_month:month};
   }
-  const payload={staff_id:staffId,effective_month:month,target_saldo:raw===''||raw==null?null:num(raw),member_parkir_amount:parkir,updated_at:new Date().toISOString()};
+  const payload={staff_id:staffId,effective_month:month,target_saldo:raw===''||raw==null?null:num(raw),target_order:rawOrder===''||rawOrder==null?null:num(rawOrder),member_parkir_amount:parkir,updated_at:new Date().toISOString()};
   const rows=await sb('/rest/v1/raos_kpi_targets_staff?on_conflict=staff_id,effective_month',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify(payload)});
   return rows?.[0]||payload;
 }

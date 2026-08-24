@@ -32,7 +32,7 @@ const FIXTURES = {
   employees: [{ employee_id: 'E001', full_name: 'Staff A', company_code: 'RIFIM', department: 'Ops', position: 'Staff', branch: 'bth', status: 'AKTIF', salary_base: 3000000, bank_name: 'BCA', bank_account: '123' }],
   hrisPayroll: [],
   raosPayroll: [
-    { staff_id: 'u1', gapok: 3000000, bonus_saldo: 100000, bpjs: 100000, paket_data: 50000, member_parkir: 20000, bonus_kpi: 50000, target_pct: 30, status_target: 'ok', late_deduction_total: 0, thp: 3500000 },
+    { staff_id: 'u1', gapok: 3000000, bonus_saldo: 100000, bpjs: 100000, paket_data: 50000, member_parkir: 20000, bonus_kpi: 50000, target_pct: 12, status_target: 'ok', late_deduction_total: 0, thp: 3500000 },
     { staff_id: 'orphan-uuid', bonus_saldo: 10000, bonus_kpi: 0, thp: 0, target_pct: 0, status_target: 'na', late_deduction_total: 0 }
   ],
   attendance: [
@@ -42,13 +42,18 @@ const FIXTURES = {
   leave: [],
   roster: [
     { employee_uuid: 'u1', employee_id: 'E001', full_name: 'Staff A', position: 'Staff', salary_base: 3000000, user_id: 'u1', system_role: 'staff', branch_id: 'b-soeta', branch_name: 'Soekarno-Hatta', resolved_role: 'staff', sync_status: 'ready' },
-    { employee_uuid: 'u2', employee_id: 'E002', full_name: 'Staff B', position: 'Staff', salary_base: 3000000, user_id: 'u2', system_role: 'staff', branch_id: 'b-bth', branch_name: 'Batam', resolved_role: 'staff', sync_status: 'ready' }
+    { employee_uuid: 'u2', employee_id: 'E002', full_name: 'Staff B', position: 'Staff', salary_base: 3000000, user_id: 'u2', system_role: 'staff', branch_id: 'b-bth', branch_name: 'Batam', resolved_role: 'staff', sync_status: 'ready' },
+    { employee_uuid: 'u5', employee_id: 'E005', full_name: 'Staff C', position: 'Staff', salary_base: 3000000, user_id: 'u5', system_role: 'staff', branch_id: 'b-soeta', branch_name: 'Soekarno-Hatta', resolved_role: 'staff', sync_status: 'ready' }
   ],
   branchTargets: [
     { branch_id: 'b-soeta', effective_month: '2026-08-01', target_cabang: 100, target_staff_default: 10, mode: 'order' },
     { branch_id: 'b-bth', effective_month: '2026-08-01', target_cabang: 1000000, target_staff_default: 500000, mode: 'saldo' }
   ],
-  staffTargets: [],
+  staffTargets: [
+    { staff_id: 'u1', target_saldo: 1000000, target_order: 25, member_parkir_amount: 0 },
+    { staff_id: 'u2', target_saldo: 700000, target_order: 5, member_parkir_amount: 0 },
+    { staff_id: 'u5', target_saldo: 999999, target_order: null, member_parkir_amount: 0 }
+  ],
   realisasi: [
     { staff_id: 'u1', realisasi_saldo: 500000 },
     { staff_id: 'u2', realisasi_saldo: 500000 }
@@ -157,33 +162,41 @@ async function runPayroll(params) {
   // Fix A: order mode counts valid scan_orders; saldo mode unchanged
   // ---------------------------------------------------------------------------
 
-  // 2. order mode: valid scans counted for the right staff/branch
+  // Order and saldo target-staff semantics
   const orderResult = await runContracts({ mode: 'finance_staff_targets', month: '2026-08', branch_id: 'b-soeta' });
   assert.strictEqual(orderResult.res._status, 200, 'order staff targets should return 200');
   const orderRows = orderResult.body.rows;
-  assert.strictEqual(orderRows.length, 1, 'one staff in Soeta roster');
-  const soeta = orderRows[0];
-  assert.strictEqual(soeta.mode, 'order', 'Soeta branch mode is order');
-  assert.strictEqual(soeta.realisasi_scan, 3, 'order realisasi counts all valid scans for staff u1 regardless of scan_orders.branch_id');
-  assert.strictEqual(soeta.pct, 30, 'order pct is computed from realisasi_scan / target (3/10*100)');
+  assert.strictEqual(orderRows.length, 2, 'two Soeta staff in roster');
+  const u1 = orderRows.find(r => r.staff_id === 'u1');
+  const u5 = orderRows.find(r => r.staff_id === 'u5');
+  assert.ok(u1 && u5, 'Soeta roster includes u1 and u5');
+  assert.strictEqual(u1.mode, 'order', 'Soeta branch mode is order');
+  assert.strictEqual(u1.target_order, 25, 'order mode uses target_order override');
+  assert.strictEqual(u1.target_order_override, 25, 'target_order_override exposed');
+  assert.strictEqual(u1.target_saldo, null, 'target_saldo is not used for order effective target');
+  assert.strictEqual(u1.target_scan, 25, 'effective order target is the target_order override');
+  assert.strictEqual(u1.realisasi_scan, 3, 'order realisasi counts valid scans for u1 regardless of scan_orders.branch_id');
   assert.ok(orderResult.log.some(u => u.includes('scan_orders') && u.includes('status=eq.valid')), 'scan_orders query must filter status=valid');
   assert.ok(orderResult.log.some(u => u.includes('scan_orders') && u.includes('scanned_at=gte.2026-08-01') && u.includes('scanned_at=lt.2026-09-01')), 'scan_orders query must filter the selected month window');
   assert.ok(!orderResult.log.some(u => u.includes('scan_orders') && u.includes('branch_id')), 'scan_orders query must not select or filter by branch_id');
 
-  // 1. saldo mode: realisasi_saldo unchanged; scan orders do not inflate it
+  // Null target_order falls back to branch default
+  assert.strictEqual(u5.target_order, 10, 'null target_order falls back to branch target_staff_default');
+  assert.strictEqual(u5.target_order_override, null, 'u5 has no target_order override');
+  assert.strictEqual(u5.target_scan, 10, 'u5 effective order target is the fallback default');
+  assert.strictEqual(u5.target_saldo, null, 'u5 target_saldo not exposed in order mode');
+
+  // Saldo mode uses target_saldo; target_order is ignored
   const saldoResult = await runContracts({ mode: 'finance_staff_targets', month: '2026-08', branch_id: 'b-bth' });
   assert.strictEqual(saldoResult.res._status, 200, 'saldo staff targets should return 200');
   const batam = saldoResult.body.rows[0];
   assert.strictEqual(batam.mode, 'saldo', 'Batam branch mode is saldo');
+  assert.strictEqual(batam.target_saldo, 700000, 'saldo mode uses target_saldo');
+  assert.strictEqual(batam.target_saldo_override, 700000, 'saldo override exposed');
+  assert.strictEqual(batam.target_order, null, 'target_order is not used for saldo effective target');
   assert.strictEqual(batam.realisasi_saldo, 500000, 'saldo realisasi uses raos_target_tercapai_bulan unchanged');
   assert.strictEqual(batam.realisasi_scan, null, 'saldo realisasi_scan is null');
-
-  // 3-8. exclusion evidence
-  // No scan_orders.branch_id dependency: u1 scan at b-other still counts because u1's canonical branch is Soeta (roster/profile)
-  // Wrong staff: u2 is not in Soeta roster, so u2 scan does not leak into Soeta result
-  // Wrong month: 2026-09-01 scan filtered out by the scanned_at window
-  // Pending/rejected: filtered out by status=eq.valid
-  assert.strictEqual(soeta.realisasi_scan, 3, 'pending/rejected/invalid/wrong month/wrong staff excluded; scan_orders.branch_id is not required');
+  assert.ok(batam.pct > 71 && batam.pct < 71.5, 'saldo pct computed from target_saldo (500000/700000*100)');
 
   // ---------------------------------------------------------------------------
   // Fix B: UUID -> employee mapping + orphan surfacing
