@@ -108,6 +108,7 @@ function syncSoetaStaffFromRaosMaster() {
   rows.forEach(function(r) {
     var empId = String(r.employee_id || '').toUpperCase().trim();
     if (!empId) { skipped++; return; }
+    if (r.is_activated !== true) { skipped++; return; }
 
     var basePayload = {
       full_name:    r.full_name,

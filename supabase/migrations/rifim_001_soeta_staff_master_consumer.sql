@@ -9,7 +9,7 @@
 -- RAOS raos_116 has been applied and preview/UAT approved.
 -- ============================================================================
 
--- View: HRIS-friendly projection of SOETA master staff.
+-- View: HRIS-friendly projection of ACTIVATED SOETA master staff.
 -- Service role (RIFIM GAS) reads this and upserts into employees.
 CREATE OR REPLACE VIEW public.raos_staff_master_hris AS
 SELECT
@@ -19,18 +19,14 @@ SELECT
   phone,
   (airport || ' ' || terminal)   AS branch,
   role                           AS position,
-  CASE status
-    WHEN 'Aktif' THEN 'AKTIF'
-    WHEN 'Nonaktif' THEN 'NONAKTIF'
-    ELSE 'AKTIF'
-  END                            AS status,
+  'AKTIF'                        AS status,
   is_activated,
   auth_user_id,
   branch_id
 FROM public.raos_staff_master
-WHERE status = 'Aktif';
+WHERE is_activated = true;
 
 COMMENT ON VIEW public.raos_staff_master_hris IS
-  'HRIS-facing view of SOETA staff master in RAOS. RIFIM GAS reads activated rows and writes to employees.';
+  'HRIS-facing view of activated SOETA staff master in RAOS. RIFIM GAS reads and writes to employees.';
 
 GRANT SELECT ON public.raos_staff_master_hris TO authenticated, service_role;
