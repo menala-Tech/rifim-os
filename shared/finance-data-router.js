@@ -72,16 +72,6 @@ async function apiPost(mode,params){
 
 function dateKey(v){var s=String(v||'').trim(),m;if((m=s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/)))return m[3]+'-'+m[2]+'-'+m[1];if((m=s.match(/^(\d{4})-(\d{2})-(\d{2})/)))return m[1]+'-'+m[2]+'-'+m[3];var d=new Date(s);return isNaN(d.getTime())?'':d.toISOString().slice(0,10)}
 function filterLog(data,params){if(!data||!Array.isArray(data.rows))return data;var from=String(params.from||''),to=String(params.to||'');if(!from&&!to)return data;var copy=Object.assign({},data);copy.rows=data.rows.filter(function(r){var k=dateKey(r.tanggal||r.date||r.timestamp);if(!k)return true;if(from&&k<from)return false;if(to&&k>to)return false;return true});return copy}
-// P0.4 fix (2026-08-18): used to call original(action,params) here, which is
-// the pre-router browser _gasCall -- a direct client-side fetch to GAS via
-// api-cache-core.js's RifimAPI, itself wrapped a SECOND time by api-cache.js's
-// FinanceRuntimeFix (its own cache + its own rate limiter). Three independent
-// layers, one fragile 1-retry client fetch underneath. Now calls the server
-// -side passthrough (api/internal/hris-contracts.js mode=finance_legacy_gas)
-// directly, which retries up to 3x server-side before giving up. This is now
-// the ONE canonical Finance transport for these 6 actions; the stale-cache
-// fallback below is unchanged so "Menampilkan data terakhir" still works if
-// even the server-side retries are exhausted.
 async function legacyRead(action,params){
   params=Object.assign({},params||{});if(action==='finance_log_list'){if(!params.from)params.from=val('l-from');if(!params.to)params.to=val('l-to')}
   var cached=readCache(action,params);
@@ -94,7 +84,12 @@ async function legacyRead(action,params){
   catch(e){if(cached){var stale2=Object.assign({},cached.payload);stale2._stale=true;stale2._stale_at=cached.at;stale2.message='Menampilkan data terakhir karena GAS sedang tidak tersedia.';return action==='finance_log_list'?filterLog(stale2,params):stale2}throw e}
 }
 
-async function saldoList(params){params=Object.assign({},params||{});if(['semua','all'].includes(String(params.status||'').toLowerCase()))delete params.status;var data=await apiGet('finance_saldo_list',params);var rows=Array.isArray(data.rows)?data.rows.slice():[];var branch=val('sr-branch'),search=val('sr-search').toLowerCase();if(branch)rows=rows.filter(function(r){return String(r.branch_id||'')===branch});if(search)rows=rows.filter(function(r){return [r.id,r.request_no,r.staff_name,r.staff_code,r.driver_name,r.driver_login_id,r.branch_name].join(' ').toLowerCase().indexOf(search)>=0});return Object.assign({},data,{rows:rows})}
+function invoiceNominal(rawValue){
+  var raw=Number(rawValue)||0;
+  var map={45000:50000,95000:100000,140000:150000,145000:150000,190000:200000,195000:200000};
+  return map[raw]||raw;
+}
+async function saldoList(params){params=Object.assign({},params||{});if(['semua','all'].includes(String(params.status||'').toLowerCase()))delete params.status;var data=await apiGet('finance_saldo_list',params);var rows=Array.isArray(data.rows)?data.rows.slice():[];var branch=val('sr-branch'),search=val('sr-search').toLowerCase();if(branch)rows=rows.filter(function(r){return String(r.branch_id||'')===branch});if(search)rows=rows.filter(function(r){return [r.id,r.request_no,r.staff_name,r.staff_code,r.driver_name,r.driver_login_id,r.branch_name].join(' ').toLowerCase().indexOf(search)>=0});rows=rows.map(function(r){var raw=Number(r.nominal)||0,invoice=invoiceNominal(raw);return Object.assign({},r,{saldo_nominal:raw,invoice_nominal:invoice,nominal:invoice})});return Object.assign({},data,{rows:rows})}
 
 function normalizeHeader(v){return String(v||'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim()}
 function totalRowFromRekap(data){var headers=Array.isArray(data&&data.headers_row_1)?data.headers_row_1:[];var rows=Array.isArray(data&&data.rows_from_2)?data.rows_from_2:[];var total=rows.find(function(r){return Array.isArray(r)&&r.some(function(c){return /TOTAL\s+KESELURUHAN/i.test(String(c||''))})});if(!total)return null;var hi={};headers.forEach(function(h,i){hi[normalizeHeader(h)]=i});function at(names,fallback){for(var i=0;i<names.length;i++){var k=normalizeHeader(names[i]);if(hi[k]!=null)return Number(total[hi[k]])||0}return Number(total[fallback])||0}return {income:at(['TOTAL PEMASUKAN RP','TOTAL PEMASUKAN'],3),expense:at(['TOTAL PENGELUARAN RP','TOTAL PENGELUARAN'],4),net:at(['NET RP','NET'],5)}}
@@ -107,37 +102,14 @@ async function syncBranches(){try{var d=await apiGet('finance_branches',{}),rows
 function bindUi(){bind('sr-branch','change',function(){if(typeof global.loadSaldoRaos==='function')global.loadSaldoRaos()});bind('sr-search','input',function(){if(typeof global.loadSaldoRaos==='function')global.loadSaldoRaos()});bind('l-from','change',function(){if(typeof global.loadLog==='function')global.loadLog()});bind('l-to','change',function(){if(typeof global.loadLog==='function')global.loadLog()});var panel=document.querySelector('[data-panel="db-driver"]');if(panel){var desc=panel.querySelector('.desc');if(desc)desc.textContent='Daftar driver per cabang + assignment ke staff. Admin/Direksi dapat assign; Management read-only.';var a=document.getElementById('dd-assign');if(a)a.textContent='🎲 Random Assign (Admin/Direksi)'}document.querySelectorAll('.tab[data-tab="dashboard"]').forEach(function(t){if(t.dataset.financeSummaryBound!=='1'){t.dataset.financeSummaryBound='1';t.addEventListener('click',function(){refreshDashboardSummary(false)})}})}
 function refreshActive(){var tab=document.querySelector('.tab.active'),name=tab&&tab.dataset&&tab.dataset.tab;var map={'saldo-raos':'loadSaldoRaos','target-cabang':'loadTargetCabang','target-staff':'loadTargetStaff','db-driver':'loadDBDriver'};var fn=map[name];if(fn&&typeof global[fn]==='function')setTimeout(function(){global[fn]()},0);if(name==='dashboard')setTimeout(function(){refreshDashboardSummary(false)},0)}
 
-function interceptEarlyTab(event){
-  if(ready||releasingTab)return;
-  var btn=event.target&&event.target.closest?event.target.closest('.tab'):null;
-  if(!btn)return;
-  pendingTab=btn.dataset.tab||pendingTab;
-  event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();
-}
+function interceptEarlyTab(event){if(ready||releasingTab)return;var btn=event.target&&event.target.closest?event.target.closest('.tab'):null;if(!btn)return;pendingTab=btn.dataset.tab||pendingTab;event.preventDefault();event.stopPropagation();event.stopImmediatePropagation()}
 document.addEventListener('click',interceptEarlyTab,true);
 
-async function releaseBoot(){
-  try{await sessionToken()}catch(e){console.warn('[Finance router] session gate:',e.message||e);return}
-  ready=true;
-  document.removeEventListener('click',interceptEarlyTab,true);
-  bindUi();
-  await syncBranches();
-  if(typeof global.populateBranchDropdowns==='function')await Promise.resolve(global.populateBranchDropdowns()).catch(function(){});
-  releasingTab=true;
-  var name=pendingTab||String(location.hash||'').replace('#','')||'dashboard';
-  var btn=document.querySelector('.tab[data-tab="'+name.replace(/"/g,'')+'"]')||document.querySelector('.tab[data-tab="dashboard"]');
-  if(btn)btn.click();else refreshActive();
-  releasingTab=false;
-}
+async function releaseBoot(){try{await sessionToken()}catch(e){console.warn('[Finance router] session gate:',e.message||e);return}ready=true;document.removeEventListener('click',interceptEarlyTab,true);bindUi();await syncBranches();if(typeof global.populateBranchDropdowns==='function')await Promise.resolve(global.populateBranchDropdowns()).catch(function(){});releasingTab=true;var name=pendingTab||String(location.hash||'').replace('#','')||'dashboard';var btn=document.querySelector('.tab[data-tab="'+name.replace(/"/g,'')+'"]')||document.querySelector('.tab[data-tab="dashboard"]');if(btn)btn.click();else refreshActive();releasingTab=false}
 function postInstall(){setTimeout(releaseBoot,0);setTimeout(function(){bindUi();syncBranches()},500)}
-function install(){
-  if(installed||typeof global._gasCall!=='function')return false;
-  original=global._gasCall;
-  global._gasCall=async function(action,params){params=params||{};if(action==='finance_saldo_raos_list')return saldoList(params);if(DIRECT_GET[action])return apiGet(DIRECT_GET[action],params);if(DIRECT_POST[action])return apiPost(DIRECT_POST[action],params);if(LEGACY_READ.has(action))return legacyRead(action,params);return original.apply(this,arguments)};
-  global._gasCall.__financeCanonicalRouter=true;installed=true;postInstall();return true;
-}
+function install(){if(installed||typeof global._gasCall!=='function')return false;original=global._gasCall;global._gasCall=async function(action,params){params=params||{};if(action==='finance_saldo_raos_list')return saldoList(params);if(DIRECT_GET[action])return apiGet(DIRECT_GET[action],params);if(DIRECT_POST[action])return apiPost(DIRECT_POST[action],params);if(LEGACY_READ.has(action))return legacyRead(action,params);return original.apply(this,arguments)};global._gasCall.__financeCanonicalRouter=true;installed=true;postInstall();return true}
 function start(){var tries=0,t=setInterval(function(){tries++;if(install()||tries>400)clearInterval(t)},25)}
 start();
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){install();bindUi()},{once:true});
-global.FinanceDataRouter={install:install,version:'2.3.0-session-gate',api:API,syncBranches:syncBranches,refreshSummary:refreshDashboardSummary,isReady:function(){return ready}};
+global.FinanceDataRouter={install:install,version:'2.3.2-global-invoice-rounding',api:API,syncBranches:syncBranches,refreshSummary:refreshDashboardSummary,isReady:function(){return ready}};
 })(window);
