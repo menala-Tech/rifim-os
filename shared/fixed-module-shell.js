@@ -1,6 +1,8 @@
 (function(global){
 'use strict';
 var p=String(location.pathname||'');
+var host=String(location.hostname||'').toLowerCase();
+var isPreview=host.endsWith('.vercel.app')&&host!=='rifim-os.vercel.app';
 function ensureTableHeaderCss(){
   var old=document.querySelector('link[data-rifim-table-freeze]');
   if(old&&String(old.href||'').indexOf('freeze-4')>=0)return;
@@ -12,12 +14,6 @@ function ensureTableHeaderCss(){
   document.head.appendChild(l);
 }
 function ensureTableFreezeSync(){
-  // 2026-08-18 fix: table-header-freeze.css now reads its `top` offset from
-  // --rifim-table-freeze-offset (falling back to the same hard-coded number
-  // as before if this script hasn't measured yet). This script sets that
-  // var to the ACTUAL rendered header/nav/tabs height per module, so the
-  // sticky table header can't drift out of sync the way the old hard-coded
-  // top:104px (etc.) did whenever a module's header height changed.
   if(document.querySelector('script[data-rifim-table-freeze-sync]'))return;
   var s=document.createElement('script');
   s.src='/shared/table-header-freeze-sync.js?v=20260818-sync-1';
@@ -42,10 +38,61 @@ function ensureFinanceAutoRecompute(){
   s.dataset.financeStaffAutoRecompute='1';
   document.head.appendChild(s);
 }
+function ensureHrisPreviewGuard(){
+  if(!isPreview||!/^\/hris(?:\/|$)/.test(p))return;
+  var attempts=0;
+  var timer=global.setInterval(function(){
+    attempts+=1;
+    var target=document.querySelector('#tab-karyawan .card-body');
+    if(!target){if(attempts>=100)global.clearInterval(timer);return;}
+    if(!document.getElementById('hris-preview-guard')){
+      var guard=document.createElement('div');
+      guard.id='hris-preview-guard';
+      guard.style.cssText='padding:11px 14px;margin-bottom:12px;background:#fff7ed;border-left:4px solid #ea580c;border-radius:6px;font-size:13px;color:#9a3412;font-weight:700';
+      guard.textContent='PREVIEW QA — Supabase QA only. Sync SSOT/GAS production dinonaktifkan di halaman ini.';
+      target.insertBefore(guard,target.firstChild);
+    }
+    var syncBtn=document.getElementById('btn-sync-ssot-now');
+    if(syncBtn){
+      syncBtn.disabled=true;
+      syncBtn.onclick=function(){return false;};
+      syncBtn.textContent='Sync dinonaktifkan di Preview';
+      syncBtn.title='Preview QA tidak boleh menjalankan GAS/production sync';
+      syncBtn.style.opacity='.55';
+      syncBtn.style.cursor='not-allowed';
+    }
+    global.clearInterval(timer);
+  },50);
+}
+function ensureHrisPreactivationEntry(){
+  if(!/^\/hris(?:\/|$)/.test(p))return;
+  if(document.getElementById('hris-preactivation-entry'))return;
+  var attempts=0;
+  var timer=global.setInterval(function(){
+    attempts+=1;
+    if(document.getElementById('hris-preactivation-entry')){global.clearInterval(timer);return;}
+    var target=document.querySelector('#tab-karyawan .card-body');
+    if(!target){if(attempts>=100)global.clearInterval(timer);return;}
+    var box=document.createElement('div');
+    box.id='hris-preactivation-entry';
+    box.style.cssText='padding:12px 14px;margin-bottom:12px;background:#eef6ff;border-left:4px solid #2563eb;border-radius:6px;font-size:13px;color:#1e3a8a;display:flex;align-items:center;gap:12px;flex-wrap:wrap';
+    var text=document.createElement('div');
+    text.style.cssText='flex:1;min-width:260px;line-height:1.5';
+    text.innerHTML='<strong>Incoming / Pre-Activation Workforce</strong><br><span style="color:#475569">Lihat staff SOETA dari RAOS Staff Master sebelum aktivasi. Read-only, belum masuk employees/payroll/attendance aktif.</span>';
+    var btn=document.createElement('button');
+    btn.type='button';
+    btn.className='btn btn-secondary';
+    btn.textContent='Buka Pre-Activation';
+    btn.onclick=function(){global.location.href='/modules/hris/preactivation.html';};
+    box.appendChild(text);box.appendChild(btn);
+    target.insertBefore(box,target.firstChild);
+    global.clearInterval(timer);
+  },50);
+}
 function css(t){var s=document.createElement('style');s.id='rifim-fixed-module-shell';s.textContent=t;document.head.appendChild(s)}
 function install(){
   if(document.getElementById('rifim-fixed-module-shell')){
-    ensureTableHeaderCss();ensureTableFreezeSync();ensureModuleRuntimeHotfix();ensureFinanceAutoRecompute();return;
+    ensureTableHeaderCss();ensureTableFreezeSync();ensureModuleRuntimeHotfix();ensureFinanceAutoRecompute();ensureHrisPreactivationEntry();ensureHrisPreviewGuard();return;
   }
   if(/^\/finance(?:\/|$)/.test(p))css(`
  :root{--rifim-head:58px;--rifim-tabs:46px}
@@ -72,7 +119,9 @@ function install(){
   ensureTableFreezeSync();
   ensureModuleRuntimeHotfix();
   ensureFinanceAutoRecompute();
+  ensureHrisPreactivationEntry();
+  ensureHrisPreviewGuard();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
-global.RifimFixedModuleShell={version:'1.4.0-table-freeze-sync',install:install};
+global.RifimFixedModuleShell={version:'1.6.0-preview-guard',install:install};
 })(window);
