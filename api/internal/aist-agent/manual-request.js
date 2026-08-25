@@ -1,4 +1,4 @@
-const { env, json, sbRpc, readJson, roleOf } = require('./_shared')
+const { env, json, sbRpc, readJson, roleOf } = require('../../../shared/aist-agent')
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return json(res, 405, { success:false, message:'Method not allowed' })

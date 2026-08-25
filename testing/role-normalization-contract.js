@@ -8,7 +8,7 @@ process.env.AIST_RUNNER_URL = 'https://runner.example';
 process.env.AIST_RUNNER_SHARED_SECRET = 'runnersecret';
 process.env.RIFIM_GAS_WEBAPP_URL = 'https://gas.example/exec';
 
-const _shared = require(path.join(__dirname, '../api/internal/aist-agent/_shared.js'));
+const _shared = require(path.join(__dirname, '../shared/aist-agent.js'));
 const hrisContractSync = require(path.join(__dirname, '../api/internal/hris-contract-sync.js'));
 const aistRunner = require(path.join(__dirname, '../api/internal/aist-runner.js'));
 const aistStatus = require(path.join(__dirname, '../api/internal/aist-agent/status.js'));
