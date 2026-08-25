@@ -9,8 +9,14 @@
     global.document.head.appendChild(fixedShell)
   }
 
-  const SB_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co'
-  const SB_ANON = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1'
+  const PROD_SB_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co'
+  const PROD_SB_ANON = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1'
+  const QA_SB_URL = 'https://cdlkujllqnrurgecoaur.supabase.co'
+  const QA_SB_ANON = 'sb_publishable_y5rpSIfnLka3P6FIEwYuzQ_-X05xX7K'
+  const host = String((global.location && global.location.hostname) || '').toLowerCase()
+  const isPreview = host.endsWith('.vercel.app') && host !== 'rifim-os.vercel.app'
+  const SB_URL = isPreview ? QA_SB_URL : PROD_SB_URL
+  const SB_ANON = isPreview ? QA_SB_ANON : PROD_SB_ANON
   const STORAGE_KEY = 'rifim_auth'
 
   const FALLBACK_ALIASES = {
@@ -259,6 +265,7 @@
     require: requireSession,
     normalizeRole,
     canMutate,
+    config: { supabaseUrl: SB_URL, supabaseAnonKey: SB_ANON, isPreview },
   }
 
   installHrisMutationGuard()
