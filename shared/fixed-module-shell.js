@@ -1,6 +1,8 @@
 (function(global){
 'use strict';
 var p=String(location.pathname||'');
+var host=String(location.hostname||'').toLowerCase();
+var isPreview=host.endsWith('.vercel.app')&&host!=='rifim-os.vercel.app';
 function ensureTableHeaderCss(){
   var old=document.querySelector('link[data-rifim-table-freeze]');
   if(old&&String(old.href||'').indexOf('freeze-4')>=0)return;
@@ -36,6 +38,32 @@ function ensureFinanceAutoRecompute(){
   s.dataset.financeStaffAutoRecompute='1';
   document.head.appendChild(s);
 }
+function ensureHrisPreviewGuard(){
+  if(!isPreview||!/^\/hris(?:\/|$)/.test(p))return;
+  var attempts=0;
+  var timer=global.setInterval(function(){
+    attempts+=1;
+    var target=document.querySelector('#tab-karyawan .card-body');
+    if(!target){if(attempts>=100)global.clearInterval(timer);return;}
+    if(!document.getElementById('hris-preview-guard')){
+      var guard=document.createElement('div');
+      guard.id='hris-preview-guard';
+      guard.style.cssText='padding:11px 14px;margin-bottom:12px;background:#fff7ed;border-left:4px solid #ea580c;border-radius:6px;font-size:13px;color:#9a3412;font-weight:700';
+      guard.textContent='PREVIEW QA — Supabase QA only. Sync SSOT/GAS production dinonaktifkan di halaman ini.';
+      target.insertBefore(guard,target.firstChild);
+    }
+    var syncBtn=document.getElementById('btn-sync-ssot-now');
+    if(syncBtn){
+      syncBtn.disabled=true;
+      syncBtn.onclick=function(){return false;};
+      syncBtn.textContent='Sync dinonaktifkan di Preview';
+      syncBtn.title='Preview QA tidak boleh menjalankan GAS/production sync';
+      syncBtn.style.opacity='.55';
+      syncBtn.style.cursor='not-allowed';
+    }
+    global.clearInterval(timer);
+  },50);
+}
 function ensureHrisPreactivationEntry(){
   if(!/^\/hris(?:\/|$)/.test(p))return;
   if(document.getElementById('hris-preactivation-entry'))return;
@@ -64,7 +92,7 @@ function ensureHrisPreactivationEntry(){
 function css(t){var s=document.createElement('style');s.id='rifim-fixed-module-shell';s.textContent=t;document.head.appendChild(s)}
 function install(){
   if(document.getElementById('rifim-fixed-module-shell')){
-    ensureTableHeaderCss();ensureTableFreezeSync();ensureModuleRuntimeHotfix();ensureFinanceAutoRecompute();ensureHrisPreactivationEntry();return;
+    ensureTableHeaderCss();ensureTableFreezeSync();ensureModuleRuntimeHotfix();ensureFinanceAutoRecompute();ensureHrisPreactivationEntry();ensureHrisPreviewGuard();return;
   }
   if(/^\/finance(?:\/|$)/.test(p))css(`
  :root{--rifim-head:58px;--rifim-tabs:46px}
@@ -92,7 +120,8 @@ function install(){
   ensureModuleRuntimeHotfix();
   ensureFinanceAutoRecompute();
   ensureHrisPreactivationEntry();
+  ensureHrisPreviewGuard();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
-global.RifimFixedModuleShell={version:'1.5.0-hris-preactivation-entry',install:install};
+global.RifimFixedModuleShell={version:'1.6.0-preview-guard',install:install};
 })(window);
