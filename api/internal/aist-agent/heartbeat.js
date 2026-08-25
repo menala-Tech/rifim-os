@@ -1,4 +1,4 @@
-const { json, verifyAgent, sbRpc, getOperatorByEmail } = require('./_shared')
+const { json, verifyAgent, sbRpc, getOperatorByEmail } = require('../../../shared/aist-agent')
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return json(res, 405, { success:false, message:'Method not allowed' })

@@ -1,4 +1,4 @@
-const { env, json, readJson, roleOf } = require('./_shared')
+const { env, json, readJson, roleOf } = require('../../../shared/aist-agent')
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'GET') return json(res, 405, { success:false, message:'Method not allowed' })
