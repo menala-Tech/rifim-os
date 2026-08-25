@@ -94,7 +94,13 @@ async function legacyRead(action,params){
   catch(e){if(cached){var stale2=Object.assign({},cached.payload);stale2._stale=true;stale2._stale_at=cached.at;stale2.message='Menampilkan data terakhir karena GAS sedang tidak tersedia.';return action==='finance_log_list'?filterLog(stale2,params):stale2}throw e}
 }
 
-async function saldoList(params){params=Object.assign({},params||{});if(['semua','all'].includes(String(params.status||'').toLowerCase()))delete params.status;var data=await apiGet('finance_saldo_list',params);var rows=Array.isArray(data.rows)?data.rows.slice():[];var branch=val('sr-branch'),search=val('sr-search').toLowerCase();if(branch)rows=rows.filter(function(r){return String(r.branch_id||'')===branch});if(search)rows=rows.filter(function(r){return [r.id,r.request_no,r.staff_name,r.staff_code,r.driver_name,r.driver_login_id,r.branch_name].join(' ').toLowerCase().indexOf(search)>=0});return Object.assign({},data,{rows:rows})}
+function makassarInvoiceNominal(row){
+  var raw=Number(row&&row.nominal)||0;
+  if(!/makassar/i.test(String(row&&row.branch_name||'')))return raw;
+  var map={45000:50000,95000:100000,140000:150000,145000:150000,190000:200000,195000:200000};
+  return map[raw]||raw;
+}
+async function saldoList(params){params=Object.assign({},params||{});if(['semua','all'].includes(String(params.status||'').toLowerCase()))delete params.status;var data=await apiGet('finance_saldo_list',params);var rows=Array.isArray(data.rows)?data.rows.slice():[];var branch=val('sr-branch'),search=val('sr-search').toLowerCase();if(branch)rows=rows.filter(function(r){return String(r.branch_id||'')===branch});if(search)rows=rows.filter(function(r){return [r.id,r.request_no,r.staff_name,r.staff_code,r.driver_name,r.driver_login_id,r.branch_name].join(' ').toLowerCase().indexOf(search)>=0});rows=rows.map(function(r){var raw=Number(r.nominal)||0,invoice=makassarInvoiceNominal(r);return Object.assign({},r,{saldo_nominal:raw,invoice_nominal:invoice,nominal:invoice})});return Object.assign({},data,{rows:rows})}
 
 function normalizeHeader(v){return String(v||'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim()}
 function totalRowFromRekap(data){var headers=Array.isArray(data&&data.headers_row_1)?data.headers_row_1:[];var rows=Array.isArray(data&&data.rows_from_2)?data.rows_from_2:[];var total=rows.find(function(r){return Array.isArray(r)&&r.some(function(c){return /TOTAL\s+KESELURUHAN/i.test(String(c||''))})});if(!total)return null;var hi={};headers.forEach(function(h,i){hi[normalizeHeader(h)]=i});function at(names,fallback){for(var i=0;i<names.length;i++){var k=normalizeHeader(names[i]);if(hi[k]!=null)return Number(total[hi[k]])||0}return Number(total[fallback])||0}return {income:at(['TOTAL PEMASUKAN RP','TOTAL PEMASUKAN'],3),expense:at(['TOTAL PENGELUARAN RP','TOTAL PENGELUARAN'],4),net:at(['NET RP','NET'],5)}}
@@ -139,5 +145,5 @@ function install(){
 function start(){var tries=0,t=setInterval(function(){tries++;if(install()||tries>400)clearInterval(t)},25)}
 start();
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){install();bindUi()},{once:true});
-global.FinanceDataRouter={install:install,version:'2.3.0-session-gate',api:API,syncBranches:syncBranches,refreshSummary:refreshDashboardSummary,isReady:function(){return ready}};
+global.FinanceDataRouter={install:install,version:'2.3.1-makassar-invoice-rounding',api:API,syncBranches:syncBranches,refreshSummary:refreshDashboardSummary,isReady:function(){return ready}};
 })(window);
