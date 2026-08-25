@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RIFIM OS — SOETA KPI</title>
+<script src="/shared/portal-session.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:#f4f6f9;color:#1f2937}.wrap{max-width:1120px;margin:auto;padding:24px}.head{background:#1a1a2e;color:#fff;padding:20px 24px;border-radius:16px;margin-bottom:16px}.head a{color:#fff;text-decoration:none;font-size:13px;margin-right:14px}.head h1{margin:12px 0 5px;font-size:25px}.head p{margin:0;color:#c8ccda;font-size:13px}.notice{padding:12px 14px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;margin-bottom:14px;font-size:13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:18px}.card h2{font-size:16px;margin:0 0 12px}.field{display:grid;gap:6px;margin-bottom:11px}.field label{font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700}.field input,.field select,.field textarea{width:100%;border:1px solid #d1d5db;border-radius:10px;padding:10px 12px;background:#fff;font:inherit}.field textarea{min-height:70px;resize:vertical}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{border:0;border-radius:10px;padding:11px 15px;background:#c40000;color:#fff;font-weight:800;cursor:pointer}.btn:disabled{opacity:.45;cursor:not-allowed}.score{font-size:42px;font-weight:900;color:#111827}.pillars{display:grid;gap:8px;margin-top:12px}.pillar{display:grid;grid-template-columns:1fr auto auto;gap:12px;padding:9px 10px;border-radius:10px;background:#f8fafc;font-size:12px}.good{color:#166534}.bad{color:#b91c1c}.muted{color:#64748b}.state{padding:20px;text-align:center;color:#64748b}@media(max-width:800px){.grid,.row{grid-template-columns:1fr}.wrap{padding:12px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><a href="/hris">← HRIS</a><a href="/modules/hris/preactivation.html">Pre-Activation</a><h1>SOETA KPI 6-Pillar</h1><p>Target Order 40% · GMV 20% · Kehadiran 15% · SOP 10% · Pembinaan Driver 10% · Penilaian Koordinator 5%</p></div>
+  <div class="notice">Workspace ini belum memotong payroll lama. Data KPI disiapkan dan divalidasi lebih dulu; payroll SOETA baru akan cutover setelah cross-module QA PASS.</div>
+  <div id="state" class="state">Memuat roster SOETA...</div>
+  <div id="app" style="display:none">
+    <div class="card" style="margin-bottom:14px">
+      <div class="row">
+        <div class="field"><label>Staff aktif SOETA</label><select id="staff"></select></div>
+        <div class="field"><label>Bulan efektif</label><input id="month" type="month"></div>
+      </div>
+      <button class="btn" id="load">Muat KPI</button>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h2>Target Canonical</h2>
+        <div class="row"><div class="field"><label>Target Cabang — Order</label><input id="branch-order" type="number" min="0"></div><div class="field"><label>Target Cabang — GMV</label><input id="branch-gmv" type="number" min="0"></div></div>
+        <div class="row"><div class="field"><label>Override Target Staff — Order</label><input id="staff-order" type="number" min="0" placeholder="Kosong = default/equal share"></div><div class="field"><label>Override Target Staff — GMV</label><input id="staff-gmv" type="number" min="0" placeholder="Kosong = equal share"></div></div>
+        <button class="btn write" id="save-target">Simpan Target</button>
+      </div>
+      <div class="card">
+        <h2>Input Pilar Manual</h2>
+        <div class="row"><div class="field"><label>SOP (0–100)</label><input id="sop" type="number" min="0" max="100"></div><div class="field"><label>Pembinaan Driver (0–100)</label><input id="coaching" type="number" min="0" max="100"></div></div>
+        <div class="field"><label>Penilaian Koordinator (0–100)</label><input id="coord" type="number" min="0" max="100"></div>
+        <div class="field"><label>Catatan</label><textarea id="notes"></textarea></div>
+        <button class="btn write" id="save-manual">Simpan Pilar Manual</button>
+      </div>
+      <div class="card" style="grid-column:1/-1">
+        <h2>Snapshot KPI</h2>
+        <div id="snapshot" class="muted">Pilih staff dan klik Muat KPI.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+let session,cfg,roster=[],selected=null,branch=null,canWrite=false
+const $=id=>document.getElementById(id)
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+async function rest(path,opts={}){const r=await fetch(cfg.supabaseUrl+path,{...opts,headers:{apikey:cfg.supabaseAnonKey,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json',...(opts.headers||{})}});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.message||b.error||('HTTP '+r.status));return b}
+function nval(id){const v=$(id).value.trim();return v===''?null:Number(v)}
+function scoreVal(id){const v=nval(id);if(v==null)return null;if(!Number.isFinite(v)||v<0||v>100)throw new Error(id+' wajib 0–100');return v}
+async function resolveBranch(){if(!selected?.branch_id){branch=null;return}const terminal=(await rest('/rest/v1/branches?id=eq.'+encodeURIComponent(selected.branch_id)+'&select=id,parent_branch_id,code,name&limit=1'))[0];if(!terminal){branch=null;return}const id=terminal.parent_branch_id||terminal.id;branch=(await rest('/rest/v1/branches?id=eq.'+encodeURIComponent(id)+'&select=id,code,name&limit=1'))[0]||null}
+async function loadData(){try{selected=roster.find(x=>x.auth_user_id===$('staff').value)||null;if(!selected)throw new Error('Staff belum dipilih');await resolveBranch();if(!branch||String(branch.code).toUpperCase()!=='SOETA')throw new Error('Branch SOETA tidak ter-resolve');const month=$('month').value+'-01';const [bt,st,mi]=await Promise.all([
+rest('/rest/v1/raos_kpi_targets_branch?branch_id=eq.'+encodeURIComponent(branch.id)+'&effective_month=eq.'+month+'&select=target_cabang,target_staff_default,target_gmv,mode&limit=1'),
+rest('/rest/v1/raos_kpi_targets_staff?staff_id=eq.'+encodeURIComponent(selected.auth_user_id)+'&effective_month=eq.'+month+'&select=target_order,target_gmv,member_parkir_amount&limit=1'),
+rest('/rest/v1/raos_soeta_kpi_manual_inputs?staff_id=eq.'+encodeURIComponent(selected.auth_user_id)+'&effective_month=eq.'+month+'&select=sop_score,coaching_score,coordinator_score,notes&limit=1')]);
+const b=bt[0]||{},s=st[0]||{},m=mi[0]||{};$('branch-order').value=b.target_cabang??'';$('branch-gmv').value=b.target_gmv??'';$('staff-order').value=s.target_order??'';$('staff-gmv').value=s.target_gmv??'';$('sop').value=m.sop_score??'';$('coaching').value=m.coaching_score??'';$('coord').value=m.coordinator_score??'';$('notes').value=m.notes??'';await loadSnapshot()}catch(e){$('snapshot').innerHTML='<span class="bad">'+esc(e.message)+'</span>'}}
+async function loadSnapshot(){const month=$('month').value+'-01';const b=await rest('/rest/v1/rpc/raos_soeta_kpi_staff_snapshot',{method:'POST',body:JSON.stringify({p_staff_id:selected.auth_user_id,p_month:month})});const p=b.pillars||{};const rows=[['Target Order',p.order],['GMV',p.gmv],['Kehadiran',p.attendance],['SOP',p.sop],['Pembinaan Driver',p.driverCoaching],['Penilaian Koordinator',p.coordinatorAssessment]];$('snapshot').innerHTML='<div class="score">'+Number(b.score||0).toFixed(2)+'</div><div class="muted">Status input: <b class="'+(b.complete?'good':'bad')+'">'+(b.complete?'LENGKAP':'BELUM LENGKAP')+'</b></div><div class="pillars">'+rows.map(([n,x])=>'<div class="pillar"><b>'+n+'</b><span>'+Number(x?.pct||0).toFixed(2)+'%</span><span>'+Number(x?.weighted||0).toFixed(2)+' / '+Number(x?.weight||0)+'</span></div>').join('')+'</div>'}
+async function saveTarget(){if(!canWrite)return;try{const month=$('month').value+'-01',bo=nval('branch-order'),bg=nval('branch-gmv'),so=nval('staff-order'),sg=nval('staff-gmv');if(bo==null)throw new Error('Target Cabang Order wajib diisi');await rest('/rest/v1/raos_kpi_targets_branch?on_conflict=branch_id,effective_month',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({branch_id:branch.id,effective_month:month,target_cabang:bo,target_gmv:bg,mode:'order',updated_at:new Date().toISOString()})});const existing=(await rest('/rest/v1/raos_kpi_targets_staff?staff_id=eq.'+encodeURIComponent(selected.auth_user_id)+'&effective_month=eq.'+month+'&select=member_parkir_amount&limit=1'))[0]||{};await rest('/rest/v1/raos_kpi_targets_staff?on_conflict=staff_id,effective_month',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({staff_id:selected.auth_user_id,effective_month:month,target_order:so,target_gmv:sg,member_parkir_amount:Number(existing.member_parkir_amount||0),updated_at:new Date().toISOString()})});alert('Target tersimpan');await loadData()}catch(e){alert(e.message)}}
+async function saveManual(){if(!canWrite)return;try{const month=$('month').value+'-01';await rest('/rest/v1/raos_soeta_kpi_manual_inputs?on_conflict=staff_id,effective_month',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({staff_id:selected.auth_user_id,effective_month:month,sop_score:scoreVal('sop'),coaching_score:scoreVal('coaching'),coordinator_score:scoreVal('coord'),notes:$('notes').value.trim()||null,updated_by:session.id,updated_at:new Date().toISOString()})});alert('Pilar manual tersimpan');await loadSnapshot()}catch(e){alert(e.message)}}
+async function init(){session=await window.RifimPortalSession.require({allowedRoles:['admin','direksi','management'],redirect:'/portal'});if(!session)return;cfg=window.RifimPortalSession.config||{};if(!cfg.supabaseUrl||!cfg.supabaseAnonKey)return $('state').textContent='Konfigurasi Supabase tidak tersedia';canWrite=['admin','direksi'].includes(String(session.role||'').toLowerCase());document.querySelectorAll('.write').forEach(b=>b.disabled=!canWrite);const now=new Date();$('month').value=now.toISOString().slice(0,7);try{roster=await rest('/rest/v1/raos_staff_master?airport=eq.SOETA&is_activated=eq.true&auth_user_id=not.is.null&select=staff_id,full_name,terminal,branch_id,auth_user_id,role,status&order=full_name.asc&limit=500');$('staff').innerHTML=roster.map(r=>'<option value="'+esc(r.auth_user_id)+'">'+esc(r.full_name)+' · '+esc(r.staff_id)+' · '+esc(r.terminal||'SOETA')+'</option>').join('');$('state').style.display='none';$('app').style.display='block';if(roster.length)await loadData();else $('snapshot').textContent='Belum ada staff SOETA teraktivasi untuk KPI.'}catch(e){$('state').textContent=e.message}}
+$('load').onclick=loadData;$('save-target').onclick=saveTarget;$('save-manual').onclick=saveManual;init()
+</script>
+</body>
+</html>
