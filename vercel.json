@@ -1,5 +1,11 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
+  "git": {
+    "deploymentEnabled": {
+      "main": false
+    }
+  },
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
     { "source": "/portal", "destination": "/modules/portal/secure.html" },
