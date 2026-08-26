@@ -67,6 +67,10 @@
     } catch (_) { return null }
   }
 
+  // Item 2 (2026-08-26): custom error to distinguish transient network
+  // failures (kept session) from unrecoverable auth failures (clear session).
+  function AuthHardError(msg) { const e = new Error(msg); e.isHardAuth = true; return e }
+
   async function refreshToken(refreshToken) {
     const res = await fetch(SB_URL + '/auth/v1/token?grant_type=refresh_token', {
       method: 'POST',
@@ -76,7 +80,10 @@
       },
       body: JSON.stringify({ refresh_token: refreshToken }),
     })
-    if (!res.ok) throw new Error('Portal session refresh gagal')
+    if (res.status === 400 || res.status === 401 || res.status === 403) {
+      throw AuthHardError('Portal session refresh ditolak (refresh_token invalid)')
+    }
+    if (!res.ok) throw new Error('Portal session refresh gagal (transient)')
     return res.json()
   }
 
@@ -92,12 +99,34 @@
         Accept: 'application/json',
       },
     })
-    if (!res.ok) throw new Error('Portal profile validation gagal')
+    if (res.status === 401 || res.status === 403) {
+      throw AuthHardError('Portal profile ditolak (token invalid)')
+    }
+    if (!res.ok) throw new Error('Portal profile validation gagal (transient)')
     const rows = await res.json()
     return Array.isArray(rows) ? rows[0] || null : null
   }
 
-  async function validateSession() {
+  // Item 2 (2026-08-26): validation cache + single-flight.
+  // Sebelum patch: validateSession() dijalankan di SETIAP apiGet/apiPost via
+  // sessionToken(); tiap panggilan re-fetch user_profile ke Supabase. Sekali
+  // transient network error → clearSession() → seluruh UI Finance kolaps ke
+  // "Session invalid" walau sesi sebenarnya masih valid. Fix:
+  //   1. Cache hasil validasi selama VALIDATE_TTL (60s) → skip network jika
+  //      token access masih jauh dari expiry.
+  //   2. Single-flight: panggilan paralel share satu Promise refresh/validate,
+  //      cegah race + duplicate refresh yang membakar refresh_token.
+  //   3. Transient failure (network / 5xx pada fetchProfile) tidak lagi
+  //      clearSession() — sesi lokal dipertahankan, error dibubble ke caller
+  //      supaya bisa retry-once alih-alih logout.
+  //   4. Hanya AuthHardError (refresh_token 4xx / profile 401-403 / profile
+  //      is_active=false) yang benar-benar clearSession().
+  const VALIDATE_TTL = 60 * 1000
+  let lastGoodAt = 0
+  let lastGood = null
+  let inFlight = null
+
+  async function _validateOnce() {
     const saved = readSession()
     if (!saved || !saved.access_token) return null
 
@@ -106,40 +135,86 @@
     let expiresAt = Number(saved.expires_at || 0)
     const now = Math.floor(Date.now() / 1000)
 
+    let refreshed = false
     try {
       if (!expiresAt || expiresAt <= now + 60) {
-        if (!refreshTokenValue) throw new Error('Refresh token tidak tersedia')
-        const refreshed = await refreshToken(refreshTokenValue)
-        accessToken = refreshed.access_token || ''
-        refreshTokenValue = refreshed.refresh_token || refreshTokenValue
-        expiresAt = Number(refreshed.expires_at || (now + Number(refreshed.expires_in || 3600)))
-        if (!accessToken) throw new Error('Access token kosong setelah refresh')
+        if (!refreshTokenValue) throw AuthHardError('Refresh token tidak tersedia')
+        const r = await refreshToken(refreshTokenValue)
+        accessToken = r.access_token || ''
+        refreshTokenValue = r.refresh_token || refreshTokenValue
+        expiresAt = Number(r.expires_at || (now + Number(r.expires_in || 3600)))
+        if (!accessToken) throw AuthHardError('Access token kosong setelah refresh')
+        refreshed = true
       }
 
       const payload = decodeJwt(accessToken)
       const userId = payload && payload.sub
-      if (!userId) throw new Error('Token Portal tidak valid')
+      if (!userId) throw AuthHardError('Token Portal tidak valid')
 
-      const profile = await fetchProfile(accessToken, userId)
-      if (!profile || profile.is_active === false) throw new Error('Profil Portal tidak aktif')
+      // Skip profile revalidate untuk fast-path (token access masih valid,
+      // sudah pernah divalidasi baru-baru ini). Hanya validate ulang saat:
+      //   - token baru saja di-refresh, atau
+      //   - belum pernah lolos validasi profile,
+      //   - atau saved.role/id kosong.
+      const needsProfile = refreshed || !lastGood || !saved.role || !saved.id
+      let profile = null
+      if (needsProfile) {
+        try { profile = await fetchProfile(accessToken, userId) }
+        catch (err) {
+          if (err && err.isHardAuth) throw err
+          // Transient: keep saved session, do NOT clear.
+          console.warn('[RifimPortalSession] profile transient:', err && err.message)
+          const kept = writeSession(Object.assign({}, saved, {
+            access_token: accessToken,
+            refresh_token: refreshTokenValue,
+            expires_at: expiresAt,
+            ts: Date.now(),
+          }))
+          lastGood = kept; lastGoodAt = Date.now()
+          return kept
+        }
+        if (!profile || profile.is_active === false) {
+          throw AuthHardError('Profil Portal tidak aktif')
+        }
+      }
 
-      return writeSession(Object.assign({}, saved, {
-        id: profile.id,
-        full_name: profile.full_name || saved.full_name || saved.name || saved.email || 'User',
-        name: profile.full_name || saved.name || saved.full_name || saved.email || 'User',
-        role: normalizeRole(profile.role || saved.role),
-        staff_id: profile.staff_id || saved.staff_id || null,
-        branch_id: profile.branch_id || saved.branch_id || null,
+      const merged = writeSession(Object.assign({}, saved, {
+        id: (profile && profile.id) || saved.id,
+        full_name: (profile && profile.full_name) || saved.full_name || saved.name || saved.email || 'User',
+        name: (profile && profile.full_name) || saved.name || saved.full_name || saved.email || 'User',
+        role: normalizeRole((profile && profile.role) || saved.role),
+        staff_id: (profile && profile.staff_id) || saved.staff_id || null,
+        branch_id: (profile && profile.branch_id) || saved.branch_id || null,
         access_token: accessToken,
         refresh_token: refreshTokenValue,
         expires_at: expiresAt,
         ts: Date.now(),
       }))
+      lastGood = merged; lastGoodAt = Date.now()
+      return merged
     } catch (err) {
       console.warn('[RifimPortalSession]', err && err.message ? err.message : err)
-      clearSession()
-      return null
+      if (err && err.isHardAuth) {
+        clearSession()
+        lastGood = null; lastGoodAt = 0
+        return null
+      }
+      // Transient error di layer refresh: kembalikan sesi tersimpan bila ada,
+      // biar caller bisa mencoba lagi tanpa logout.
+      const fallback = readSession()
+      return (fallback && fallback.access_token) ? fallback : null
     }
+  }
+
+  async function validateSession() {
+    // Fast-path: hasil validasi masih hangat dan token belum near expiry.
+    if (lastGood && (Date.now() - lastGoodAt) < VALIDATE_TTL) {
+      const exp = Number(lastGood.expires_at || 0)
+      if (!exp || exp > Math.floor(Date.now() / 1000) + 60) return lastGood
+    }
+    if (inFlight) return inFlight
+    inFlight = _validateOnce().finally(() => { inFlight = null })
+    return inFlight
   }
 
   async function requireSession(options) {
@@ -258,11 +333,16 @@
     }, 50)
   }
 
+  // Item 2: force revalidate by dropping fast-path cache. Callers use this
+  // after a 401 to trigger a real refresh on the next validate() call.
+  function invalidateCache() { lastGood = null; lastGoodAt = 0 }
+
   global.RifimPortalSession = {
     read: readSession,
     clear: clearSession,
     validate: validateSession,
     require: requireSession,
+    invalidate: invalidateCache,
     normalizeRole,
     canMutate,
     config: { supabaseUrl: SB_URL, supabaseAnonKey: SB_ANON, isPreview },
