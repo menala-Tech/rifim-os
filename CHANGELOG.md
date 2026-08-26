@@ -8,6 +8,26 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Saldo Support V2 (Finance → Bookmarklet, semi-auto, non-Lunas) (2026-08-26)
+
+Alur baru **coexist** dengan Auto-Fill AIST (Worker/Agent) — tidak mengganti.
+
+- `shared/aist-finance-semi.js` (**new**) — decorate tiap row Finance Isi Saldo (RAOS) dengan 3 tombol:
+  - `📋 Login`   → clipboard = `driver_login_id` raw
+  - `📋 Nominal` → clipboard = RAW saldo (integer, no "Rp", no separator)
+  - `🪄 Fill AIST` → clipboard = `MENALA_AIST_V2:<base64json>` payload (versi 2, TTL 10 menit)
+  Tidak memutasi backend, tidak menandai Lunas, tidak menyentuh Finance GAS.
+- `automation/aist-bookmarklet/aist-fill-v2.source.js` (**rewrite**) — pure field-filler.
+  - Membaca clipboard, mem-validate prefix + versi + source + TTL + digit-only login + numeric nominal + whitelist field (anti-secret smuggling).
+  - Mendeteksi form AIST Balance replenishment (`Driver login` + `Amount`).
+  - Meminta konfirmasi eksplisit, mengisi 2 field, read-back exact match, gagal tertutup jika mismatch.
+  - **Tidak** lagi fetch `finance_saldo_raos_list`, **tidak** membaca `rifim_auth.access_token`, **tidak** memanggil `finance_saldo_raos_mark_paid`, **tidak** submit form.
+- `automation/aist-bookmarklet/install.html` — instruksi baru (alur Finance → clipboard → AIST) + fallback manual.
+- `shared/api-cache-core.js` — auto-load `/shared/aist-finance-semi.js` di halaman `/finance`.
+- `testing/finance-saldo-semi-v2.test.js` (**new**) — 12 assertion: builder + encode/decode roundtrip + TTL + version + prefix + unknown-field guard + bookmarklet bebas dari GAS queue/auth/mark_paid, bebas auto-submit.
+
+**Kontrak RAW nominal preserved**: 45.000 / 95.000 / 200.000 diteruskan apa adanya ke Amount AIST (invoice-rounded tidak pernah dikirim).
+
 ### Added / Fixed — Document Studio HTML→PDF Pipeline + DDS v3.0 (2026-07-19)
 ### Added / Updated — AI Prompt Caching Standardization (2026-07-19)
 - `PROJECT_RULES.md` — Tambah seksi "AI Integration Rules" (Rule 67-68): wajib menggunakan Prompt Caching (Cache Otomatis) untuk efisiensi token API Claude.

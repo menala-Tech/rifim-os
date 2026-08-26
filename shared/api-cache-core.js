@@ -280,7 +280,7 @@ if(typeof window!=='undefined'&&/\/finance(?:\/|$)/.test(window.location.pathnam
   // - aist-finance-agent-v2.js: AIST job action
   // - built-in Finance notifier: saldo notifications
   // Legacy aist-finance.js, finance-saldo-cache-first.js and finance-p7-compat.js are intentionally not loaded.
-  ['/shared/finance-light-ui.js','/shared/finance-target-cache-first.js','/shared/aist-finance-agent-v2.js','/shared/aist-agent-status.js'].forEach(function(src){
+  ['/shared/finance-light-ui.js','/shared/finance-target-cache-first.js','/shared/aist-finance-agent-v2.js','/shared/aist-agent-status.js','/shared/aist-finance-semi.js'].forEach(function(src){
     var s=document.createElement('script');
     s.src=src;
     s.async=false;
