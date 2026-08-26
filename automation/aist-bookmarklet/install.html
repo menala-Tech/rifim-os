@@ -2,11 +2,11 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<title>Install AIST Fill v2 Bookmarklet</title>
+<title>Install Fill AIST Saldo (Semi-Auto V2)</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1A1A1A; color: #fff; min-height: 100vh; padding: 40px 20px; }
-.container { max-width: 780px; margin: 0 auto; }
+.container { max-width: 820px; margin: 0 auto; }
 h1 { font-size: 24px; margin-bottom: 8px; }
 .sub { color: #aaa; margin-bottom: 30px; font-size: 14px; }
 .card { background: #2B2B2B; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
@@ -15,74 +15,73 @@ h2 { font-size: 16px; color: #C40000; margin-bottom: 12px; }
 .step b { color: #ff9999; }
 .bookmark-btn { display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #C40000, #8B0000); color: #fff !important; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; margin: 20px 0; cursor: grab; box-shadow: 0 4px 16px rgba(196,0,0,.3); }
 .bookmark-btn:active { cursor: grabbing; }
-.note { padding: 12px; background: rgba(234,179,8,.1); border: 1px solid rgba(234,179,8,.3); border-radius: 6px; font-size: 12px; color: #facc15; }
+.note { padding: 12px; background: rgba(234,179,8,.1); border: 1px solid rgba(234,179,8,.3); border-radius: 6px; font-size: 12px; color: #facc15; margin-top: 8px; }
 code { background: rgba(0,0,0,.4); padding: 2px 6px; border-radius: 3px; font-size: 12px; color: #4ade80; }
-.diff { background: rgba(14,165,233,.08); border: 1px solid rgba(14,165,233,.3); border-radius: 6px; padding: 12px; margin-top: 12px; font-size: 12px; color: #93c5fd; }
+.diff { background: rgba(14,165,233,.08); border: 1px solid rgba(14,165,233,.3); border-radius: 6px; padding: 12px; margin-top: 12px; font-size: 12px; color: #93c5fd; line-height: 1.55; }
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>AIST Fill v2 — Bookmarklet Install</h1>
-  <p class="sub">Auto-fill Amount + Driver login di modal AIST Balance replenishment, langsung dari raos_saldo_requests Supabase (bukan sheet lama).</p>
+  <h1>Fill AIST Saldo — Bookmarklet Install (Semi V2)</h1>
+  <p class="sub">Bookmarklet field-filler untuk form <b>Balance replenishment</b> di AIST. Payload dipilih dari RIFIM Finance → Isi Saldo (RAOS), ditransfer lewat clipboard.</p>
 
   <div class="card">
     <h2>1. Drag tombol ini ke bookmark bar</h2>
-    <a class="bookmark-btn" id="bookmark-link" href="#" onclick="return false">🔴 AIST Fill v2</a>
-    <p style="font-size:12px;color:#888">Tarik ke Bookmarks Bar Chrome/Edge/Brave. Kalau bookmark bar tidak muncul: tekan <code>Ctrl+Shift+B</code>.</p>
+    <a class="bookmark-btn" id="bookmark-link" href="#" onclick="return false">🔴 Fill AIST Saldo</a>
+    <p style="font-size:12px;color:#888">Tarik ke Bookmarks Bar Chrome/Edge/Brave. Kalau bar tidak muncul: <code>Ctrl+Shift+B</code>.</p>
   </div>
 
   <div class="card">
-    <h2>2. Cara pakai</h2>
-    <div class="step"><b>[Sekali]</b> Login <a href="https://rifim-os.vercel.app/portal" target="_blank" style="color:#4ade80">rifim-os.vercel.app/portal</a> pakai email admin. Auth token disimpan di localStorage.</div>
-    <div class="step"><b>[Setiap sesi]</b> Buka AIST → <b>Documents</b> → <b>Add</b> → <b>Balance replenishment</b>. Pilih Subdivision + Currency manual.</div>
-    <div class="step"><b>Klik bookmark "AIST Fill v2"</b> → picker floating muncul di kanan atas.</div>
-    <div class="step">Klik salah satu row driver → input <b>Amount</b> + <b>Driver login</b> di modal AIST otomatis terisi dan row dikunci sementara.</div>
-    <div class="step">Klik <b>OK di modal AIST</b>. Row baru ditandai lunas setelah toast sukses AIST terdeteksi; gagal/batal/timeout tetap berstatus approved dan bisa di-retry.</div>
+    <h2>2. Alur operator (semi-auto, non-Lunas)</h2>
+    <div class="step">1. Buka <a href="https://rifim-os.vercel.app/finance#saldo-raos" target="_blank" style="color:#4ade80">RIFIM OS → Finance → Isi Saldo (RAOS)</a>.</div>
+    <div class="step">2. Pilih request yang mau diproses (status pending/approved). Verifikasi Cabang / Staff / Driver / Login / Nominal.</div>
+    <div class="step">3. Klik <b>🪄 Fill AIST</b>. Popup konfirmasi muncul, payload sudah tersalin ke clipboard.</div>
+    <div class="step">4. Pindah ke tab AIST → <b>Document → Add → Balance replenishment</b>. Pilih Subdivision + Currency manual seperti biasa.</div>
+    <div class="step">5. Setelah form terbuka, klik bookmark <b>Fill AIST Saldo</b>. Bookmarklet membaca clipboard, memvalidasi payload + TTL, meminta konfirmasi, lalu mengisi Driver login + Amount.</div>
+    <div class="step">6. Operator memeriksa nilai + tekan <b>OK/Save</b> di AIST secara <b>manual</b>. Bookmarklet TIDAK submit dan TIDAK menandai Lunas.</div>
+    <div class="step">7. Setelah AIST mengembalikan sukses, kembali ke Finance → klik <b>✓ Konfirmasi AIST Berhasil</b> (jalur manual eksisting) untuk menandai Lunas.</div>
+    <p class="note">⚠️ Payload TTL: 10 menit. Kalau lebih lama, ulangi dari step 3.</p>
   </div>
 
   <div class="card">
-    <h2>3. Bedanya dari bookmarklet lama</h2>
+    <h2>3. Fallback manual</h2>
+    <div class="step">Kalau browser menolak clipboard read/write: pakai tombol <b>📋 Login</b> dan <b>📋 Nominal</b> di baris yang sama, lalu paste manual ke form AIST.</div>
+  </div>
+
+  <div class="card">
+    <h2>4. Perbedaan vs bookmarklet lama</h2>
     <div class="diff">
-      <b>Lama</b> (spreadsheet Pengisian Saldo, sheet Jawaban Formulir 1):<br>
-      &bull; Baca dari sheet Google, filter row tanpa checkbox G<br>
-      &bull; Mark isi = centang checkbox G di sheet<br><br>
-      <b>Baru v2</b>:<br>
-      &bull; Baca langsung dari Supabase <code>raos_saldo_requests</code> (via GAS Web App)<br>
-      &bull; Mark isi = RPC guarded setelah acknowledgement sukses AIST → auto-trigger notif ke staff PWA<br>
-      &bull; Filter <code>status=approved</code> (koord/admin sudah setujui)<br>
-      &bull; Auto-refresh 30 detik (pengajuan baru dari PWA RAOS langsung muncul)
+      <b>Lama (V1 sheet queue)</b>: baca dari Google Sheet Pengisian Saldo, tandai isi = checkbox kolom G.<br>
+      <b>Lama (V2 sebelum sesi ini)</b>: bookmarklet fetch <code>finance_saldo_raos_list</code> dari GAS, mengirim <code>rifim_auth.access_token</code> cross-origin, dan memanggil <code>finance_saldo_raos_mark_paid</code> otomatis setelah fill.<br>
+      <b>V2 semi (2026-08-26)</b>: bookmarklet <b>tidak</b> memanggil GAS, <b>tidak</b> membaca <code>rifim_auth</code>, dan <b>tidak</b> menandai Lunas. Sumber pilihan = Finance UI. Handoff = clipboard <code>MENALA_AIST_V2:&lt;base64&gt;</code> dengan TTL 10 menit.
     </div>
   </div>
 
   <div class="card">
-    <h2>4. Troubleshooting</h2>
-    <div class="step">🔴 <b>"Belum login Rifim-OS"</b> → buka portal, login dulu.</div>
-    <div class="step">🔴 <b>"Tidak nemu input Amount/Login"</b> → pastikan modal AIST sudah terbuka + input visible.</div>
-    <div class="step">🔴 <b>Picker tidak muncul</b> → cek console browser (F12). Kemungkinan AIST punya CSP block script. Coba akses AIST via HTTP (bukan HTTPS strict).</div>
-    <div class="step">🔴 <b>Row tidak refresh</b> → klik tombol 🔄 di picker header, atau reload picker (klik bookmark lagi).</div>
+    <h2>5. Troubleshooting</h2>
+    <div class="step">🔴 <b>"Clipboard kosong / bukan payload MENALA_AIST_V2"</b> → kembali ke Finance dan klik 🪄 Fill AIST dulu.</div>
+    <div class="step">🔴 <b>"Form AIST tidak terdeteksi"</b> → buka form Balance replenishment dulu, tunggu Amount + Driver login muncul, baru klik bookmark.</div>
+    <div class="step">🔴 <b>"Payload kedaluwarsa"</b> → payload &gt;10 menit. Pilih ulang di Finance.</div>
+    <div class="step">🔴 <b>"Read-back Amount TIDAK cocok"</b> → jangan tekan OK di AIST. Cek input custom / mask / mata uang, atau paste manual pakai Copy Nominal.</div>
+    <div class="step">🔴 <b>Browser tolak <code>navigator.clipboard</code></b> → pastikan tab AIST punya user gesture (klik bookmark), atau gunakan mode manual.</div>
   </div>
 
-  <p class="note">⚠️ Source code lengkap: <code>automation/aist-bookmarklet/aist-fill-v2.source.js</code>. Kalau AIST DOM berubah, selector di <code>findInputByLabel()</code> perlu di-update.</p>
+  <p class="note">Source: <code>automation/aist-bookmarklet/aist-fill-v2.source.js</code>. Kalau selector Amount/Login berubah di AIST, sesuaikan di <code>findInputByLabel()</code>.</p>
 </div>
 
 <script>
-// Fetch source, minify (strip comments + whitespace), URL-encode, jadi javascript: bookmark
 fetch('aist-fill-v2.source.js')
   .then(r => r.text())
   .then(src => {
-    // Simple minify: strip block comments + line comments + multiple spaces
     const min = src
-      .replace(/\/\*[\s\S]*?\*\//g, '')      // block comments
-      .replace(/^\s*\/\/.*$/gm, '')           // line comments
-      .replace(/\n\s*/g, ' ')                 // newlines
-      .replace(/\s{2,}/g, ' ');              // multiple spaces
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
+      .replace(/\n\s*/g, ' ')
+      .replace(/\s{2,}/g, ' ');
     const href = 'javascript:' + encodeURIComponent(min);
     document.getElementById('bookmark-link').href = href;
   })
-  .catch(err => {
-    document.getElementById('bookmark-link').textContent = '⚠️ Source tidak bisa di-load: ' + err.message;
-    document.getElementById('bookmark-link').style.background = '#f87171';
-  });
+  .catch(err => console.error('load bookmarklet source gagal:', err));
 </script>
 </body>
 </html>
