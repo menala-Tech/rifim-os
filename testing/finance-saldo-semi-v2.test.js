@@ -54,6 +54,14 @@ function loadSemi() {
 const semi = loadSemi();
 assert.ok(semi && typeof semi.buildSemiPayload === 'function', 'semi module exports test hook');
 
+// Evaluate the production invoice mapping; do not duplicate its map here.
+const routerSrc = read('shared/finance-data-router.js');
+const invoiceFnMatch = routerSrc.match(/function invoiceNominal\(rawValue\)\{[\s\S]*?return map\[raw\]\|\|raw;\s*\}/);
+assert.ok(invoiceFnMatch, 'invoiceNominal helper found in finance-data-router.js');
+const routerInternals = {};
+vm.runInNewContext(invoiceFnMatch[0] + '\nglobalThis.__invoiceNominal = invoiceNominal;', routerInternals);
+const invoiceNominal = routerInternals.__invoiceNominal;
+
 // ── 1. Payload builder: happy path 45k ─────────────────────────────────
 const row45 = {
   request_id: 'req-abc-123',
@@ -103,7 +111,8 @@ assert.ok(encoded.indexOf('MENALA_AIST_V2:') === 0, 'clipboard prefix present');
 // Bookmarklet decodeAndValidate diekstrak lewat regex + eval bertopeng.
 const bookmarkletSrc = read('automation/aist-bookmarklet/aist-fill-v2.source.js');
 // Ambil hanya fungsi decodeAndValidate + eksekusi dalam sandbox.
-const fnMatch = bookmarkletSrc.match(/function decodeAndValidate\([\s\S]*?\n  \}\n/);
+// CRLF-tolerant: bookmarklet file may be checked out with \r\n on Windows.
+const fnMatch = bookmarkletSrc.match(/function decodeAndValidate\([\s\S]*?\r?\n  \}\r?\n/);
 assert.ok(fnMatch, 'decodeAndValidate ditemukan di bookmarklet');
 
 const ctx = {
@@ -207,4 +216,182 @@ const semiSrc = read('shared/aist-finance-semi.js');
 });
 console.log('  ok  Finance semi module bebas backend mutation');
 
-console.log('\nAll semi-V2 contract assertions PASS.');
+// ── 13. Item 1 (2026-08-26): readRowFromButton prefers RAW saldo nominal
+//        (data-saldo-nominal) over invoice-rounded data-nominal.
+// Regression untuk field-UAT: 45k → invoice 50k, payload harus tetap 45000.
+assert.ok(typeof semi.readRowFromButton === 'function', 'readRowFromButton exposed');
+function mkBtnStub(ds) {
+  return {
+    dataset: ds,
+    closest: () => ({ cells: [{}, { textContent: ds.branch || 'GENERAL' }, { textContent: 'Bobby' }] }),
+  };
+}
+[
+  { branch: 'MAKASSAR', raw: 190000, invoice: 200000 },
+  { branch: 'MAKASSAR', raw: 140000, invoice: 150000 },
+  { branch: 'BALIKPAPAN', raw: 145000, invoice: 150000 },
+  { branch: 'PEKANBARU', raw: 145000, invoice: 150000 },
+  { branch: 'GENERAL', raw: 195000, invoice: 200000 },
+  { branch: 'GENERAL', raw: 45000, invoice: 50000 },
+  { branch: 'GENERAL', raw: 95000, invoice: 100000 },
+  { branch: 'GENERAL', raw: 200000, invoice: 200000 },
+].forEach(({ branch, raw, invoice }) => {
+  const btn = mkBtnStub({
+    markSaldo: 'req-' + raw,
+    driverLogin: '200108666',
+    driverName: 'Wahyudi',
+    requestNo: 'A-1',
+    branch,
+    nominal: String(invoice),        // display invoice (bug source)
+    saldoNominal: String(raw),       // RAW saldo (fix)
+  });
+  const row = semi.readRowFromButton(btn);
+  assert.strictEqual(row.nominal, raw,
+    `${branch}: readRowFromButton must use RAW ${raw}, got ${row.nominal}`);
+  const payload = semi.buildSemiPayload(row);
+  assert.strictEqual(payload.nominal, raw,
+    `${branch}: payload.nominal must be RAW ${raw}, got ${payload.nominal}`);
+  assert.strictEqual(invoiceNominal(raw), invoice,
+    `${branch}: invoiceNominal(${raw}) must be ${invoice}, got ${invoiceNominal(raw)}`);
+});
+console.log('  ok  owner raw nominal matrix uses raw AIST values and production invoice mapping');
+
+// Fallback: legacy button tanpa data-saldo-nominal → tetap pakai data-nominal
+// (jangan sampai patch me-null-kan value baris lama saat progressive rollout).
+const legacyBtn = mkBtnStub({
+  markSaldo: 'req-legacy',
+  driverLogin: '200108666',
+  driverName: 'X',
+  requestNo: 'A-2',
+  nominal: '77000',
+});
+assert.strictEqual(semi.readRowFromButton(legacyBtn).nominal, 77000,
+  'fallback ke data-nominal saat data-saldo-nominal belum tersedia');
+console.log('  ok  Item 1 — fallback ke data-nominal untuk baris legacy');
+
+// The router mapping is covered by source-text contract here because this
+// test file has no live API harness for driving saldoList().
+assert.match(routerSrc, /saldo_nominal:raw[\s\S]*?invoice_nominal:invoice[\s\S]*?nominal:invoice/,
+  'saldoList mapping must preserve raw saldo_nominal and expose invoice as nominal');
+console.log('  ok  saldoList source mapping preserves raw saldo_nominal and invoice nominal');
+
+const financeHtmlSrc = read('modules/finance/index.html');
+assert.match(financeHtmlSrc, /data-nominal=/, 'saldo row exposes data-nominal');
+assert.match(financeHtmlSrc, /data-saldo-nominal=/, 'saldo row exposes data-saldo-nominal');
+assert.match(financeHtmlSrc, /const rawSaldo = r\.saldo_nominal != null \? Number\(r\.saldo_nominal\) : Number\(r\.nominal \|\| 0\)/,
+  'amount cell raw fallback must use saldo_nominal then nominal');
+assert.match(financeHtmlSrc, /const amountCell = rawSaldo !== invoiceNominal[\s\S]*?: fmtRp\(invoiceNominal\);/,
+  'amount cell must collapse to one invoice value when raw equals invoice');
+assert.match(financeHtmlSrc, /Saldo: \$\{fmtRp\(rawSaldo\)\}/, 'amount cell labels raw value as Saldo');
+assert.match(financeHtmlSrc, /Invoice: \$\{fmtRp\(invoiceNominal\)\}/, 'amount cell labels rounded value as Invoice');
+assert.match(financeHtmlSrc, /Saldo \(AIST\): \$\{nominal\}/, 'confirmation dialog labels raw AIST value');
+assert.match(financeHtmlSrc, /btn\.dataset\.saldoNominal != null \? btn\.dataset\.saldoNominal : \(btn\.dataset\.nominal \|\| 0\)/,
+  'confirmation dialog sources raw AIST amount from data-saldo-nominal');
+assert.match(financeHtmlSrc, /const invoiceLine = rawSaldoValue !== invoiceNominal \?[\s\S]*?: '';/,
+  'confirmation dialog invoice line is conditional');
+assert.match(financeHtmlSrc, /if \(!confirm\(confirmMsg\)\) return;/, 'mark-paid remains behind explicit confirmation');
+assert.match(financeHtmlSrc, /confirmMsg[\s\S]*?_gasCall\('finance_saldo_raos_mark_paid'/,
+  'mark-paid RPC remains in the explicit confirmation flow');
+console.log('  ok  Finance dual-label render + explicit manual confirmation contract');
+
+function runBookmarkletFill(payload) {
+  return new Promise((resolve, reject) => {
+    const amount = {
+      type: 'text', name: 'amount', placeholder: 'Amount', id: 'aist-amount',
+      disabled: false, readOnly: false, offsetParent: {},
+      previousElementSibling: null, closest: () => null,
+      getAttribute: () => '', dispatchEvent: () => {},
+    };
+    const login = {
+      type: 'text', name: 'driver_login', placeholder: 'Driver login', id: 'aist-login',
+      disabled: false, readOnly: false, offsetParent: {},
+      previousElementSibling: null, closest: () => null,
+      getAttribute: () => '', dispatchEvent: () => {},
+    };
+    let submitCalls = 0;
+    let clickSubmitCalls = 0;
+    let markLunasCalls = 0;
+    const inputProto = {};
+    Object.defineProperty(inputProto, 'value', {
+      set(value) { this._value = String(value); },
+      get() { return this._value || ''; },
+    });
+    Object.setPrototypeOf(amount, inputProto);
+    Object.setPrototypeOf(login, inputProto);
+    const ctx = {
+      navigator: { clipboard: { readText: () => Promise.resolve(semi.encodePayload(payload)) } },
+      document: {
+        querySelectorAll: () => [amount, login],
+        querySelector: () => null,
+        createElement: () => ({ style: {}, textContent: '', appendChild: () => {} }),
+        body: { appendChild: () => {} },
+      },
+      window: {},
+      HTMLInputElement: function HTMLInputElement() {},
+      Event: function Event(type) { this.type = type; },
+      Promise, atob: (b64) => Buffer.from(b64, 'base64').toString('binary'),
+      escape: global.escape || ((s) => encodeURIComponent(s)),
+      decodeURIComponent, JSON, Number, Date, Object, Error, String,
+      confirm: () => true,
+      alert: (message) => { throw new Error('bookmarklet alert: ' + message); },
+      setTimeout: () => 0,
+      clearTimeout: () => {},
+      console,
+      submit: () => { submitCalls += 1; },
+      clickSubmit: () => { clickSubmitCalls += 1; },
+      markSaldoPaid: () => { markLunasCalls += 1; },
+    };
+    ctx.window = ctx;
+    ctx.window.HTMLInputElement = ctx.HTMLInputElement;
+    ctx.HTMLInputElement.prototype = inputProto;
+    vm.createContext(ctx);
+    try {
+      vm.runInContext(bookmarkletSrc, ctx);
+      Promise.resolve().then(() => Promise.resolve()).then(() => {
+        resolve({
+          login: login.value,
+          amount: amount.value,
+          submitCalls,
+          clickSubmitCalls,
+          markLunasCalls,
+        });
+      }, reject);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+async function runBookmarkletRawRegression() {
+  const cases = [
+    { branch: 'MAKASSAR', raw: 190000 },
+    { branch: 'MAKASSAR', raw: 140000 },
+    { branch: 'BALIKPAPAN', raw: 145000 },
+    { branch: 'GENERAL', raw: 195000 },
+  ];
+  for (const { branch, raw } of cases) {
+    const payload = semi.buildSemiPayload({
+      request_id: `bookmarklet-${branch}-${raw}`,
+      driver_login: '200108666',
+      nominal: raw,
+      driver_name: 'Wahyudi',
+      branch_name: branch,
+      staff_name: 'Bobby',
+    });
+    const filled = await runBookmarkletFill(payload);
+    assert.strictEqual(filled.amount, String(raw), `${branch}: bookmarklet Amount must be RAW ${raw}`);
+    assert.strictEqual(filled.login, payload.driver_login, `${branch}: bookmarklet Driver login must be filled`);
+    assert.strictEqual(filled.submitCalls, 0, `${branch}: bookmarklet must not submit`);
+    assert.strictEqual(filled.clickSubmitCalls, 0, `${branch}: bookmarklet must not click-submit`);
+    assert.strictEqual(filled.markLunasCalls, 0, `${branch}: bookmarklet must not mark Lunas`);
+    console.log(`  ok  bookmarklet real fill path ${branch} raw=${raw} login=${payload.driver_login}`);
+  }
+}
+
+runBookmarkletRawRegression().then(() => {
+  console.log('  ok  bookmarklet raw nominal regression matrix passed through real decode/fill logic');
+  console.log('\nAll semi-V2 contract assertions PASS.');
+}).catch((err) => {
+  console.error(err && err.stack ? err.stack : err);
+  process.exitCode = 1;
+});

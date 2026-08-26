@@ -52,21 +52,43 @@ function val(id){var e=document.getElementById(id);return e?String(e.value||'').
 function money(n){return 'Rp '+(Number(n)||0).toLocaleString('id-ID')}
 function setText(id,v){var e=document.getElementById(id);if(e)e.textContent=v}
 
-async function apiGet(mode,params){
-  var t=await sessionToken();
+// Item 2 (2026-08-26): retry-once on 401. Sebelum patch, transient auth
+// error langsung dilempar ke UI sebagai "Session invalid" walau refresh
+// token masih valid. Sekarang bila status 401 → invalidate cache token
+// → validate ulang (paksa refresh) → retry request satu kali. Bila gagal
+// lagi baru bubble error ke UI.
+async function _doGet(mode,params,tokenOverride){
+  var t=tokenOverride||await sessionToken();
   var qs=new URLSearchParams({mode:mode});
   Object.keys(params||{}).forEach(function(k){var v=params[k];if(v!==''&&v!=null)qs.set(k,String(v))});
   var r=await fetch(API+'?'+qs.toString(),{headers:{Authorization:'Bearer '+t},cache:'no-store'});
-  var d=await r.json().catch(function(){return{}});
-  if(!r.ok||d.success!==true)throw new Error(d.message||'Finance API gagal');
+  return {res:r,token:t};
+}
+async function _doPost(mode,params,tokenOverride){
+  var t=tokenOverride||await sessionToken();
+  var body=Object.assign({mode:mode},params||{});
+  var r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+t},body:JSON.stringify(body)});
+  return {res:r,token:t};
+}
+async function _readJson(r){var d=await r.json().catch(function(){return{}});return d}
+async function apiGet(mode,params){
+  var out=await _doGet(mode,params);
+  if(out.res.status===401){
+    if(global.RifimPortalSession&&typeof global.RifimPortalSession.invalidate==='function')global.RifimPortalSession.invalidate();
+    out=await _doGet(mode,params);
+  }
+  var d=await _readJson(out.res);
+  if(!out.res.ok||d.success!==true)throw new Error(d.message||'Finance API gagal');
   return d;
 }
 async function apiPost(mode,params){
-  var t=await sessionToken();
-  var body=Object.assign({mode:mode},params||{});
-  var r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+t},body:JSON.stringify(body)});
-  var d=await r.json().catch(function(){return{}});
-  if(!r.ok||d.success!==true)throw new Error(d.message||'Finance API gagal');
+  var out=await _doPost(mode,params);
+  if(out.res.status===401){
+    if(global.RifimPortalSession&&typeof global.RifimPortalSession.invalidate==='function')global.RifimPortalSession.invalidate();
+    out=await _doPost(mode,params);
+  }
+  var d=await _readJson(out.res);
+  if(!out.res.ok||d.success!==true)throw new Error(d.message||'Finance API gagal');
   return d;
 }
 

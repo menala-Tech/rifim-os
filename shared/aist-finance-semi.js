@@ -110,11 +110,19 @@
   // (already emitted by loadSaldoRaos in modules/finance/index.html).
   function readRowFromButton(manualButton) {
     var tr = manualButton.closest('tr');
+    // Item 1 (2026-08-26): payload nominal MUST come from RAW saldo request
+    // (data-saldo-nominal), not the invoice-rounded value displayed in the
+    // Finance table (data-nominal). See modules/finance/index.html
+    // loadSaldoRaos row template + shared/finance-data-router.saldoList.
+    // Fallback ke data-nominal hanya untuk kompat lama seandainya tombol
+    // ter-render sebelum patch attribute; contract test menegakkan RAW.
+    var rawNominal = manualButton.dataset.saldoNominal;
+    if (rawNominal == null || rawNominal === '') rawNominal = manualButton.dataset.nominal;
     return {
       request_id: manualButton.dataset.markSaldo || '',
       driver_login: safeStr(manualButton.dataset.driverLogin).replace(/^-$/, ''),
       driver_name: safeStr(manualButton.dataset.driverName).replace(/^-$/, ''),
-      nominal: parseNominal(manualButton.dataset.nominal),
+      nominal: parseNominal(rawNominal),
       branch_name: tr && tr.cells[1] ? safeStr(tr.cells[1].textContent) : '',
       staff_name: tr && tr.cells[2] ? safeStr(tr.cells[2].textContent.split('\n')[0]) : '',
       request_no: manualButton.dataset.requestNo || '',
@@ -232,6 +240,7 @@
     buildSemiPayload: buildSemiPayload,
     encodePayload: encodePayload,
     parseNominal: parseNominal,
+    readRowFromButton: readRowFromButton,
     CLIPBOARD_PREFIX: CLIPBOARD_PREFIX,
     SOURCE_TAG: SOURCE_TAG,
   };

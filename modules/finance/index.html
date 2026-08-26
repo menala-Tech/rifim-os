@@ -348,6 +348,11 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <input class="grow" placeholder="Cari driver / staff / no request…" id="sr-search">
         <button class="btn ghost small">🔄 Refresh</button>
         <button class="btn ghost small" onclick="window.open('https://aist-id.taxsee.com/', '_blank', 'noopener,noreferrer')" title="Buka AIST Maxim di tab baru">🌐 Buka AIST</button>
+        <!-- Item 3 (2026-08-26): entry point ke halaman install bookmarklet
+             "Fill AIST Saldo" (drag-to-bookmarks-bar). Rewrite di vercel.json
+             mengarahkan /aist-install ke automation/aist-bookmarklet/install.html
+             agar URL pendek dan mudah dishare ke operator. -->
+        <button class="btn ghost small" onclick="window.open('/aist-install', '_blank', 'noopener,noreferrer')" title="Halaman install bookmarklet Fill AIST Saldo (drag ke bookmark bar Chrome)">🔖 Pasang Bookmark Fill AIST</button>
       </div>
       <table class="tbl">
         <thead><tr>
@@ -948,13 +953,18 @@ async function loadSaldoRaos() {
       const driverCell = r.driver_name || r.driver_login_id
         ? `${esc(r.driver_name || '—')}${r.driver_login_id ? '<br><span style="font-size:11px;color:#38bdf8">' + esc(r.driver_login_id) + '</span>' : ''}`
         : '<span style="font-size:11px;color:#666">—</span>';
+      const rawSaldo = r.saldo_nominal != null ? Number(r.saldo_nominal) : Number(r.nominal || 0);
+      const invoiceNominal = Number(r.nominal || 0);
+      const amountCell = rawSaldo !== invoiceNominal
+        ? `Saldo: ${fmtRp(rawSaldo)}<br><span style="font-size:11px;color:#888;font-weight:400">Invoice: ${fmtRp(invoiceNominal)}</span>`
+        : fmtRp(invoiceNominal);
       return `
         <tr>
           <td class="key" style="font-family:monospace;font-size:11px;color:#facc15">${esc(r.id.substring(0, 8))}…</td>
           <td style="font-size:11px">${esc(r.branch_name || '—')}</td>
           <td>${staffCell}</td>
           <td>${driverCell}</td>
-          <td style="text-align:right;font-weight:600">${fmtRp(r.nominal)}</td>
+          <td style="text-align:right;font-weight:600">${amountCell}</td>
           <td>${statusChip}</td>
           <td style="font-size:11px">${fmtDateTime(r.created_at)}</td>
           <td>${r.is_processed ? '—' : (['pending','approved'].includes(r.status) ? '<button class="btn ok small" data-mark-saldo="' + esc(r.id) + '"' +
@@ -962,6 +972,12 @@ async function loadSaldoRaos() {
             ' data-driver-name="' + esc(r.driver_name || '-') + '"' +
             ' data-driver-login="' + esc(r.driver_login_id || '-') + '"' +
             ' data-nominal="' + esc(String(r.nominal || 0)) + '"' +
+            // Item 1 (2026-08-26): expose RAW saldo nominal separately.
+            // r.nominal is invoice-rounded (finance-data-router.saldoList
+            // overwrites nominal with invoiceNominal(raw) for display).
+            // AIST payload must use RAW request amount, not invoice.
+            // finance-data-router preserves the raw as r.saldo_nominal.
+            ' data-saldo-nominal="' + esc(String(r.saldo_nominal != null ? r.saldo_nominal : (r.nominal || 0))) + '"' +
             '>✓ Konfirmasi AIST Berhasil</button>' : '<span style="font-size:11px;color:#888">—</span>')}</td>
         </tr>`;
     }).join('');
@@ -988,13 +1004,16 @@ async function markSaldoPaid(btn) {
   const requestNo = btn.dataset.requestNo || '-';
   const driverName = btn.dataset.driverName || '-';
   const driverLogin = btn.dataset.driverLogin || '-';
-  const nominal = fmtRp(Number(btn.dataset.nominal || 0));
+  const rawSaldoValue = Number(btn.dataset.saldoNominal != null ? btn.dataset.saldoNominal : (btn.dataset.nominal || 0));
+  const invoiceNominal = Number(btn.dataset.nominal || 0);
+  const nominal = fmtRp(rawSaldoValue);
+  const invoiceLine = rawSaldoValue !== invoiceNominal ? `\nInvoice: ${fmtRp(invoiceNominal)}` : '';
 
   const confirmMsg = 'Pastikan saldo sudah benar-benar berhasil diposting di AIST sebelum mengonfirmasi.\n\n' +
     `Request No: ${requestNo}\n` +
     `Driver: ${driverName}\n` +
     `Login ID: ${driverLogin}\n` +
-    `Nominal: ${nominal}\n\n` +
+    `Saldo (AIST): ${nominal}${invoiceLine}\n\n` +
     'Lanjutkan Konfirmasi AIST Berhasil?';
   if (!confirm(confirmMsg)) return;
 
