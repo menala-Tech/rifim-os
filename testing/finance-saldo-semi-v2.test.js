@@ -103,7 +103,8 @@ assert.ok(encoded.indexOf('MENALA_AIST_V2:') === 0, 'clipboard prefix present');
 // Bookmarklet decodeAndValidate diekstrak lewat regex + eval bertopeng.
 const bookmarkletSrc = read('automation/aist-bookmarklet/aist-fill-v2.source.js');
 // Ambil hanya fungsi decodeAndValidate + eksekusi dalam sandbox.
-const fnMatch = bookmarkletSrc.match(/function decodeAndValidate\([\s\S]*?\n  \}\n/);
+// CRLF-tolerant: bookmarklet file may be checked out with \r\n on Windows.
+const fnMatch = bookmarkletSrc.match(/function decodeAndValidate\([\s\S]*?\r?\n  \}\r?\n/);
 assert.ok(fnMatch, 'decodeAndValidate ditemukan di bookmarklet');
 
 const ctx = {
@@ -206,5 +207,52 @@ const semiSrc = read('shared/aist-finance-semi.js');
     'aist-finance-semi.js TIDAK boleh mengandung "' + needle + '"');
 });
 console.log('  ok  Finance semi module bebas backend mutation');
+
+// ── 13. Item 1 (2026-08-26): readRowFromButton prefers RAW saldo nominal
+//        (data-saldo-nominal) over invoice-rounded data-nominal.
+// Regression untuk field-UAT: 45k → invoice 50k, payload harus tetap 45000.
+assert.ok(typeof semi.readRowFromButton === 'function', 'readRowFromButton exposed');
+function mkBtnStub(ds) {
+  return {
+    dataset: ds,
+    closest: () => ({ cells: [{}, { textContent: 'CGK' }, { textContent: 'Bobby' }] }),
+  };
+}
+[
+  { raw: 45000,  invoice: 50000  },
+  { raw: 95000,  invoice: 100000 },
+  { raw: 140000, invoice: 150000 },
+  { raw: 195000, invoice: 200000 },
+  { raw: 200000, invoice: 200000 },
+].forEach(({ raw, invoice }) => {
+  const btn = mkBtnStub({
+    markSaldo: 'req-' + raw,
+    driverLogin: '200108666',
+    driverName: 'Wahyudi',
+    requestNo: 'A-1',
+    nominal: String(invoice),        // display invoice (bug source)
+    saldoNominal: String(raw),       // RAW saldo (fix)
+  });
+  const row = semi.readRowFromButton(btn);
+  assert.strictEqual(row.nominal, raw,
+    `raw ${raw} / invoice ${invoice} → readRowFromButton.nominal=${row.nominal} (expected ${raw})`);
+  const payload = semi.buildSemiPayload(row);
+  assert.strictEqual(payload.nominal, raw,
+    `payload.nominal must be RAW ${raw}, got ${payload.nominal}`);
+});
+console.log('  ok  Item 1 — RAW saldo nominal preserved end-to-end (45k/95k/140k/195k/200k)');
+
+// Fallback: legacy button tanpa data-saldo-nominal → tetap pakai data-nominal
+// (jangan sampai patch me-null-kan value baris lama saat progressive rollout).
+const legacyBtn = mkBtnStub({
+  markSaldo: 'req-legacy',
+  driverLogin: '200108666',
+  driverName: 'X',
+  requestNo: 'A-2',
+  nominal: '77000',
+});
+assert.strictEqual(semi.readRowFromButton(legacyBtn).nominal, 77000,
+  'fallback ke data-nominal saat data-saldo-nominal belum tersedia');
+console.log('  ok  Item 1 — fallback ke data-nominal untuk baris legacy');
 
 console.log('\nAll semi-V2 contract assertions PASS.');

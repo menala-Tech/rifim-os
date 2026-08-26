@@ -962,6 +962,12 @@ async function loadSaldoRaos() {
             ' data-driver-name="' + esc(r.driver_name || '-') + '"' +
             ' data-driver-login="' + esc(r.driver_login_id || '-') + '"' +
             ' data-nominal="' + esc(String(r.nominal || 0)) + '"' +
+            // Item 1 (2026-08-26): expose RAW saldo nominal separately.
+            // r.nominal is invoice-rounded (finance-data-router.saldoList
+            // overwrites nominal with invoiceNominal(raw) for display).
+            // AIST payload must use RAW request amount, not invoice.
+            // finance-data-router preserves the raw as r.saldo_nominal.
+            ' data-saldo-nominal="' + esc(String(r.saldo_nominal != null ? r.saldo_nominal : (r.nominal || 0))) + '"' +
             '>✓ Konfirmasi AIST Berhasil</button>' : '<span style="font-size:11px;color:#888">—</span>')}</td>
         </tr>`;
     }).join('');
