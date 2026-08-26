@@ -18,7 +18,8 @@
     { "source": "/finance", "destination": "/modules/finance/index.html" },
     { "source": "/finance/(.*)", "destination": "/modules/finance/$1" },
     { "source": "/sistem", "destination": "/modules/sistem/v3-shell.html" },
-    { "source": "/sistem/(.*)", "destination": "/modules/sistem/$1" }
+    { "source": "/sistem/(.*)", "destination": "/modules/sistem/$1" },
+    { "source": "/aist-install", "destination": "/automation/aist-bookmarklet/install.html" }
   ],
   "redirects": [
     { "source": "/raos", "destination": "https://raos-menala.vercel.app", "permanent": false },

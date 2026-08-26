@@ -348,6 +348,11 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <input class="grow" placeholder="Cari driver / staff / no request…" id="sr-search">
         <button class="btn ghost small">🔄 Refresh</button>
         <button class="btn ghost small" onclick="window.open('https://aist-id.taxsee.com/', '_blank', 'noopener,noreferrer')" title="Buka AIST Maxim di tab baru">🌐 Buka AIST</button>
+        <!-- Item 3 (2026-08-26): entry point ke halaman install bookmarklet
+             "Fill AIST Saldo" (drag-to-bookmarks-bar). Rewrite di vercel.json
+             mengarahkan /aist-install ke automation/aist-bookmarklet/install.html
+             agar URL pendek dan mudah dishare ke operator. -->
+        <button class="btn ghost small" onclick="window.open('/aist-install', '_blank', 'noopener,noreferrer')" title="Halaman install bookmarklet Fill AIST Saldo (drag ke bookmark bar Chrome)">🔖 Pasang Bookmark Fill AIST</button>
       </div>
       <table class="tbl">
         <thead><tr>
