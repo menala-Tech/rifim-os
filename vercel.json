@@ -7,31 +7,100 @@
     }
   },
   "rewrites": [
-    { "source": "/", "destination": "/index.html" },
-    { "source": "/portal", "destination": "/modules/portal/secure.html" },
-    { "source": "/smart-office", "destination": "/modules/smart-office/v2-shell.html" },
-    { "source": "/smart-office/(.*)", "destination": "/modules/smart-office/$1" },
-    { "source": "/hris", "destination": "/modules/hris/index.html" },
-    { "source": "/hris/(.*)", "destination": "/modules/hris/$1" },
-    { "source": "/crm", "destination": "/modules/crm/index.html" },
-    { "source": "/crm/(.*)", "destination": "/modules/crm/$1" },
-    { "source": "/finance", "destination": "/modules/finance/index.html" },
-    { "source": "/finance/(.*)", "destination": "/modules/finance/$1" },
-    { "source": "/sistem", "destination": "/modules/sistem/v3-shell.html" },
-    { "source": "/sistem/(.*)", "destination": "/modules/sistem/$1" },
-    { "source": "/aist-install", "destination": "/automation/aist-bookmarklet/install.html" },
-    { "source": "/aist-handoff", "destination": "/automation/aist-bookmarklet/handoff.html" },
-    { "source": "/api/aist-queue", "destination": "/api/internal/hris-contracts?mode=aist_queue" }
+    {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/portal",
+      "destination": "/modules/portal/secure.html"
+    },
+    {
+      "source": "/smart-office",
+      "destination": "/modules/smart-office/v2-shell.html"
+    },
+    {
+      "source": "/smart-office/(.*)",
+      "destination": "/modules/smart-office/$1"
+    },
+    {
+      "source": "/hris",
+      "destination": "/modules/hris/index.html"
+    },
+    {
+      "source": "/hris/(.*)",
+      "destination": "/modules/hris/$1"
+    },
+    {
+      "source": "/crm",
+      "destination": "/modules/crm/index.html"
+    },
+    {
+      "source": "/crm/(.*)",
+      "destination": "/modules/crm/$1"
+    },
+    {
+      "source": "/finance",
+      "destination": "/modules/finance/index.html"
+    },
+    {
+      "source": "/finance/(.*)",
+      "destination": "/modules/finance/$1"
+    },
+    {
+      "source": "/sistem",
+      "destination": "/modules/sistem/v3-shell.html"
+    },
+    {
+      "source": "/sistem/(.*)",
+      "destination": "/modules/sistem/$1"
+    },
+    {
+      "source": "/aist-install",
+      "destination": "/automation/aist-bookmarklet/install.html"
+    },
+    {
+      "source": "/aist-handoff",
+      "destination": "/automation/aist-bookmarklet/handoff.html"
+    },
+    {
+      "source": "/aist-bookmarklet-source",
+      "destination": "/automation/aist-bookmarklet/aist-fill-v2.source.js"
+    },
+    {
+      "source": "/api/aist-queue",
+      "destination": "/api/internal/hris-contracts?mode=aist_queue"
+    }
   ],
   "redirects": [
-    { "source": "/raos", "destination": "https://raos-menala.vercel.app", "permanent": false },
-    { "source": "/raos/(.*)", "destination": "https://raos-menala.vercel.app/$1", "permanent": false }
+    {
+      "source": "/raos",
+      "destination": "https://raos-menala.vercel.app",
+      "permanent": false
+    },
+    {
+      "source": "/raos/(.*)",
+      "destination": "https://raos-menala.vercel.app/$1",
+      "permanent": false
+    }
   ],
   "headers": [
-    { "source": "/(.*)", "headers": [
-      { "key": "X-Content-Type-Options", "value": "nosniff" },
-      { "key": "X-Frame-Options", "value": "DENY" },
-      { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
-    ] }
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    }
   ]
 }
