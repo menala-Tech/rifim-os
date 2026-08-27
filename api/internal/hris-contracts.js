@@ -26,7 +26,45 @@
 function env(n){return String(process.env[n]||'').trim()}
 async function read(res){const t=await res.text();try{return t?JSON.parse(t):{}}catch(_){return{message:t||`HTTP ${res.status}`}}}
 function out(res,s,b){res.status(s).setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(b))}
+const crypto=require('crypto');
 function q(v){return encodeURIComponent(String(v==null?'':v))}
+const AIST_HANDOFF_TTL_MS=10*60*1000;
+function aistSecret(){
+  const s=env('AIST_HANDOFF_SECRET');
+  if(!s) throw new Error('AIST_HANDOFF_SECRET missing');
+  return s;
+}
+function b64uEncode(b){return b.toString('base64url').replace(/=+$/,'')}
+function b64uDecode(s){return Buffer.from(String(s).replace(/-/g,'+').replace(/_/g,'/') + '=='.slice(0,(4 - String(s).length % 4) % 4),'base64')}
+function issueAistHandoff(){
+  const secret=aistSecret(); if(!secret) throw new Error('AIST handoff secret missing');
+  const exp=Date.now()+AIST_HANDOFF_TTL_MS;
+  const nonce=b64uEncode(crypto.randomBytes(16));
+  const p={exp,scope:'aist_queue_read',nonce};
+  const body=JSON.stringify(p);
+  const sig=b64uEncode(crypto.createHmac('sha256',secret).update(body).digest());
+  const token=b64uEncode(Buffer.from(JSON.stringify({p,s:sig})));
+  return {token,expires_at:new Date(exp).toISOString(),scope:p.scope};
+}
+function verifyAistHandoff(token){
+  const secret=aistSecret(); if(!secret) throw new Error('AIST handoff secret missing');
+  try{
+    const raw=JSON.parse(b64uDecode(token).toString('utf8'));
+    if(!raw||!raw.p||!raw.s) throw new Error('token format invalid');
+    const p=raw.p;
+    if(typeof p.exp!=='number'||p.exp<Date.now()) throw new Error('token expired');
+    if(p.scope!=='aist_queue_read') throw new Error('token scope invalid');
+    const body=JSON.stringify(p);
+    const sig=b64uEncode(crypto.createHmac('sha256',secret).update(body).digest());
+    if(sig!==raw.s) throw new Error('token signature invalid');
+    return p;
+  }catch(e){ throw new Error('token invalid: '+(e.message||e)); }
+}
+function aistQueueToken(req){
+  const q=req.query||{}, b=req.body||{};
+  return String(q.t||b.t||req.headers['x-aist-handoff']||'').trim();
+}
+
 function roleOf(v){v=String(v||'').toLowerCase();return v==='direktur'?'direksi':v==='koord'?'koordinator':v==='mgmt'?'management':v}
 function monthDate(v){const s=String(v||'').trim();if(/^\d{4}-\d{2}$/.test(s))return s+'-01';if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s.slice(0,7)+'-01';const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`}
 function monthNext(start){const y=+start.slice(0,4),m=+start.slice(5,7);const n=m===12?1:m+1,ny=n===1?y+1:y;return `${ny}-${String(n).padStart(2,'0')}-01`}
@@ -276,6 +314,51 @@ async function financeLegacyGas(req,p){
 // client-supplied action/token fields removed, bounded retry, and the same
 // diagnostic logging. The GAS crmApi.js write-role gate still runs, but the
 // browser no longer sends the token across the network.
+const { invoiceNominal } = require('../../shared/aist-invoice-nominal.js');
+const AIST_EXCLUDED_STATUS = new Set([
+  'lunas','paid','ditolak','dibatalkan','selesai','completed','rejected','cancelled'
+]);
+
+function formatWib(iso){
+  if(!iso) return '';
+  try{
+    const d = new Date(iso);
+    return d.toLocaleString('id-ID',{timeZone:'Asia/Jakarta',hour12:false});
+  }catch(_){return String(iso);}
+}
+
+async function listAistQueue(){
+  const exclude = Array.from(AIST_EXCLUDED_STATUS).map(q).join(',');
+  const path = `/rest/v1/raos_saldo_requests?select=id,request_no,staff_id,branch_id,nominal,status,requested_at,created_at,is_processed,driver_id,driver_login_id,driver_name,client_id&is_processed=eq.false&status=not.in.(${exclude})&driver_login_id=not.is.null&nominal=gt.0&order=created_at.desc&limit=500`;
+  const rows = await sb(path);
+  const staffIds = [...new Set((rows||[]).map(x=>x.staff_id).filter(Boolean))];
+  const branchIds = [...new Set((rows||[]).map(x=>x.branch_id).filter(Boolean))];
+  let prof=[], branches=[];
+  if(staffIds.length) prof = await sb(`/rest/v1/user_profiles?id=in.(${staffIds.map(q).join(',')})&select=id,full_name,staff_id`);
+  if(branchIds.length) branches = await sb(`/rest/v1/branches?id=in.(${branchIds.map(q).join(',')})&select=id,name,slug`);
+  const pm = Object.fromEntries((prof||[]).map(x=>[String(x.id),x]));
+  const bm = Object.fromEntries((branches||[]).map(x=>[String(x.id),x]));
+  return (rows||[]).map(r=>{
+    const raw = Number(r.nominal)||0;
+    const s = pm[String(r.staff_id)]||{};
+    const b = bm[String(r.branch_id)]||{};
+    return {
+      request_id: String(r.id),
+      request_no: String(r.request_no||''),
+      driver_login: String(r.driver_login_id).replace(/\D/g,''),
+      driver_name: String(r.driver_name||''),
+      branch_name: String(b.name||b.slug||''),
+      staff_name: String(s.full_name||''),
+      staff_code: String(s.staff_id||''),
+      saldo_nominal: raw,
+      invoice_nominal: invoiceNominal(raw),
+      submitted_at: r.requested_at || r.created_at,
+      submitted_at_wib: formatWib(r.requested_at || r.created_at),
+      status: String(r.status||'pending'),
+    };
+  });
+}
+
 const TAGIHAN_GAS_ACTIONS=new Set(['finance_tagihan_add','finance_tagihan_mark_paid']);
 async function financeTagihan(req,p,mode){
   financeWrite(p);
@@ -326,7 +409,26 @@ async function financeTagihan(req,p,mode){
 
 module.exports=async function handler(req,res){
   try{
-    const p=await actor(req),mode=String(req.query.mode||req.body?.mode||'');
+    const mode=String(req.query.mode||req.body?.mode||'');
+    if(mode==='aist_queue'){
+      res.setHeader('Access-Control-Allow-Origin','*');
+      res.setHeader('Access-Control-Allow-Methods','GET, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers','Content-Type');
+      if(req.method==='OPTIONS') return out(res,200,{success:true});
+      if(req.method==='GET'){
+        try{
+          verifyAistHandoff(aistQueueToken(req));
+          return out(res,200,{success:true,rows:await listAistQueue(),source:'supabase'});
+        }catch(e){return out(res,403,{success:false,message:'AIST handoff token missing, invalid, expired, or wrong scope'});}
+      }
+      return out(res,405,{success:false,message:'Method not allowed'});
+    }
+    const p=await actor(req);
+    if(req.method==='POST'&&mode==='aist_queue_issue'){
+      financeRead(p);
+      const h=issueAistHandoff();
+      return out(res,200,{success:true,token:h.token,expires_at:h.expires_at,scope:h.scope});
+    }
     if(req.method==='GET'&&mode==='finance_saldo_list')return out(res,200,{success:true,rows:await listSaldo(req,p),source:'supabase'});
     if(req.method==='POST'&&mode==='finance_saldo_mark_paid'){const r=await markSaldo(req,p);return out(res,200,{success:true,...(r||{})})}
     if(req.method==='GET'&&mode==='finance_branches')return out(res,200,{success:true,rows:await listFinanceBranches(req,p),source:'supabase'});
