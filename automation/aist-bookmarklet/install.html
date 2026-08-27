@@ -64,8 +64,11 @@ code { background: rgba(0,0,0,.4); padding: 2px 6px; border-radius: 3px; font-si
 </div>
 
 <script>
-fetch('aist-fill-v2.source.js')
-  .then(r => r.text())
+fetch('/aist-bookmarklet-source', { cache: 'no-store' })
+  .then(r => {
+    if (!r.ok) throw new Error('Bookmarklet source HTTP ' + r.status);
+    return r.text();
+  })
   .then(src => {
     const min = src
       .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -77,7 +80,18 @@ fetch('aist-fill-v2.source.js')
     const href = 'javascript:' + encodeURIComponent(patched);
     document.getElementById('bookmark-link').href = href;
   })
-  .catch(err => console.error('load bookmarklet source gagal:', err));
+  .catch(err => {
+    console.error('load bookmarklet source gagal:', err);
+    const link = document.getElementById('bookmark-link');
+    link.removeAttribute('href');
+    link.style.opacity = '.55';
+    link.style.cursor = 'not-allowed';
+    link.textContent = 'Bookmarklet gagal dimuat';
+    const msg = document.createElement('p');
+    msg.className = 'note';
+    msg.textContent = 'Source bookmarklet tidak berhasil dimuat. Jangan pasang bookmark dari halaman ini. Refresh lalu coba lagi.';
+    link.parentNode.appendChild(msg);
+  });
 </script>
 </body>
 </html>
