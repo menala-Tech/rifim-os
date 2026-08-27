@@ -28,7 +28,9 @@ code { background: rgba(0,0,0,.4); padding: 2px 6px; border-radius: 3px; font-si
   <div class="card">
     <h2>1. Drag tombol ini ke bookmark bar</h2>
     <a class="bookmark-btn" id="bookmark-link" href="#" onclick="return false">Fill AIST Saldo</a>
-    <p style="font-size:12px;color:#888">Tarik ke Bookmarks Bar Chrome/Edge/Brave. Kalau bar tidak muncul: <code>Ctrl+Shift+B</code>.</p>
+    <button class="bookmark-btn" id="copy-bookmarklet" type="button" style="margin-left:8px;cursor:pointer;border:0">Salin URL Bookmarklet</button>
+    <p id="bookmark-status" style="font-size:12px;color:#888">Memuat source bookmarklet...</p>
+    <p style="font-size:12px;color:#888;margin-top:8px">Cara 1: tarik <b>Fill AIST Saldo</b> ke Bookmarks Bar. Cara 2: klik <b>Salin URL Bookmarklet</b> lalu buat/edit bookmark dan paste ke kolom URL. Kalau bar tidak muncul: <code>Ctrl+Shift+B</code>.</p>
   </div>
 
   <div class="card">
@@ -70,6 +72,9 @@ fetch('/aist-bookmarklet-source', { cache: 'no-store' })
     return r.text();
   })
   .then(src => {
+    if (!src.includes('MENALA_AIST_HANDOFF') || !src.includes('startOneClickHandoff')) {
+      throw new Error('Source bookmarklet tidak valid');
+    }
     const min = src
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/^\s*\/\/.*$/gm, '')
@@ -78,7 +83,22 @@ fetch('/aist-bookmarklet-source', { cache: 'no-store' })
     const base = 'https://rifim-os.vercel.app';
     const patched = min.split(base).join(location.origin);
     const href = 'javascript:' + encodeURIComponent(patched);
-    document.getElementById('bookmark-link').href = href;
+    const link = document.getElementById('bookmark-link');
+    const copy = document.getElementById('copy-bookmarklet');
+    const status = document.getElementById('bookmark-status');
+    link.href = href;
+    status.textContent = 'Bookmarklet siap dipasang.';
+    status.style.color = '#4ade80';
+    copy.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(href);
+        status.textContent = 'URL bookmarklet sudah disalin. Paste ke kolom URL bookmark Chrome.';
+        status.style.color = '#4ade80';
+      } catch (e) {
+        status.textContent = 'Clipboard diblokir browser. Gunakan drag tombol Fill AIST Saldo.';
+        status.style.color = '#facc15';
+      }
+    };
   })
   .catch(err => {
     console.error('load bookmarklet source gagal:', err);
@@ -87,6 +107,13 @@ fetch('/aist-bookmarklet-source', { cache: 'no-store' })
     link.style.opacity = '.55';
     link.style.cursor = 'not-allowed';
     link.textContent = 'Bookmarklet gagal dimuat';
+    const copy = document.getElementById('copy-bookmarklet');
+    if (copy) copy.disabled = true;
+    const status = document.getElementById('bookmark-status');
+    if (status) {
+      status.textContent = 'Source bookmarklet gagal dimuat. Jangan pasang bookmark dari halaman ini.';
+      status.style.color = '#f87171';
+    }
     const msg = document.createElement('p');
     msg.className = 'note';
     msg.textContent = 'Source bookmarklet tidak berhasil dimuat. Jangan pasang bookmark dari halaman ini. Refresh lalu coba lagi.';
