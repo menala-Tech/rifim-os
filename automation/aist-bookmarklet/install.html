@@ -33,35 +33,30 @@ code { background: rgba(0,0,0,.4); padding: 2px 6px; border-radius: 3px; font-si
 
   <div class="card">
     <h2>2. Alur operator (queue picker, non-Lunas)</h2>
-    <div class="step">1. Buka AIST → <b>Document → Add → Balance replenishment</b>. Pilih Subdivision + Currency manual seperti biasa.</div>
-    <div class="step">2. Klik bookmark <b>Fill AIST Saldo</b>. Modal antrian muncul mengambil data pending dari RIFIM.</div>
-    <div class="step">3. Klik baris yang sesuai (verifikasi Cabang / Staff / Driver / Login / Saldo / Invoice).</div>
-    <div class="step">4. Bookmarklet mengisi <b>Driver login</b> dan <b>Amount</b> dengan <b>SALDO RAW</b>, lalu membaca kembali. Jika tidak cocok → fail closed, JANGAN submit.</div>
-    <div class="step">5. Operator memeriksa nilai + tekan <b>OK/Save</b> di AIST secara <b>manual</b>. Bookmarklet TIDAK submit dan TIDAK menandai Lunas.</div>
-    <div class="step">6. Setelah AIST mengembalikan sukses, kembali ke <a href="https://rifim-os.vercel.app/finance#saldo-raos" target="_blank" style="color:#4ade80">RIFIM Finance → Isi Saldo (RAOS)</a> dan klik <b>✓ Konfirmasi AIST Berhasil</b> untuk menandai Lunas.</div>
+    <div class="step">1. Buka RIFIM <a href="https://rifim-os.vercel.app/finance#saldo-raos" target="_blank" style="color:#4ade80">Finance → Isi Saldo (RAOS)</a> dan klik <b>🎫 Siapkan AIST Queue</b>. Token 10 menit disalin ke clipboard.</div>
+    <div class="step">2. Buka tab baru → <b>AIST</b> → <b>Document → Add → Balance replenishment</b>. Pilih Subdivision + Currency manual seperti biasa.</div>
+    <div class="step">3. Klik bookmark <b>Fill AIST Saldo</b>. Modal antrian muncul mengambil data pending dari RIFIM.</div>
+    <div class="step">4. Klik baris yang sesuai (verifikasi Cabang / Staff / Driver / Login / Saldo / Invoice).</div>
+    <div class="step">5. Bookmarklet mengisi <b>Driver login</b> dan <b>Amount</b> dengan <b>SALDO RAW</b>, lalu membaca kembali. Jika tidak cocok → fail closed, JANGAN submit.</div>
+    <div class="step">6. Operator memeriksa nilai + tekan <b>OK/Save</b> di AIST secara <b>manual</b>. Bookmarklet TIDAK submit dan TIDAK menandai Lunas.</div>
   </div>
 
   <div class="card">
-    <h2>3. Fallback manual</h2>
-    <div class="step">Kalau browser menolak clipboard read/write: pakai tombol <b>📋 Login</b> dan <b>📋 Nominal</b> di baris yang sama, lalu paste manual ke form AIST.</div>
-  </div>
-
-  <div class="card">
-    <h2>4. Perbedaan vs bookmarklet lama</h2>
+    <h2>3. Perbedaan vs bookmarklet lama</h2>
     <div class="diff">
       <b>Lama (V1 sheet queue)</b>: baca dari Google Sheet Pengisian Saldo, tandai isi = checkbox kolom G.<br>
       <b>Lama (V2 sebelum sesi ini)</b>: bookmarklet fetch <code>finance_saldo_raos_list</code> dari GAS, mengirim <code>rifim_auth.access_token</code> cross-origin, dan memanggil <code>finance_saldo_raos_mark_paid</code> otomatis setelah fill.<br>
-      <b>V2 semi (2026-08-26)</b>: bookmarklet <b>tidak</b> memanggil GAS, <b>tidak</b> membaca <code>rifim_auth</code>, dan <b>tidak</b> menandai Lunas. Sumber pilihan = Finance UI. Handoff = clipboard <code>MENALA_AIST_V2:&lt;base64&gt;</code> dengan TTL 10 menit.
+      <b>V2 token (2026-08-27)</b>: bookmarklet <b>tidak</b> memanggil GAS, <b>tidak</b> membaca <code>rifim_auth</code>, dan <b>tidak</b> menandai Lunas. Sumber pilihan = Finance UI. Handoff = clipboard <code>MENALA_AIST_HANDOFF:&lt;token&gt;</code> dengan TTL 10 menit, ditandatangani dengan <code>AIST_HANDOFF_SECRET</code>.
     </div>
   </div>
 
   <div class="card">
-    <h2>5. Troubleshooting</h2>
-    <div class="step">🔴 <b>"Clipboard kosong / bukan payload MENALA_AIST_V2"</b> → kembali ke Finance dan klik 🪄 Fill AIST dulu.</div>
+    <h2>4. Troubleshooting</h2>
+    <div class="step">🔴 <b>"Token AIST tidak ditemukan di clipboard"</b> → kembali ke Finance dan klik <b>🎫 Siapkan AIST Queue</b> dulu.</div>
+    <div class="step">🔴 <b>"Token AIST tidak valid, expired, atau belum aktif"</b> → token lebih dari 10 menit. Buat ulang di Finance.</div>
     <div class="step">🔴 <b>"Form AIST tidak terdeteksi"</b> → buka form Balance replenishment dulu, tunggu Amount + Driver login muncul, baru klik bookmark.</div>
-    <div class="step">🔴 <b>"Payload kedaluwarsa"</b> → payload &gt;10 menit. Pilih ulang di Finance.</div>
-    <div class="step">🔴 <b>"Read-back Amount TIDAK cocok"</b> → jangan tekan OK di AIST. Cek input custom / mask / mata uang, atau paste manual pakai Copy Nominal.</div>
-    <div class="step">🔴 <b>Browser tolak <code>navigator.clipboard</code></b> → pastikan tab AIST punya user gesture (klik bookmark), atau gunakan mode manual.</div>
+    <div class="step">🔴 <b>"Read-back Amount TIDAK cocok"</b> → jangan tekan OK di AIST. Cek input custom / mask / mata uang, atau paste manual.</div>
+    <div class="step">🔴 <b>Browser tolak <code>navigator.clipboard</code></b> → pastikan tab AIST punya user gesture (klik bookmark). Kalau tetap ditolak, buat ulang token dan paste manual <code>MENALA_AIST_HANDOFF:&lt;token&gt;</code> ke console.</div>
   </div>
 
   <p class="note">Source: <code>automation/aist-bookmarklet/aist-fill-v2.source.js</code>. Kalau selector Amount/Login berubah di AIST, sesuaikan di <code>findInputByLabel()</code>.</p>
