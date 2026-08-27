@@ -347,6 +347,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <select id="sr-branch"><option value="">Semua Cabang</option></select>
         <input class="grow" placeholder="Cari driver / staff / no request…" id="sr-search">
         <button class="btn ghost small">🔄 Refresh</button>
+        <button class="btn ghost small" id="sr-issue-aist" title="Buat token AIST 10 menit untuk queue picker">🎫 Siapkan AIST Queue</button>
         <button class="btn ghost small" onclick="window.open('https://aist-id.taxsee.com/', '_blank', 'noopener,noreferrer')" title="Buka AIST Maxim di tab baru">🌐 Buka AIST</button>
         <!-- Item 3 (2026-08-26): entry point ke halaman install bookmarklet
              "Fill AIST Saldo" (drag-to-bookmarks-bar). Rewrite di vercel.json
@@ -1187,6 +1188,30 @@ function _srNotify(payload) {
   if (activeTab && activeTab.dataset.tab === 'saldo-raos') loadSaldoRaos();
 }
 
+async function issueAistHandoff() {
+  const btn = document.getElementById('sr-issue-aist');
+  const original = btn ? btn.textContent : '🎫 Siapkan AIST Queue';
+  try {
+    const token = await _finGetAccessToken();
+    if (!token) throw new Error('Session Finance tidak ditemukan.');
+    const r = await fetch('/api/internal/hris-contracts?mode=aist_queue_issue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ mode: 'aist_queue_issue' })
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || data.success !== true || !data.token) throw new Error(data.message || 'Gagal membuat token AIST');
+    const payload = 'MENALA_AIST_HANDOFF:' + data.token;
+    await navigator.clipboard.writeText(payload);
+    const expires = new Date(data.expires_at).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' });
+    showToast(`🎫 AIST Queue aktif sampai ${expires} WIB. Token disalin ke clipboard.`, 'ok');
+  } catch (err) {
+    if (typeof showToast === 'function') showToast('❌ ' + (err && err.message ? err.message : String(err)), 'err');
+  } finally {
+    if (btn) { setTimeout(() => { btn.textContent = original; }, 2000); }
+  }
+}
+
 async function _srFallbackPoll() {
   try {
     const data = await _gasCall('finance_saldo_raos_list', { status: 'pending' });
@@ -1665,6 +1690,7 @@ function wireFinanceHandlers() {
     if (b.textContent.indexOf('Tagihan Baru') > -1) b.addEventListener('click', addTagihan);
   });
   document.getElementById('sr-status').addEventListener('change', loadSaldoRaos);
+  document.getElementById('sr-issue-aist').addEventListener('click', issueAistHandoff);
   document.querySelectorAll('[data-panel="saldo-raos"] .btn.ghost.small').forEach(b => {
     if (b.textContent.indexOf('Refresh') > -1) b.addEventListener('click', loadSaldoRaos);
   });
