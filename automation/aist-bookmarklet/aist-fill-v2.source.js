@@ -1,7 +1,27 @@
-/** * AIST Fill Saldo — Bookmarklet v2 (Queue Picker, no auto-submit, no Lunas) * * Arsitektur (spec 2026-08-27, canonical queue fix): * 1. Operator buka AIST → Document → Add → Balance replenishment. * 2. Operator klik bookmark "Fill AIST Saldo". * 3. Bookmarklet mengambil antrian pending via fetch() ke RIFIM OS /api/aist-queue (public read-only, canonical Finance source). * 4. Modal muncul di AIST; operator klik baris yang diinginkan. * 5. Bookmarklet mengisi Driver login + Amount (RAW saldo, bukan invoice). * 6. Bookmarklet membaca kembali (read-back). Kalau tidak cocok: fail closed, error. * 7. Operator verifikasi manual dan tekan OK di AIST. * 8. Bookmarklet TIDAK submit, TIDAK menandai Lunas, TIDAK memutasi Finance/Sheet. */ (function () { 'use strict';
+/**
+ * AIST Fill Saldo — Bookmarklet v2.1 (One-click handoff)
+ *
+ * Arsitektur (spec 2026-08-27 rev 2):
+ * 1. Operator buka AIST → Document → Add → Balance replenishment.
+ * 2. Operator klik bookmark "Fill AIST Saldo".
+ * 3. Bookmarklet membuka popup ke RIFIM /aist-handoff.
+ * 4. RIFIM memverifikasi sesi aktif, membuat token scoped 10 menit,
+ *    mengirimnya kembali via window.postMessage ke AIST (origin-locked).
+ * 5. Bookmarklet mengambil antrian pending via fetch() ke RIFIM /api/aist-queue.
+ * 6. Modal muncul di AIST; operator klik baris yang diinginkan.
+ * 7. Bookmarklet mengisi Driver login + Amount (RAW saldo, bukan invoice).
+ * 8. Bookmarklet membaca kembali (read-back). Kalau tidak cocok: fail closed.
+ * 9. Operator verifikasi manual dan tekan OK di AIST.
+ * 10. Bookmarklet TIDAK submit, TIDAK menandai Lunas, TIDAK memutasi Finance/Sheet.
+ */
+(function () { 'use strict';
 
   var RIFIM_BASE = 'https://rifim-os.vercel.app';
+  var RIFIM_ORIGIN = (function () { try { return new URL(RIFIM_BASE).origin; } catch (_) { return RIFIM_BASE; } })();
   var QUEUE_URL = RIFIM_BASE + '/api/aist-queue';
+  var HANDOFF_URL = RIFIM_BASE + '/aist-handoff';
+  var HANDOFF_TYPE = 'MENALA_AIST_HANDOFF';
+
   var CSS = [
     'position:fixed', 'inset:0', 'z-index:2147483647', 'background:rgba(0,0,0,.6)',
     'display:flex', 'align-items:center', 'justify-content:center', 'font-family:system-ui,Segoe UI,sans-serif'
@@ -20,7 +40,6 @@
   ].join(';');
   var TH_CSS = 'text-align:left;padding:8px 10px;border-bottom:2px solid #ddd;background:#f8f8f8;';
   var TD_CSS = 'padding:8px 10px;border-bottom:1px solid #eee;cursor:pointer;';
-  var ROW_HOVER_CSS = 'background:#f0f7ff;';
   var STATUS_CSS = 'color:#666;font-size:12px;';
   var FOOTER_CSS = 'padding:10px 16px;border-top:1px solid #eee;color:#666;font-size:12px;display:flex;gap:12px;align-items:center;';
   var BTN_CSS = [
@@ -188,20 +207,21 @@
     return null;
   }
 
+  // TreeWalker-first matches the proven legacy AIST DOM traversal.
   var LOGIN_KEYWORDS = ['Driver login', 'Login ID', 'Driver ID', 'driver login', 'login driver', 'Nomor Login'];
   var AMOUNT_KEYWORDS = ['Amount', 'Jumlah', 'Nominal', 'amount', 'jumlah', 'nominal', 'Saldo'];
 
   function findLoginField() {
-    return findBySelector(LOGIN_KEYWORDS)
+    return findByTreeWalker(LOGIN_KEYWORDS)
       || findByLabelNext(LOGIN_KEYWORDS)
-      || findByTreeWalker(LOGIN_KEYWORDS)
+      || findBySelector(LOGIN_KEYWORDS)
       || findByHeuristic(LOGIN_KEYWORDS);
   }
 
   function findAmountField() {
-    return findBySelector(AMOUNT_KEYWORDS)
+    return findByTreeWalker(AMOUNT_KEYWORDS)
       || findByLabelNext(AMOUNT_KEYWORDS)
-      || findByTreeWalker(AMOUNT_KEYWORDS)
+      || findBySelector(AMOUNT_KEYWORDS)
       || findByHeuristic(AMOUNT_KEYWORDS);
   }
 
@@ -239,10 +259,10 @@
     var amountEl = findAmountField();
     if (!loginEl || !amountEl) {
       alertLines([
-        '❌ Form AIST Balance replenishment tidak terdeteksi.',
+        'Form AIST Balance replenishment tidak terdeteksi.',
         '',
         'Pastikan Anda sudah membuka:',
-        'Document → Add → Balance replenishment',
+        'Document -> Add -> Balance replenishment',
         '',
         'Lalu klik bookmark kembali.'
       ]);
@@ -257,7 +277,7 @@
 
     if (actualLogin !== row.driver_login) {
       alertLines([
-        '❌ Read-back Driver login TIDAK cocok.',
+        'Read-back Driver login TIDAK cocok.',
         '',
         'Diharapkan : ' + row.driver_login,
         'Aktual     : ' + actualLogin,
@@ -268,7 +288,7 @@
     }
     if (actualAmount !== row.saldo_nominal) {
       alertLines([
-        '❌ Read-back Amount TIDAK cocok.',
+        'Read-back Amount TIDAK cocok.',
         '',
         'Diharapkan : ' + row.saldo_nominal,
         'Aktual     : ' + actualAmount,
@@ -278,7 +298,7 @@
       return;
     }
 
-    toast('✅ Field AIST diisi. Login=' + row.driver_login + ' | Amount=' + money(row.saldo_nominal) + ' (SALDO RAW). Silakan verifikasi dan submit manual.', 'ok');
+    toast('Field AIST diisi. Login=' + row.driver_login + ' | Amount=' + money(row.saldo_nominal) + ' (SALDO RAW). Silakan verifikasi dan submit manual.', 'ok');
   }
 
   function renderQueue(rows, filterText) {
@@ -345,9 +365,9 @@
     }
     m.innerHTML = '';
     var p = el('div', PANEL_CSS);
-    p.appendChild(el('div', HEADER_CSS, 'Fill AIST — Pengisian Saldo'));
+    p.appendChild(el('div', HEADER_CSS, 'Fill AIST - Pengisian Saldo'));
     var b = el('div', BODY_CSS);
-    b.textContent = '❌ ' + msg;
+    b.textContent = ' ' + msg;
     p.appendChild(b);
     m.appendChild(p);
   }
@@ -360,7 +380,7 @@
     p.id = '__menala_aist_panel__';
 
     var header = el('div', HEADER_CSS);
-    header.innerHTML = '<span>Fill AIST — Pengisian Saldo</span>';
+    header.innerHTML = '<span>Fill AIST - Pengisian Saldo</span>';
     var closeBtn = el('button', BTN_CSS, 'Tutup');
     closeBtn.onclick = closeModal;
     header.appendChild(closeBtn);
@@ -375,7 +395,7 @@
     search.placeholder = 'Cari cabang / driver / login…';
     search.oninput = function () { renderQueue(rows, this.value); };
     var refresh = el('button', BTN_CSS, 'Refresh');
-    refresh.onclick = function () { fetchQueue(); };
+    refresh.onclick = function () { startOneClickHandoff(); };
     footer.appendChild(search);
     footer.appendChild(refresh);
     p.appendChild(footer);
@@ -396,7 +416,7 @@
     else if (data && typeof data === 'object' && Array.isArray(data.rows)) rawRows = data.rows;
     else if (data && typeof data === 'object' && data.success === false) return { error: 'GAS melaporkan gagal: ' + (data.message || 'tidak diketahui'), rows: [] };
     else return { error: 'Antrian kosong atau bukan format JSON yang diharapkan.', rows: [] };
-    if (rawRows.length === 0) return { error: null, rows: [] }; // valid empty queue
+    if (rawRows.length === 0) return { error: null, rows: [] };
     var normalized = [];
     for (var i = 0; i < rawRows.length; i++) {
       var row = normalizeRow(rawRows[i]);
@@ -406,29 +426,11 @@
     return { error: null, rows: normalized };
   }
 
-  function readClipboard() {
-    if (navigator.clipboard && navigator.clipboard.readText) return navigator.clipboard.readText();
-    return Promise.reject(new Error('Clipboard read tidak didukung di browser ini.'));
-  }
-
-  function extractHandoffToken(raw) {
-    var text = String(raw || '').trim();
-    var prefix = 'MENALA_AIST_HANDOFF:';
-    if (text.indexOf(prefix) !== 0) return '';
-    return text.slice(prefix.length).split(':')[0].trim();
-  }
-
-  function fetchQueue() {
-    showError('Membaca token AIST…');
-    readClipboard()
-      .then(function (raw) {
-        var token = extractHandoffToken(raw);
-        if (!token) throw new Error('Token AIST tidak ditemukan di clipboard. Klik "🎫 Siapkan AIST Queue" di RIFIM Finance terlebih dahulu.');
-        showError('Memuat antrian…');
-        return fetch(QUEUE_URL + '?t=' + encodeURIComponent(token), { method: 'GET', credentials: 'omit', cache: 'no-store' });
-      })
+  function fetchQueueWithToken(token) {
+    showError('Memuat antrian…');
+    return fetch(QUEUE_URL + '?t=' + encodeURIComponent(token), { method: 'GET', credentials: 'omit', cache: 'no-store' })
       .then(function (r) {
-        if (r.status === 401 || r.status === 403) throw new Error('Token AIST tidak valid, expired, atau belum aktif. Buat ulang di RIFIM Finance.');
+        if (r.status === 401 || r.status === 403) throw new Error('Token AIST tidak valid, expired, atau belum aktif.');
         if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
         if (!isJsonContentType(r)) throw new Error('Response bukan JSON (Content-Type: ' + (r.headers.get('Content-Type') || 'kosong') + '). Kemungkinan CORB.');
         return r.json();
@@ -437,11 +439,47 @@
         var v = validateQueuePayload(data);
         if (v.error) throw new Error(v.error);
         showQueue(v.rows);
-      })
-      .catch(function (err) {
-        showError('Gagal memuat antrian: ' + (err && err.message ? err.message : String(err)));
       });
   }
 
-  fetchQueue();
+  function onHandoffMessage(event) {
+    if (event.origin !== RIFIM_ORIGIN) return;
+    var data = event.data;
+    if (!data || data.type !== HANDOFF_TYPE || !data.token) return;
+    window.removeEventListener('message', onHandoffMessage);
+    clearTimeout(window.__menala_aist_handoff_timeout__);
+    fetchQueueWithToken(data.token).catch(function (err) {
+      showError('Gagal memuat antrian: ' + (err && err.message ? err.message : String(err)));
+    });
+  }
+
+  function openHandoffWindow() {
+    var w = 480, h = 420;
+    var left = window.screenX + (window.innerWidth - w) / 2;
+    var top = window.screenY + (window.innerHeight - h) / 2;
+    var features = 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',resizable=yes,scrollbars=yes';
+    return window.open(HANDOFF_URL + '?origin=' + encodeURIComponent(window.location.origin), 'menala_aist_handoff', features);
+  }
+
+  function startOneClickHandoff() {
+    if (window.location.origin !== 'https://aist-id.taxsee.com') {
+      showError('Bookmarklet ini hanya untuk halaman AIST (https://aist-id.taxsee.com). Origin saat ini: ' + window.location.origin);
+      return;
+    }
+    window.removeEventListener('message', onHandoffMessage);
+    window.addEventListener('message', onHandoffMessage);
+    var popup = openHandoffWindow();
+    if (!popup) {
+      showError('Popup AIST handoff diblokir. Izinkan popup untuk domain AIST, lalu ulangi.');
+      return;
+    }
+    showError('Menunggu token dari RIFIM…');
+    clearTimeout(window.__menala_aist_handoff_timeout__);
+    window.__menala_aist_handoff_timeout__ = setTimeout(function () {
+      window.removeEventListener('message', onHandoffMessage);
+      showError('AIST handoff tidak menerima token dalam waktu 60 detik. Pastikan Anda login ke RIFIM dan popup tidak diblokir.');
+    }, 60000);
+  }
+
+  startOneClickHandoff();
 })();

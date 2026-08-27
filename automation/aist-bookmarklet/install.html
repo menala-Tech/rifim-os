@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<title>Install Fill AIST Saldo (Semi-Auto V2)</title>
+<title>Install Fill AIST Saldo (One-Click V2.1)</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1A1A1A; color: #fff; min-height: 100vh; padding: 40px 20px; }
@@ -22,44 +22,45 @@ code { background: rgba(0,0,0,.4); padding: 2px 6px; border-radius: 3px; font-si
 </head>
 <body>
 <div class="container">
-  <h1>Fill AIST Saldo — Bookmarklet Install (Semi V2)</h1>
-  <p class="sub">Bookmarklet field-filler untuk form <b>Balance replenishment</b> di AIST. Operator memilih antrian dari RIFIM Finance → Isi Saldo (RAOS) langsung di halaman AIST.</p>
+  <h1>Fill AIST Saldo - Bookmarklet Install (One-Click V2.1)</h1>
+  <p class="sub">Bookmarklet field-filler untuk form <b>Balance replenishment</b> di AIST. Operator login ke RIFIM, buka AIST, klik bookmark, pilih antrian, lalu verifikasi manual.</p>
 
   <div class="card">
     <h2>1. Drag tombol ini ke bookmark bar</h2>
-    <a class="bookmark-btn" id="bookmark-link" href="#" onclick="return false">🔴 Fill AIST Saldo</a>
+    <a class="bookmark-btn" id="bookmark-link" href="#" onclick="return false">Fill AIST Saldo</a>
     <p style="font-size:12px;color:#888">Tarik ke Bookmarks Bar Chrome/Edge/Brave. Kalau bar tidak muncul: <code>Ctrl+Shift+B</code>.</p>
   </div>
 
   <div class="card">
-    <h2>2. Alur operator (queue picker, non-Lunas)</h2>
-    <div class="step">1. Buka RIFIM <a href="https://rifim-os.vercel.app/finance#saldo-raos" target="_blank" style="color:#4ade80">Finance → Isi Saldo (RAOS)</a> dan klik <b>🎫 Siapkan AIST Queue</b>. Token 10 menit disalin ke clipboard.</div>
-    <div class="step">2. Buka tab baru → <b>AIST</b> → <b>Document → Add → Balance replenishment</b>. Pilih Subdivision + Currency manual seperti biasa.</div>
-    <div class="step">3. Klik bookmark <b>Fill AIST Saldo</b>. Modal antrian muncul mengambil data pending dari RIFIM.</div>
+    <h2>2. Alur operator (one-click, non-Lunas)</h2>
+    <div class="step">1. Login ke <a href="https://rifim-os.vercel.app/finance" target="_blank" style="color:#4ade80">RIFIM Finance</a> seperti biasa (satu sesi browser).</div>
+    <div class="step">2. Buka <b>AIST</b> → <b>Document → Add → Balance replenishment</b>. Pilih Subdivision + Currency manual.</div>
+    <div class="step">3. Klik bookmark <b>Fill AIST Saldo</b>. Popup RIFIM muncul sebentar, lalu modal antrian muncul langsung di AIST.</div>
     <div class="step">4. Klik baris yang sesuai (verifikasi Cabang / Staff / Driver / Login / Saldo / Invoice).</div>
     <div class="step">5. Bookmarklet mengisi <b>Driver login</b> dan <b>Amount</b> dengan <b>SALDO RAW</b>, lalu membaca kembali. Jika tidak cocok → fail closed, JANGAN submit.</div>
     <div class="step">6. Operator memeriksa nilai + tekan <b>OK/Save</b> di AIST secara <b>manual</b>. Bookmarklet TIDAK submit dan TIDAK menandai Lunas.</div>
   </div>
 
   <div class="card">
-    <h2>3. Perbedaan vs bookmarklet lama</h2>
+    <h2>3. Keamanan</h2>
     <div class="diff">
-      <b>Lama (V1 sheet queue)</b>: baca dari Google Sheet Pengisian Saldo, tandai isi = checkbox kolom G.<br>
-      <b>Lama (V2 sebelum sesi ini)</b>: bookmarklet fetch <code>finance_saldo_raos_list</code> dari GAS, mengirim <code>rifim_auth.access_token</code> cross-origin, dan memanggil <code>finance_saldo_raos_mark_paid</code> otomatis setelah fill.<br>
-      <b>V2 token (2026-08-27)</b>: bookmarklet <b>tidak</b> memanggil GAS, <b>tidak</b> membaca <code>rifim_auth</code>, dan <b>tidak</b> menandai Lunas. Sumber pilihan = Finance UI. Handoff = clipboard <code>MENALA_AIST_HANDOFF:&lt;token&gt;</code> dengan TTL 10 menit, ditandatangani dengan <code>AIST_HANDOFF_SECRET</code>.
+      <b>Token 10 menit</b>: RIFIM membuat token <code>aist_queue_read</code> scoped yang ditandatangani <code>AIST_HANDOFF_SECRET</code> dan dikirim ke AIST via <code>postMessage</code> origin-locked.<br>
+      <b>Tidak ada clipboard</b>: normal flow tidak menyalin token. Tidak perlu klik <b>Siapkan AIST Queue</b> di Finance.<br>
+      <b>Queue</b>: sumber kanonik Supabase <code>raos_saldo_requests</code>, sama dengan Finance → Isi Saldo (RAOS).<br>
+      <b>No auto-Lunas</b>: bookmarklet tidak pernah memanggil GAS, tidak memutasi status, tidak menandai Lunas.
     </div>
   </div>
 
   <div class="card">
     <h2>4. Troubleshooting</h2>
-    <div class="step">🔴 <b>"Token AIST tidak ditemukan di clipboard"</b> → kembali ke Finance dan klik <b>🎫 Siapkan AIST Queue</b> dulu.</div>
-    <div class="step">🔴 <b>"Token AIST tidak valid, expired, atau belum aktif"</b> → token lebih dari 10 menit. Buat ulang di Finance.</div>
+    <div class="step">🔴 <b>"Popup diblokir"</b> → izinkan popup untuk <code>https://aist-id.taxsee.com</code> di browser, lalu ulangi.</div>
+    <div class="step">🔴 <b>"Sesi RIFIM tidak ditemukan"</b> → login ke RIFIM Finance di tab mana saja di browser yang sama, lalu ulangi.</div>
+    <div class="step">🔴 <b>"Token AIST tidak valid, expired"</b> → popup akan membuat token baru. Jika gagal, tutup popup dan klik bookmark lagi.</div>
     <div class="step">🔴 <b>"Form AIST tidak terdeteksi"</b> → buka form Balance replenishment dulu, tunggu Amount + Driver login muncul, baru klik bookmark.</div>
     <div class="step">🔴 <b>"Read-back Amount TIDAK cocok"</b> → jangan tekan OK di AIST. Cek input custom / mask / mata uang, atau paste manual.</div>
-    <div class="step">🔴 <b>Browser tolak <code>navigator.clipboard</code></b> → pastikan tab AIST punya user gesture (klik bookmark). Kalau tetap ditolak, buat ulang token dan paste manual <code>MENALA_AIST_HANDOFF:&lt;token&gt;</code> ke console.</div>
   </div>
 
-  <p class="note">Source: <code>automation/aist-bookmarklet/aist-fill-v2.source.js</code>. Kalau selector Amount/Login berubah di AIST, sesuaikan di <code>findInputByLabel()</code>.</p>
+  <p class="note">Source: <code>automation/aist-bookmarklet/aist-fill-v2.source.js</code>. Kalau selector Amount/Login berubah di AIST, sesuaikan urutan pencarian di <code>findLoginField()</code> / <code>findAmountField()</code>.</p>
 </div>
 
 <script>
@@ -71,9 +72,6 @@ fetch('aist-fill-v2.source.js')
       .replace(/^\s*\/\/.*$/gm, '')
       .replace(/\n\s*/g, ' ')
       .replace(/\s{2,}/g, ' ');
-    // Bind queue URL to the origin where this install page is served
-    // (production vs preview branch) so the saved bookmark points to the
-    // deployment it was dragged from.
     const base = 'https://rifim-os.vercel.app';
     const patched = min.split(base).join(location.origin);
     const href = 'javascript:' + encodeURIComponent(patched);
