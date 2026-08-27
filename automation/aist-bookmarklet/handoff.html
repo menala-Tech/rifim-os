@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RIFIM — AIST Handoff</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Segoe UI', system-ui, sans-serif; background: #1A1A1A; color: #fff; }
+body { display: flex; align-items: center; justify-content: center; padding: 24px; }
+.box { max-width: 420px; width: 100%; background: #2B2B2B; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: 24px; text-align: center; }
+h1 { font-size: 16px; margin-bottom: 12px; color: #ff9999; }
+#status { font-size: 13px; line-height: 1.55; color: #ddd; min-height: 3.5em; }
+#status.ok { color: #4ade80; }
+#status.err { color: #f87171; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+<div class="box">
+  <h1>Menghubungkan ke AIST…</h1>
+  <p id="status">Memverifikasi sesi RIFIM…</p>
+</div>
+<script>
+(function () {
+  'use strict';
+
+  var AIST_ORIGINS = ['https://aist-id.taxsee.com'];
+  var SUPABASE_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+  var API_URL = '/api/internal/hris-contracts?mode=aist_queue_issue';
+
+  function setStatus(msg, isErr) {
+    var el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = isErr ? 'err' : 'ok';
+  }
+
+  function getTargetOrigin() {
+    return new URLSearchParams(location.search).get('origin') || '';
+  }
+
+  function getSavedAuth() {
+    try { return JSON.parse(localStorage.getItem('rifim_auth') || '{}'); } catch (_) { return {}; }
+  }
+
+  async function getAccessToken() {
+    var saved = getSavedAuth();
+    if (window.supabase && saved.refresh_token) {
+      try {
+        var client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+        });
+        var session = (await client.auth.getSession()).data.session;
+        var expiring = !session || !session.expires_at || session.expires_at * 1000 < Date.now() + 60000;
+        if (expiring) {
+          session = (await client.auth.refreshSession({ refresh_token: saved.refresh_token })).data.session;
+        }
+        if (session && session.access_token) {
+          saved.access_token = session.access_token;
+          saved.refresh_token = session.refresh_token || saved.refresh_token;
+          saved.expires_at = session.expires_at || saved.expires_at;
+          localStorage.setItem('rifim_auth', JSON.stringify(saved));
+          return session.access_token;
+        }
+      } catch (_) { /* fail closed */ }
+    }
+    return saved.access_token || '';
+  }
+
+  async function issueToken() {
+    var token = await getAccessToken();
+    if (!token) throw new Error('Sesi RIFIM tidak ditemukan. Login ke RIFIM terlebih dahulu.');
+    var r = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ mode: 'aist_queue_issue' })
+    });
+    var data = await r.json().catch(function () { return {}; });
+    if (!r.ok || data.success !== true || !data.token) throw new Error(data.message || 'Gagal membuat token AIST.');
+    return data;
+  }
+
+  function postAndClose(origin, data) {
+    if (!window.opener) return;
+    window.opener.postMessage(data, origin);
+    setTimeout(function () { window.close(); }, 300);
+  }
+
+  async function main() {
+    var origin = getTargetOrigin();
+    if (AIST_ORIGINS.indexOf(origin) === -1) {
+      setStatus('Asal AIST tidak dikenali. Origin: ' + origin, true);
+      return;
+    }
+    if (!window.opener) {
+      setStatus('Buka dari halaman AIST menggunakan bookmark.', true);
+      return;
+    }
+    try {
+      var data = await issueToken();
+      postAndClose(origin, {
+        type: 'MENALA_AIST_HANDOFF',
+        token: data.token,
+        expires_at: data.expires_at,
+        scope: data.scope
+      });
+      setStatus('Token dikirim ke AIST. Jendela ini akan tertutup.', false);
+    } catch (err) {
+      setStatus(err.message || 'Gagal handoff.', true);
+    }
+  }
+
+  main();
+})();
+</script>
+</body>
+</html>

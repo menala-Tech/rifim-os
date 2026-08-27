@@ -20,6 +20,7 @@
     { "source": "/sistem", "destination": "/modules/sistem/v3-shell.html" },
     { "source": "/sistem/(.*)", "destination": "/modules/sistem/$1" },
     { "source": "/aist-install", "destination": "/automation/aist-bookmarklet/install.html" },
+    { "source": "/aist-handoff", "destination": "/automation/aist-bookmarklet/handoff.html" },
     { "source": "/api/aist-queue", "destination": "/api/internal/hris-contracts?mode=aist_queue" }
   ],
   "redirects": [
