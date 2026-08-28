@@ -1,0 +1,21 @@
+name: One-shot RIFIM OS production deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-production:
+    if: contains(github.event.head_commit.message, '[prod-session-release]')
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: team_PpkAToo3Pg1CgnG0vefYMO52
+      VERCEL_PROJECT_ID: prj_S4XfkcurSujcUHHc2tWg0hTthZjn
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install -g vercel
+      - name: Deploy RIFIM OS to Vercel Production
+        run: vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
