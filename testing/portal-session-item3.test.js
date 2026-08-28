@@ -257,26 +257,33 @@ return (async () => {
     console.log('  ok  T6 stale lock recovery works');
   }
 
-  // ── T7: Terminal auth state (hard 401) clears session ──
+  // ── T7: First 401 is recoverable; second 401 is terminal ──
   {
     const store = {};
     const tab1 = makeWin({ sharedStore: store });
-
     primeSession(tab1);
 
-    // Simulate hard 401 on profile endpoint
-    tab1.fetch = async () => {
+    let refreshCalls = 0;
+    tab1.fetch = async (url) => {
+      if (String(url).indexOf('/auth/v1/token') !== -1) {
+        refreshCalls++;
+        return { ok: true, status: 200, json: async () => ({
+          access_token: fakeJwt('user-xyz', now + 7200),
+          refresh_token: 'r-token-new',
+          expires_at: now + 7200,
+        }) };
+      }
       return { ok: false, status: 401, json: async () => ({}) };
     };
 
-    tab1.RifimPortalSession.invalidate();  // Force re-fetch
+    tab1.RifimPortalSession.invalidate();
     const s1 = await tab1.RifimPortalSession.validate();
 
-    assert.strictEqual(s1, null, 'T7 hard 401 returns null');
-    // After delete, key is undefined (not null in JavaScript)
-    assert.ok(!('rifim_auth' in store), 'T7 hard 401 clears session');
+    assert.strictEqual(s1, null, 'T7 second profile 401 after refresh is terminal');
+    assert.strictEqual(refreshCalls, 1, 'T7 only one refresh attempted');
+    assert.ok(!('rifim_auth' in store), 'T7 confirmed terminal auth clears session');
 
-    console.log('  ok  T7 hard 401 (terminal) clears session');
+    console.log('  ok  T7 first 401 recovers once; repeated 401 terminates');
   }
 
   // ── T8: Transient network error keeps session (Item 2 regression) ──

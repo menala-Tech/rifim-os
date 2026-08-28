@@ -1,0 +1,42 @@
+name: RIFIM Combined Preview Behavioral Tests
+
+on:
+  push:
+    branches:
+      - feature/data-maintenance-staff-sync-activation-20260828
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  session-p0:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check combined backend and UI files
+        # 2026-08-28: hris-operations.js + data-maintenance.js merged into
+        # hris-contracts.js to stay under Vercel Hobby's 12-Serverless-Function
+        # cap. Their behavior is now covered by the two behavioral gates below.
+        run: |
+          node --check shared/portal-session.js
+          node --check shared/data-maintenance-ui.js
+          node --check shared/hris-employee-activation-ui.js
+          node --check api/internal/hris-contracts.js
+          node --check api/internal/hris-v2.js
+      - name: Run P0 session recovery S1-S10
+        run: node testing/portal-session-p0-recovery.test.js
+      - name: Run Item 2 regression
+        run: node testing/portal-session-item2.test.js
+      - name: Run Item 3 multi-tab regression
+        run: node testing/portal-session-item3.test.js
+      - name: Run Phase F behavioral gate
+        run: node testing/phase-f-regression.test.js
+      - name: Run data-maintenance behavioral gate (backend fail-closed contract)
+        run: node testing/data-maintenance-behavioral.test.js
+      - name: Run hris-operations behavioral gate (activate + reconcile + staff_sync)
+        run: node testing/hris-operations-behavioral.test.js

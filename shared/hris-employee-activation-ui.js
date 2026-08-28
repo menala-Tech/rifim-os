@@ -44,7 +44,7 @@ function decorateEmployeeRows(){
     btn.type='button';
     btn.className='btn btn-success btn-sm';
     btn.dataset.activateEmployee=employeeId;
-    btn.textContent='✓ Aktifkan';
+    btn.textContent='✅ Aktifkan';
     btn.addEventListener('click',()=>activateEmployee(employeeId,btn));
     actionCell.appendChild(document.createTextNode(' '));
     actionCell.appendChild(btn);
@@ -53,27 +53,44 @@ function decorateEmployeeRows(){
 
 async function activateEmployee(employeeId,btn){
   if(!employeeId||/MEMUAT|LOADING/i.test(employeeId))return;
-  if(!confirm(`Aktifkan ${employeeId} dan mulai sinkronisasi ke modul?`))return;
+  if(!confirm(`Aktifkan ${employeeId}?`))return;
 
   btn.disabled=true;
   const original=btn.textContent;
   btn.textContent='Memproses...';
 
   try{
-    const sb=global.supabase?.rpc?global.supabase:global._supabase;
-    if(!sb?.rpc)throw new Error('Supabase client HRIS tidak ditemukan');
+    const session=global.RifimPortalSession?.read?.();
+    const token=session?.access_token||'';
+    if(!token)throw new Error('Session tidak tersedia. Silakan login kembali.');
 
-    const{data,error}=await sb.rpc('hris_activate_employee',{p_employee_id:employeeId});
-    if(error)throw error;
+    const r=await fetch('/api/internal/hris-contracts',{
+      method:'POST',
+      headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+      body:JSON.stringify({mode:'hris_activate',employee_id:employeeId}),
+      cache:'no-store'
+    });
+    const j=await r.json();
+    if(!r.ok||!j?.success)throw new Error(j?.message||'Aktivasi staff gagal.');
 
-    btn.textContent='✓ Aktif';
-    if(typeof global.showToast==='function')global.showToast('Karyawan aktif. Event sinkron modul dibuat.','success');
-    if(typeof global.loadEmployees==='function')global.loadEmployees();
-    return data;
+    btn.textContent='✅ Aktif';
+    const row=btn.closest('tr');
+    if(row){
+      const statusCell=row.cells?.[7];
+      if(statusCell)statusCell.innerHTML='<span class="badge badge-aktif">AKTIF</span>';
+      row.dataset.activationState='active';
+    }
+    if(typeof global.showToast==='function')global.showToast(j.message||'✅ Staff berhasil diaktifkan','success');
+
+    // Refresh canonical data in background; the row has already updated immediately.
+    if(typeof global.loadEmployees==='function')Promise.resolve(global.loadEmployees({forceRefresh:true})).catch(()=>{});
+    return j.row;
   }catch(err){
     btn.disabled=false;
     btn.textContent=original;
-    alert(err.message||String(err));
+    const msg=err?.message||String(err);
+    if(typeof global.showToast==='function')global.showToast(msg,'error');
+    else alert(msg);
   }
 }
 

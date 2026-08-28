@@ -90,7 +90,7 @@ async function listContracts(req,p){if(!['admin','direksi','management','koordin
 async function validateContract(req,p){if(!['admin','direksi'].includes(p.role))throw new Error('Hanya Admin/Direksi boleh validasi kontrak');const id=String(req.body?.contract_id||'').trim();if(!id)throw new Error('contract_id wajib');return await sb('/rest/v1/rpc/hris_validate_contract',{method:'POST',body:JSON.stringify({p_contract_id:id})})}
 
 // Finance / RAOS canonical direct reads
-async function listSaldo(req,p){financeRead(p);let path='/rest/v1/raos_saldo_requests?select=id,request_no,staff_id,branch_id,nominal,status,requested_at,created_at,is_processed,processed_at,driver_id,driver_login_id,driver_name,client_id&order=created_at.desc&limit=500';const status=String(req.query.status||'').trim().toLowerCase();if(status&&status!=='all'){if(['paid','processed','lunas'].includes(status))path+='&is_processed=eq.true';else if(['unprocessed','belum_lunas'].includes(status))path+='&is_processed=eq.false';else path+=`&status=eq.${q(status)}`}const rows=await sb(path);const staffIds=[...new Set((rows||[]).map(x=>x.staff_id).filter(Boolean))],branchIds=[...new Set((rows||[]).map(x=>x.branch_id).filter(Boolean))];let prof=[],branches=[];if(staffIds.length)prof=await sb(`/rest/v1/user_profiles?id=in.(${staffIds.map(q).join(',')})&select=id,full_name,staff_id`);if(branchIds.length)branches=await sb(`/rest/v1/branches?id=in.(${branchIds.map(q).join(',')})&select=id,name,slug`);const pm=Object.fromEntries((prof||[]).map(x=>[String(x.id),x])),bm=Object.fromEntries((branches||[]).map(x=>[String(x.id),x]));return (rows||[]).map(r=>{const s=pm[String(r.staff_id)]||{},b=bm[String(r.branch_id)]||{};return{...r,staff_name:s.full_name||'',staff_code:s.staff_id||'',branch_name:b.name||b.slug||''}})}
+async function listSaldo(req,p){financeRead(p);let path='/rest/v1/raos_saldo_requests?is_archived=eq.false&select=id,request_no,staff_id,branch_id,nominal,status,requested_at,created_at,is_processed,processed_at,driver_id,driver_login_id,driver_name,client_id,is_archived,archived_at&order=created_at.desc&limit=500';const status=String(req.query.status||'').trim().toLowerCase();if(status&&status!=='all'){if(['paid','processed','lunas'].includes(status))path+='&is_processed=eq.true';else if(['unprocessed','belum_lunas'].includes(status))path+='&is_processed=eq.false';else path+=`&status=eq.${q(status)}`}const rows=await sb(path);const staffIds=[...new Set((rows||[]).map(x=>x.staff_id).filter(Boolean))],branchIds=[...new Set((rows||[]).map(x=>x.branch_id).filter(Boolean))];let prof=[],branches=[];if(staffIds.length)prof=await sb(`/rest/v1/user_profiles?id=in.(${staffIds.map(q).join(',')})&select=id,full_name,staff_id`);if(branchIds.length)branches=await sb(`/rest/v1/branches?id=in.(${branchIds.map(q).join(',')})&select=id,name,slug`);const pm=Object.fromEntries((prof||[]).map(x=>[String(x.id),x])),bm=Object.fromEntries((branches||[]).map(x=>[String(x.id),x]));return (rows||[]).map(r=>{const s=pm[String(r.staff_id)]||{},b=bm[String(r.branch_id)]||{};return{...r,staff_name:s.full_name||'',staff_code:s.staff_id||'',branch_name:b.name||b.slug||''}})}
 async function markSaldo(req,p){financeWrite(p);const id=String(req.body?.id||req.body?.request_id||'').trim();if(!id)throw new Error('id wajib');return await sbAsActor('/rest/v1/rpc/raos_saldo_mark_paid',{method:'POST',body:JSON.stringify({p_request_id:id,p_processor_id:p.id})},String(req.headers.authorization||''))}
 
 async function listFinanceBranches(req,p){financeRead(p);return await sb('/rest/v1/branches?is_active=eq.true&parent_branch_id=is.null&select=id,code,name,slug,branch_type&order=name.asc')}
@@ -407,6 +407,292 @@ async function financeTagihan(req,p,mode){
   return {success:false,message:'GAS backend sedang tidak tersedia setelah '+LEGACY_GAS_MAX_ATTEMPTS+'x percobaan server-side: '+lastMsg,_gas_throttled:true};
 }
 
+// ─── Consolidated 2026-08-28: HRIS operations + Data Maintenance ─────────────
+// Previously lived at api/internal/hris-operations.js + api/internal/data-maintenance.js.
+// Merged here to keep Vercel Hobby deployment ≤12 Serverless Functions
+// (see release-hold closure prompt). Behavior verified by:
+//   - testing/hris-operations-behavioral.test.js
+//   - testing/data-maintenance-behavioral.test.js
+// Security contract preserved verbatim from the original modules.
+
+// Audit trail — writes as service_role (matches original hris-operations/audit()
+// and data-maintenance/audit()). Never logs tokens/secrets.
+async function opsAudit(a,operation,module,scope,affected,success,detail){
+  try{
+    await sb('/rest/v1/rifim_ops_audit_log',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({
+      actor_id:a.id,actor_role:a.role,operation,module,scope:scope||{},affected_rows:Number(affected||0),success:!!success,detail:detail||{}
+    })})
+  }catch(e){console.error('[hris-contracts:audit] audit failed:',e.message)}
+}
+
+// ─── HRIS Operations (activate / reconcile / staff_sync) ─────────────────────
+function opsCanWrite(role){return['admin','direksi'].includes(role)}
+
+function activationMessage(err){
+  const m=String(err?.message||err||'')
+  if(/validated_active_contract_required/i.test(m))return 'Belum dapat diaktifkan: kontrak aktif yang tervalidasi belum tersedia.'
+  if(/write_permission_required/i.test(m))return 'Anda tidak memiliki izin untuk mengaktifkan staff.'
+  if(/employee_not_found/i.test(m))return 'Data staff tidak ditemukan.'
+  if(/employee_id_required/i.test(m))return 'ID staff wajib diisi.'
+  return m
+}
+
+// hris_activate — Path A (SSOT) + Path B (validated contract) inside RPC.
+// RPC is DEFINER + internal role guard; we still pre-check role for a clean 400.
+async function hrisActivate(req,a){
+  if(!opsCanWrite(a.role))throw new Error('Hanya Admin/Direksi boleh mengaktifkan staff')
+  const employeeId=String(req.body?.employee_id||'').trim()
+  if(!employeeId)throw new Error('employee_id wajib')
+  try{
+    const row=await sbAsActor('/rest/v1/rpc/hris_activate_employee',{method:'POST',body:JSON.stringify({p_employee_id:employeeId})},String(req.headers.authorization||''))
+    return{row,message:'✅ Staff berhasil diaktifkan'}
+  }catch(e){
+    await opsAudit(a,'activate_employee_failed','hris',{employee_id:employeeId},0,false,{reason:activationMessage(e)})
+    throw new Error(activationMessage(e))
+  }
+}
+
+// hris_activation_reconcile — dry-run (apply=false) or apply=true.
+// Forwarded as caller bearer so DEFINER RPC's get_my_role()/auth.uid() resolve
+// to the admin/direksi actor (never to service_role).
+async function hrisReconcile(req,a,apply){
+  if(!opsCanWrite(a.role))throw new Error('Hanya Admin/Direksi boleh melakukan rekonsiliasi aktivasi')
+  const result=await sbAsActor('/rest/v1/rpc/hris_reconcile_activation_states',{method:'POST',body:JSON.stringify({p_apply:!!apply})},String(req.headers.authorization||''))
+  return{result}
+}
+
+// hris_staff_sync — one-click canonical: read raos_staff_master (server-side),
+// push to SSOT via raos_sync_staff_ssot_records, upsert eligible/non-conflict
+// rows into employees via raos_hris_upsert_employees. Refuses to insert a NEW
+// employee row when raos_hris_employee_defaults doesn't yet carry the row's
+// company_code/employment_type/join_date (missing_hris_defaults).
+function opsNorm(v){return String(v==null?'':v).trim()}
+function opsSame(a,b){return opsNorm(a).toLowerCase()===opsNorm(b).toLowerCase()}
+async function hrisStaffSync(req,a){
+  if(!opsCanWrite(a.role))throw new Error('Hanya Admin/Direksi boleh sinkron Database Staff')
+
+  const [master,branches,employees,defaults]=await Promise.all([
+    sb('/rest/v1/raos_staff_master?select=staff_id,full_name,email,phone,branch_id,airport,terminal,role,status,auth_user_id&order=staff_id.asc&limit=5000'),
+    sb('/rest/v1/branches?select=id,slug,name,code&limit=500'),
+    sb('/rest/v1/employees?select=employee_id,full_name,email,phone,branch,position,status&limit=5000'),
+    sb('/rest/v1/raos_hris_employee_defaults?select=staff_id&limit=5000').catch(()=>[])
+  ])
+  const branchById=new Map((branches||[]).map(x=>[String(x.id),x]))
+  const records=(master||[]).map((x,i)=>{
+    const br=branchById.get(String(x.branch_id||''))
+    return{
+      source_row:i+1,
+      email:opsNorm(x.email)||null,
+      full_name:opsNorm(x.full_name)||null,
+      salary:null,
+      legacy_branch_name:br?.slug||opsNorm(x.airport)||null,
+      staff_id:opsNorm(x.staff_id).toUpperCase()||null,
+      jabatan:opsNorm(x.role)||null,
+      phone:opsNorm(x.phone)||null,
+      role_system:opsNorm(x.role).toLowerCase()||null,
+      status_active:['aktif','active'].includes(opsNorm(x.status).toLowerCase()),
+      raos_id:opsNorm(x.auth_user_id)||null
+    }
+  })
+
+  const sourceResult=await sb('/rest/v1/rpc/raos_sync_staff_ssot_records',{method:'POST',body:JSON.stringify({p_records:records})})
+  const ssot=await sb('/rest/v1/raos_staff_ssot_records?select=staff_id,full_name,email,phone,legacy_branch_name,branch_id,resolved_role,status_active,conflict_status&order=staff_id.asc&limit=5000')
+  const empById=new Map((employees||[]).map(x=>[opsNorm(x.employee_id).toUpperCase(),x]))
+  const defaultsSet=new Set((defaults||[]).map(x=>opsNorm(x.staff_id).toUpperCase()).filter(Boolean))
+  const eligible=(ssot||[]).filter(x=>x.status_active===true&&x.conflict_status==='none')
+  let added=0,updated=0,unchanged=0,missingDefaults=0
+  const upsert=[]
+
+  for(const x of eligible){
+    const id=opsNorm(x.staff_id).toUpperCase()
+    if(!id)continue
+    const old=empById.get(id)
+    const desired={
+      employee_id:id,
+      full_name:opsNorm(x.full_name),
+      email:opsNorm(x.email)||null,
+      phone:opsNorm(x.phone)||null,
+      branch:opsNorm(x.legacy_branch_name),
+      position:opsNorm(x.resolved_role),
+      status:x.status_active?'AKTIF':'NONAKTIF'
+    }
+    if(!old){
+      if(!defaultsSet.has(id)){missingDefaults++;continue}
+      added++;upsert.push(desired);continue
+    }
+    const changed=!opsSame(old.full_name,desired.full_name)||!opsSame(old.email,desired.email)||!opsSame(old.phone,desired.phone)||!opsSame(old.branch,desired.branch)||!opsSame(old.position,desired.position)||!opsSame(old.status,desired.status)
+    if(changed){updated++;upsert.push(desired)}else unchanged++
+  }
+
+  let hrisResult={inserted:0,updated:0,skipped:0,errors:[]}
+  if(upsert.length){
+    hrisResult=await sb('/rest/v1/rpc/raos_hris_upsert_employees',{method:'POST',body:JSON.stringify({p_records:upsert})})
+  }
+
+  const inactive=(ssot||[]).filter(x=>x.status_active!==true||x.conflict_status==='inactive').length
+  const conflicts=(ssot||[]).filter(x=>!['none','inactive'].includes(String(x.conflict_status||''))).length
+  const missingBranch=(ssot||[]).filter(x=>x.conflict_status==='unmapped_branch').length
+  const duplicateStaff=(ssot||[]).filter(x=>x.conflict_status==='duplicate_staff_id').length
+  const duplicateEmail=(ssot||[]).filter(x=>x.conflict_status==='duplicate_email').length
+  const summary={
+    total_source:records.length,
+    added,updated,unchanged,inactive,
+    conflict:conflicts,
+    missing_branch:missingBranch,
+    duplicate_staff_id:duplicateStaff,
+    duplicate_email:duplicateEmail,
+    missing_hris_defaults:missingDefaults,
+    eligible:eligible.length,
+    ssot:sourceResult,
+    hris:hrisResult,
+    synced_at:new Date().toISOString()
+  }
+  await opsAudit(a,'staff_database_sync','hris',{source:'raos_staff_master'},Number(hrisResult.inserted||0)+Number(hrisResult.updated||0),true,summary)
+  return{summary}
+}
+
+// ─── Data Maintenance (Bersihkan Data) — preview + execute ───────────────────
+// Full fail-closed contract preserved verbatim from data-maintenance.js:
+//   - preview_token = sha256({module, action, sorted ids, deps})
+//   - execute revalidates row-set; drift → refused
+//   - Permanent Delete requires typed 'HAPUS DATA'
+//   - finance_saldo delete with aist_jobs requires confirm_dependencies=true
+//   - hris_karyawan module is always protected
+//   - allowedExecute = admin ONLY (Direksi/Management preview-only)
+function dmAllowedPreview(role){return['admin','direksi','management','koordinator'].includes(role)}
+function dmAllowedExecute(role){return role==='admin'}
+function dmDate(v,name){const s=String(v||'');if(!/^\d{4}-\d{2}-\d{2}$/.test(s))throw new Error(name+' wajib YYYY-MM-DD');return s}
+function dmInList(ids){return ids.map(x=>String(x)).join(',')}
+function dmChunks(a,n=100){const r=[];for(let i=0;i<a.length;i+=n)r.push(a.slice(i,i+n));return r}
+function dmTokenFor(module,action,rows,deps){
+  const stable={module,action,ids:(rows||[]).map(x=>String(x.id)).sort(),dependencies:deps||{}}
+  return crypto.createHash('sha256').update(JSON.stringify(stable)).digest('hex')
+}
+async function dmProfilesFor(rows){
+  const ids=[...new Set((rows||[]).map(x=>x.staff_id).filter(Boolean).map(String))]
+  if(!ids.length)return new Map()
+  let all=[]
+  for(const part of dmChunks(ids,80)){
+    const x=await sb('/rest/v1/user_profiles?id=in.('+dmInList(part)+')&select=id,staff_id,full_name,role,branch_id')
+    all=all.concat(x||[])
+  }
+  return new Map(all.map(x=>[String(x.id),x]))
+}
+function dmApplyPersonFilters(rows,profiles,b){
+  const role=roleOf(b.role||''),staff=String(b.staff||'').trim().toLowerCase()
+  return (rows||[]).filter(r=>{
+    const p=profiles.get(String(r.staff_id))||{}
+    if(role&&role!=='semua'&&roleOf(p.role)!==role)return false
+    if(staff){
+      const hay=[p.staff_id,p.full_name,r.staff_id].join(' ').toLowerCase()
+      if(!hay.includes(staff))return false
+    }
+    return true
+  })
+}
+async function dmAttendanceSelection(a,b){
+  const from=dmDate(b.date_from,'Dari'),to=dmDate(b.date_to,'Sampai');if(from>to)throw new Error('Rentang tanggal tidak valid')
+  let branch=String(b.branch_id||'').trim()
+  if(a.role==='koordinator')branch=String(a.branch_id||'')
+  let path='/rest/v1/raos_attendance?date=gte.'+q(from)+'&date=lte.'+q(to)+'&select=id,staff_id,branch_id,date,status,created_at&order=date.asc&limit=10000'
+  if(branch)path+='&branch_id=eq.'+q(branch)
+  const status=String(b.status||'').trim();if(status&&status!=='semua')path+='&status=eq.'+q(status)
+  let rows=await sb(path)
+  const pm=await dmProfilesFor(rows);rows=dmApplyPersonFilters(rows,pm,b)
+  const months=[...new Set(rows.map(x=>String(x.date||'').slice(0,7)).filter(Boolean))]
+  const [payroll,raosPayroll]=await Promise.all([
+    sb('/rest/v1/payroll?select=id,period_year,period_month,status,employee_id&limit=10000').catch(()=>[]),
+    sb('/rest/v1/raos_payroll?select=id,effective_month,staff_id,computed_at&limit=10000').catch(()=>[])
+  ])
+  const payrollRows=(payroll||[]).filter(x=>months.includes(String(x.period_year)+'-'+String(x.period_month).padStart(2,'0')))
+  const raosPayrollRows=(raosPayroll||[]).filter(x=>months.includes(String(x.effective_month||'').slice(0,7)))
+  const deps={payroll_rows:payrollRows.length,raos_payroll_rows:raosPayrollRows.length,aist_jobs:0}
+  return{rows,profiles:pm,deps,tables:['raos_attendance'],warnings:(payrollRows.length||raosPayrollRows.length)?['Payroll untuk periode yang sama sudah pernah dibuat.']:[]}
+}
+async function dmSaldoSelection(a,b){
+  const from=dmDate(b.date_from,'Dari'),to=dmDate(b.date_to,'Sampai');if(from>to)throw new Error('Rentang tanggal tidak valid')
+  let branch=String(b.branch_id||'').trim()
+  if(a.role==='koordinator')branch=String(a.branch_id||'')
+  let path='/rest/v1/raos_saldo_requests?created_at=gte.'+q(from+'T00:00:00Z')+'&created_at=lte.'+q(to+'T23:59:59.999Z')+
+    '&select=id,request_no,staff_id,branch_id,status,is_processed,processed_at,created_at,is_archived,nominal&order=created_at.asc&limit=10000'
+  if(branch)path+='&branch_id=eq.'+q(branch)
+  const status=String(b.status||'').trim().toLowerCase()
+  if(status&&status!=='semua'){
+    if(['paid','processed','lunas'].includes(status))path+='&is_processed=eq.true'
+    else if(['unprocessed','belum_lunas'].includes(status))path+='&is_processed=eq.false'
+    else path+='&status=eq.'+q(status)
+  }
+  if(String(b.include_archived||'')!=='true')path+='&is_archived=eq.false'
+  let rows=await sb(path)
+  const pm=await dmProfilesFor(rows);rows=dmApplyPersonFilters(rows,pm,b)
+  const ids=rows.map(x=>x.id)
+  let jobs=[]
+  for(const part of dmChunks(ids,80)){
+    if(!part.length)continue
+    const x=await sb('/rest/v1/aist_jobs?request_id=in.('+dmInList(part)+')&select=id,request_id,status,completed_at&limit=10000')
+    jobs=jobs.concat(x||[])
+  }
+  const strong=rows.filter(x=>x.is_processed===true).length+(jobs||[]).filter(x=>x.status==='success'||x.completed_at).length
+  const deps={aist_jobs:jobs.length,processed_or_completed:strong,payroll_rows:0,raos_payroll_rows:0}
+  const warnings=[]
+  if(jobs.length)warnings.push('Terdapat riwayat AIST yang terkait.')
+  if(strong)warnings.push('Sebagian data sudah diproses/selesai dan merupakan riwayat keuangan.')
+  return{rows,profiles:pm,deps,tables:['raos_saldo_requests'].concat(jobs.length?['aist_jobs']:[]),warnings}
+}
+async function dmSelection(a,b){
+  const module=String(b.module||'')
+  if(module==='attendance')return dmAttendanceSelection(a,b)
+  if(module==='finance_saldo')return dmSaldoSelection(a,b)
+  if(module==='hris_karyawan')return{rows:[],deps:{protected_identity:true},tables:['employees','raos_staff_ssot_records','raos_staff_master','raos_staff_master_hris','user_profiles'],warnings:['Identitas karyawan adalah data master yang dilindungi dan tidak dapat dihapus dari menu ini.'],protected:true}
+  throw new Error('Module/Data tidak didukung')
+}
+async function maintenancePreview(req,a){
+  const b=req.body||{}
+  if(!dmAllowedPreview(a.role))throw new Error('Role tidak boleh melihat preview Bersihkan Data')
+  const s=await dmSelection(a,b)
+  const action=String(b.action||((b.module==='finance_saldo')?'archive':'delete'))
+  const result={
+    module:b.module,action,
+    affected_rows:s.rows.length,
+    tables:s.tables,
+    dependent_rows:s.deps,
+    warnings:s.warnings,
+    protected:!!s.protected,
+    preview_token:dmTokenFor(b.module,action,s.rows,s.deps)
+  }
+  await opsAudit(a,'maintenance_preview',String(b.module||''),{filters:{branch_id:b.branch_id||null,date_from:b.date_from||null,date_to:b.date_to||null,role:b.role||null,status:b.status||null,staff:b.staff||null},action},0,true,result)
+  return result
+}
+async function maintenanceExecute(req,a){
+  const b=req.body||{}
+  if(!dmAllowedExecute(a.role))throw new Error('Hanya Admin boleh menjalankan Bersihkan Data')
+  const module=String(b.module||''),action=String(b.action||((module==='finance_saldo')?'archive':'delete'))
+  const s=await dmSelection(a,b)
+  if(s.protected)throw new Error('Data master karyawan dilindungi dan tidak dapat dihapus dari menu ini.')
+  const expected=dmTokenFor(module,action,s.rows,s.deps)
+  if(!b.preview_token||String(b.preview_token)!==expected)throw new Error('Data berubah sejak preview. Tampilkan preview ulang sebelum melanjutkan.')
+  const ids=s.rows.map(x=>x.id)
+  if(!ids.length)return{affected_rows:0,action,module}
+
+  if(action==='delete'){
+    if(String(b.confirm_text||'')!=='HAPUS DATA')throw new Error('Ketik HAPUS DATA untuk konfirmasi.')
+    if(module==='finance_saldo'&&Number(s.deps.aist_jobs||0)>0&&b.confirm_dependencies!==true){
+      throw new Error('Ada riwayat AIST terkait. Konfirmasi dependency wajib sebelum Permanent Delete.')
+    }
+    for(const part of dmChunks(ids,80)){
+      await sb('/rest/v1/'+(module==='attendance'?'raos_attendance':'raos_saldo_requests')+'?id=in.('+dmInList(part)+')',{method:'DELETE',headers:{Prefer:'return=minimal'}})
+    }
+  }else if(module==='finance_saldo'&&action==='archive'){
+    for(const part of dmChunks(ids,80)){
+      await sb('/rest/v1/raos_saldo_requests?id=in.('+dmInList(part)+')',{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({is_archived:true,archived_at:new Date().toISOString(),archived_by:a.id})})
+    }
+  }else throw new Error('Aksi maintenance tidak didukung')
+
+  const detail={action,module,dependencies:s.deps,warnings:s.warnings}
+  await opsAudit(a,'maintenance_'+action,module,{filters:{branch_id:b.branch_id||null,date_from:b.date_from||null,date_to:b.date_to||null,role:b.role||null,status:b.status||null,staff:b.staff||null}},ids.length,true,detail)
+  return{affected_rows:ids.length,action,module,dependencies:s.deps}
+}
+
 module.exports=async function handler(req,res){
   try{
     const mode=String(req.query.mode||req.body?.mode||'');
@@ -442,6 +728,24 @@ module.exports=async function handler(req,res){
     if(req.method==='POST'&&mode==='finance_legacy_gas')return out(res,200,await financeLegacyGas(req,p));
     if(req.method==='POST'&&mode==='finance_tagihan_add')return out(res,200,await financeTagihan(req,p,mode));
     if(req.method==='POST'&&mode==='finance_tagihan_mark_paid')return out(res,200,await financeTagihan(req,p,mode));
+    // Consolidated 2026-08-28 (post release-hold closure):
+    // HRIS operations (staff sync + activate + reconciliation) and Data
+    // Maintenance (Bersihkan Data) previously lived in separate API files
+    // that pushed the deployment over the Vercel Hobby 12-function cap. They
+    // are now mode handlers here; frontend callers were updated in the same
+    // commit — old URLs no longer exist.
+    if(req.method==='POST'&&mode==='hris_activate')return out(res,200,{success:true,...await hrisActivate(req,p)});
+    if(req.method==='POST'&&mode==='hris_activation_reconcile_preview')return out(res,200,{success:true,...await hrisReconcile(req,p,false)});
+    if(req.method==='POST'&&mode==='hris_activation_reconcile_apply')return out(res,200,{success:true,...await hrisReconcile(req,p,true)});
+    if(req.method==='POST'&&mode==='hris_staff_sync')return out(res,200,{success:true,...await hrisStaffSync(req,p)});
+    if(req.method==='POST'&&mode==='maintenance_preview'){
+      try{return out(res,200,{success:true,preview:await maintenancePreview(req,p)})}
+      catch(e){await opsAudit(p,'maintenance_failed',String(req.body?.module||''),{mode:'preview',action:String(req.body?.action||'')},0,false,{reason:e instanceof Error?e.message:String(e)});throw e}
+    }
+    if(req.method==='POST'&&mode==='maintenance_execute'){
+      try{return out(res,200,{success:true,result:await maintenanceExecute(req,p)})}
+      catch(e){await opsAudit(p,'maintenance_failed',String(req.body?.module||''),{mode:'execute',action:String(req.body?.action||'')},0,false,{reason:e instanceof Error?e.message:String(e)});throw e}
+    }
     if(req.method==='GET')return out(res,200,{success:true,rows:await listContracts(req,p)});
     if(req.method==='POST'&&mode==='validate')return out(res,200,{success:true,result:await validateContract(req,p)});
     return out(res,405,{success:false,message:'Method not allowed'});
