@@ -199,10 +199,12 @@ async function run() {
   }
 
   // T11 — SSOT sanity: split-brain alias `cancelled -> rejected` is REMOVED.
-  //       Reading the source guarantees future edits don't reintroduce it.
+  //       Reading the source (dispatcher + internal module) guarantees future
+  //       edits don't reintroduce it after Phase 2 refactor.
   try {
-    const src = fs.readFileSync(path.resolve(__dirname, '..', 'api', 'internal', 'hris-contracts.js'), 'utf8')
-    assert.ok(/SALDO_STATUS_WHITELIST=new Set\(\[[^\]]*'cancelled'[^\]]*\]\)/.test(src), 'whitelist must include cancelled')
+    const src = fs.readFileSync(path.resolve(__dirname, '..', 'api', 'internal', 'hris-contracts.js'), 'utf8') +
+                '\n' + fs.readFileSync(path.resolve(__dirname, '..', 'api', 'internal', '_modules', 'finance-saldo.js'), 'utf8')
+    assert.ok(/SALDO_STATUS_WHITELIST\s*=\s*new Set\(\[[^\]]*'cancelled'[^\]]*\]\)/.test(src), 'whitelist must include cancelled')
     assert.ok(!/'cancelled'\s*:\s*'rejected'/.test(src), 'split-brain alias cancelled->rejected must NOT be reintroduced')
     assert.ok(/'dibatalkan'\s*:\s*'cancelled'/.test(src), 'display alias dibatalkan must map to cancelled, not rejected')
     pass('T11 split-brain alias cancelled->rejected is not present (canonical is preserved)')

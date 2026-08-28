@@ -96,40 +96,11 @@ async function sbAsActor(path,opts={},bearer){const {url,publishable:pub}=_sbRes
 async function listContracts(req,p){if(!['admin','direksi','management','koordinator'].includes(p.role))throw new Error('Role tidak boleh melihat Kontrak');let path='/rest/v1/hris_contract_employee_view?select=*&order=updated_at.desc&limit=1000';const employeeId=String(req.query.employee_id||'').trim();if(employeeId)path+=`&employee_id=eq.${q(employeeId)}`;let rows=await sb(path);if(p.role==='koordinator'){const prof=await sb(`/rest/v1/user_profiles?branch_id=eq.${q(p.branch_id||'')}&is_active=eq.true&select=staff_id`);const allowed=new Set((prof||[]).map(x=>String(x.staff_id||'').toUpperCase()).filter(Boolean));rows=(rows||[]).filter(x=>allowed.has(String(x.employee_id||'').toUpperCase()))}return rows||[]}
 async function validateContract(req,p){if(!['admin','direksi'].includes(p.role))throw new Error('Hanya Admin/Direksi boleh validasi kontrak');const id=String(req.body?.contract_id||'').trim();if(!id)throw new Error('contract_id wajib');return await sb('/rest/v1/rpc/hris_validate_contract',{method:'POST',body:JSON.stringify({p_contract_id:id})})}
 
-// Finance / RAOS canonical direct reads
-// Phase 1 Cancel gate 2026-08-29: `cancelled` is now a first-class canonical
-// status (matches Production status text-check accepting pending/approved/
-// rejected/cancelled) — MUST NOT be silently rewritten to `rejected` here,
-// that caused a split-brain where RIFIM filter "cancelled" returned RAOS
-// rejected rows. Only the Indonesian display alias `ditolak` (→rejected) and
-// `dibatalkan` (→cancelled) remain, as filter conveniences.
-const SALDO_STATUS_WHITELIST=new Set(['pending','approved','rejected','cancelled']);
-const SALDO_STATUS_ALIASES={'ditolak':'rejected','dibatalkan':'cancelled'};
-async function listSaldo(req,p){financeRead(p);let path='/rest/v1/raos_saldo_requests?is_archived=eq.false&select=id,request_no,staff_id,branch_id,nominal,status,requested_at,created_at,is_processed,processed_at,driver_id,driver_login_id,driver_name,client_id,is_archived,archived_at&order=created_at.desc&limit=500';const status=String(req.query.status||'').trim().toLowerCase();if(status&&status!=='all'&&status!=='semua'){if(['paid','processed','lunas'].includes(status))path+='&is_processed=eq.true';else if(['unprocessed','belum_lunas'].includes(status))path+='&is_processed=eq.false';else{const canonical=SALDO_STATUS_ALIASES[status]||status;if(SALDO_STATUS_WHITELIST.has(canonical))path+=`&status=eq.${q(canonical)}`;/* unknown status is ignored to avoid PostgREST 400 */}}const rows=await sb(path);const staffIds=[...new Set((rows||[]).map(x=>x.staff_id).filter(Boolean))],branchIds=[...new Set((rows||[]).map(x=>x.branch_id).filter(Boolean))];let prof=[],branches=[];if(staffIds.length)prof=await sb(`/rest/v1/user_profiles?id=in.(${staffIds.map(q).join(',')})&select=id,full_name,staff_id`);if(branchIds.length)branches=await sb(`/rest/v1/branches?id=in.(${branchIds.map(q).join(',')})&select=id,name,slug`);const pm=Object.fromEntries((prof||[]).map(x=>[String(x.id),x])),bm=Object.fromEntries((branches||[]).map(x=>[String(x.id),x]));return (rows||[]).map(r=>{const s=pm[String(r.staff_id)]||{},b=bm[String(r.branch_id)]||{};return{...r,staff_name:s.full_name||'',staff_code:s.staff_id||'',branch_name:b.name||b.slug||''}})}
-async function markSaldo(req,p){financeWrite(p);const id=String(req.body?.id||req.body?.request_id||'').trim();if(!id)throw new Error('id wajib');return await sbAsActor('/rest/v1/rpc/raos_saldo_mark_paid',{method:'POST',body:JSON.stringify({p_request_id:id,p_processor_id:p.id})},String(req.headers.authorization||''))}
-// Phase 1 Cancel Isi Saldo (2026-08-29). Canonical lifecycle: pending →
-// cancelled. Blocked when row is archived, processed (is_processed=true), or
-// already terminal (approved/paid/rejected/cancelled). Idempotent: second
-// cancel of an already-cancelled row returns success without another PATCH.
-// No new Vercel function created — this is a mode branch on the existing
-// dispatcher (function count unchanged). No schema migration required —
-// architect verified `status` is text with check accepting `cancelled`.
-async function cancelSaldo(req,p){
-  financeWrite(p);
-  const id=String(req.body?.id||req.body?.request_id||'').trim();
-  if(!id)throw new Error('id wajib');
-  const rows=await sb(`/rest/v1/raos_saldo_requests?id=eq.${q(id)}&select=id,status,is_processed,is_archived&limit=1`);
-  const row=rows&&rows[0];
-  if(!row){await opsAudit(p,'finance_saldo_cancel','finance_saldo',{id},0,false,{reason:'not_found'});return{status:'not_found',id}}
-  if(row.is_archived===true){await opsAudit(p,'finance_saldo_cancel','finance_saldo',{id},0,false,{reason:'archived',current_status:row.status});throw new Error('Pengajuan sudah diarsipkan dan tidak dapat dibatalkan.')}
-  if(row.is_processed===true){await opsAudit(p,'finance_saldo_cancel','finance_saldo',{id},0,false,{reason:'already_processed',current_status:row.status});throw new Error('Pengajuan sudah diproses (lunas) dan tidak dapat dibatalkan.')}
-  const s=String(row.status||'').toLowerCase();
-  if(s==='cancelled'){await opsAudit(p,'finance_saldo_cancel','finance_saldo',{id},0,true,{reason:'already_cancelled'});return{status:'already_cancelled',id,current_status:'cancelled'}}
-  if(s!=='pending'){await opsAudit(p,'finance_saldo_cancel','finance_saldo',{id},0,false,{reason:'not_cancellable',current_status:s});throw new Error(`Status saat ini "${s}" tidak dapat dibatalkan. Hanya pengajuan pending yang dapat dibatalkan.`)}
-  await sb(`/rest/v1/raos_saldo_requests?id=eq.${q(id)}&status=eq.pending&is_processed=eq.false&is_archived=eq.false`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({status:'cancelled'})});
-  await opsAudit(p,'finance_saldo_cancel','finance_saldo',{id},1,true,{previous_status:'pending',new_status:'cancelled'});
-  return{status:'cancelled',id,current_status:'cancelled'};
-}
+// Phase 2 (2026-08-29): Finance Isi Saldo lifecycle is now owned by an
+// internal module required by the existing /api/internal/hris-contracts
+// dispatcher. This keeps the Vercel function count at 12 and isolates the
+// saldo domain from the overloaded HRIS contracts file.
+const financeSaldo = require('./_modules/finance-saldo')({ sb, sbAsActor, opsAudit, q });
 
 async function listFinanceBranches(req,p){financeRead(p);return await sb('/rest/v1/branches?is_active=eq.true&parent_branch_id=is.null&select=id,code,name,slug,branch_type&order=name.asc')}
 
@@ -753,9 +724,9 @@ module.exports=async function handler(req,res){
       const h=issueAistHandoff();
       return out(res,200,{success:true,token:h.token,expires_at:h.expires_at,scope:h.scope});
     }
-    if(req.method==='GET'&&mode==='finance_saldo_list')return out(res,200,{success:true,rows:await listSaldo(req,p),source:'supabase'});
-    if(req.method==='POST'&&mode==='finance_saldo_mark_paid'){const r=await markSaldo(req,p);return out(res,200,{success:true,...(r||{})})}
-    if(req.method==='POST'&&mode==='finance_saldo_cancel'){const r=await cancelSaldo(req,p);return out(res,200,{success:true,...(r||{})})}
+    if(req.method==='GET'&&mode==='finance_saldo_list')return out(res,200,{success:true,rows:await financeSaldo.listSaldo(req,p),source:'supabase'});
+    if(req.method==='POST'&&mode==='finance_saldo_mark_paid'){const r=await financeSaldo.markSaldo(req,p);return out(res,200,{success:true,...(r||{})})}
+    if(req.method==='POST'&&mode==='finance_saldo_cancel'){const r=await financeSaldo.cancelSaldo(req,p);return out(res,200,{success:true,...(r||{})})}
     if(req.method==='GET'&&mode==='finance_branches')return out(res,200,{success:true,rows:await listFinanceBranches(req,p),source:'supabase'});
     if(req.method==='GET'&&mode==='finance_branch_targets')return out(res,200,{success:true,rows:await listBranchTargets(req,p),source:'supabase'});
     if(req.method==='POST'&&mode==='finance_branch_target_upsert')return out(res,200,{success:true,row:await upsertBranchTarget(req,p)});
