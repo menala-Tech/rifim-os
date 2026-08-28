@@ -1,0 +1,28 @@
+name: RIFIM Combined Preview Behavioral Tests
+
+on:
+  push:
+    branches:
+      - feature/data-maintenance-staff-sync-activation-20260828
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  session-p0:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run P0 session recovery S1-S10
+        run: node testing/portal-session-p0-recovery.test.js
+      - name: Run Item 2 regression
+        run: node testing/portal-session-item2.test.js
+      - name: Run Item 3 multi-tab regression
+        run: node testing/portal-session-item3.test.js
+      - name: Run Phase F behavioral gate
+        run: node testing/phase-f-regression.test.js
