@@ -340,7 +340,7 @@ tr:last-child td{border-bottom:none}
             <div style="flex:1;min-width:280px">
               ℹ️ <strong>Mode SSOT sementara:</strong> Tambah / ubah karyawan lewat sheet <a href="https://docs.google.com/spreadsheets/d/1fcraq3QHqIaD-13Ebzt6stT9aA6j_loTXeAtpNX12kw/edit" target="_blank" style="color:#78350f;text-decoration:underline"><strong>MASTER DATA STAFF</strong></a>. Sinkron otomatis ke HRIS + PWA RAOS tiap 10 menit. Kolom <em>Perusahaan · Tipe Kontrak · Tanggal Masuk · Department</em> tetap diedit di HRIS via tombol Detail.
             </div>
-            <button class="btn btn-primary" id="btn-sync-ssot-now" onclick="syncSsotNow()" style="background:#f59e0b;border-color:#f59e0b;color:#fff;font-size:12px;padding:6px 12px;white-space:nowrap">🔄 Sync Sekarang</button>
+            <button class="btn btn-primary" id="btn-sync-ssot-now" onclick="syncSsotNow()" style="background:#f59e0b;border-color:#f59e0b;color:#fff;font-size:12px;padding:6px 12px;white-space:nowrap">🔄 Sinkron Database Staff</button> <span id="staff-sync-last-at" style="font-size:12px;color:var(--muted,#64748b);margin-left:8px">Terakhir sinkron: -</span>
           </div>
           <div class="toolbar">
             <input type="text" id="search-emp" placeholder="Cari nama / ID / jabatan…" oninput="filterEmployees()">
@@ -1344,7 +1344,7 @@ function setSyncLoading(isLoading) {
   const btn = document.getElementById('btn-sync-ssot-now');
   if (!btn) return;
   btn.disabled = isLoading;
-  btn.textContent = isLoading ? '\u23F3 Sinkron...' : '\uD83D\uDD04 Sync Sekarang';
+  btn.textContent = isLoading ? '⏳ Sinkron...' : '🔄 Sinkron Database Staff';
 }
 
 function isLikelyBackgroundSyncError(err) {
@@ -1379,41 +1379,47 @@ async function runHrisSyncWithUiTimeout() {
 
 async function syncSsotNow() {
   setSyncLoading(true);
-  const raosToken = getRaosSyncToken();
-
   try {
-    const tasks = [
-      runHrisSyncWithUiTimeout(),
+    const session = window.RifimPortalSession?.read?.();
+    const token = session?.access_token || '';
+    if (!token) throw new Error('Session tidak tersedia. Silakan login kembali.');
 
-      // 2. Sync SSOT to user_profiles (RAOS) via RAOS Web API
-      raosToken
-        ? fetch(RAOS_GAS_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'sync_staff', token: raosToken }),
-          }).then(r => r.json())
-            .then(j => ({ target: 'PWA RAOS user_profiles', ok: !!j.ok, background: false, detail: j.result || j.error || j }))
-            .catch(e => ({ target: 'PWA RAOS user_profiles', ok: false, background: false, detail: e.message }))
-        : Promise.resolve({ target: 'PWA RAOS user_profiles', ok: false, background: false, detail: 'session token tidak ditemukan \u2014 login ulang' }),
+    const r = await fetch('/api/internal/hris-operations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token,
+      },
+      body: JSON.stringify({ mode: 'staff_sync' }),
+      cache: 'no-store',
+    });
+    const j = await r.json();
+    if (!r.ok || !j?.success) throw new Error(j?.message || 'Sinkron Database Staff gagal.');
+
+    const s = j.summary || {};
+    const parts = [
+      'Total ' + Number(s.total_source || 0),
+      'Baru ' + Number(s.added || 0),
+      'Diperbarui ' + Number(s.updated || 0),
+      'Tetap ' + Number(s.unchanged || 0),
+      'Konflik ' + Number(s.conflict || 0),
     ];
+    if (Number(s.missing_branch || 0)) parts.push('Cabang belum cocok ' + Number(s.missing_branch || 0));
+    if (Number(s.duplicate_staff_id || 0)) parts.push('ID duplikat ' + Number(s.duplicate_staff_id || 0));
+    if (Number(s.duplicate_email || 0)) parts.push('Email duplikat ' + Number(s.duplicate_email || 0));
 
-    const results = await Promise.all(tasks);
-    const hrisResult = results.find(r => r.target === 'HRIS employees');
-    const summary = results.map(r => (r.ok ? '\u2705' : '\u274C') + ' ' + r.target).join('  \u00B7  ');
-    showToast('Sync selesai \u2014 ' + summary, results.every(r => r.ok) ? 'success' : 'warn');
-    console.log('[HRIS] syncSsotNow results:', results);
+    window._lastStaffSyncAt = s.synced_at || new Date().toISOString();
+    const stamp = document.getElementById('staff-sync-last-at');
+    if (stamp) stamp.textContent = 'Terakhir sinkron: ' + new Date(window._lastStaffSyncAt).toLocaleString('id-ID');
 
-    if (hrisResult && hrisResult.background) {
-      alert('\u23F3 Sync di-trigger. Karena data besar, prosesnya jalan di background 30-60 detik.\n\nRefresh halaman ini 1 menit lagi untuk lihat hasilnya.');
-    } else if (results.every(r => r.ok)) {
-      alert('\u2705 Sync berhasil, data akan refresh dalam 15 detik...');
-    } else {
-      const failed = results.filter(r => !r.ok).map(r => r.target + ': ' + r.detail).join('\n');
-      alert('\u274C Sync gagal:\n' + failed);
-    }
+    showToast('✅ Sinkron Database Staff selesai — ' + parts.join(' · '), Number(s.conflict || 0) ? 'warn' : 'success');
+    await loadEmployees({ forceRefresh: true });
+    return j;
+  } catch (err) {
+    showToast(err.message || 'Sinkron Database Staff gagal.', 'error');
+    throw err;
   } finally {
     setSyncLoading(false);
-    setTimeout(() => loadEmployees({ forceRefresh: true }), 15000);
   }
 }
 
