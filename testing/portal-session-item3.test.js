@@ -361,7 +361,30 @@ return (async () => {
     console.log('  ok  T10 stress test: 5 concurrent tabs all validated (fetches:', profileFetches, ')');
   }
 
-  console.log('\n✓ All Item 3 multi-tab synchronization tests PASS');
+  // ── T11: 403 Permission error keeps session (does NOT logout) ──
+  // Item 3 correction (2026-08-28): 403 is permission denied, NOT terminal auth
+  {
+    const store = {};
+    const tab1 = makeWin({ sharedStore: store });
+
+    primeSession(tab1);
+
+    // Simulate 403 permission denied on profile endpoint
+    tab1.fetch = async () => {
+      return { ok: false, status: 403, json: async () => ({}) };
+    };
+
+    tab1.RifimPortalSession.invalidate();  // Force re-fetch
+    const s1 = await tab1.RifimPortalSession.validate();
+
+    // 403 should return transient error, NOT terminal logout
+    assert.ok(s1, 'T11 403 permission returns fallback session (NOT logout)');
+    assert.ok('rifim_auth' in store, 'T11 403 permission does NOT clear session');
+
+    console.log('  ok  T11 403 permission error preserves session (not terminal)');
+  }
+
+  console.log('\n✓ All Item 3 multi-tab synchronization tests PASS (T1-T11)');
   console.log('\nItem 2 regression tests: Run with `node testing/portal-session-item2.test.js`');
 })().catch(err => {
   console.error('FAIL:', err);

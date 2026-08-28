@@ -99,8 +99,18 @@
         Accept: 'application/json',
       },
     })
-    if (res.status === 401 || res.status === 403) {
-      throw AuthHardError('Portal profile ditolak (token invalid)')
+    // Item 3 (2026-08-28): Distinguish 401 from 403
+    // - 401: access token expired/invalid → should attempt refresh/recovery
+    // - 403: permission denied → keep session, show permission error
+    // Only 401 on initial token check (not from Supabase validation) is terminal
+    if (res.status === 403) {
+      // Permission denied: keep session, return error to caller
+      throw new Error('Portal profile: akses ditolak (403 permission)')
+    }
+    if (res.status === 401) {
+      // Could be: expired token, revoked session, deleted user
+      // Only terminal if we already tried refresh (will be caught by refresh logic)
+      throw AuthHardError('Portal profile: token invalid (401)')
     }
     if (!res.ok) throw new Error('Portal profile validation gagal (transient)')
     const rows = await res.json()
