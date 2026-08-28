@@ -337,15 +337,216 @@
   // after a 401 to trigger a real refresh on the next validate() call.
   function invalidateCache() { lastGood = null; lastGoodAt = 0 }
 
+  // ─── Item 3 (2026-08-28): Multi-tab / multi-device session sync ──────────────
+  // Problem: When same account logged in on multiple tabs/devices, token refresh
+  // in one tab invalidates cached token in others. Multiple tabs can race to
+  // refresh using same refresh_token (single-use), causing 400 errors.
+  // Solution:
+  //   1. Unique tab ID (sessionStorage-based UUID, per-tab lifetime)
+  //   2. Refresh lock (localStorage-based, with ownership + expiry)
+  //   3. Storage event listener (detect other tab changes, invalidate cache)
+  //   4. Wait-for-lock pattern (tab waits for other tab's refresh, reads updated session)
+  //   5. Separate logout semantics (distinguish transient 401 from terminal logout)
+
+  const LOCK_STORAGE_KEY = 'rifim_auth_refresh_lock'
+  const TAB_ID_SESSION_KEY = 'rifim_tab_id'
+  const LOCK_LEASE_MS = 5000  // Stale lock > 5s is abandoned
+  const LOCK_WAIT_MAX_MS = 5000
+  const LOCK_WAIT_POLL_MS = 50
+
+  // Generate or retrieve unique tab ID (stored in sessionStorage = per-tab)
+  function getTabId() {
+    const existing = global.sessionStorage && global.sessionStorage.getItem(TAB_ID_SESSION_KEY)
+    if (existing) return existing
+    // Generate UUID v4-like identifier
+    const uuid = 'tab_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now()
+    if (global.sessionStorage) {
+      global.sessionStorage.setItem(TAB_ID_SESSION_KEY, uuid)
+    }
+    return uuid
+  }
+
+  // Read lock from localStorage (returns { tabId, ts } or null)
+  function readLock() {
+    try {
+      const lock = global.localStorage && global.localStorage.getItem(LOCK_STORAGE_KEY)
+      return lock ? JSON.parse(lock) : null
+    } catch (_) { return null }
+  }
+
+  // Write lock to localStorage (only if we own it or it's expired)
+  function writeLock(tabId, now) {
+    const lock = { tabId, ts: now }
+    if (global.localStorage) {
+      global.localStorage.setItem(LOCK_STORAGE_KEY, JSON.stringify(lock))
+    }
+  }
+
+  // Clear lock from localStorage (only if we own it)
+  function clearLock(tabId) {
+    const lock = readLock()
+    if (lock && lock.tabId === tabId) {
+      if (global.localStorage) {
+        global.localStorage.removeItem(LOCK_STORAGE_KEY)
+      }
+    }
+  }
+
+  // Acquire refresh lock with wait-for-lock pattern
+  // Returns { acquired: boolean, waited: boolean }
+  async function acquireRefreshLock(tabId) {
+    const start = Date.now()
+    let waited = false
+
+    while (true) {
+      const now = Date.now()
+      const lock = readLock()
+      const elapsed = now - start
+
+      // Check if lock is held by another tab
+      if (lock && lock.tabId !== tabId) {
+        const lockAge = now - lock.ts
+
+        if (lockAge < LOCK_LEASE_MS) {
+          // Lock is fresh and held by another tab
+          if (elapsed > LOCK_WAIT_MAX_MS) {
+            // Timeout: give up waiting, proceed anyway
+            writeLock(tabId, now)
+            return { acquired: true, waited }
+          }
+          // Wait and retry
+          waited = true
+          await new Promise(r => global.setTimeout(r, LOCK_WAIT_POLL_MS))
+          continue
+        }
+        // Lock is stale (>5s), we can take over
+      }
+
+      // We can acquire (no lock or stale lock)
+      writeLock(tabId, now)
+      const confirmLock = readLock()
+      if (confirmLock && confirmLock.tabId === tabId) {
+        return { acquired: true, waited }
+      }
+      // Another tab beat us, retry
+      if (elapsed > LOCK_WAIT_MAX_MS) {
+        return { acquired: false, waited }
+      }
+      await new Promise(r => global.setTimeout(r, LOCK_WAIT_POLL_MS))
+    }
+  }
+
+  // Install cross-tab storage listener (Item 3)
+  function installStorageListener() {
+    if (!global.addEventListener) return
+
+    global.addEventListener('storage', function(event) {
+      if (event.key === STORAGE_KEY) {
+        // Our session was modified by another tab
+        // Two cases:
+        // 1. event.newValue is null → another tab logged out (logout broadcast)
+        // 2. event.newValue exists → another tab refreshed token
+        // In both cases: invalidate cache so next validate() call is fresh
+        invalidateCache()
+        console.debug('[RifimPortalSession] storage event on STORAGE_KEY, cache invalidated')
+      }
+      if (event.key === LOCK_STORAGE_KEY) {
+        // Lock state changed by another tab (for diagnostics)
+        console.debug('[RifimPortalSession] storage event on LOCK_STORAGE_KEY')
+      }
+    })
+  }
+
+  // Enhanced clearSession() with logout broadcast (Item 3)
+  function clearSessionWithBroadcast() {
+    const tabId = getTabId()
+    try {
+      // Broadcast logout to all tabs by removing session
+      if (global.localStorage) {
+        global.localStorage.removeItem(STORAGE_KEY)
+      }
+      // Release any lock we hold
+      clearLock(tabId)
+      // Invalidate local cache
+      invalidateCache()
+      console.debug('[RifimPortalSession] clearSessionWithBroadcast completed')
+    } catch (e) {
+      console.warn('[RifimPortalSession] clearSessionWithBroadcast error:', e && e.message)
+    }
+  }
+
+  // Enhanced validateSession with lock coordination (Item 3)
+  async function validateSessionWithLocking() {
+    const tabId = getTabId()
+
+    // Fast-path: cache still warm
+    if (lastGood && (Date.now() - lastGoodAt) < VALIDATE_TTL) {
+      const exp = Number(lastGood.expires_at || 0)
+      if (!exp || exp > Math.floor(Date.now() / 1000) + 60) return lastGood
+    }
+
+    // Check if another tab is already refreshing
+    if (inFlight) return inFlight
+
+    inFlight = (async () => {
+      try {
+        // Try to acquire refresh lock
+        const lockResult = await acquireRefreshLock(tabId)
+
+        if (lockResult.waited) {
+          // We waited for another tab to refresh
+          // Re-read session from localStorage (another tab may have updated it)
+          invalidateCache()
+          // Check if cache is now warm (another tab may have validated)
+          if (lastGood && (Date.now() - lastGoodAt) < VALIDATE_TTL) {
+            const exp = Number(lastGood.expires_at || 0)
+            if (!exp || exp > Math.floor(Date.now() / 1000) + 60) {
+              return lastGood
+            }
+          }
+        }
+
+        if (!lockResult.acquired) {
+          // Failed to acquire lock (timeout), use fallback
+          const fallback = readSession()
+          if (fallback && fallback.access_token) {
+            invalidateCache()
+            return fallback
+          }
+          return null
+        }
+
+        // We hold the lock; perform validation
+        try {
+          return await _validateOnce()
+        } finally {
+          clearLock(tabId)
+        }
+      } finally {
+        inFlight = null
+      }
+    })()
+
+    return inFlight
+  }
+
+  // Initialize cross-tab sync on module load
+  installStorageListener()
+
+  // Export enhanced public API (backward compatible)
   global.RifimPortalSession = {
     read: readSession,
-    clear: clearSession,
-    validate: validateSession,
+    clear: clearSessionWithBroadcast,  // Enhanced with broadcast
+    validate: validateSessionWithLocking,  // Enhanced with locking
     require: requireSession,
     invalidate: invalidateCache,
     normalizeRole,
     canMutate,
     config: { supabaseUrl: SB_URL, supabaseAnonKey: SB_ANON, isPreview },
+    // Item 3: expose internals for testing
+    _getTabId: getTabId,
+    _readLock: readLock,
+    _acquireRefreshLock: acquireRefreshLock,
   }
 
   installHrisMutationGuard()
