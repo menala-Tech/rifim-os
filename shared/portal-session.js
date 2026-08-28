@@ -67,9 +67,10 @@
     } catch (_) { return null }
   }
 
-  // Item 2 (2026-08-26): custom error to distinguish transient network
-  // failures (kept session) from unrecoverable auth failures (clear session).
+  // Typed auth errors: a first profile 401 is recoverable; terminal auth
+  // failures are only raised after refresh/retry confirms the session is dead.
   function AuthHardError(msg) { const e = new Error(msg); e.isHardAuth = true; return e }
+  function Profile401Error(msg) { const e = new Error(msg); e.isProfile401 = true; return e }
 
   async function refreshToken(refreshToken) {
     const res = await fetch(SB_URL + '/auth/v1/token?grant_type=refresh_token', {
@@ -99,18 +100,14 @@
         Accept: 'application/json',
       },
     })
-    // Item 3 (2026-08-28): Distinguish 401 from 403
-    // - 401: access token expired/invalid → should attempt refresh/recovery
-    // - 403: permission denied → keep session, show permission error
-    // Only 401 on initial token check (not from Supabase validation) is terminal
+    // 401 is recoverable exactly once per validation cycle: caller must refresh
+    // the current session, persist the rotated tokens, then retry profile once.
+    // 403 is authorization/permission, not proof that the auth session is dead.
     if (res.status === 403) {
-      // Permission denied: keep session, return error to caller
       throw new Error('Portal profile: akses ditolak (403 permission)')
     }
     if (res.status === 401) {
-      // Could be: expired token, revoked session, deleted user
-      // Only terminal if we already tried refresh (will be caught by refresh logic)
-      throw AuthHardError('Portal profile: token invalid (401)')
+      throw Profile401Error('Portal profile: token invalid (401)')
     }
     if (!res.ok) throw new Error('Portal profile validation gagal (transient)')
     const rows = await res.json()
@@ -144,57 +141,101 @@
     let refreshTokenValue = saved.refresh_token || ''
     let expiresAt = Number(saved.expires_at || 0)
     const now = Math.floor(Date.now() / 1000)
-
+    let refreshAttempted = false
     let refreshed = false
+
+    async function refreshCurrentSession() {
+      if (refreshAttempted) throw AuthHardError('Refresh sudah dicoba pada siklus validasi ini')
+      refreshAttempted = true
+      if (!refreshTokenValue) throw AuthHardError('Refresh token tidak tersedia')
+
+      const r = await refreshToken(refreshTokenValue)
+      accessToken = r.access_token || ''
+      refreshTokenValue = r.refresh_token || refreshTokenValue
+      expiresAt = Number(r.expires_at || (Math.floor(Date.now() / 1000) + Number(r.expires_in || 3600)))
+      if (!accessToken) throw AuthHardError('Access token kosong setelah refresh')
+      refreshed = true
+
+      // Persist immediately. This is critical for sibling tabs: a waiter must
+      // never continue with the old refresh token after token rotation.
+      writeSession(Object.assign({}, readSession() || saved, {
+        access_token: accessToken,
+        refresh_token: refreshTokenValue,
+        expires_at: expiresAt,
+        ts: Date.now(),
+      }))
+    }
+
     try {
       if (!expiresAt || expiresAt <= now + 60) {
-        if (!refreshTokenValue) throw AuthHardError('Refresh token tidak tersedia')
-        const r = await refreshToken(refreshTokenValue)
-        accessToken = r.access_token || ''
-        refreshTokenValue = r.refresh_token || refreshTokenValue
-        expiresAt = Number(r.expires_at || (now + Number(r.expires_in || 3600)))
-        if (!accessToken) throw AuthHardError('Access token kosong setelah refresh')
-        refreshed = true
+        await refreshCurrentSession()
       }
 
-      const payload = decodeJwt(accessToken)
-      const userId = payload && payload.sub
+      let payload = decodeJwt(accessToken)
+      let userId = payload && payload.sub
       if (!userId) throw AuthHardError('Token Portal tidak valid')
 
-      // Skip profile revalidate untuk fast-path (token access masih valid,
-      // sudah pernah divalidasi baru-baru ini). Hanya validate ulang saat:
-      //   - token baru saja di-refresh, atau
-      //   - belum pernah lolos validasi profile,
-      //   - atau saved.role/id kosong.
       const needsProfile = refreshed || !lastGood || !saved.role || !saved.id
       let profile = null
+
       if (needsProfile) {
-        try { profile = await fetchProfile(accessToken, userId) }
-        catch (err) {
-          if (err && err.isHardAuth) throw err
-          // Transient: keep saved session, do NOT clear.
-          console.warn('[RifimPortalSession] profile transient:', err && err.message)
-          const kept = writeSession(Object.assign({}, saved, {
-            access_token: accessToken,
-            refresh_token: refreshTokenValue,
-            expires_at: expiresAt,
-            ts: Date.now(),
-          }))
-          lastGood = kept; lastGoodAt = Date.now()
-          return kept
+        try {
+          profile = await fetchProfile(accessToken, userId)
+        } catch (err) {
+          if (err && err.isProfile401) {
+            // First profile 401 is not terminal. Recover once, persist newest
+            // tokens, then retry the profile request exactly once.
+            if (!refreshAttempted) {
+              await refreshCurrentSession()
+              payload = decodeJwt(accessToken)
+              userId = payload && payload.sub
+              if (!userId) throw AuthHardError('Token Portal tidak valid setelah refresh')
+              try {
+                profile = await fetchProfile(accessToken, userId)
+              } catch (retryErr) {
+                if (retryErr && retryErr.isProfile401) {
+                  throw AuthHardError('Portal profile tetap 401 setelah refresh')
+                }
+                if (retryErr && retryErr.isHardAuth) throw retryErr
+                throw retryErr
+              }
+            } else {
+              // We already refreshed earlier in this cycle (for example because
+              // the token was near expiry). A profile 401 now is the terminal
+              // post-refresh 401.
+              throw AuthHardError('Portal profile 401 setelah refresh')
+            }
+          } else if (err && err.isHardAuth) {
+            throw err
+          } else {
+            // Permission/network/5xx are non-terminal. Preserve the latest
+            // persisted session so UI can recover without false "Session invalid".
+            console.warn('[RifimPortalSession] profile transient:', err && err.message)
+            const latest = readSession() || saved
+            const kept = writeSession(Object.assign({}, latest, {
+              access_token: accessToken,
+              refresh_token: refreshTokenValue,
+              expires_at: expiresAt,
+              ts: Date.now(),
+            }))
+            lastGood = kept; lastGoodAt = Date.now()
+            return kept
+          }
         }
+
         if (!profile || profile.is_active === false) {
           throw AuthHardError('Profil Portal tidak aktif')
         }
       }
 
-      const merged = writeSession(Object.assign({}, saved, {
-        id: (profile && profile.id) || saved.id,
-        full_name: (profile && profile.full_name) || saved.full_name || saved.name || saved.email || 'User',
-        name: (profile && profile.full_name) || saved.name || saved.full_name || saved.email || 'User',
-        role: normalizeRole((profile && profile.role) || saved.role),
-        staff_id: (profile && profile.staff_id) || saved.staff_id || null,
-        branch_id: (profile && profile.branch_id) || saved.branch_id || null,
+      const latest = readSession() || saved
+      const merged = writeSession(Object.assign({}, latest, {
+        id: (profile && profile.id) || latest.id,
+        full_name: (profile && profile.full_name) || latest.full_name || latest.name || latest.email || 'User',
+        name: (profile && profile.full_name) || latest.name || latest.full_name || latest.email || 'User',
+        role: normalizeRole((profile && profile.role) || latest.role),
+        staff_id: (profile && profile.staff_id) || latest.staff_id || null,
+        branch_id: (profile && profile.branch_id) || latest.branch_id || null,
         access_token: accessToken,
         refresh_token: refreshTokenValue,
         expires_at: expiresAt,
@@ -209,8 +250,6 @@
         lastGood = null; lastGoodAt = 0
         return null
       }
-      // Transient error di layer refresh: kembalikan sesi tersimpan bila ada,
-      // biar caller bisa mencoba lagi tanpa logout.
       const fallback = readSession()
       return (fallback && fallback.access_token) ? fallback : null
     }
@@ -504,16 +543,12 @@
         const lockResult = await acquireRefreshLock(tabId)
 
         if (lockResult.waited) {
-          // We waited for another tab to refresh
-          // Re-read session from localStorage (another tab may have updated it)
+          // Another tab may have rotated both access_token and refresh_token.
+          // Drop any in-memory state and explicitly re-read localStorage before
+          // continuing. _validateOnce() will read this newest persisted session.
           invalidateCache()
-          // Check if cache is now warm (another tab may have validated)
-          if (lastGood && (Date.now() - lastGoodAt) < VALIDATE_TTL) {
-            const exp = Number(lastGood.expires_at || 0)
-            if (!exp || exp > Math.floor(Date.now() / 1000) + 60) {
-              return lastGood
-            }
-          }
+          const newest = readSession()
+          if (!newest || !newest.access_token) return null
         }
 
         if (!lockResult.acquired) {
