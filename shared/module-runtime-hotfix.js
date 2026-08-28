@@ -1,8 +1,11 @@
 (function(global){
 'use strict';
 var path=String(location.pathname||'');
-var SB_URL='https://vlievtojpmrbsmzlqswl.supabase.co';
-var SB_KEY='sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+// Hotfix 2026-08-29 followup: pull URL/anon from RifimPortalSession so this
+// module also targets QA on Preview and PROD on rifim-os.vercel.app instead
+// of always sending traffic to PROD Supabase.
+var SB_URL=(global.RifimPortalSession&&global.RifimPortalSession.config&&global.RifimPortalSession.config.supabaseUrl)||'https://vlievtojpmrbsmzlqswl.supabase.co';
+var SB_KEY=(global.RifimPortalSession&&global.RifimPortalSession.config&&global.RifimPortalSession.config.supabaseAnonKey)||'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
 
 function readAuth(){try{return JSON.parse(localStorage.getItem('rifim_auth')||'{}')||{}}catch(_){return{}}}
 function normRole(v){v=String(v||'').trim().toLowerCase();if(v==='direktur'||v==='direktur utama')return'direksi';if(v==='mgmt'||v==='manajemen')return'management';if(v==='koord'||v==='coordinator')return'koordinator';return v}
