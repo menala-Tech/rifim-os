@@ -34,3 +34,7 @@ jobs:
         run: node testing/portal-session-item3.test.js
       - name: Run Phase F behavioral gate
         run: node testing/phase-f-regression.test.js
+      - name: Run data-maintenance behavioral gate (backend fail-closed contract)
+        run: node testing/data-maintenance-behavioral.test.js
+      - name: Run hris-operations behavioral gate (activate + reconcile + staff_sync)
+        run: node testing/hris-operations-behavioral.test.js
