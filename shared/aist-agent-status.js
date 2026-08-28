@@ -2,6 +2,8 @@
   'use strict'
   if (!/\/finance(?:\/|$)/.test(location.pathname)) return
 
+  var activeInterval = null
+
   function badge(label, ok, detail) {
     return '<span class="aist-agent-pill ' + (ok ? 'ok' : 'bad') + '" title="' + String(detail || '').replace(/"/g, '&quot;') + '">'
       + (ok ? '🟢 ' : '🔴 ') + label + '</span>'
@@ -12,6 +14,11 @@
     var token = await _finGetAccessToken()
     if (!token) return null
     var res = await fetch('/api/internal/aist-agent/status', { headers: { Authorization: 'Bearer ' + token } })
+    // 2026-08-29: stop the poll on auth failure to avoid repeated 401/403 console spam.
+    if (res.status === 401 || res.status === 403) {
+      if (activeInterval) { clearInterval(activeInterval); activeInterval = null }
+      return null
+    }
     if (!res.ok) return null
     return res.json()
   }
@@ -51,7 +58,8 @@
     }
 
     refresh()
-    setInterval(refresh, 10000)
+    if (activeInterval) clearInterval(activeInterval)
+    activeInterval = setInterval(refresh, 10000)
   }
 
   function autoMount() {

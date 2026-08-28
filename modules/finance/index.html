@@ -647,6 +647,17 @@ function _finGetUserEmail() {
 
 let _finSessionClient = null;
 async function _finGetAccessToken() {
+  // Hotfix 2026-08-29: AIST / Saldo callers must use the same canonical
+  // validated access token as the rest of Finance. Without this, the
+  // competing GoTrue client below can return a stale token and cause
+  // repeated 401 on /api/internal/aist-agent/status and 400 on
+  // /api/internal/hris-contracts. Portal session is the single source of truth.
+  if (window.RifimPortalSession && typeof window.RifimPortalSession.validate === 'function') {
+    try {
+      const s = await window.RifimPortalSession.validate();
+      if (s && s.access_token) return String(s.access_token);
+    } catch (_) { /* fall through to legacy refresh */ }
+  }
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem('rifim_auth') || '{}'); }
   catch (e) { return ''; }
