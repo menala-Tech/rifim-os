@@ -18,8 +18,15 @@ function statusOptions(m){
   if(m==='finance_saldo')return [['semua','Semua Status'],['pending','Pending'],['approved','Approved'],['processed','Lunas / Diproses'],['rejected','Ditolak'],['cancelled','Dibatalkan']];
   return [['semua','Semua Status']];
 }
+// Hotfix 2026-08-29 (R1): canonical branch source. Previously this scraped
+// another module's DOM select (#filter-att-branch / #sr-branch) which is a
+// race condition — if the other module had not populated yet, dropdown ended
+// up with only "Semua Cabang" and users could not scope Bersihkan Data. We
+// now fetch from the backend directly and cache per session, with the DOM
+// scrape kept ONLY as a last-resort fallback when the fetch fails.
+let _branchCache=null, _branchLoading=null, _branchError=null;
 function branchSource(m){return document.getElementById(m==='finance_saldo'?'sr-branch':'filter-att-branch')}
-function branchOptions(m){
+function branchOptionsFromDom(m){
   const src=branchSource(m), out=[['','Semua Cabang']];
   if(!src)return out;
   [...src.options].forEach(o=>{
@@ -27,6 +34,52 @@ function branchOptions(m){
     if(!out.some(x=>x[0]===v))out.push([v,String(o.textContent||v)]);
   });
   return out;
+}
+function branchOptions(){
+  const out=[['','Semua Cabang']];
+  if(Array.isArray(_branchCache)){
+    _branchCache.forEach(b=>{
+      const v=String(b.id||b.code||'');
+      const label=String(b.name||b.code||b.slug||v);
+      if(v&&!out.some(x=>x[0]===v)) out.push([v,label]);
+    });
+  }
+  return out;
+}
+async function fetchBranches(){
+  if(Array.isArray(_branchCache)) return _branchCache;
+  if(_branchLoading) return _branchLoading;
+  _branchLoading=(async()=>{
+    const t=token();
+    if(!t){ _branchError='Session tidak tersedia.'; return []; }
+    try{
+      const r=await fetch(API+'?mode=maintenance_branches',{headers:{Authorization:'Bearer '+t},cache:'no-store'});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok||!j?.success){ _branchError=j?.message||('Gagal memuat cabang (HTTP '+r.status+')'); return []; }
+      _branchCache=Array.isArray(j.rows)?j.rows:[];
+      _branchError=null;
+      return _branchCache;
+    }catch(e){ _branchError=e?.message||String(e); return []; }
+    finally{ _branchLoading=null; }
+  })();
+  return _branchLoading;
+}
+function renderBranchSelect(){
+  const sel=document.getElementById('dm-branch'); if(!sel) return;
+  const opts=branchOptions();
+  // Fail-closed guard: if backend fetch failed AND we have no cache, do NOT
+  // silently show only "Semua Cabang" — surface the error so admin knows
+  // scope selection is broken instead of accidentally targeting everything.
+  if(_branchError && opts.length<=1){
+    sel.innerHTML='<option value="__ERR__">⚠ Gagal memuat cabang</option>';
+    sel.title=_branchError; sel.disabled=true;
+    return;
+  }
+  // Second-choice fallback: if fetch returned empty but DOM has branches, use those.
+  const finalOpts=(opts.length>1)?opts:branchOptionsFromDom(currentModule);
+  sel.innerHTML=finalOpts.map(x=>'<option value="'+esc(x[0])+'">'+esc(x[1])+'</option>').join('');
+  sel.disabled=(currentModule==='hris_karyawan');
+  sel.title='';
 }
 function inject(){
   if(document.getElementById('rifim-maintenance-modal'))return;
@@ -80,7 +133,7 @@ function configure(m){
   const mod=document.getElementById('dm-module');
   mod.innerHTML=[['attendance','HRIS — Absensi'],['finance_saldo','Finance — Isi Saldo (RAOS)'],['hris_karyawan','HRIS — Karyawan']].map(x=>'<option value="'+x[0]+'">'+x[1]+'</option>').join('');
   mod.value=currentModule;
-  const br=document.getElementById('dm-branch');br.innerHTML=branchOptions(currentModule).map(x=>'<option value="'+esc(x[0])+'">'+esc(x[1])+'</option>').join('');
+  renderBranchSelect();
   const st=document.getElementById('dm-status');st.innerHTML=statusOptions(currentModule).map(x=>'<option value="'+x[0]+'">'+x[1]+'</option>').join('');
   const ac=document.getElementById('dm-action');
   if(currentModule==='finance_saldo')ac.innerHTML='<option value="archive">Archive / Hide (Disarankan)</option><option value="delete">Permanent Delete</option>';
@@ -100,6 +153,10 @@ function open(m){
   document.getElementById('dm-staff').value='';document.getElementById('dm-role').value='';
   configure(currentModule);
   document.getElementById('rifim-maintenance-modal').style.display='flex';
+  // Hotfix 2026-08-29 (R1): kick off canonical branch fetch. Re-render the
+  // select once branches arrive so admins always see the real list even if
+  // the DOM-scrape fallback would have been empty.
+  fetchBranches().then(()=>renderBranchSelect()).catch(()=>renderBranchSelect());
 }
 function close(){const e=document.getElementById('rifim-maintenance-modal');if(e)e.style.display='none';lastPreview=null}
 function hidePreview(){const p=document.getElementById('dm-preview'),c=document.getElementById('dm-confirm');if(p)p.style.display='none';if(c)c.style.display='none'}
@@ -162,7 +219,17 @@ async function execute(){
   try{
     const j=await call(body);clearOperationalCaches();
     const n=Number(j.result?.affected_rows||0);
-    if(typeof global.showToast==='function')global.showToast('✅ '+n+' data berhasil '+(body.action==='archive'?'diarsipkan.':'dihapus.'),'success');
+    // Hotfix 2026-08-29 (R2): never silently claim success. If the backend
+    // reports 0 affected rows, surface that explicitly so Admin sees the
+    // real outcome instead of thinking the delete quietly "didn't work".
+    const msg='✅ '+n+' data berhasil '+(body.action==='archive'?'diarsipkan.':'dihapus.');
+    if(n===0){
+      alert('⚠ Tidak ada baris yang terhapus. Preview mungkin sudah kedaluwarsa — silakan preview ulang.');
+    }else if(typeof global.showToast==='function'){
+      global.showToast(msg,'success');
+    }else{
+      alert(msg);
+    }
     if(currentModule==='attendance'){
       if(typeof global.loadAttendance==='function')await Promise.resolve(global.loadAttendance({forceRefresh:true})).catch(()=>{});
       if(typeof global.loadPayroll==='function'&&document.querySelector('#tab-payroll.active'))Promise.resolve(global.loadPayroll()).catch(()=>{});
@@ -174,7 +241,7 @@ async function execute(){
       if(typeof global.loadTargetStaff==='function')Promise.resolve(global.loadTargetStaff()).catch(()=>{});
     }
     close();
-  }catch(e){alert(e.message||String(e))}finally{btn.disabled=false;btn.textContent=old}
+  }catch(e){alert('❌ '+(e.message||String(e)))}finally{btn.disabled=false;btn.textContent=old}
 }
 function bindButtons(){
   document.querySelectorAll('[data-maintenance-module]').forEach(b=>{

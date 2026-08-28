@@ -123,6 +123,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
 <script src="/shared/api-cache.js"></script>
 <script src="/shared/master-role-policy.js"></script>
 <script src="/shared/portal-session.js"></script>
+<script src="/shared/gas-call.js"></script>
 </head>
 <body>
 
@@ -661,7 +662,11 @@ function getSb() {
     showStatus('Supabase SDK belum load — refresh halaman', 'err');
     return null;
   }
-  _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // Hotfix 2026-08-29 (R3): share the Portal auth storage so CRM does not
+  // spawn a second GoTrueClient (Production Finance console shows the warning
+  // otherwise, and the stale second client causes 403 /auth/v1/user which
+  // previously wiped rifim_auth).
+  _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'rifim_portal_sb' } });
   return _sb;
 }
 

@@ -738,6 +738,23 @@ module.exports=async function handler(req,res){
     if(req.method==='POST'&&mode==='hris_activation_reconcile_preview')return out(res,200,{success:true,...await hrisReconcile(req,p,false)});
     if(req.method==='POST'&&mode==='hris_activation_reconcile_apply')return out(res,200,{success:true,...await hrisReconcile(req,p,true)});
     if(req.method==='POST'&&mode==='hris_staff_sync')return out(res,200,{success:true,...await hrisStaffSync(req,p)});
+    // Hotfix 2026-08-29 (R1): branch list for Bersihkan Data modal.
+    // The modal previously read branches from another module's DOM select; if
+    // that select had not populated yet, Production showed only "Semua
+    // Cabang". This mode is the canonical branch source for the modal:
+    //   - admin/direksi/management -> all active top-level branches
+    //   - koordinator             -> only their own branch (BR-01 scope)
+    //   - other roles             -> rejected
+    if(req.method==='GET'&&mode==='maintenance_branches'){
+      const allowed=['admin','direksi','management','koordinator'];
+      if(!allowed.includes(p.role)) throw new Error('Role tidak boleh melihat daftar cabang');
+      let path='/rest/v1/branches?is_active=eq.true&parent_branch_id=is.null&select=id,code,name,slug&order=name.asc';
+      if(p.role==='koordinator'){
+        if(!p.branch_id) return out(res,200,{success:true,rows:[]});
+        path='/rest/v1/branches?is_active=eq.true&id=eq.'+q(p.branch_id)+'&select=id,code,name,slug';
+      }
+      return out(res,200,{success:true,rows:await sb(path),source:'supabase'});
+    }
     if(req.method==='POST'&&mode==='maintenance_preview'){
       try{return out(res,200,{success:true,preview:await maintenancePreview(req,p)})}
       catch(e){await opsAudit(p,'maintenance_failed',String(req.body?.module||''),{mode:'preview',action:String(req.body?.action||'')},0,false,{reason:e instanceof Error?e.message:String(e)});throw e}
