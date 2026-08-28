@@ -646,6 +646,17 @@ function _finGetUserEmail() {
 }
 
 let _finSessionClient = null;
+function _finIsPreview() {
+  const host = String(window.location && window.location.hostname || '');
+  if (window.RifimPortalSession && typeof window.RifimPortalSession.config === 'object' && window.RifimPortalSession.config.isPreview != null) {
+    return !!window.RifimPortalSession.config.isPreview;
+  }
+  return /\.vercel\.app$/i.test(host) && host !== 'rifim-os.vercel.app';
+}
+function _finPreviewNotice(tb, msg) {
+  if (!tb) return;
+  tb.innerHTML = '<tr><td colspan="999" class="empty" style="padding:20px;color:#0ea5e9">ℹ️ ' + esc(msg) + '</td></tr>';
+}
 async function _finGetAccessToken() {
   // Hotfix 2026-08-29: AIST / Saldo callers must use the same canonical
   // validated access token as the rest of Finance. Without this, the
@@ -715,6 +726,10 @@ function _finActionIsMutation(action) {
 // alternate path if the canonical router script ever fails to install.
 var _FIN_LEGACY_READ_ACTIONS = ['finance_list', 'finance_cabang_list', 'finance_tagihan_list', 'finance_rekap_harian', 'finance_rekap_bulanan', 'finance_log_list'];
 async function _gasCall(action, extra) {
+  const host = String(window.location && window.location.hostname || '');
+  const previewFromPortal = window.RifimPortalSession && typeof window.RifimPortalSession.config === 'object' && window.RifimPortalSession.config.isPreview;
+  const isPreview = previewFromPortal || (/\.vercel\.app$/i.test(host) && host !== 'rifim-os.vercel.app');
+  if (isPreview) return { success: false, code: 'PREVIEW_GAS_UNAVAILABLE', preview_notice: true, message: 'Fitur GAS tidak tersedia di Preview QA' };
   if (_finActionIsMutation(action) && !_finCanMutate()) {
     throw new Error('Role view-only tidak diizinkan melakukan perubahan Finance.');
   }
@@ -781,6 +796,7 @@ const showToast = (msg, kind) => {
 // ═══════════════════════════════════════════════════════════════════════
 async function loadDashboard() {
   const tb = document.getElementById('d-body');
+  if (_finIsPreview()) { _finPreviewNotice(tb, 'Fitur GAS Dashboard tidak tersedia di Preview QA'); return; }
   tb.innerHTML = '<tr><td colspan="7"><div class="empty">Loading dari sheet LIA…</div></td></tr>';
   try {
     const data = await _gasCall('finance_list', {
@@ -815,6 +831,7 @@ async function loadDashboard() {
 // ═══════════════════════════════════════════════════════════════════════
 async function loadCabangDetail(cabang) {
   const tb = document.getElementById('c-body');
+  if (_finIsPreview()) { _finPreviewNotice(tb, 'Fitur GAS Ledger per cabang tidak tersedia di Preview QA'); return; }
   tb.innerHTML = '<tr><td colspan="6"><div class="empty">Loading sheet ' + esc(cabang) + '…</div></td></tr>';
   try {
     const data = await _gasCall('finance_cabang_list', {
@@ -842,6 +859,7 @@ async function loadCabangDetail(cabang) {
 // ═══════════════════════════════════════════════════════════════════════
 async function loadTagihan() {
   const tb = document.getElementById('t-body');
+  if (_finIsPreview()) { _finPreviewNotice(tb, 'Fitur GAS Tagihan tidak tersedia di Preview QA'); return; }
   tb.innerHTML = '<tr><td colspan="8"><div class="empty">Loading Tagihan…</div></td></tr>';
   try {
     const data = await _gasCall('finance_tagihan_list', {
@@ -877,6 +895,7 @@ async function loadTagihan() {
 }
 
 async function markTagihanPaid(noTag) {
+  if (_finIsPreview()) { showToast('ℹ️ Fitur GAS Tagihan tidak tersedia di Preview QA', ''); return; }
   const tgl = prompt(`Tandai LUNAS untuk ${noTag}\n\nTanggal bayar (YYYY-MM-DD, kosong = hari ini):`);
   if (tgl === null) return;
   showToast('Memproses…');
@@ -889,6 +908,7 @@ async function markTagihanPaid(noTag) {
 }
 
 async function addTagihan() {
+  if (_finIsPreview()) { showToast('ℹ️ Fitur GAS Tagihan tidak tersedia di Preview QA', ''); return; }
   const jenis    = prompt('Jenis tagihan (mis. Listrik, PDAM, Sewa):'); if (jenis === null) return;
   const noTag    = prompt('No Tagihan:');                                if (noTag === null || !noTag.trim()) return;
   const instansi = prompt('Nama Instansi:');                             if (instansi === null || !instansi.trim()) return;
@@ -913,6 +933,7 @@ async function addTagihan() {
 async function loadRekap() {
   const panel = document.querySelector('[data-panel="rekap"] .empty');
   if (!panel) return;
+  if (_finIsPreview()) { panel.innerHTML = '<div class="icon">ℹ️</div>Fitur GAS Rekap tidak tersedia di Preview QA'; return; }
   panel.innerHTML = '<div class="icon">⏳</div>Loading rekap…';
   try {
     const [har, bul] = await Promise.all([
@@ -1279,6 +1300,7 @@ function startSaldoRaosNotifier() {
 // ═══════════════════════════════════════════════════════════════════════
 async function loadLog() {
   const tb = document.getElementById('l-body');
+  if (_finIsPreview()) { _finPreviewNotice(tb, 'Fitur GAS System Log tidak tersedia di Preview QA'); return; }
   tb.innerHTML = '<tr><td colspan="5"><div class="empty">Loading log…</div></td></tr>';
   try {
     const data = await _gasCall('finance_log_list', {
@@ -1496,6 +1518,7 @@ async function editTargetCabang(branchId, branchName, currTarget, currStaffDefau
   });
 }
 async function computePayrollForMonth() {
+  if (_finIsPreview()) { showToast('ℹ️ Fitur GAS Payroll tidak tersedia di Preview QA', ''); return; }
   const monthEl = document.getElementById('tc-month');
   if (!confirm('Recompute payroll bulan ' + monthEl.value + ' untuk SEMUA staff aktif?\nIni akan overwrite raos_payroll bulan ini.')) return;
   try {
@@ -1635,6 +1658,7 @@ async function loadDBDriver() {
   }
 }
 async function randomAssignDriver(force) {
+  if (_finIsPreview()) { showToast('ℹ️ Fitur GAS Driver Assignment tidak tersedia di Preview QA', ''); return; }
   const cabangEl = document.getElementById('dd-cabang');
   if (!cabangEl.value) return showToast('❌ Pilih cabang dulu', 'err');
   const cabangName = cabangEl.options[cabangEl.selectedIndex].text;

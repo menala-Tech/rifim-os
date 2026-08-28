@@ -620,6 +620,11 @@ function showStatus(msg, kind) {
   bar.className = 'status-bar show ' + (kind || '');
   setTimeout(() => bar.classList.remove('show'), 4000);
 }
+// Hotfix 2026-08-29 (R5): Production GAS is not reachable from Vercel Preview
+// because Preview tokens are QA JWTs. Any GAS-backed call in Preview must be
+// rendered as an informational (not red / not "Session invalid") notice.
+function _crmIsPreviewNotice(data) { return data && data.preview_notice === true; }
+function _crmInfoTb(tb, msg) { tb.innerHTML = '<tr><td colspan="999" class="empty" style="padding:20px;color:#0ea5e9">ℹ️ ' + _escapeHtml(msg) + '</td></tr>'; }
 
 document.getElementById('cc-save').addEventListener('click', async () => {
   const keys = [...dirty.company];
@@ -633,6 +638,7 @@ document.getElementById('cc-save').addEventListener('click', async () => {
     const input = document.querySelector(`input[data-section="company"][data-key="${k}"]`);
     try {
       const data = await _gasCall('company_config_set', { key: k, value: input.value, user: me });
+      if (_crmIsPreviewNotice(data)) { showStatus('ℹ️ ' + data.message, ''); btn.disabled = false; return; }
       if (!data.success) { results.err++; results.errors.push(`${k}: ${data.message}`); }
       else { results.ok++; }
     } catch (err) {
@@ -713,6 +719,12 @@ document.getElementById('sc-save').addEventListener('click', async () => {
       const mirror = await _gasCall('sistem_config_set', {
         key: item.key, value: item.value, user: me,
       });
+      if (_crmIsPreviewNotice(mirror)) {
+        // Supabase write already succeeded; GAS mirror is unavailable in Preview.
+        showStatus('ℹ️ ' + mirror.message, '');
+        results.ok++;
+        continue;
+      }
       if (!mirror || mirror.success !== true) {
         throw new Error('Sheet mirror gagal: ' + ((mirror && mirror.message) || 'response tidak valid'));
       }
@@ -738,6 +750,7 @@ document.getElementById('cc-refresh').addEventListener('click', async () => {
   try {
     const me = _wlCurrentUserEmail();
     const data = await _gasCall('company_config_list', { user: me });
+    if (_crmIsPreviewNotice(data)) { showStatus('ℹ️ ' + data.message, ''); return; }
     if (!data.success) throw new Error(data.message || 'Gagal load');
     const rows = data.config || [];
     let updated = 0;
@@ -844,6 +857,7 @@ async function loadAuditLog() {
   try {
     const me = _wlCurrentUserEmail();
     const data = await _gasCall('crm_audit_tail', { user: me, limit: 200 });
+    if (_crmIsPreviewNotice(data)) { _crmInfoTb(tbody, data.message); return; }
     if (!data.success) throw new Error(data.message || 'Gagal load');
     _auCache = data.logs || [];
     if (_auCache.length === 0) {
@@ -933,6 +947,7 @@ async function loadRaosUsers() {
       _gasCall('raos_users_list', { user: me }),
       _gasCall('raos_credentials_list', { user: me }).catch(() => ({ success: false })),
     ]);
+    if (_crmIsPreviewNotice(data)) { _crmInfoTb(tbody, data.message); return; }
     if (!data.success) throw new Error(data.message || 'Gagal load');
     _ruCache = data.users || [];
     _rcCache = (credRes && credRes.success && credRes.credentials) || {};
@@ -1023,6 +1038,7 @@ async function loadContacts() {
   try {
     const me = _wlCurrentUserEmail();
     const data = await _gasCall('contacts_list', { user: me });
+    if (_crmIsPreviewNotice(data)) { _crmInfoTb(tbody, data.message); return; }
     if (!data.success) throw new Error(data.message || 'Gagal load');
     _ctCache = data.contacts || [];
     renderContacts();
@@ -1064,6 +1080,7 @@ async function saveContact() {
     };
     if (_ctEditing) payload.id = _ctEditing.id;
     const data = await _gasCall('contacts_upsert', payload);
+    if (_crmIsPreviewNotice(data)) { showStatus('ℹ️ ' + data.message, ''); return; }
     if (!data.success) throw new Error(data.message || 'Gagal simpan');
     showStatus(`✅ Kontak ${_ctEditing ? 'ter-update' : 'ditambahkan'}`, 'ok');
     document.getElementById('ct-modal').style.display = 'none';
@@ -1082,6 +1099,7 @@ async function deleteContact(id) {
   try {
     const me = _wlCurrentUserEmail();
     const data = await _gasCall('contacts_delete', { id, user: me });
+    if (_crmIsPreviewNotice(data)) { showStatus('ℹ️ ' + data.message, ''); return; }
     if (!data.success) throw new Error(data.message || 'Gagal hapus');
     showStatus(`✅ Kontak "${c.name}" dihapus`, 'ok');
     await loadContacts();

@@ -26,6 +26,14 @@
   if (typeof global._gasCall === 'function') return; // Respect a page-local override that loaded earlier.
 
   var GAS_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec';
+  var PREVIEW_GAS_UNAVAILABLE = { success: false, code: 'PREVIEW_GAS_UNAVAILABLE', preview_notice: true, message: 'Fitur GAS tidak tersedia di Preview QA' };
+  function _isPreview() {
+    var host = String(global.location && global.location.hostname || '');
+    if (window.RifimPortalSession && typeof window.RifimPortalSession.config === 'object' && window.RifimPortalSession.config.isPreview != null) {
+      return !!window.RifimPortalSession.config.isPreview;
+    }
+    return /\.vercel\.app$/i.test(host) && host !== 'rifim-os.vercel.app';
+  }
   function currentUserEmail() {
     try { return (JSON.parse(global.localStorage.getItem('rifim_auth') || '{}').email || ''); }
     catch (_) { return ''; }
@@ -35,6 +43,7 @@
   }
 
   global._gasCall = async function _gasCall(action, extra) {
+    if (_isPreview()) return PREVIEW_GAS_UNAVAILABLE;
     var params = Object.assign({ action: action, user: currentUserEmail() }, extra || {});
     // Preferred path — canonical same-origin transport.
     if (global.RifimAPI) {
