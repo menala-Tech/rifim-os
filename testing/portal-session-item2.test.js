@@ -7,8 +7,8 @@
  *      tidak refetch profile.
  *   2. Single-flight: panggilan paralel share satu Promise.
  *   3. Transient failure (network/5xx) di fetchProfile TIDAK clearSession.
- *   4. Hanya AuthHardError (refresh_token 4xx / profile 401-403 /
- *      is_active=false) yang clearSession → return null → logout.
+ *   4. First profile 401 refreshes + retries once; only confirmed terminal
+ *      auth (refresh 4xx / second 401 / inactive profile) clears session.
  *
  * Run:
  *   node testing/portal-session-item2.test.js
@@ -110,16 +110,31 @@ function primeSession(win, over) {
     assert.ok(win.localStorage.getItem('rifim_auth'), 'T2 localStorage session NOT cleared');
     console.log('  ok  T2 transient profile failure does not clear session');
 
-    // ── T3: hard 401 pada profile → sesi dibersihkan
+    // ── T3: first profile 401 → refresh once → retry succeeds
     win.RifimPortalSession.invalidate();
-    win.fetch = async () => ({ ok: false, status: 401, json: async () => ({}) });
-    // Pastikan needsProfile true
+    let t3ProfileCalls = 0;
+    let t3RefreshCalls = 0;
+    win.fetch = async (url) => {
+      if (String(url).indexOf('/auth/v1/token') !== -1) {
+        t3RefreshCalls++;
+        return { ok: true, status: 200, json: async () => ({
+          access_token: fakeJwt('user-xyz', now + 7200),
+          refresh_token: 'r-token-rotated',
+          expires_at: now + 7200,
+        }) };
+      }
+      t3ProfileCalls++;
+      if (t3ProfileCalls === 1) return { ok: false, status: 401, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => ([{ id: 'user-xyz', role: 'admin', full_name: 'Test', is_active: true }]) };
+    };
     const saved3 = JSON.parse(win.localStorage.getItem('rifim_auth'));
     delete saved3.role; win.localStorage.setItem('rifim_auth', JSON.stringify(saved3));
     const s4 = await win.RifimPortalSession.validate();
-    assert.strictEqual(s4, null, 'T3 401 pada profile → return null');
-    assert.strictEqual(win.localStorage.getItem('rifim_auth'), null, 'T3 401 clears session (hard auth)');
-    console.log('  ok  T3 hard 401 profile clears session');
+    assert.ok(s4 && s4.access_token, 'T3 first 401 recovers');
+    assert.strictEqual(t3RefreshCalls, 1, 'T3 exactly one refresh');
+    assert.strictEqual(t3ProfileCalls, 2, 'T3 exactly one profile retry');
+    assert.strictEqual(JSON.parse(win.localStorage.getItem('rifim_auth')).refresh_token, 'r-token-rotated');
+    console.log('  ok  T3 first profile 401 refreshes once and recovers');
 
     // ── T4: refresh_token 400 → hard auth → clear
     primeSession(win, { access_token: fakeJwt('user-xyz', now - 10), expires_at: now - 10 });
