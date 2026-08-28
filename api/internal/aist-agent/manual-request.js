@@ -6,8 +6,8 @@ module.exports = async function handler(req, res) {
     const token = String(req.headers.authorization || '')
     if (!token.startsWith('Bearer ')) throw new Error('Bearer required')
 
-    const url = env('SUPABASE_URL')
-    const publishable = env('SUPABASE_PUBLISHABLE_KEY')
+    // Hotfix 2026-08-29 Preview UAT: canonical resolver → QA on Preview.
+    const {url,publishable}=require('../../_lib/sb-env').resolve()
     if (!url || !publishable) throw new Error('Supabase env missing')
 
     const authRes = await fetch(`${url}/auth/v1/user`, { headers:{ apikey:publishable, Authorization:token } })

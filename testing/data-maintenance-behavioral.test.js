@@ -89,9 +89,12 @@ async function run() {
     const r = req({ headers: { authorization: '' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
-    assert.strictEqual(s._status, 400)
+    // Hotfix 2026-08-29 Preview UAT: dispatcher now maps auth errors to 401
+    // (was collapsed to 400 before, which the browser mis-classified as
+    // business error and showed the persistent "Session invalid" card).
+    assert.strictEqual(s._status, 401)
     assert.ok(/Session required/i.test(body.message))
-    pass('M1 unauthenticated request refused with Session required')
+    pass('M1 unauthenticated request refused with Session required (HTTP 401)')
   } catch (e) { fail('M1 unauthenticated request refused with Session required', e) }
 
   // M2: Unknown POST mode is refused with 405 (Method not allowed).
@@ -116,7 +119,8 @@ async function run() {
     const r = req({ body: { mode: 'maintenance_preview', module: 'attendance', date_from: '2026-08-01', date_to: '2026-08-28' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
-    assert.strictEqual(s._status, 400)
+    // Role denied is 403 (was 400 before hotfix status-contract fix).
+    assert.strictEqual(s._status, 403)
     assert.ok(/Role tidak boleh melihat preview/i.test(body.message))
     pass('M3 staff denied on preview (role guard)')
   } catch (e) { fail('M3 staff denied on preview (role guard)', e) }
@@ -152,7 +156,8 @@ async function run() {
     const r = req({ body: { mode: 'maintenance_execute', module: 'attendance', date_from: '2026-08-01', date_to: '2026-08-28', preview_token: 'x', confirm_text: 'HAPUS DATA' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
-    assert.strictEqual(s._status, 400)
+    // Role denied is 403 (was 400 before hotfix status-contract fix).
+    assert.strictEqual(s._status, 403)
     assert.ok(/Hanya Admin/i.test(body.message))
     pass('M5 management denied on execute (admin-only write policy)')
   } catch (e) { fail('M5 management denied on execute (admin-only write policy)', e) }

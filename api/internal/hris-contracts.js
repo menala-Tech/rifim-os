@@ -23,6 +23,12 @@
  * POST ?mode=finance_tagihan_add            -> financeTagihan
  * POST ?mode=finance_tagihan_mark_paid      -> financeTagihan
  */
+// Hotfix 2026-08-29 Preview UAT followup: central sb-env resolver so Preview
+// can point at QA Supabase via SUPABASE_URL_QA overrides while Production
+// keeps SUPABASE_URL, and httpStatusFor() so auth failures return 401/403
+// instead of collapsing to 400 (frontend previously read that as business
+// error and showed "Session invalid").
+const {resolve:_sbResolve,httpStatusFor}=require('../_lib/sb-env');
 function env(n){return String(process.env[n]||'').trim()}
 async function read(res){const t=await res.text();try{return t?JSON.parse(t):{}}catch(_){return{message:t||`HTTP ${res.status}`}}}
 function out(res,s,b){res.status(s).setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(b))}
@@ -71,8 +77,8 @@ function monthNext(start){const y=+start.slice(0,4),m=+start.slice(5,7);const n=
 function num(v,d=0){const n=Number(v);return Number.isFinite(n)?n:d}
 function financeRead(p){if(!['admin','direksi','management'].includes(p.role))throw new Error('Role tidak boleh melihat Finance')}
 function financeWrite(p){if(!['admin','direksi'].includes(p.role))throw new Error('Hanya Admin/Direksi boleh mengubah Finance')}
-async function sb(path,opts={}){const url=env('SUPABASE_URL'),svc=env('SUPABASE_SERVICE_ROLE_KEY');if(!url||!svc)throw new Error('Supabase server env missing');const r=await fetch(url+path,{...opts,headers:{apikey:svc,Authorization:`Bearer ${svc}`,'Content-Type':'application/json',...(opts.headers||{})}});const b=await read(r);if(!r.ok)throw new Error(b.message||b.error||`Supabase HTTP ${r.status}`);return b}
-async function actor(req){const url=env('SUPABASE_URL'),pub=env('SUPABASE_PUBLISHABLE_KEY'),bearer=String(req.headers.authorization||'');if(!url||!pub)throw new Error('Supabase server env missing');if(!bearer.startsWith('Bearer '))throw new Error('Session required');const ur=await fetch(`${url}/auth/v1/user`,{headers:{apikey:pub,Authorization:bearer}}),u=await read(ur);if(!ur.ok||!u?.id)throw new Error('Session invalid');const rows=await sb(`/rest/v1/user_profiles?id=eq.${q(u.id)}&select=id,role,branch_id,is_active&limit=1`),p=rows?.[0];if(!p?.is_active)throw new Error('Profil tidak aktif');p.role=roleOf(p.role);return p}
+async function sb(path,opts={}){const {url,service:svc}=_sbResolve();if(!url||!svc)throw new Error('Supabase server env missing');const r=await fetch(url+path,{...opts,headers:{apikey:svc,Authorization:`Bearer ${svc}`,'Content-Type':'application/json',...(opts.headers||{})}});const b=await read(r);if(!r.ok)throw new Error(b.message||b.error||`Supabase HTTP ${r.status}`);return b}
+async function actor(req){const {url,publishable:pub}=_sbResolve(),bearer=String(req.headers.authorization||'');if(!url||!pub)throw new Error('Supabase server env missing');if(!bearer.startsWith('Bearer '))throw new Error('Session required');const ur=await fetch(`${url}/auth/v1/user`,{headers:{apikey:pub,Authorization:bearer}}),u=await read(ur);if(!ur.ok||!u?.id)throw new Error('Session invalid');const rows=await sb(`/rest/v1/user_profiles?id=eq.${q(u.id)}&select=id,role,branch_id,is_active&limit=1`),p=rows?.[0];if(!p?.is_active)throw new Error('Profil tidak aktif');p.role=roleOf(p.role);return p}
 // P0 round 2 fix (2026-08-20): some RPCs (raos_saldo_mark_paid) gate on
 // `auth.uid() = p_processor_id`, which only resolves when Postgres sees the
 // CALLING USER's own JWT -- not the service_role key that sb() always sends.
@@ -83,7 +89,7 @@ async function actor(req){const url=env('SUPABASE_URL'),pub=env('SUPABASE_PUBLIS
 // the real caller instead of NULL. Use this ONLY for RPCs that specifically
 // need the caller's own identity in auth.uid(); sb() (service_role) remains
 // the default for everything else in this file.
-async function sbAsActor(path,opts={},bearer){const url=env('SUPABASE_URL'),pub=env('SUPABASE_PUBLISHABLE_KEY');if(!url||!pub)throw new Error('Supabase server env missing');if(!String(bearer||'').startsWith('Bearer '))throw new Error('Session required');const r=await fetch(url+path,{...opts,headers:{apikey:pub,Authorization:bearer,'Content-Type':'application/json',...(opts.headers||{})}});const b=await read(r);if(!r.ok)throw new Error(b.message||b.error||`Supabase HTTP ${r.status}`);return b}
+async function sbAsActor(path,opts={},bearer){const {url,publishable:pub}=_sbResolve();if(!url||!pub)throw new Error('Supabase server env missing');if(!String(bearer||'').startsWith('Bearer '))throw new Error('Session required');const r=await fetch(url+path,{...opts,headers:{apikey:pub,Authorization:bearer,'Content-Type':'application/json',...(opts.headers||{})}});const b=await read(r);if(!r.ok)throw new Error(b.message||b.error||`Supabase HTTP ${r.status}`);return b}
 
 // HRIS contract API (existing canonical behavior)
 async function listContracts(req,p){if(!['admin','direksi','management','koordinator'].includes(p.role))throw new Error('Role tidak boleh melihat Kontrak');let path='/rest/v1/hris_contract_employee_view?select=*&order=updated_at.desc&limit=1000';const employeeId=String(req.query.employee_id||'').trim();if(employeeId)path+=`&employee_id=eq.${q(employeeId)}`;let rows=await sb(path);if(p.role==='koordinator'){const prof=await sb(`/rest/v1/user_profiles?branch_id=eq.${q(p.branch_id||'')}&is_active=eq.true&select=staff_id`);const allowed=new Set((prof||[]).map(x=>String(x.staff_id||'').toUpperCase()).filter(Boolean));rows=(rows||[]).filter(x=>allowed.has(String(x.employee_id||'').toUpperCase()))}return rows||[]}
@@ -768,5 +774,5 @@ module.exports=async function handler(req,res){
     if(req.method==='GET')return out(res,200,{success:true,rows:await listContracts(req,p)});
     if(req.method==='POST'&&mode==='validate')return out(res,200,{success:true,result:await validateContract(req,p)});
     return out(res,405,{success:false,message:'Method not allowed'});
-  }catch(e){return out(res,400,{success:false,message:e instanceof Error?e.message:String(e)})}
+  }catch(e){return out(res,httpStatusFor(e),{success:false,message:e instanceof Error?e.message:String(e),code:e&&e.code||null})}
 }

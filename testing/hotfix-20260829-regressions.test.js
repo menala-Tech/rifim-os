@@ -110,9 +110,10 @@ async function run() {
     const r = req({ method: 'GET', query: { mode: 'maintenance_branches' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
-    assert.strictEqual(s._status, 400)
+    // Role denied is 403 (was 400 before hotfix status-contract fix).
+    assert.strictEqual(s._status, 403)
     assert.ok(/Role tidak boleh/i.test(body.message))
-    pass('R1-3 non-portal role denied (fail-closed on branch list)')
+    pass('R1-3 non-portal role denied (fail-closed on branch list, HTTP 403)')
   } catch (e) { fail('R1-3 non-portal role denied (fail-closed on branch list)', e) }
 
   // R5-1: shared/gas-call.js registers window._gasCall without throwing.

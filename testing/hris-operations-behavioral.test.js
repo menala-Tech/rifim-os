@@ -77,9 +77,10 @@ async function run() {
     const r = req({ body: { mode: 'hris_activate', employee_id: 'E001' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
-    assert.strictEqual(s._status, 400)
+    // Role denied is 403 (was 400 before hotfix status-contract fix).
+    assert.strictEqual(s._status, 403)
     assert.ok(/Admin\/Direksi/i.test(body.message))
-    pass('H1 staff denied on activate (role guard)')
+    pass('H1 staff denied on activate (role guard, HTTP 403)')
   } catch (e) { fail('H1 staff denied on activate (role guard)', e) }
 
   // H2: admin activate — RPC returns row → success with Indonesian success message
@@ -117,9 +118,10 @@ async function run() {
     const r = req({ body: { mode: 'hris_activation_reconcile_apply' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
-    assert.strictEqual(s._status, 400)
+    // Role denied is 403 (was 400 before hotfix status-contract fix).
+    assert.strictEqual(s._status, 403)
     assert.ok(/Admin\/Direksi/i.test(body.message))
-    pass('H4 management denied on reconcile apply (write-role guard)')
+    pass('H4 management denied on reconcile apply (write-role guard, HTTP 403)')
   } catch (e) { fail('H4 management denied on reconcile apply (write-role guard)', e) }
 
   // H5: admin reconcile preview forwards p_apply=false and returns result
