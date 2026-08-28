@@ -652,9 +652,17 @@ document.getElementById('cc-save').addEventListener('click', async () => {
 // ═══════════════════════════════════════════════════════════════════════
 // SUPABASE CLIENT (RAOS project) — untuk RPC set_system_config
 // ═══════════════════════════════════════════════════════════════════════
-const SUPABASE_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co';
-// Publishable key (safe to embed — RLS enforces access, RPC checks role via get_my_role())
-const SUPABASE_ANON_KEY = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+// Hotfix 2026-08-29 (R3 followup): DO NOT hardcode PROD URL — Preview runs
+// against QA Supabase (cdlkujllqnrurgecoaur) and Portal issues its session
+// for that project. Previously CRM hardcoded PROD and my earlier storageKey
+// fix caused QA-issued tokens to be sent to PROD → 401 "Session tidak valid".
+// RifimPortalSession.config picks QA vs PROD from location.hostname exactly
+// the same way Portal itself does; using it here keeps CRM and Portal on the
+// same project on every environment.
+const _CRM_SB_URL_PROD = 'https://vlievtojpmrbsmzlqswl.supabase.co';
+const _CRM_SB_KEY_PROD = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+const SUPABASE_URL = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseUrl) || _CRM_SB_URL_PROD;
+const SUPABASE_ANON_KEY = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseAnonKey) || _CRM_SB_KEY_PROD;
 let _sb = null;
 function getSb() {
   if (_sb) return _sb;
@@ -665,7 +673,9 @@ function getSb() {
   // Hotfix 2026-08-29 (R3): share the Portal auth storage so CRM does not
   // spawn a second GoTrueClient (Production Finance console shows the warning
   // otherwise, and the stale second client causes 403 /auth/v1/user which
-  // previously wiped rifim_auth).
+  // previously wiped rifim_auth). URL/anon key come from RifimPortalSession
+  // so this client always targets the SAME project the Portal session was
+  // issued for (QA on Preview, PROD on rifim-os.vercel.app).
   _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'rifim_portal_sb' } });
   return _sb;
 }

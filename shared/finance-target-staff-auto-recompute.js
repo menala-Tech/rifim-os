@@ -2,8 +2,10 @@
 'use strict';
 if(!/^\/finance(?:\/|$)/.test(String(global.location&&global.location.pathname||'')))return;
 
-var SB_URL='https://vlievtojpmrbsmzlqswl.supabase.co';
-var SB_KEY='sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+// Hotfix 2026-08-29 followup: pull URL/anon from RifimPortalSession so this
+// script targets QA on Preview instead of always PROD.
+var SB_URL=(global.RifimPortalSession&&global.RifimPortalSession.config&&global.RifimPortalSession.config.supabaseUrl)||'https://vlievtojpmrbsmzlqswl.supabase.co';
+var SB_KEY=(global.RifimPortalSession&&global.RifimPortalSession.config&&global.RifimPortalSession.config.supabaseAnonKey)||'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
 var installed=false;
 
 function rawAuth(){try{return JSON.parse(localStorage.getItem('rifim_auth')||'{}')||{}}catch(_){return{}}}

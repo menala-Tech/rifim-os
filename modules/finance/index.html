@@ -665,14 +665,17 @@ async function _finGetAccessToken() {
   if (window.supabase && saved.refresh_token) {
     try {
       if (!_finSessionClient) {
-        // Hotfix 2026-08-29 (R3): share the canonical Portal auth storage
-        // (`rifim_portal_sb`) so this module does NOT create a competing
-        // GoTrueClient. Without storageKey the SDK invents a per-instance one
-        // and Production console shows "Multiple GoTrueClient instances
-        // detected" while the two stores fight over token rotation.
+        // Hotfix 2026-08-29 (R3 + Preview UAT followup): share the canonical
+        // Portal auth storage (`rifim_portal_sb`) so this module does NOT
+        // create a competing GoTrueClient, AND target the SAME Supabase
+        // project the Portal session was issued for (QA on Preview, PROD on
+        // rifim-os.vercel.app). Hardcoding PROD sent QA tokens to PROD in
+        // Preview UAT and produced 401 "Session tidak valid".
+        const _finSbUrl  = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseUrl)     || 'https://vlievtojpmrbsmzlqswl.supabase.co';
+        const _finSbKey  = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseAnonKey) || 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
         _finSessionClient = window.supabase.createClient(
-          'https://vlievtojpmrbsmzlqswl.supabase.co',
-          'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1',
+          _finSbUrl,
+          _finSbKey,
           { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'rifim_portal_sb' } },
         );
       }
@@ -1244,8 +1247,10 @@ function startSaldoRaosNotifier() {
 
   // Realtime broadcast subscribe — reuse client dari CRM kalau ada, jika
   // tidak buat sendiri (Finance modul bisa dibuka standalone tanpa CRM).
-  const SB_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co';
-  const SB_ANON = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+  // Hotfix 2026-08-29 followup: pull URL/anon from RifimPortalSession so
+  // Preview subscribes to QA realtime channel (not PROD).
+  const SB_URL  = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseUrl)     || 'https://vlievtojpmrbsmzlqswl.supabase.co';
+  const SB_ANON = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseAnonKey) || 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
   if (typeof window.supabase === 'undefined') {
     console.warn('[finance] supabase-js belum load — realtime skip, fallback poll aktif');
   } else {
