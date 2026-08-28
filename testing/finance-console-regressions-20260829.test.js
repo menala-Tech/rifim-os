@@ -52,21 +52,27 @@ async function run() {
   const fail = (n, e) => { failures.push({ n, e }); console.log('  FAIL  ' + n + '\n        ' + (e && e.message || e)) }
 
   try {
+    // Phase 1 Cancel gate 2026-08-29: `cancelled` is now first-class canonical
+    // (architect verified Production status text-check accepts it). Filter
+    // must PASS `cancelled` through to Supabase — the previous split-brain
+    // alias `cancelled -> rejected` was removed. `ditolak`/`semua` still not
+    // raw. `dibatalkan` is a display alias for `cancelled` (Indonesian UI).
     mockFetch(authRoutes('admin').concat([
       { match: u => u.includes('/rest/v1/raos_saldo_requests'), body: (url) => {
-        if (url.includes('status=eq.cancelled')) throw new Error('cancelled must not reach Supabase raw')
         if (url.includes('status=eq.ditolak')) throw new Error('ditolak must not reach Supabase raw')
         if (url.includes('status=eq.semua')) throw new Error('semua must not reach Supabase raw')
-        return [{ id: 'r1', status: 'rejected' }]
+        if (url.includes('status=eq.dibatalkan')) throw new Error('dibatalkan alias must not reach Supabase raw')
+        if (!url.includes('status=eq.cancelled')) throw new Error('cancelled MUST reach Supabase as canonical value')
+        return [{ id: 'r1', status: 'cancelled' }]
       }},
     ]))
     const r1 = req({ method: 'GET', query: { mode: 'finance_saldo_list', status: 'cancelled' } })
     const s1 = makeRes(); await handler(r1, s1)
     const b1 = JSON.parse(s1._body)
-    assert.strictEqual(s1._status, 200, 'cancelled alias must not 400')
+    assert.strictEqual(s1._status, 200, 'cancelled canonical must not 400')
     assert.strictEqual(b1.success, true)
-    pass('finance_saldo_list status=cancelled (mapped to rejected) does not 400')
-  } catch (e) { fail('finance_saldo_list status=cancelled (mapped to rejected) does not 400', e) }
+    pass('finance_saldo_list status=cancelled is canonical (no split-brain to rejected)')
+  } catch (e) { fail('finance_saldo_list status=cancelled is canonical (no split-brain to rejected)', e) }
 
   try {
     mockFetch(authRoutes('admin').concat([
