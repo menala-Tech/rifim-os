@@ -24,6 +24,7 @@
   'use strict';
   if(!/\/finance(?:\/|$)/.test(String(global.location&&global.location.pathname||''))) return;
 
+  var aistGuardInterval=null;
   var GAS_HOST='script.google.com';
   var GAS_GAP_MS=1400;
   var nativeFetch=global.fetch.bind(global);
@@ -93,9 +94,15 @@
     try{
       var token=await validatedToken();
       var res=await nativeFetch('/api/internal/aist-agent/status',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
-      var data=await res.json().catch(function(){return{};});
-      var a=data&&data.agent;
-      agentState={at:Date.now(),online:!!a,ready:!!(a&&a.aist_ready&&a.finance_ready&&a.status!=='error'),detail:a?(String(a.machine_name||a.device_id||'Agent')+(a.last_error?' · '+a.last_error:'')):'Tidak ada MENALA AIST Agent yang heartbeat'};
+      // 2026-08-29: stop the guard on auth failure to avoid repeated 401/403 loops.
+      if(res.status===401||res.status===403){
+        agentState={at:Date.now(),online:false,ready:false,detail:'Sesi tidak valid — AIST guard dihentikan'};
+        if(aistGuardInterval){clearInterval(aistGuardInterval);aistGuardInterval=null;}
+      }else{
+        var data=await res.json().catch(function(){return{};});
+        var a=data&&data.agent;
+        agentState={at:Date.now(),online:!!a,ready:!!(a&&a.aist_ready&&a.finance_ready&&a.status!=='error'),detail:a?(String(a.machine_name||a.device_id||'Agent')+(a.last_error?' · '+a.last_error:'')):'Tidak ada MENALA AIST Agent yang heartbeat'};
+      }
     }catch(err){agentState={at:Date.now(),online:false,ready:false,detail:err&&err.message?err.message:'Agent tidak tersedia'};}
     return agentState;
   }
@@ -121,9 +128,9 @@
   }
   function updateAistButtons(force){getAgentState(!!force).then(applyAistState);}
   function startAgentGuard(){
+    if(aistGuardInterval)return;
     updateAistButtons(true);
-    setInterval(function(){updateAistButtons(false);},2000);
-    setInterval(function(){updateAistButtons(true);},10000);
+    aistGuardInterval=setInterval(function(){updateAistButtons(true);},10000);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',startAgentGuard,{once:true});
   else startAgentGuard();
