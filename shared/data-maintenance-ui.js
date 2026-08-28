@@ -1,6 +1,9 @@
 (function(global){
 'use strict';
-const API='/api/internal/data-maintenance';
+const API='/api/internal/hris-contracts';
+// Consolidated 2026-08-28: preview/execute now live behind hris-contracts
+// as mode='maintenance_preview'/'maintenance_execute' to keep the deployment
+// within Vercel Hobby's 12-Serverless-Function cap. Behavior unchanged.
 let currentModule='attendance', lastPreview=null;
 
 function auth(){try{return JSON.parse(localStorage.getItem('rifim_auth')||'{}')||{}}catch(_){return{}}}
@@ -120,7 +123,7 @@ async function call(body){
 async function preview(){
   const btn=document.getElementById('dm-preview-btn');btn.disabled=true;btn.textContent='Memeriksa...';
   try{
-    const j=await call(payload('preview'));lastPreview=j.preview;
+    const j=await call(payload('maintenance_preview'));lastPreview=j.preview;
     const p=j.preview||{}, deps=p.dependent_rows||{}, warnings=Array.isArray(p.warnings)?p.warnings:[];
     const html=[
       '<strong>Data yang akan terdampak</strong>',
@@ -152,7 +155,7 @@ function clearOperationalCaches(){
 }
 async function execute(){
   if(!lastPreview)return;
-  const body=payload('execute');body.preview_token=lastPreview.preview_token;
+  const body=payload('maintenance_execute');body.preview_token=lastPreview.preview_token;
   body.confirm_text=document.getElementById('dm-confirm-text')?.value||'';
   body.confirm_dependencies=!!document.getElementById('dm-confirm-deps')?.checked;
   const btn=document.getElementById('dm-execute-btn');btn.disabled=true;const old=btn.textContent;btn.textContent='Memproses...';

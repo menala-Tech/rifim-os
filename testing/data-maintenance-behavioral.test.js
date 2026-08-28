@@ -1,9 +1,14 @@
-// data-maintenance.js — behavioral coverage.
-// Verifies the actual handler with mocked Supabase fetch layer.
+// Data Maintenance behavioral coverage — preview/execute modes on the
+// consolidated hris-contracts endpoint.
 //
-// The API contract we lock in:
-//   - POST only
-//   - mode='preview' | mode='execute'
+// Previously lived in api/internal/data-maintenance.js. Merged into
+// api/internal/hris-contracts.js on 2026-08-28 to keep the deployment
+// ≤12 Vercel Serverless Functions (Hobby cap). Mode names renamed:
+//   preview  → maintenance_preview
+//   execute  → maintenance_execute
+//
+// Contract locked in (unchanged from pre-consolidation shape):
+//   - Preview + Execute are POST-only under the consolidated endpoint
 //   - Preview returns { preview_token, affected_rows, dependent_rows, warnings, protected }
 //   - Execute requires matching preview_token, else "Data berubah sejak preview"
 //   - Permanent Delete requires confirm_text === 'HAPUS DATA'
@@ -22,7 +27,7 @@ process.env.SUPABASE_PUBLISHABLE_KEY = 'PUB_KEY_STUB'
 const assert = require('assert')
 const path = require('path')
 
-const handlerPath = path.resolve(__dirname, '..', 'api', 'internal', 'data-maintenance.js')
+const handlerPath = path.resolve(__dirname, '..', 'api', 'internal', 'hris-contracts.js')
 delete require.cache[handlerPath]
 const handler = require(handlerPath)
 
@@ -89,23 +94,26 @@ async function run() {
     pass('M1 unauthenticated request refused with Session required')
   } catch (e) { fail('M1 unauthenticated request refused with Session required', e) }
 
-  // M2: GET is refused (POST only per handler contract)
+  // M2: Unknown POST mode is refused with 405 (Method not allowed).
+  // The consolidated hris-contracts endpoint also serves GET (listContracts)
+  // and other legitimate POST modes; verifying that maintenance-adjacent
+  // callers can't smuggle an unrecognized mode past the dispatcher.
   try {
     mockFetch(authRoutes('admin').concat([]))
-    const r = req({ method: 'GET' })
+    const r = req({ method: 'POST', body: { mode: 'maintenance_something_bogus' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
     assert.strictEqual(s._status, 405)
     assert.ok(/Method not allowed/i.test(body.message))
-    pass('M2 GET refused (POST-only endpoint)')
-  } catch (e) { fail('M2 GET refused (POST-only endpoint)', e) }
+    pass('M2 unknown POST mode refused with 405 (dispatcher rejects unregistered maintenance modes)')
+  } catch (e) { fail('M2 unknown POST mode refused with 405 (dispatcher rejects unregistered maintenance modes)', e) }
 
   // M3: staff denied on preview (allowedPreview excludes staff)
   try {
     mockFetch(authRoutes('staff').concat([
       { match: u => u.includes('rifim_ops_audit_log'), body: {} },
     ]))
-    const r = req({ body: { mode: 'preview', module: 'attendance', date_from: '2026-08-01', date_to: '2026-08-28' } })
+    const r = req({ body: { mode: 'maintenance_preview', module: 'attendance', date_from: '2026-08-01', date_to: '2026-08-28' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
     assert.strictEqual(s._status, 400)
@@ -125,7 +133,7 @@ async function run() {
       { match: u => u.includes('/rest/v1/aist_jobs'), body: [] },
       { match: u => u.includes('rifim_ops_audit_log'), body: {} },
     ]))
-    const r = req({ body: { mode: 'preview', module: 'attendance', date_from: '2026-08-01', date_to: '2026-08-28' } })
+    const r = req({ body: { mode: 'maintenance_preview', module: 'attendance', date_from: '2026-08-01', date_to: '2026-08-28' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
     assert.strictEqual(s._status, 200)
@@ -141,7 +149,7 @@ async function run() {
     mockFetch(authRoutes('management').concat([
       { match: u => u.includes('rifim_ops_audit_log'), body: {} },
     ]))
-    const r = req({ body: { mode: 'execute', module: 'attendance', date_from: '2026-08-01', date_to: '2026-08-28', preview_token: 'x', confirm_text: 'HAPUS DATA' } })
+    const r = req({ body: { mode: 'maintenance_execute', module: 'attendance', date_from: '2026-08-01', date_to: '2026-08-28', preview_token: 'x', confirm_text: 'HAPUS DATA' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
     assert.strictEqual(s._status, 400)
@@ -154,7 +162,7 @@ async function run() {
     mockFetch(authRoutes('admin').concat([
       { match: u => u.includes('rifim_ops_audit_log'), body: {} },
     ]))
-    const r = req({ body: { mode: 'execute', module: 'hris_karyawan', date_from: '2026-08-01', date_to: '2026-08-28', preview_token: 'x', confirm_text: 'HAPUS DATA' } })
+    const r = req({ body: { mode: 'maintenance_execute', module: 'hris_karyawan', date_from: '2026-08-01', date_to: '2026-08-28', preview_token: 'x', confirm_text: 'HAPUS DATA' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
     assert.strictEqual(s._status, 400)
@@ -172,7 +180,7 @@ async function run() {
       { match: u => u.includes('/rest/v1/aist_jobs'), body: [] },
       { match: u => u.includes('rifim_ops_audit_log'), body: {} },
     ]))
-    const r = req({ body: { mode: 'execute', module: 'finance_saldo', date_from: '2026-08-01', date_to: '2026-08-28', preview_token: 'WRONG', action: 'archive' } })
+    const r = req({ body: { mode: 'maintenance_execute', module: 'finance_saldo', date_from: '2026-08-01', date_to: '2026-08-28', preview_token: 'WRONG', action: 'archive' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
     assert.strictEqual(s._status, 400)
@@ -191,7 +199,7 @@ async function run() {
       { match: u => u.includes('/rest/v1/aist_jobs'), body: [] },
       { match: u => u.includes('rifim_ops_audit_log'), body: {} },
     ]))
-    const previewReq = req({ body: { mode: 'preview', module: 'attendance', date_from: '2026-07-01', date_to: '2026-07-31' } })
+    const previewReq = req({ body: { mode: 'maintenance_preview', module: 'attendance', date_from: '2026-07-01', date_to: '2026-07-31' } })
     const previewRes = makeRes(); await handler(previewReq, previewRes)
     const previewBody = JSON.parse(previewRes._body)
     const token = previewBody.preview.preview_token
@@ -204,7 +212,7 @@ async function run() {
       { match: u => u.includes('/rest/v1/aist_jobs'), body: [] },
       { match: u => u.includes('rifim_ops_audit_log'), body: {} },
     ]))
-    const executeReq = req({ body: { mode: 'execute', module: 'attendance', date_from: '2026-07-01', date_to: '2026-07-31', preview_token: token, action: 'delete' } })
+    const executeReq = req({ body: { mode: 'maintenance_execute', module: 'attendance', date_from: '2026-07-01', date_to: '2026-07-31', preview_token: token, action: 'delete' } })
     const executeRes = makeRes(); await handler(executeReq, executeRes)
     const executeBody = JSON.parse(executeRes._body)
     assert.strictEqual(executeRes._status, 400)
@@ -223,7 +231,7 @@ async function run() {
       { match: u => u.includes('rifim_ops_audit_log'), body: {} },
     ]))
     // Two-pass: preview first to capture token
-    const prevReq = req({ body: { mode: 'preview', module: 'finance_saldo', date_from: '2026-07-01', date_to: '2026-07-31', action: 'delete' } })
+    const prevReq = req({ body: { mode: 'maintenance_preview', module: 'finance_saldo', date_from: '2026-07-01', date_to: '2026-07-31', action: 'delete' } })
     const prevRes = makeRes(); await handler(prevReq, prevRes)
     const prevBody = JSON.parse(prevRes._body)
     const token = prevBody.preview.preview_token
@@ -236,7 +244,7 @@ async function run() {
       { match: u => u.includes('/rest/v1/aist_jobs'), body: [{ id: 'J1', request_id: 'S1', status: 'success', completed_at: '2026-07-01' }] },
       { match: u => u.includes('rifim_ops_audit_log'), body: {} },
     ]))
-    const execReq = req({ body: { mode: 'execute', module: 'finance_saldo', date_from: '2026-07-01', date_to: '2026-07-31', action: 'delete', preview_token: token, confirm_text: 'HAPUS DATA', confirm_dependencies: false } })
+    const execReq = req({ body: { mode: 'maintenance_execute', module: 'finance_saldo', date_from: '2026-07-01', date_to: '2026-07-31', action: 'delete', preview_token: token, confirm_text: 'HAPUS DATA', confirm_dependencies: false } })
     const execRes = makeRes(); await handler(execReq, execRes)
     const execBody = JSON.parse(execRes._body)
     assert.strictEqual(execRes._status, 400)
@@ -253,7 +261,7 @@ async function run() {
       { match: u => u.includes('/rest/v1/aist_jobs'), body: [] },
       { match: u => u.includes('rifim_ops_audit_log'), body: {} },
     ]))
-    const r = req({ body: { mode: 'preview', module: 'finance_saldo', date_from: '2026-08-01', date_to: '2026-08-28' } })
+    const r = req({ body: { mode: 'maintenance_preview', module: 'finance_saldo', date_from: '2026-08-01', date_to: '2026-08-28' } })
     const s = makeRes(); await handler(r, s)
     for (const c of calls) {
       assert.ok(!/SVC_ROLE_STUB/.test(c.url), 'service-role key must not appear in URL: ' + c.url)

@@ -19,13 +19,15 @@ jobs:
         with:
           node-version: '20'
       - name: Syntax check combined backend and UI files
+        # 2026-08-28: hris-operations.js + data-maintenance.js merged into
+        # hris-contracts.js to stay under Vercel Hobby's 12-Serverless-Function
+        # cap. Their behavior is now covered by the two behavioral gates below.
         run: |
           node --check shared/portal-session.js
           node --check shared/data-maintenance-ui.js
           node --check shared/hris-employee-activation-ui.js
-          node --check api/internal/hris-operations.js
-          node --check api/internal/data-maintenance.js
           node --check api/internal/hris-contracts.js
+          node --check api/internal/hris-v2.js
       - name: Run P0 session recovery S1-S10
         run: node testing/portal-session-p0-recovery.test.js
       - name: Run Item 2 regression

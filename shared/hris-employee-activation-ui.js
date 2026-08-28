@@ -64,10 +64,10 @@ async function activateEmployee(employeeId,btn){
     const token=session?.access_token||'';
     if(!token)throw new Error('Session tidak tersedia. Silakan login kembali.');
 
-    const r=await fetch('/api/internal/hris-operations',{
+    const r=await fetch('/api/internal/hris-contracts',{
       method:'POST',
       headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-      body:JSON.stringify({mode:'activate',employee_id:employeeId}),
+      body:JSON.stringify({mode:'hris_activate',employee_id:employeeId}),
       cache:'no-store'
     });
     const j=await r.json();

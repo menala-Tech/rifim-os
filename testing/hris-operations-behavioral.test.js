@@ -1,12 +1,18 @@
-// hris-operations.js — behavioral coverage.
-// Verifies activate/reconcile/staff_sync modes against a mocked Supabase layer.
+// hris operations behavioral coverage — activate / reconcile / staff_sync
+// modes on the consolidated hris-contracts endpoint.
 //
-// Contract locked in:
+// The three modes previously lived in api/internal/hris-operations.js and were
+// merged into api/internal/hris-contracts.js on 2026-08-28 to keep the
+// deployment ≤12 Vercel Serverless Functions (Hobby cap). Mode names were
+// renamed to their canonical namespaced form at the same time:
+//   activate                       → hris_activate
+//   activation_reconcile_preview   → hris_activation_reconcile_preview
+//   activation_reconcile_apply     → hris_activation_reconcile_apply
+//   staff_sync                     → hris_staff_sync
+//
+// Contract locked in (unchanged from the pre-consolidation shape):
 //   - POST only
-//   - mode='activate'                   — needs admin/direksi
-//   - mode='activation_reconcile_preview' — needs admin/direksi
-//   - mode='activation_reconcile_apply'   — needs admin/direksi
-//   - mode='staff_sync'                 — needs admin/direksi
+//   - Every mode needs admin/direksi
 //   - RPC errors translated to operational Indonesian messages
 //   - Failed activations write audit trail
 //   - Caller bearer forwarded to user-context RPCs (activation, reconcile)
@@ -20,7 +26,7 @@ process.env.SUPABASE_PUBLISHABLE_KEY = 'PUB_KEY_STUB'
 
 const assert = require('assert')
 const path = require('path')
-const handlerPath = path.resolve(__dirname, '..', 'api', 'internal', 'hris-operations.js')
+const handlerPath = path.resolve(__dirname, '..', 'api', 'internal', 'hris-contracts.js')
 delete require.cache[handlerPath]
 const handler = require(handlerPath)
 
@@ -68,7 +74,7 @@ async function run() {
   // H1: staff denied on activate
   try {
     mockFetch(authRoutes('staff').concat([{ match: u => u.includes('rifim_ops_audit_log'), body: {} }]))
-    const r = req({ body: { mode: 'activate', employee_id: 'E001' } })
+    const r = req({ body: { mode: 'hris_activate', employee_id: 'E001' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
     assert.strictEqual(s._status, 400)
@@ -81,7 +87,7 @@ async function run() {
     mockFetch(authRoutes('admin').concat([
       { match: u => u.includes('/rpc/hris_activate_employee'), body: { employee_id: 'E001', full_name: 'Test', activation_state: 'active' } },
     ]))
-    const r = req({ body: { mode: 'activate', employee_id: 'E001' } })
+    const r = req({ body: { mode: 'hris_activate', employee_id: 'E001' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
     assert.strictEqual(s._status, 200)
@@ -96,7 +102,7 @@ async function run() {
       { match: u => u.includes('/rpc/hris_activate_employee'), status: 400, body: { message: 'validated_active_contract_required' } },
       { match: u => u.includes('rifim_ops_audit_log'), body: {} },
     ]))
-    const r = req({ body: { mode: 'activate', employee_id: 'E001' } })
+    const r = req({ body: { mode: 'hris_activate', employee_id: 'E001' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
     assert.strictEqual(s._status, 400)
@@ -108,7 +114,7 @@ async function run() {
   // H4: management denied on reconcile apply
   try {
     mockFetch(authRoutes('management').concat([{ match: u => u.includes('rifim_ops_audit_log'), body: {} }]))
-    const r = req({ body: { mode: 'activation_reconcile_apply' } })
+    const r = req({ body: { mode: 'hris_activation_reconcile_apply' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
     assert.strictEqual(s._status, 400)
@@ -123,7 +129,7 @@ async function run() {
       { match: u => u.includes('/rpc/hris_reconcile_activation_states'),
         body: (u, o) => { capturedApply = JSON.parse(o.body).p_apply; return { before_count: 3, reconciled_ssot: 2, reconciled_contract: 0, unresolved: 1, after_count: 1, applied: capturedApply } } },
     ]))
-    const r = req({ body: { mode: 'activation_reconcile_preview' } })
+    const r = req({ body: { mode: 'hris_activation_reconcile_preview' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
     assert.strictEqual(s._status, 200)
@@ -139,7 +145,7 @@ async function run() {
       { match: u => u.includes('/rpc/hris_reconcile_activation_states'),
         body: (u, o) => { capturedApply = JSON.parse(o.body).p_apply; return { before_count: 3, reconciled_ssot: 2, reconciled_contract: 0, unresolved: 1, after_count: 1, applied: true } } },
     ]))
-    const r = req({ body: { mode: 'activation_reconcile_apply' } })
+    const r = req({ body: { mode: 'hris_activation_reconcile_apply' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
     assert.strictEqual(s._status, 200)
@@ -155,7 +161,7 @@ async function run() {
       { match: u => u.includes('/rpc/hris_reconcile_activation_states'),
         body: (u, o) => { rpcAuth = String(o.headers.Authorization || ''); return { before_count: 0, reconciled_ssot: 0, reconciled_contract: 0, unresolved: 0, after_count: 0, applied: false } } },
     ]))
-    const r = req({ body: { mode: 'activation_reconcile_preview' } })
+    const r = req({ body: { mode: 'hris_activation_reconcile_preview' } })
     const s = makeRes(); await handler(r, s)
     assert.ok(rpcAuth.includes('USER_TOKEN'), 'must forward user bearer')
     assert.ok(!rpcAuth.includes('SVC_ROLE_STUB'), 'must NOT use service-role for user-scoped RPC')
@@ -177,7 +183,7 @@ async function run() {
       { match: u => u.includes('/rpc/raos_hris_upsert_employees'), body: { inserted: 1, updated: 0, skipped: 0, errors: [] } },
       { match: u => u.includes('rifim_ops_audit_log'), body: {} },
     ]))
-    const r = req({ body: { mode: 'staff_sync' } })
+    const r = req({ body: { mode: 'hris_staff_sync' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
     assert.strictEqual(s._status, 200)
@@ -202,7 +208,7 @@ async function run() {
         body: [{ staff_id: 'S002', full_name: 'Bob', email: 'b@x.co', phone: '628', legacy_branch_name: 'soeta-t1', branch_id: 'b1', resolved_role: 'staff', status_active: true, conflict_status: 'none' }] },
       { match: u => u.includes('rifim_ops_audit_log'), body: {} },
     ]))
-    const r = req({ body: { mode: 'staff_sync' } })
+    const r = req({ body: { mode: 'hris_staff_sync' } })
     const s = makeRes(); await handler(r, s)
     const body = JSON.parse(s._body)
     assert.strictEqual(s._status, 200)
@@ -216,7 +222,7 @@ async function run() {
     mockFetch(authRoutes('admin').concat([
       { match: u => u.includes('/rpc/hris_reconcile_activation_states'), body: { before_count: 0, applied: false, reconciled_ssot: 0, reconciled_contract: 0, unresolved: 0, after_count: 0 } },
     ]))
-    const r = req({ body: { mode: 'activation_reconcile_preview' } })
+    const r = req({ body: { mode: 'hris_activation_reconcile_preview' } })
     const s = makeRes(); await handler(r, s)
     for (const c of calls) {
       assert.ok(!/SVC_ROLE_STUB/.test(c.url), 'service-role key must not appear in URL: ' + c.url)
