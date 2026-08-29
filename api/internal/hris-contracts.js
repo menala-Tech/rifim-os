@@ -12,6 +12,7 @@
  * GET  ?mode=finance_saldo_list            -> listSaldo
  * POST ?mode=finance_saldo_mark_paid       -> markSaldo
  * POST ?mode=finance_saldo_cancel          -> cancelSaldo
+ * POST ?mode=finance_saldo_notify          -> notifySaldo
  * GET  ?mode=finance_branches              -> listFinanceBranches
  * GET  ?mode=finance_branch_targets        -> listBranchTargets
  * POST ?mode=finance_branch_target_upsert  -> upsertBranchTarget
@@ -727,6 +728,7 @@ module.exports=async function handler(req,res){
     if(req.method==='GET'&&mode==='finance_saldo_list')return out(res,200,{success:true,rows:await financeSaldo.listSaldo(req,p),source:'supabase'});
     if(req.method==='POST'&&mode==='finance_saldo_mark_paid'){const r=await financeSaldo.markSaldo(req,p);return out(res,200,{success:true,...(r||{})})}
     if(req.method==='POST'&&mode==='finance_saldo_cancel'){const r=await financeSaldo.cancelSaldo(req,p);return out(res,200,{success:true,...(r||{})})}
+    if(req.method==='POST'&&mode==='finance_saldo_notify'){const r=await financeSaldo.notifySaldo(req,p);return out(res,200,{success:true,...(r||{})})}
     if(req.method==='GET'&&mode==='finance_branches')return out(res,200,{success:true,rows:await listFinanceBranches(req,p),source:'supabase'});
     if(req.method==='GET'&&mode==='finance_branch_targets')return out(res,200,{success:true,rows:await listBranchTargets(req,p),source:'supabase'});
     if(req.method==='POST'&&mode==='finance_branch_target_upsert')return out(res,200,{success:true,row:await upsertBranchTarget(req,p)});
