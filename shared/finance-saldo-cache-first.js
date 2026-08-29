@@ -92,7 +92,7 @@
       }
 
       var result = await originalGasCall(action, params)
-      if (action === 'finance_saldo_raos_mark_paid' && result && result.success !== false) clear()
+      if ((action === 'finance_saldo_raos_mark_paid' || action === 'finance_saldo_cancel') && result && result.success !== false) clear()
       return result
     }
     global._gasCall.__financeSaldoCacheWrapped = true

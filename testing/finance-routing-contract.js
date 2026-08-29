@@ -125,7 +125,7 @@ async function runHrisTest({ role, mode, body }) {
       mode: 'finance_tagihan_add',
       body: { jenis: 'Listrik', no_tagihan: 'T-001', instansi: 'PLN' }
     });
-    assert.strictEqual(res._status, 400, 'staff tagihan add must be rejected');
+    assert.strictEqual(res._status, 403, 'staff tagihan add must be rejected');
     const body = JSON.parse(res._body);
     assert.strictEqual(body.success, false, 'staff tagihan add must return success:false');
     assert.ok(/Hanya|Admin\/Direksi|mengubah/i.test(body.message), 'staff rejection must mention Finance write guard');

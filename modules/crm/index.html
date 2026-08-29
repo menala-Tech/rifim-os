@@ -123,6 +123,7 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
 <script src="/shared/api-cache.js"></script>
 <script src="/shared/master-role-policy.js"></script>
 <script src="/shared/portal-session.js"></script>
+<script src="/shared/gas-call.js"></script>
 </head>
 <body>
 
@@ -619,6 +620,11 @@ function showStatus(msg, kind) {
   bar.className = 'status-bar show ' + (kind || '');
   setTimeout(() => bar.classList.remove('show'), 4000);
 }
+// Hotfix 2026-08-29 (R5): Production GAS is not reachable from Vercel Preview
+// because Preview tokens are QA JWTs. Any GAS-backed call in Preview must be
+// rendered as an informational (not red / not "Session invalid") notice.
+function _crmIsPreviewNotice(data) { return data && data.preview_notice === true; }
+function _crmInfoTb(tb, msg) { tb.innerHTML = '<tr><td colspan="999" class="empty" style="padding:20px;color:#0ea5e9">ℹ️ ' + _escapeHtml(msg) + '</td></tr>'; }
 
 document.getElementById('cc-save').addEventListener('click', async () => {
   const keys = [...dirty.company];
@@ -632,6 +638,7 @@ document.getElementById('cc-save').addEventListener('click', async () => {
     const input = document.querySelector(`input[data-section="company"][data-key="${k}"]`);
     try {
       const data = await _gasCall('company_config_set', { key: k, value: input.value, user: me });
+      if (_crmIsPreviewNotice(data)) { showStatus('ℹ️ ' + data.message, ''); btn.disabled = false; return; }
       if (!data.success) { results.err++; results.errors.push(`${k}: ${data.message}`); }
       else { results.ok++; }
     } catch (err) {
@@ -651,9 +658,17 @@ document.getElementById('cc-save').addEventListener('click', async () => {
 // ═══════════════════════════════════════════════════════════════════════
 // SUPABASE CLIENT (RAOS project) — untuk RPC set_system_config
 // ═══════════════════════════════════════════════════════════════════════
-const SUPABASE_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co';
-// Publishable key (safe to embed — RLS enforces access, RPC checks role via get_my_role())
-const SUPABASE_ANON_KEY = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+// Hotfix 2026-08-29 (R3 followup): DO NOT hardcode PROD URL — Preview runs
+// against QA Supabase (cdlkujllqnrurgecoaur) and Portal issues its session
+// for that project. Previously CRM hardcoded PROD and my earlier storageKey
+// fix caused QA-issued tokens to be sent to PROD → 401 "Session tidak valid".
+// RifimPortalSession.config picks QA vs PROD from location.hostname exactly
+// the same way Portal itself does; using it here keeps CRM and Portal on the
+// same project on every environment.
+const _CRM_SB_URL_PROD = 'https://vlievtojpmrbsmzlqswl.supabase.co';
+const _CRM_SB_KEY_PROD = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+const SUPABASE_URL = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseUrl) || _CRM_SB_URL_PROD;
+const SUPABASE_ANON_KEY = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseAnonKey) || _CRM_SB_KEY_PROD;
 let _sb = null;
 function getSb() {
   if (_sb) return _sb;
@@ -661,7 +676,13 @@ function getSb() {
     showStatus('Supabase SDK belum load — refresh halaman', 'err');
     return null;
   }
-  _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // Hotfix 2026-08-29 (R3): share the Portal auth storage so CRM does not
+  // spawn a second GoTrueClient (Production Finance console shows the warning
+  // otherwise, and the stale second client causes 403 /auth/v1/user which
+  // previously wiped rifim_auth). URL/anon key come from RifimPortalSession
+  // so this client always targets the SAME project the Portal session was
+  // issued for (QA on Preview, PROD on rifim-os.vercel.app).
+  _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'rifim_portal_sb' } });
   return _sb;
 }
 
@@ -698,6 +719,12 @@ document.getElementById('sc-save').addEventListener('click', async () => {
       const mirror = await _gasCall('sistem_config_set', {
         key: item.key, value: item.value, user: me,
       });
+      if (_crmIsPreviewNotice(mirror)) {
+        // Supabase write already succeeded; GAS mirror is unavailable in Preview.
+        showStatus('ℹ️ ' + mirror.message, '');
+        results.ok++;
+        continue;
+      }
       if (!mirror || mirror.success !== true) {
         throw new Error('Sheet mirror gagal: ' + ((mirror && mirror.message) || 'response tidak valid'));
       }
@@ -723,6 +750,7 @@ document.getElementById('cc-refresh').addEventListener('click', async () => {
   try {
     const me = _wlCurrentUserEmail();
     const data = await _gasCall('company_config_list', { user: me });
+    if (_crmIsPreviewNotice(data)) { showStatus('ℹ️ ' + data.message, ''); return; }
     if (!data.success) throw new Error(data.message || 'Gagal load');
     const rows = data.config || [];
     let updated = 0;
@@ -829,6 +857,7 @@ async function loadAuditLog() {
   try {
     const me = _wlCurrentUserEmail();
     const data = await _gasCall('crm_audit_tail', { user: me, limit: 200 });
+    if (_crmIsPreviewNotice(data)) { _crmInfoTb(tbody, data.message); return; }
     if (!data.success) throw new Error(data.message || 'Gagal load');
     _auCache = data.logs || [];
     if (_auCache.length === 0) {
@@ -918,6 +947,7 @@ async function loadRaosUsers() {
       _gasCall('raos_users_list', { user: me }),
       _gasCall('raos_credentials_list', { user: me }).catch(() => ({ success: false })),
     ]);
+    if (_crmIsPreviewNotice(data)) { _crmInfoTb(tbody, data.message); return; }
     if (!data.success) throw new Error(data.message || 'Gagal load');
     _ruCache = data.users || [];
     _rcCache = (credRes && credRes.success && credRes.credentials) || {};
@@ -1008,6 +1038,7 @@ async function loadContacts() {
   try {
     const me = _wlCurrentUserEmail();
     const data = await _gasCall('contacts_list', { user: me });
+    if (_crmIsPreviewNotice(data)) { _crmInfoTb(tbody, data.message); return; }
     if (!data.success) throw new Error(data.message || 'Gagal load');
     _ctCache = data.contacts || [];
     renderContacts();
@@ -1049,6 +1080,7 @@ async function saveContact() {
     };
     if (_ctEditing) payload.id = _ctEditing.id;
     const data = await _gasCall('contacts_upsert', payload);
+    if (_crmIsPreviewNotice(data)) { showStatus('ℹ️ ' + data.message, ''); return; }
     if (!data.success) throw new Error(data.message || 'Gagal simpan');
     showStatus(`✅ Kontak ${_ctEditing ? 'ter-update' : 'ditambahkan'}`, 'ok');
     document.getElementById('ct-modal').style.display = 'none';
@@ -1067,6 +1099,7 @@ async function deleteContact(id) {
   try {
     const me = _wlCurrentUserEmail();
     const data = await _gasCall('contacts_delete', { id, user: me });
+    if (_crmIsPreviewNotice(data)) { showStatus('ℹ️ ' + data.message, ''); return; }
     if (!data.success) throw new Error(data.message || 'Gagal hapus');
     showStatus(`✅ Kontak "${c.name}" dihapus`, 'ok');
     await loadContacts();

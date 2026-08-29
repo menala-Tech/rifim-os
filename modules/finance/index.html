@@ -646,7 +646,29 @@ function _finGetUserEmail() {
 }
 
 let _finSessionClient = null;
+function _finIsPreview() {
+  const host = String(window.location && window.location.hostname || '');
+  if (window.RifimPortalSession && typeof window.RifimPortalSession.config === 'object' && window.RifimPortalSession.config.isPreview != null) {
+    return !!window.RifimPortalSession.config.isPreview;
+  }
+  return /\.vercel\.app$/i.test(host) && host !== 'rifim-os.vercel.app';
+}
+function _finPreviewNotice(tb, msg) {
+  if (!tb) return;
+  tb.innerHTML = '<tr><td colspan="999" class="empty" style="padding:20px;color:#0ea5e9">ℹ️ ' + esc(msg) + '</td></tr>';
+}
 async function _finGetAccessToken() {
+  // Hotfix 2026-08-29: AIST / Saldo callers must use the same canonical
+  // validated access token as the rest of Finance. Without this, the
+  // competing GoTrue client below can return a stale token and cause
+  // repeated 401 on /api/internal/aist-agent/status and 400 on
+  // /api/internal/hris-contracts. Portal session is the single source of truth.
+  if (window.RifimPortalSession && typeof window.RifimPortalSession.validate === 'function') {
+    try {
+      const s = await window.RifimPortalSession.validate();
+      if (s && s.access_token) return String(s.access_token);
+    } catch (_) { /* fall through to legacy refresh */ }
+  }
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem('rifim_auth') || '{}'); }
   catch (e) { return ''; }
@@ -654,10 +676,18 @@ async function _finGetAccessToken() {
   if (window.supabase && saved.refresh_token) {
     try {
       if (!_finSessionClient) {
+        // Hotfix 2026-08-29 (R3 + Preview UAT followup): share the canonical
+        // Portal auth storage (`rifim_portal_sb`) so this module does NOT
+        // create a competing GoTrueClient, AND target the SAME Supabase
+        // project the Portal session was issued for (QA on Preview, PROD on
+        // rifim-os.vercel.app). Hardcoding PROD sent QA tokens to PROD in
+        // Preview UAT and produced 401 "Session tidak valid".
+        const _finSbUrl  = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseUrl)     || 'https://vlievtojpmrbsmzlqswl.supabase.co';
+        const _finSbKey  = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseAnonKey) || 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
         _finSessionClient = window.supabase.createClient(
-          'https://vlievtojpmrbsmzlqswl.supabase.co',
-          'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1',
-          { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } },
+          _finSbUrl,
+          _finSbKey,
+          { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'rifim_portal_sb' } },
         );
       }
       let session = (await _finSessionClient.auth.getSession()).data.session;
@@ -696,6 +726,10 @@ function _finActionIsMutation(action) {
 // alternate path if the canonical router script ever fails to install.
 var _FIN_LEGACY_READ_ACTIONS = ['finance_list', 'finance_cabang_list', 'finance_tagihan_list', 'finance_rekap_harian', 'finance_rekap_bulanan', 'finance_log_list'];
 async function _gasCall(action, extra) {
+  const host = String(window.location && window.location.hostname || '');
+  const previewFromPortal = window.RifimPortalSession && typeof window.RifimPortalSession.config === 'object' && window.RifimPortalSession.config.isPreview;
+  const isPreview = previewFromPortal || (/\.vercel\.app$/i.test(host) && host !== 'rifim-os.vercel.app');
+  if (isPreview) return { success: false, code: 'PREVIEW_GAS_UNAVAILABLE', preview_notice: true, message: 'Fitur GAS tidak tersedia di Preview QA' };
   if (_finActionIsMutation(action) && !_finCanMutate()) {
     throw new Error('Role view-only tidak diizinkan melakukan perubahan Finance.');
   }
@@ -762,6 +796,7 @@ const showToast = (msg, kind) => {
 // ═══════════════════════════════════════════════════════════════════════
 async function loadDashboard() {
   const tb = document.getElementById('d-body');
+  if (_finIsPreview()) { _finPreviewNotice(tb, 'Fitur GAS Dashboard tidak tersedia di Preview QA'); return; }
   tb.innerHTML = '<tr><td colspan="7"><div class="empty">Loading dari sheet LIA…</div></td></tr>';
   try {
     const data = await _gasCall('finance_list', {
@@ -796,6 +831,7 @@ async function loadDashboard() {
 // ═══════════════════════════════════════════════════════════════════════
 async function loadCabangDetail(cabang) {
   const tb = document.getElementById('c-body');
+  if (_finIsPreview()) { _finPreviewNotice(tb, 'Fitur GAS Ledger per cabang tidak tersedia di Preview QA'); return; }
   tb.innerHTML = '<tr><td colspan="6"><div class="empty">Loading sheet ' + esc(cabang) + '…</div></td></tr>';
   try {
     const data = await _gasCall('finance_cabang_list', {
@@ -823,6 +859,7 @@ async function loadCabangDetail(cabang) {
 // ═══════════════════════════════════════════════════════════════════════
 async function loadTagihan() {
   const tb = document.getElementById('t-body');
+  if (_finIsPreview()) { _finPreviewNotice(tb, 'Fitur GAS Tagihan tidak tersedia di Preview QA'); return; }
   tb.innerHTML = '<tr><td colspan="8"><div class="empty">Loading Tagihan…</div></td></tr>';
   try {
     const data = await _gasCall('finance_tagihan_list', {
@@ -858,6 +895,7 @@ async function loadTagihan() {
 }
 
 async function markTagihanPaid(noTag) {
+  if (_finIsPreview()) { showToast('ℹ️ Fitur GAS Tagihan tidak tersedia di Preview QA', ''); return; }
   const tgl = prompt(`Tandai LUNAS untuk ${noTag}\n\nTanggal bayar (YYYY-MM-DD, kosong = hari ini):`);
   if (tgl === null) return;
   showToast('Memproses…');
@@ -870,6 +908,7 @@ async function markTagihanPaid(noTag) {
 }
 
 async function addTagihan() {
+  if (_finIsPreview()) { showToast('ℹ️ Fitur GAS Tagihan tidak tersedia di Preview QA', ''); return; }
   const jenis    = prompt('Jenis tagihan (mis. Listrik, PDAM, Sewa):'); if (jenis === null) return;
   const noTag    = prompt('No Tagihan:');                                if (noTag === null || !noTag.trim()) return;
   const instansi = prompt('Nama Instansi:');                             if (instansi === null || !instansi.trim()) return;
@@ -894,6 +933,7 @@ async function addTagihan() {
 async function loadRekap() {
   const panel = document.querySelector('[data-panel="rekap"] .empty');
   if (!panel) return;
+  if (_finIsPreview()) { panel.innerHTML = '<div class="icon">ℹ️</div>Fitur GAS Rekap tidak tersedia di Preview QA'; return; }
   panel.innerHTML = '<div class="icon">⏳</div>Loading rekap…';
   try {
     const [har, bul] = await Promise.all([
@@ -967,7 +1007,7 @@ async function loadSaldoRaos() {
           <td style="text-align:right;font-weight:600">${amountCell}</td>
           <td>${statusChip}</td>
           <td style="font-size:11px">${fmtDateTime(r.created_at)}</td>
-          <td>${r.is_processed ? '—' : (['pending','approved'].includes(r.status) ? '<button class="btn ok small" data-mark-saldo="' + esc(r.id) + '"' +
+          <td>${r.is_processed || r.is_archived ? '—' : (['pending','approved'].includes(r.status) ? '<button class="btn ok small" data-mark-saldo="' + esc(r.id) + '"' +
             ' data-request-no="' + esc(r.request_no || '-') + '"' +
             ' data-driver-name="' + esc(r.driver_name || '-') + '"' +
             ' data-driver-login="' + esc(r.driver_login_id || '-') + '"' +
@@ -978,11 +1018,24 @@ async function loadSaldoRaos() {
             // AIST payload must use RAW request amount, not invoice.
             // finance-data-router preserves the raw as r.saldo_nominal.
             ' data-saldo-nominal="' + esc(String(r.saldo_nominal != null ? r.saldo_nominal : (r.nominal || 0))) + '"' +
-            '>✓ Konfirmasi AIST Berhasil</button>' : '<span style="font-size:11px;color:#888">—</span>')}</td>
+            '>✓ Konfirmasi AIST Berhasil</button>' : '<span style="font-size:11px;color:#888">—</span>')}
+            ${(!r.is_processed && !r.is_archived && r.status === 'pending') ? '<button class="btn small" style="background:#4a1f1f;border-color:#7f1d1d;color:#fca5a5;margin-left:4px" data-cancel-saldo="' + esc(r.id) + '"' +
+              ' data-request-no="' + esc(r.request_no || '-') + '"' +
+              ' data-branch-name="' + esc(r.branch_name || '-') + '"' +
+              ' data-staff-name="' + esc(r.staff_name || '-') + '"' +
+              ' data-nominal="' + esc(String(r.saldo_nominal != null ? r.saldo_nominal : (r.nominal || 0))) + '"' +
+              ' title="Batalkan pengajuan (canonical lifecycle: pending → cancelled)">🚫 Batal</button>' : ''}</td>
         </tr>`;
     }).join('');
     tb.querySelectorAll('button[data-mark-saldo]').forEach(btn => {
       btn.addEventListener('click', () => markSaldoPaid(btn));
+    });
+    // Phase 1 Cancel Isi Saldo (2026-08-29): Cancel wiring — visible only for
+    // status='pending' && !is_processed && !is_archived (row-level guard);
+    // backend re-validates all four guards + role (admin/direksi only) + RPC
+    // idempotency, so a stale/spoofed click never mutates a terminal row.
+    tb.querySelectorAll('button[data-cancel-saldo]').forEach(btn => {
+      btn.addEventListener('click', () => cancelSaldoRequest(btn));
     });
   } catch (err) {
     tb.innerHTML = `<tr><td colspan="8"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
@@ -1061,6 +1114,52 @@ async function markSaldoPaid(btn) {
     }
     // Re-enable supaya bisa retry -- hanya path gagal, sukses/already_processed
     // sudah return lebih dulu lewat reload table (row hilang dari daftar pending).
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+}
+
+// Phase 1 Cancel Isi Saldo (2026-08-29). Backend: finance_saldo_cancel via
+// existing dispatcher (no new Vercel function). Same double-click guard,
+// same "no optimistic success" contract as markSaldoPaid — UI only updates
+// after the backend PATCH lands (or backend returns already_cancelled for
+// idempotency). Reload of loadSaldoRaos refreshes canonical row so RAOS
+// (validasi-saldo / riwayat) reads the same row via realtime/refresh.
+async function cancelSaldoRequest(btn) {
+  const id = btn.dataset.cancelSaldo;
+  const requestNo = btn.dataset.requestNo || '-';
+  const branchName = btn.dataset.branchName || '-';
+  const staffName = btn.dataset.staffName || '-';
+  const nominal = fmtRp(Number(btn.dataset.nominal || 0));
+
+  const confirmMsg = 'BATALKAN pengajuan Isi Saldo? Tindakan ini tidak dapat di-undo.\n\n' +
+    `Request No: ${requestNo}\n` +
+    `Cabang: ${branchName}\n` +
+    `Staff: ${staffName}\n` +
+    `Nominal: ${nominal}\n\n` +
+    'Row akan berubah status menjadi CANCELLED dan RAOS (Validasi Saldo / Riwayat) langsung refleks.\n' +
+    'Lanjutkan pembatalan?';
+  if (!confirm(confirmMsg)) return;
+
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Membatalkan…';
+
+  showToast('Membatalkan…');
+  try {
+    const data = await _gasCall('finance_saldo_cancel', { id });
+    if (data.status === 'not_found') throw new Error('Pengajuan tidak ditemukan.');
+    if (!data.success) throw new Error(data.message || 'Batal saldo gagal.');
+    if (data.status === 'already_cancelled') {
+      showToast(`Info: saldo ${id.substring(0, 8)}... sudah dibatalkan`, 'ok');
+      await loadSaldoRaos();
+      return;
+    }
+    showToast(`✅ Saldo ${id.substring(0, 8)}… dibatalkan`, 'ok');
+    await loadSaldoRaos();
+  } catch (err) {
+    showToast('❌ ' + err.message, 'err');
     btn.disabled = false;
     btn.textContent = originalLabel;
   }
@@ -1228,13 +1327,17 @@ function startSaldoRaosNotifier() {
 
   // Realtime broadcast subscribe — reuse client dari CRM kalau ada, jika
   // tidak buat sendiri (Finance modul bisa dibuka standalone tanpa CRM).
-  const SB_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co';
-  const SB_ANON = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+  // Hotfix 2026-08-29 followup: pull URL/anon from RifimPortalSession so
+  // Preview subscribes to QA realtime channel (not PROD).
+  const SB_URL  = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseUrl)     || 'https://vlievtojpmrbsmzlqswl.supabase.co';
+  const SB_ANON = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseAnonKey) || 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
   if (typeof window.supabase === 'undefined') {
     console.warn('[finance] supabase-js belum load — realtime skip, fallback poll aktif');
   } else {
     try {
-      const sb = window.supabase.createClient(SB_URL, SB_ANON);
+      // Hotfix 2026-08-29 (R3): realtime-only client MUST NOT persist a
+      // session — otherwise it competes with the canonical Portal auth store.
+      const sb = window.supabase.createClient(SB_URL, SB_ANON, { auth: { persistSession: false, autoRefreshToken: false } });
       _srChannel = sb.channel('raos-saldo-new')
         .on('broadcast', { event: 'new' }, ({ payload }) => _srNotify(payload))
         .subscribe(status => {
@@ -1256,6 +1359,7 @@ function startSaldoRaosNotifier() {
 // ═══════════════════════════════════════════════════════════════════════
 async function loadLog() {
   const tb = document.getElementById('l-body');
+  if (_finIsPreview()) { _finPreviewNotice(tb, 'Fitur GAS System Log tidak tersedia di Preview QA'); return; }
   tb.innerHTML = '<tr><td colspan="5"><div class="empty">Loading log…</div></td></tr>';
   try {
     const data = await _gasCall('finance_log_list', {
@@ -1473,6 +1577,7 @@ async function editTargetCabang(branchId, branchName, currTarget, currStaffDefau
   });
 }
 async function computePayrollForMonth() {
+  if (_finIsPreview()) { showToast('ℹ️ Fitur GAS Payroll tidak tersedia di Preview QA', ''); return; }
   const monthEl = document.getElementById('tc-month');
   if (!confirm('Recompute payroll bulan ' + monthEl.value + ' untuk SEMUA staff aktif?\nIni akan overwrite raos_payroll bulan ini.')) return;
   try {
@@ -1612,6 +1717,7 @@ async function loadDBDriver() {
   }
 }
 async function randomAssignDriver(force) {
+  if (_finIsPreview()) { showToast('ℹ️ Fitur GAS Driver Assignment tidak tersedia di Preview QA', ''); return; }
   const cabangEl = document.getElementById('dd-cabang');
   if (!cabangEl.value) return showToast('❌ Pilih cabang dulu', 'err');
   const cabangName = cabangEl.options[cabangEl.selectedIndex].text;

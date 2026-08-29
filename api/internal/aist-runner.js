@@ -68,8 +68,8 @@ module.exports = async function handler(req, res) {
     return json(res, 405, { success:false, message:'Method not allowed' })
   }
 
-  const supabaseUrl = env('SUPABASE_URL')
-  const publishableKey = env('SUPABASE_PUBLISHABLE_KEY')
+  // Hotfix 2026-08-29: canonical resolver so Preview uses QA Supabase.
+  const {url:supabaseUrl,publishable:publishableKey}=require('../_lib/sb-env').resolve()
   const runnerUrl = env('AIST_RUNNER_URL')
   const runnerSecret = env('AIST_RUNNER_SHARED_SECRET')
   const gasUrl = env('RIFIM_GAS_WEBAPP_URL')

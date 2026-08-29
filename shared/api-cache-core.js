@@ -28,6 +28,7 @@
     finance_tagihan_add:true,
     finance_tagihan_mark_paid:true,
     finance_saldo_raos_mark_paid:true,
+    finance_saldo_cancel:true,
     finance_kpi_target_branch_upsert:true,
     finance_kpi_target_staff_upsert:true,
     finance_payroll_compute:true,

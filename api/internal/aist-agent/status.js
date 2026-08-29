@@ -5,9 +5,9 @@ module.exports = async function handler(req, res) {
   const token = String(req.headers.authorization || '')
   if (!token.startsWith('Bearer ')) return json(res, 401, { success:false, message:'Bearer required' })
 
-  const url = env('SUPABASE_URL')
-  const publishable = env('SUPABASE_PUBLISHABLE_KEY')
-  const service = env('SUPABASE_SERVICE_ROLE_KEY')
+  // Hotfix 2026-08-29 Preview UAT: use canonical resolver so Preview hits
+  // QA Supabase when SUPABASE_URL_QA overrides are set.
+  const {url,publishable,service}=require('../../_lib/sb-env').resolve()
   if (!url || !publishable || !service) return json(res, 503, { success:false, message:'Supabase env missing' })
 
   const authRes = await fetch(`${url}/auth/v1/user`, { headers:{ apikey:publishable, Authorization:token } })

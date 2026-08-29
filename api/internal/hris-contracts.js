@@ -11,6 +11,8 @@
  * POST ?mode=validate                     -> validateContract
  * GET  ?mode=finance_saldo_list            -> listSaldo
  * POST ?mode=finance_saldo_mark_paid       -> markSaldo
+ * POST ?mode=finance_saldo_cancel          -> cancelSaldo
+ * POST ?mode=finance_saldo_notify          -> notifySaldo
  * GET  ?mode=finance_branches              -> listFinanceBranches
  * GET  ?mode=finance_branch_targets        -> listBranchTargets
  * POST ?mode=finance_branch_target_upsert  -> upsertBranchTarget
@@ -23,6 +25,12 @@
  * POST ?mode=finance_tagihan_add            -> financeTagihan
  * POST ?mode=finance_tagihan_mark_paid      -> financeTagihan
  */
+// Hotfix 2026-08-29 Preview UAT followup: central sb-env resolver so Preview
+// can point at QA Supabase via SUPABASE_URL_QA overrides while Production
+// keeps SUPABASE_URL, and httpStatusFor() so auth failures return 401/403
+// instead of collapsing to 400 (frontend previously read that as business
+// error and showed "Session invalid").
+const {resolve:_sbResolve,httpStatusFor}=require('../_lib/sb-env');
 function env(n){return String(process.env[n]||'').trim()}
 async function read(res){const t=await res.text();try{return t?JSON.parse(t):{}}catch(_){return{message:t||`HTTP ${res.status}`}}}
 function out(res,s,b){res.status(s).setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(b))}
@@ -71,8 +79,8 @@ function monthNext(start){const y=+start.slice(0,4),m=+start.slice(5,7);const n=
 function num(v,d=0){const n=Number(v);return Number.isFinite(n)?n:d}
 function financeRead(p){if(!['admin','direksi','management'].includes(p.role))throw new Error('Role tidak boleh melihat Finance')}
 function financeWrite(p){if(!['admin','direksi'].includes(p.role))throw new Error('Hanya Admin/Direksi boleh mengubah Finance')}
-async function sb(path,opts={}){const url=env('SUPABASE_URL'),svc=env('SUPABASE_SERVICE_ROLE_KEY');if(!url||!svc)throw new Error('Supabase server env missing');const r=await fetch(url+path,{...opts,headers:{apikey:svc,Authorization:`Bearer ${svc}`,'Content-Type':'application/json',...(opts.headers||{})}});const b=await read(r);if(!r.ok)throw new Error(b.message||b.error||`Supabase HTTP ${r.status}`);return b}
-async function actor(req){const url=env('SUPABASE_URL'),pub=env('SUPABASE_PUBLISHABLE_KEY'),bearer=String(req.headers.authorization||'');if(!url||!pub)throw new Error('Supabase server env missing');if(!bearer.startsWith('Bearer '))throw new Error('Session required');const ur=await fetch(`${url}/auth/v1/user`,{headers:{apikey:pub,Authorization:bearer}}),u=await read(ur);if(!ur.ok||!u?.id)throw new Error('Session invalid');const rows=await sb(`/rest/v1/user_profiles?id=eq.${q(u.id)}&select=id,role,branch_id,is_active&limit=1`),p=rows?.[0];if(!p?.is_active)throw new Error('Profil tidak aktif');p.role=roleOf(p.role);return p}
+async function sb(path,opts={}){const {url,service:svc}=_sbResolve();if(!url||!svc)throw new Error('Supabase server env missing');const r=await fetch(url+path,{...opts,headers:{apikey:svc,Authorization:`Bearer ${svc}`,'Content-Type':'application/json',...(opts.headers||{})}});const b=await read(r);if(!r.ok)throw new Error(b.message||b.error||`Supabase HTTP ${r.status}`);return b}
+async function actor(req){const {url,publishable:pub}=_sbResolve(),bearer=String(req.headers.authorization||'');if(!url||!pub)throw new Error('Supabase server env missing');if(!bearer.startsWith('Bearer '))throw new Error('Session required');const ur=await fetch(`${url}/auth/v1/user`,{headers:{apikey:pub,Authorization:bearer}}),u=await read(ur);if(!ur.ok||!u?.id)throw new Error('Session invalid');const rows=await sb(`/rest/v1/user_profiles?id=eq.${q(u.id)}&select=id,role,branch_id,is_active&limit=1`),p=rows?.[0];if(!p?.is_active)throw new Error('Profil tidak aktif');p.role=roleOf(p.role);return p}
 // P0 round 2 fix (2026-08-20): some RPCs (raos_saldo_mark_paid) gate on
 // `auth.uid() = p_processor_id`, which only resolves when Postgres sees the
 // CALLING USER's own JWT -- not the service_role key that sb() always sends.
@@ -83,15 +91,17 @@ async function actor(req){const url=env('SUPABASE_URL'),pub=env('SUPABASE_PUBLIS
 // the real caller instead of NULL. Use this ONLY for RPCs that specifically
 // need the caller's own identity in auth.uid(); sb() (service_role) remains
 // the default for everything else in this file.
-async function sbAsActor(path,opts={},bearer){const url=env('SUPABASE_URL'),pub=env('SUPABASE_PUBLISHABLE_KEY');if(!url||!pub)throw new Error('Supabase server env missing');if(!String(bearer||'').startsWith('Bearer '))throw new Error('Session required');const r=await fetch(url+path,{...opts,headers:{apikey:pub,Authorization:bearer,'Content-Type':'application/json',...(opts.headers||{})}});const b=await read(r);if(!r.ok)throw new Error(b.message||b.error||`Supabase HTTP ${r.status}`);return b}
+async function sbAsActor(path,opts={},bearer){const {url,publishable:pub}=_sbResolve();if(!url||!pub)throw new Error('Supabase server env missing');if(!String(bearer||'').startsWith('Bearer '))throw new Error('Session required');const r=await fetch(url+path,{...opts,headers:{apikey:pub,Authorization:bearer,'Content-Type':'application/json',...(opts.headers||{})}});const b=await read(r);if(!r.ok)throw new Error(b.message||b.error||`Supabase HTTP ${r.status}`);return b}
 
 // HRIS contract API (existing canonical behavior)
 async function listContracts(req,p){if(!['admin','direksi','management','koordinator'].includes(p.role))throw new Error('Role tidak boleh melihat Kontrak');let path='/rest/v1/hris_contract_employee_view?select=*&order=updated_at.desc&limit=1000';const employeeId=String(req.query.employee_id||'').trim();if(employeeId)path+=`&employee_id=eq.${q(employeeId)}`;let rows=await sb(path);if(p.role==='koordinator'){const prof=await sb(`/rest/v1/user_profiles?branch_id=eq.${q(p.branch_id||'')}&is_active=eq.true&select=staff_id`);const allowed=new Set((prof||[]).map(x=>String(x.staff_id||'').toUpperCase()).filter(Boolean));rows=(rows||[]).filter(x=>allowed.has(String(x.employee_id||'').toUpperCase()))}return rows||[]}
 async function validateContract(req,p){if(!['admin','direksi'].includes(p.role))throw new Error('Hanya Admin/Direksi boleh validasi kontrak');const id=String(req.body?.contract_id||'').trim();if(!id)throw new Error('contract_id wajib');return await sb('/rest/v1/rpc/hris_validate_contract',{method:'POST',body:JSON.stringify({p_contract_id:id})})}
 
-// Finance / RAOS canonical direct reads
-async function listSaldo(req,p){financeRead(p);let path='/rest/v1/raos_saldo_requests?is_archived=eq.false&select=id,request_no,staff_id,branch_id,nominal,status,requested_at,created_at,is_processed,processed_at,driver_id,driver_login_id,driver_name,client_id,is_archived,archived_at&order=created_at.desc&limit=500';const status=String(req.query.status||'').trim().toLowerCase();if(status&&status!=='all'){if(['paid','processed','lunas'].includes(status))path+='&is_processed=eq.true';else if(['unprocessed','belum_lunas'].includes(status))path+='&is_processed=eq.false';else path+=`&status=eq.${q(status)}`}const rows=await sb(path);const staffIds=[...new Set((rows||[]).map(x=>x.staff_id).filter(Boolean))],branchIds=[...new Set((rows||[]).map(x=>x.branch_id).filter(Boolean))];let prof=[],branches=[];if(staffIds.length)prof=await sb(`/rest/v1/user_profiles?id=in.(${staffIds.map(q).join(',')})&select=id,full_name,staff_id`);if(branchIds.length)branches=await sb(`/rest/v1/branches?id=in.(${branchIds.map(q).join(',')})&select=id,name,slug`);const pm=Object.fromEntries((prof||[]).map(x=>[String(x.id),x])),bm=Object.fromEntries((branches||[]).map(x=>[String(x.id),x]));return (rows||[]).map(r=>{const s=pm[String(r.staff_id)]||{},b=bm[String(r.branch_id)]||{};return{...r,staff_name:s.full_name||'',staff_code:s.staff_id||'',branch_name:b.name||b.slug||''}})}
-async function markSaldo(req,p){financeWrite(p);const id=String(req.body?.id||req.body?.request_id||'').trim();if(!id)throw new Error('id wajib');return await sbAsActor('/rest/v1/rpc/raos_saldo_mark_paid',{method:'POST',body:JSON.stringify({p_request_id:id,p_processor_id:p.id})},String(req.headers.authorization||''))}
+// Phase 2 (2026-08-29): Finance Isi Saldo lifecycle is now owned by an
+// internal module required by the existing /api/internal/hris-contracts
+// dispatcher. This keeps the Vercel function count at 12 and isolates the
+// saldo domain from the overloaded HRIS contracts file.
+const financeSaldo = require('./_modules/finance-saldo')({ sb, sbAsActor, opsAudit, q });
 
 async function listFinanceBranches(req,p){financeRead(p);return await sb('/rest/v1/branches?is_active=eq.true&parent_branch_id=is.null&select=id,code,name,slug,branch_type&order=name.asc')}
 
@@ -715,8 +725,10 @@ module.exports=async function handler(req,res){
       const h=issueAistHandoff();
       return out(res,200,{success:true,token:h.token,expires_at:h.expires_at,scope:h.scope});
     }
-    if(req.method==='GET'&&mode==='finance_saldo_list')return out(res,200,{success:true,rows:await listSaldo(req,p),source:'supabase'});
-    if(req.method==='POST'&&mode==='finance_saldo_mark_paid'){const r=await markSaldo(req,p);return out(res,200,{success:true,...(r||{})})}
+    if(req.method==='GET'&&mode==='finance_saldo_list')return out(res,200,{success:true,rows:await financeSaldo.listSaldo(req,p),source:'supabase'});
+    if(req.method==='POST'&&mode==='finance_saldo_mark_paid'){const r=await financeSaldo.markSaldo(req,p);return out(res,200,{success:true,...(r||{})})}
+    if(req.method==='POST'&&mode==='finance_saldo_cancel'){const r=await financeSaldo.cancelSaldo(req,p);return out(res,200,{success:true,...(r||{})})}
+    if(req.method==='POST'&&mode==='finance_saldo_notify'){const r=await financeSaldo.notifySaldo(req,p);return out(res,200,{success:true,...(r||{})})}
     if(req.method==='GET'&&mode==='finance_branches')return out(res,200,{success:true,rows:await listFinanceBranches(req,p),source:'supabase'});
     if(req.method==='GET'&&mode==='finance_branch_targets')return out(res,200,{success:true,rows:await listBranchTargets(req,p),source:'supabase'});
     if(req.method==='POST'&&mode==='finance_branch_target_upsert')return out(res,200,{success:true,row:await upsertBranchTarget(req,p)});
@@ -738,6 +750,23 @@ module.exports=async function handler(req,res){
     if(req.method==='POST'&&mode==='hris_activation_reconcile_preview')return out(res,200,{success:true,...await hrisReconcile(req,p,false)});
     if(req.method==='POST'&&mode==='hris_activation_reconcile_apply')return out(res,200,{success:true,...await hrisReconcile(req,p,true)});
     if(req.method==='POST'&&mode==='hris_staff_sync')return out(res,200,{success:true,...await hrisStaffSync(req,p)});
+    // Hotfix 2026-08-29 (R1): branch list for Bersihkan Data modal.
+    // The modal previously read branches from another module's DOM select; if
+    // that select had not populated yet, Production showed only "Semua
+    // Cabang". This mode is the canonical branch source for the modal:
+    //   - admin/direksi/management -> all active top-level branches
+    //   - koordinator             -> only their own branch (BR-01 scope)
+    //   - other roles             -> rejected
+    if(req.method==='GET'&&mode==='maintenance_branches'){
+      const allowed=['admin','direksi','management','koordinator'];
+      if(!allowed.includes(p.role)) throw new Error('Role tidak boleh melihat daftar cabang');
+      let path='/rest/v1/branches?is_active=eq.true&parent_branch_id=is.null&select=id,code,name,slug&order=name.asc';
+      if(p.role==='koordinator'){
+        if(!p.branch_id) return out(res,200,{success:true,rows:[]});
+        path='/rest/v1/branches?is_active=eq.true&id=eq.'+q(p.branch_id)+'&select=id,code,name,slug';
+      }
+      return out(res,200,{success:true,rows:await sb(path),source:'supabase'});
+    }
     if(req.method==='POST'&&mode==='maintenance_preview'){
       try{return out(res,200,{success:true,preview:await maintenancePreview(req,p)})}
       catch(e){await opsAudit(p,'maintenance_failed',String(req.body?.module||''),{mode:'preview',action:String(req.body?.action||'')},0,false,{reason:e instanceof Error?e.message:String(e)});throw e}
@@ -749,5 +778,5 @@ module.exports=async function handler(req,res){
     if(req.method==='GET')return out(res,200,{success:true,rows:await listContracts(req,p)});
     if(req.method==='POST'&&mode==='validate')return out(res,200,{success:true,result:await validateContract(req,p)});
     return out(res,405,{success:false,message:'Method not allowed'});
-  }catch(e){return out(res,400,{success:false,message:e instanceof Error?e.message:String(e)})}
+  }catch(e){return out(res,httpStatusFor(e),{success:false,message:e instanceof Error?e.message:String(e),code:e&&e.code||null})}
 }
