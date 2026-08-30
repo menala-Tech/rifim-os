@@ -102,7 +102,8 @@ async function validateContract(req,p){if(!['admin','direksi'].includes(p.role))
 // dispatcher. This keeps the Vercel function count at 12 and isolates the
 // saldo domain from the overloaded HRIS contracts file.
 const financeSaldo = require('./_modules/finance-saldo')({ sb, sbAsActor, opsAudit, q });
-const broadcast = require('./_modules/notifications/broadcast')({ sb, opsAudit });
+const broadcast = require('./_modules/notifications/broadcast')({ sb });
+const alert = require('./_modules/notifications/error-alert')({ sb });
 
 async function listFinanceBranches(req,p){financeRead(p);return await sb('/rest/v1/branches?is_active=eq.true&parent_branch_id=is.null&select=id,code,name,slug,branch_type&order=name.asc')}
 
@@ -189,7 +190,29 @@ async function upsertStaffTarget(req,p){
   return rows?.[0]||payload;
 }
 
-async function computePayroll(req,p){financeWrite(p);const month=monthDate(req.body?.month);const r=await sb('/rest/v1/rpc/raos_compute_payroll_month',{method:'POST',body:JSON.stringify({p_month:month})});return {processed:num(r),month}}
+async function computePayroll(req,p){
+  financeWrite(p);
+  const month=monthDate(req.body?.month);
+  try{
+    const r=await sb('/rest/v1/rpc/raos_compute_payroll_month',{method:'POST',body:JSON.stringify({p_month:month})});
+    return {processed:num(r),month};
+  }catch(err){
+    // Phase 6 remediation: real consumer wiring for error-alert. Hard failure
+    // of raos_compute_payroll_month → critical WA alert ke admin (best-effort,
+    // fire-and-forget, NEVER rollback business flow). alert.emit itself
+    // NEVER throws (fail-safe internally).
+    alert.emit({
+      severity: 'critical',
+      module: 'finance-payroll',
+      event_code: 'compute_payroll_hard_failure',
+      message: 'raos_compute_payroll_month RPC failed setelah admin trigger — payroll bulan '+month+' tidak terkomputasi',
+      context: { branch_id: p&&p.branch_id||null, actor_id: p&&p.id||null },
+      correlation_id: req&&req.headers&&req.headers['x-request-id']||null,
+      action: 'Cek Supabase RPC raos_compute_payroll_month & data source. Re-run manual dari /finance/#recompute setelah root cause fix.',
+    }).catch(function(){});
+    throw err;
+  }
+}
 
 async function listDrivers(req,p){
   financeRead(p);
