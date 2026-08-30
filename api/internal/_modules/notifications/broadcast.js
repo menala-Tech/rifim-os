@@ -35,6 +35,7 @@
 // /api/internal/hris-contracts?mode=notification_broadcast (admin session).
 
 const createFonnteWa = require('./fonnte-wa');
+const createSystemLog = require('./system-log');
 
 // Room mapping — canonical global room ids (from Supabase seed).
 // TODO(post-launch): fetch dynamic dari branches.pengumuman_room_id kalau
@@ -94,9 +95,9 @@ function composeWaMessage(title, message, priority, audience) {
 
 module.exports = function createBroadcast(deps) {
   if (!deps || typeof deps.sb !== 'function') throw new Error('broadcast: missing sb dependency');
-  if (typeof deps.opsAudit !== 'function') throw new Error('broadcast: missing opsAudit dependency');
-  const { sb, opsAudit } = deps;
+  const { sb } = deps;
   const fonnte = createFonnteWa();
+  const sysLog = createSystemLog({ sb });
 
   /**
    * Post pengumuman ke chat + WA parallel.
@@ -127,7 +128,7 @@ module.exports = function createBroadcast(deps) {
       roomId = row.id;
     }
 
-    // 1. Chat write FIRST (canonical, must succeed)
+    // 1. Chat write FIRST (canonical, must succeed for combined broadcast)
     let chatResult = { ok: false, reason: 'not_attempted' };
     if (wantChat) {
       try {
@@ -152,16 +153,21 @@ module.exports = function createBroadcast(deps) {
         chatResult = { ok: true, message_id: msgId, room_id: roomId };
       } catch (e) {
         chatResult = { ok: false, reason: 'chat_write_failed', error: String(e && e.message || e).slice(0, 300) };
-        // Chat write failed — treat as broadcast failure but STILL best-effort WA below
-        // supaya admin tetap dapat notif kalau chat down.
       }
     } else {
       chatResult = { ok: false, reason: 'chat_skipped_by_channels' };
     }
 
-    // 2. WA best-effort (parallel — does NOT rollback chat on failure)
+    // 2. WA decision — split-brain prevention (Phase 6 remediation):
+    //    - Combined broadcast (chat+WA) & chat FAILED → STOP WA. Canonical
+    //      chat is primary record; do NOT announce something that failed to
+    //      become a chat message.
+    //    - WA-only mode (chat=false, WA=true) → do NOT require chat success.
+    //    - chat+WA & chat OK → attempt WA best-effort.
     let waResult = { ok: false, sent: 0, reason: 'not_attempted' };
-    if (wantWa) {
+    if (wantWa && wantChat && !chatResult.ok) {
+      waResult = { ok: false, sent: 0, reason: 'skipped_due_to_chat_failure' };
+    } else if (wantWa) {
       const phones = fonnte.getAdminPhonesFromEnv();
       const waMsg = composeWaMessage(title, message, priority, audience);
       waResult = await fonnte.send({ phones, message: waMsg, tag: 'broadcast' });
@@ -169,22 +175,25 @@ module.exports = function createBroadcast(deps) {
       waResult = { ok: false, sent: 0, reason: 'wa_skipped_by_channels' };
     }
 
-    // 3. Audit both results
-    let audit_ok = false;
-    try {
-      await opsAudit(p, 'notification_broadcast', 'notification', {
-        broadcast_key: `${audience}:${branch_id || 'global'}:${priority}:${Date.now()}`,
-      }, waResult.sent || 0, chatResult.ok, {
-        chat: chatResult,
-        wa: { ok: waResult.ok, sent: waResult.sent, skipped: waResult.skipped, reason: waResult.reason },
-        audience, branch_id: branch_id || null, priority, title_length: title.length,
-      });
-      audit_ok = true;
-    } catch (e) {
-      console.warn('[broadcast] audit failed:', e && e.message);
-    }
+    // 3. Audit both results via canonical system_logs (Phase 6 remediation:
+    //    replace opsAudit which wrote to non-existent rifim_ops_audit_log).
+    const auditRes = await sysLog.writeSystemLog({
+      type: 'notification_broadcast',
+      process: `${audience}:${branch_id || 'global'}:${priority}`,
+      status: chatResult.ok ? (waResult.ok ? 'chat_wa_ok' : (waResult.reason || 'chat_ok_wa_failed')) : 'chat_failed',
+      detail: {
+        actor_id: p.id || null,
+        actor_role: p.role || null,
+        audience,
+        branch_id: branch_id || null,
+        priority,
+        title_length: title.length,
+        chat: { ok: chatResult.ok, reason: chatResult.reason || null, message_id: chatResult.message_id || null, room_id: chatResult.room_id || null },
+        wa: { ok: waResult.ok, sent: waResult.sent, skipped: waResult.skipped || 0, reason: waResult.reason || null },
+      },
+    });
 
-    return { chat: chatResult, wa: waResult, audit_ok };
+    return { chat: chatResult, wa: waResult, audit_ok: auditRes.ok };
   }
 
   return { postBroadcast, _internals: { validateInput, composeChatContent, composeWaMessage } };

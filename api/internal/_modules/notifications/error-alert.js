@@ -32,19 +32,20 @@
 //   - secret redaction: strip authorization/apikey/token/service_role/password
 //     dari context sebelum audit + WA compose
 //
-// DEDUP MECHANISM:
-//   Query raos_ops_audit dengan event_type='system_alert', context->>'alert_key'
-//   dalam 10 menit terakhir. Kalau ada → cooldown, skip WA.
-//   Kalau tabel/RPC tidak tersedia → fail-open (kirim WA), log limitation
-//   ke console. Ini deliberate: alert kritikal lebih baik double dari hilang.
+// DEDUP MECHANISM (Phase 6 remediation, 2026-08-31):
+//   Canonical log sink adalah public.system_logs (bukan raos_ops_audit yang
+//   TIDAK EXIST di Production per architect audit). Query system_logs
+//   type='system_alert' process='${module}:${event_code}' created_at>=cutoff
+//   → parse detail JSON → compare alert_key. Kalau match ditemukan → cooldown.
+//   Kalau query gagal (DB down) → fail-open (dispatch), catat limitation ke
+//   console. Deliberate: kritikal alert lebih baik double dari hilang.
 //
 // LIMITATION:
-//   Vercel serverless stateless — kalau 2 instances berbeda fire alert
-//   yang sama dalam < 500ms, DB write race bisa gagal dedup. Acceptable
-//   karena skenario dalam praktik jarang, dan konsekuensi = 2 WA identik
-//   (bukan alert storm).
+//   Vercel serverless stateless — 2 instance fire alert sama < 500ms bisa
+//   lolos dedup. Konsekuensi = 2 WA identik (bukan alert storm).
 
 const createFonnteWa = require('./fonnte-wa');
+const createSystemLog = require('./system-log');
 const crypto = require('crypto');
 
 const SEVERITY_ELIGIBLE = new Set(['warning', 'critical']);
@@ -142,49 +143,52 @@ module.exports = function createErrorAlert(deps) {
   if (!deps || typeof deps.sb !== 'function') throw new Error('error-alert: missing sb dependency');
   const { sb } = deps;
   const fonnte = createFonnteWa();
+  const sysLog = createSystemLog({ sb });
+
+  function processId(mod, ev) {
+    return `${String(mod || 'unknown').slice(0, 80)}:${String(ev || 'unknown').slice(0, 100)}`;
+  }
 
   /**
    * Cek apakah alert dengan alert_key ini sudah pernah dikirim dalam 10 menit terakhir.
-   * Return true kalau cooldown aktif (skip). Return false kalau clear untuk kirim.
+   * Query public.system_logs (canonical sink) filtered by type+process+time,
+   * parse detail JSON server-side, compare alert_key.
    * Fail-open: kalau query error, return false (kirim, karena kritikal > dedup perfect).
    */
-  async function isCooldownActive(alertKey) {
-    try {
-      const cutoff = new Date(Date.now() - COOLDOWN_SECONDS * 1000).toISOString();
-      const url = `/rest/v1/raos_ops_audit?event_type=eq.system_alert&context->>alert_key=eq.${encodeURIComponent(alertKey)}&created_at=gte.${encodeURIComponent(cutoff)}&select=id&limit=1`;
-      const rows = await sb(url);
-      return Array.isArray(rows) && rows.length > 0;
-    } catch (e) {
-      console.warn('[error-alert] cooldown query failed (fail-open):', e && e.message);
-      return false;
+  async function isCooldownActive({ alertKey, module: mod, event_code }) {
+    const proc = processId(mod, event_code);
+    const res = await sysLog.recentLogs({ type: 'system_alert', process: proc, windowSeconds: COOLDOWN_SECONDS });
+    if (!res.ok) return false;  // fail-open
+    for (const r of (res.rows || [])) {
+      if (r.detail && r.detail.alert_key === alertKey) return true;
     }
+    return false;
   }
 
   async function auditAlert({ alertKey, severity, module: mod, event_code, dispatched, recipient_count, reason, correlation_id }) {
-    try {
-      await sb('/rest/v1/raos_ops_audit', {
-        method: 'POST',
-        headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          event_type: 'system_alert',
-          actor_id: null,
-          resource_type: 'notification',
-          resource_id: null,
-          success: dispatched,
-          context: {
-            alert_key: alertKey,
-            severity,
-            module: mod,
-            event_code,
-            recipient_count: recipient_count || 0,
-            reason: reason || null,
-            correlation_id: correlation_id || null,
-          },
-        }),
-      });
-    } catch (e) {
-      console.warn('[error-alert] auditAlert failed:', e && e.message);
-    }
+    const proc = processId(mod, event_code);
+    let status;
+    if (dispatched) status = 'dispatched';
+    else if (reason === 'cooldown') status = 'cooldown';
+    else if (reason === 'dispatch_disabled') status = 'dispatch_disabled';
+    else if (reason === 'provider_not_configured') status = 'dispatch_disabled';
+    else if (reason) status = 'provider_failed';
+    else status = 'internal_error';
+
+    await sysLog.writeSystemLog({
+      type: 'system_alert',
+      process: proc,
+      status,
+      detail: {
+        alert_key: alertKey,
+        severity,
+        module: mod,
+        event_code,
+        recipient_count: recipient_count || 0,
+        reason: reason || null,
+        correlation_id: correlation_id || null,
+      },
+    });
   }
 
   /**
@@ -207,7 +211,7 @@ module.exports = function createErrorAlert(deps) {
       }
 
       // Cooldown
-      if (await isCooldownActive(alertKey)) {
+      if (await isCooldownActive({ alertKey, module: mod, event_code })) {
         await auditAlert({ alertKey, severity, module: mod, event_code, dispatched: false, reason: 'cooldown' });
         return { sent: false, reason: 'cooldown', alert_key: alertKey };
       }
