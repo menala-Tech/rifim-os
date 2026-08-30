@@ -48,7 +48,9 @@ module.exports = function createOutbox(deps) {
       queued: true,
       notification_ids: (notification_ids || []),
       recipient_count: user_ids.length,
-      admin_phones: (adminRows || []).map(r => r.phone).filter(Boolean)
+      admin_phones: (adminRows || []).map(r => r.phone).filter(Boolean),
+      // Fields dibutuhkan saldo-wa.js untuk compose WA message body (Phase 5)
+      request_no, branch_name, staff_name, driver_name, driver_login, nominal, requested_at,
     };
   }
 
