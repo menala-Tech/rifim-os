@@ -102,6 +102,7 @@ async function validateContract(req,p){if(!['admin','direksi'].includes(p.role))
 // dispatcher. This keeps the Vercel function count at 12 and isolates the
 // saldo domain from the overloaded HRIS contracts file.
 const financeSaldo = require('./_modules/finance-saldo')({ sb, sbAsActor, opsAudit, q });
+const broadcast = require('./_modules/notifications/broadcast')({ sb, opsAudit });
 
 async function listFinanceBranches(req,p){financeRead(p);return await sb('/rest/v1/branches?is_active=eq.true&parent_branch_id=is.null&select=id,code,name,slug,branch_type&order=name.asc')}
 
@@ -729,6 +730,7 @@ module.exports=async function handler(req,res){
     if(req.method==='POST'&&mode==='finance_saldo_mark_paid'){const r=await financeSaldo.markSaldo(req,p);return out(res,200,{success:true,...(r||{})})}
     if(req.method==='POST'&&mode==='finance_saldo_cancel'){const r=await financeSaldo.cancelSaldo(req,p);return out(res,200,{success:true,...(r||{})})}
     if(req.method==='POST'&&mode==='finance_saldo_notify'){const r=await financeSaldo.notifySaldo(req,p);return out(res,200,{success:true,...(r||{})})}
+    if(req.method==='POST'&&mode==='notification_broadcast'){const r=await broadcast.postBroadcast(req,p);return out(res,200,{success:true,...(r||{})})}
     if(req.method==='GET'&&mode==='finance_branches')return out(res,200,{success:true,rows:await listFinanceBranches(req,p),source:'supabase'});
     if(req.method==='GET'&&mode==='finance_branch_targets')return out(res,200,{success:true,rows:await listBranchTargets(req,p),source:'supabase'});
     if(req.method==='POST'&&mode==='finance_branch_target_upsert')return out(res,200,{success:true,row:await upsertBranchTarget(req,p)});
