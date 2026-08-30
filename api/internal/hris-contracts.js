@@ -102,6 +102,8 @@ async function validateContract(req,p){if(!['admin','direksi'].includes(p.role))
 // dispatcher. This keeps the Vercel function count at 12 and isolates the
 // saldo domain from the overloaded HRIS contracts file.
 const financeSaldo = require('./_modules/finance-saldo')({ sb, sbAsActor, opsAudit, q });
+const broadcast = require('./_modules/notifications/broadcast')({ sb });
+const alert = require('./_modules/notifications/error-alert')({ sb });
 
 async function listFinanceBranches(req,p){financeRead(p);return await sb('/rest/v1/branches?is_active=eq.true&parent_branch_id=is.null&select=id,code,name,slug,branch_type&order=name.asc')}
 
@@ -188,7 +190,38 @@ async function upsertStaffTarget(req,p){
   return rows?.[0]||payload;
 }
 
-async function computePayroll(req,p){financeWrite(p);const month=monthDate(req.body?.month);const r=await sb('/rest/v1/rpc/raos_compute_payroll_month',{method:'POST',body:JSON.stringify({p_month:month})});return {processed:num(r),month}}
+async function computePayroll(req,p){
+  financeWrite(p);
+  const month=monthDate(req.body?.month);
+  try{
+    const r=await sb('/rest/v1/rpc/raos_compute_payroll_month',{method:'POST',body:JSON.stringify({p_month:month})});
+    return {processed:num(r),month};
+  }catch(err){
+    // Phase 6 remediation (architect final fix, 2026-08-31): AWAIT alert.emit
+    // sebelum re-throw original payroll error. Serverless handler tidak
+    // guarantee pending Promise selesai setelah throw — fire-and-forget bisa
+    // membunuh dispatch/audit di tengah jalan. alert.emit sudah NEVER-THROW
+    // internally (fail-safe), tapi kita bungkus try/catch defensif sebagai
+    // extra guard supaya bug/regressi apapun di alert path TIDAK bisa
+    // menggantikan original payroll error.
+    // Failure path SAJA yang menunggu — happy path (return {processed})
+    // tidak pernah panggil alert.emit.
+    try{
+      await alert.emit({
+        severity: 'critical',
+        module: 'finance-payroll',
+        event_code: 'compute_payroll_hard_failure',
+        message: 'raos_compute_payroll_month RPC failed setelah admin trigger — payroll bulan '+month+' tidak terkomputasi',
+        context: { branch_id: p&&p.branch_id||null, actor_id: p&&p.id||null },
+        correlation_id: req&&req.headers&&req.headers['x-request-id']||null,
+        action: 'Cek Supabase RPC raos_compute_payroll_month & data source. Re-run manual dari /finance/#recompute setelah root cause fix.',
+      });
+    }catch(_alertErr){
+      // Defensive only; alert.emit already promises never to throw.
+    }
+    throw err;
+  }
+}
 
 async function listDrivers(req,p){
   financeRead(p);
@@ -729,6 +762,7 @@ module.exports=async function handler(req,res){
     if(req.method==='POST'&&mode==='finance_saldo_mark_paid'){const r=await financeSaldo.markSaldo(req,p);return out(res,200,{success:true,...(r||{})})}
     if(req.method==='POST'&&mode==='finance_saldo_cancel'){const r=await financeSaldo.cancelSaldo(req,p);return out(res,200,{success:true,...(r||{})})}
     if(req.method==='POST'&&mode==='finance_saldo_notify'){const r=await financeSaldo.notifySaldo(req,p);return out(res,200,{success:true,...(r||{})})}
+    if(req.method==='POST'&&mode==='notification_broadcast'){const r=await broadcast.postBroadcast(req,p);return out(res,200,{success:true,...(r||{})})}
     if(req.method==='GET'&&mode==='finance_branches')return out(res,200,{success:true,rows:await listFinanceBranches(req,p),source:'supabase'});
     if(req.method==='GET'&&mode==='finance_branch_targets')return out(res,200,{success:true,rows:await listBranchTargets(req,p),source:'supabase'});
     if(req.method==='POST'&&mode==='finance_branch_target_upsert')return out(res,200,{success:true,row:await upsertBranchTarget(req,p)});
