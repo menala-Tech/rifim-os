@@ -25,7 +25,7 @@ function createAllTemplates() {
   var rootId = config['drive_root_folder_id'];
   if (rootId) {
     try {
-      tplFolder = _getOrCreateFolder(DriveApp.getFolderById(rootId), 'Templates');
+      tplFolder = _setup_getOrCreateFolder(DriveApp.getFolderById(rootId), 'Templates');
     } catch(_) {
       tplFolder = _getRootTemplateFolder();
     }
@@ -547,7 +547,7 @@ function createMenalaTemplates() {
   } catch (_) {
     rootFolder = DriveApp.getRootFolder();
   }
-  var migFolder = _getOrCreateFolder(rootFolder, 'Templates MIG');
+  var migFolder = _setup_getOrCreateFolder(rootFolder, 'Templates MIG');
   Logger.log('📁 Folder MIG: ' + migFolder.getId());
 
   var assets = { logoId: LOGO_ID, ttdId: TTD_ID, stempelId: STEMPEL_ID };
@@ -998,7 +998,7 @@ function _createLogoTemplates(code, assets) {
   var rootFolder;
   try { rootFolder = rootId ? DriveApp.getFolderById(rootId) : DriveApp.getRootFolder(); }
   catch (_) { rootFolder = DriveApp.getRootFolder(); }
-  var tplFolder = _getOrCreateFolder(rootFolder, 'Templates ' + code);
+  var tplFolder = _setup_getOrCreateFolder(rootFolder, 'Templates ' + code);
   Logger.log('📁 Folder ' + code + ': ' + tplFolder.getId());
 
   Logger.log('=== Membuat 6 template ' + code + ' ===');
