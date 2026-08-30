@@ -197,19 +197,28 @@ async function computePayroll(req,p){
     const r=await sb('/rest/v1/rpc/raos_compute_payroll_month',{method:'POST',body:JSON.stringify({p_month:month})});
     return {processed:num(r),month};
   }catch(err){
-    // Phase 6 remediation: real consumer wiring for error-alert. Hard failure
-    // of raos_compute_payroll_month → critical WA alert ke admin (best-effort,
-    // fire-and-forget, NEVER rollback business flow). alert.emit itself
-    // NEVER throws (fail-safe internally).
-    alert.emit({
-      severity: 'critical',
-      module: 'finance-payroll',
-      event_code: 'compute_payroll_hard_failure',
-      message: 'raos_compute_payroll_month RPC failed setelah admin trigger — payroll bulan '+month+' tidak terkomputasi',
-      context: { branch_id: p&&p.branch_id||null, actor_id: p&&p.id||null },
-      correlation_id: req&&req.headers&&req.headers['x-request-id']||null,
-      action: 'Cek Supabase RPC raos_compute_payroll_month & data source. Re-run manual dari /finance/#recompute setelah root cause fix.',
-    }).catch(function(){});
+    // Phase 6 remediation (architect final fix, 2026-08-31): AWAIT alert.emit
+    // sebelum re-throw original payroll error. Serverless handler tidak
+    // guarantee pending Promise selesai setelah throw — fire-and-forget bisa
+    // membunuh dispatch/audit di tengah jalan. alert.emit sudah NEVER-THROW
+    // internally (fail-safe), tapi kita bungkus try/catch defensif sebagai
+    // extra guard supaya bug/regressi apapun di alert path TIDAK bisa
+    // menggantikan original payroll error.
+    // Failure path SAJA yang menunggu — happy path (return {processed})
+    // tidak pernah panggil alert.emit.
+    try{
+      await alert.emit({
+        severity: 'critical',
+        module: 'finance-payroll',
+        event_code: 'compute_payroll_hard_failure',
+        message: 'raos_compute_payroll_month RPC failed setelah admin trigger — payroll bulan '+month+' tidak terkomputasi',
+        context: { branch_id: p&&p.branch_id||null, actor_id: p&&p.id||null },
+        correlation_id: req&&req.headers&&req.headers['x-request-id']||null,
+        action: 'Cek Supabase RPC raos_compute_payroll_month & data source. Re-run manual dari /finance/#recompute setelah root cause fix.',
+      });
+    }catch(_alertErr){
+      // Defensive only; alert.emit already promises never to throw.
+    }
     throw err;
   }
 }

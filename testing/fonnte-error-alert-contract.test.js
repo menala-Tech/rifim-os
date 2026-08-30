@@ -218,21 +218,93 @@ async function run() {
     pass('T13 real consumer wired (finance-payroll compute_payroll_hard_failure)');
   } catch (e) { fail('T13 real consumer wired', e); }
 
-  // T14 — consumer alert failure never breaks business flow
-  //   Simulate alert.emit throwing internally — call site must still throw
-  //   the ORIGINAL RPC error (not the alert error) so caller behavior stable.
+  // T14 — behavioral: computePayroll AWAITS alert.emit before rethrowing
+  //   original RPC error. Serverless handler tidak boleh fire-and-forget
+  //   karena pending Promise bisa terminated setelah throw.
+  //
+  //   4 sub-assertions per architect final fix:
+  //   14a. catch path AWAITS alert.emit (delayed promise resolves BEFORE reject)
+  //   14b. original err is still re-thrown (not alert error)
+  //   14c. alert.emit throwing cannot replace original error (defensive guard)
+  //   14d. happy path does not call alert.emit
   try {
-    // Test integration pattern by reading the code: alert.emit is called
-    // fire-and-forget with .catch(function(){}) then throw err.
+    // Extract computePayroll body from hris-contracts.js source and rebuild
+    // as isolated async function with injected mocks. Behavioral, not grep.
     const src = fs.readFileSync(path.resolve(__dirname, '..', 'api', 'internal', 'hris-contracts.js'), 'utf8');
-    // Look for the pattern in computePayroll: alert.emit({...}).catch(...); throw err;
-    const computePayrollBlock = src.match(/async function computePayroll[\s\S]*?^}/m);
-    assert.ok(computePayrollBlock, 'computePayroll block must exist');
-    const body = computePayrollBlock[0];
-    assert.ok(/\.catch\(/.test(body), 'alert.emit must be .catch()-wrapped so failure never affects flow');
-    assert.ok(/throw\s+err/.test(body), 'original RPC error must be re-thrown after alert attempt');
-    pass('T14 consumer alert failure does not break business flow');
-  } catch (e) { fail('T14 consumer alert failure not break flow', e); }
+    const m = src.match(/async function computePayroll\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/);
+    assert.ok(m, 'computePayroll body must be extractable');
+    const body = m[1];
+    const AsyncFunction = (async function(){}).constructor;
+    // Rebuild with deps as parameters so we can inject mocks
+    const rebuilt = new AsyncFunction('financeWrite', 'sb', 'monthDate', 'num', 'alert', 'req', 'p', body);
+
+    // ── 14a + 14b: catch path awaits + re-throws original ────────────────
+    {
+      const events = [];
+      const originalErr = new Error('RPC hard failure: raos_compute_payroll_month timeout');
+      let alertResolved = false;
+      const alert = {
+        emit: (input) => new Promise((resolve) => {
+          events.push({ t: 'alert_emit_called', input });
+          // Delay 30ms — if code doesn't await, this resolves LONG after throw.
+          setTimeout(() => {
+            alertResolved = true;
+            events.push({ t: 'alert_emit_resolved' });
+            resolve({ sent: false, reason: 'dispatch_disabled', alert_key: 'k' });
+          }, 30);
+        }),
+      };
+      const mocks = {
+        financeWrite: () => {},
+        sb: async () => { events.push({ t: 'sb_throw' }); throw originalErr; },
+        monthDate: () => '2026-09-01',
+        num: (v, d = 0) => Number.isFinite(Number(v)) ? Number(v) : d,
+      };
+      let caught;
+      try { await rebuilt(mocks.financeWrite, mocks.sb, mocks.monthDate, mocks.num, alert, { body: { month: '2026-09' }, headers: {} }, { id: 'admin-1', role: 'admin' }); }
+      catch (e) { caught = e; events.push({ t: 'compute_reject', msg: e && e.message }); }
+
+      assert.strictEqual(caught, originalErr, '14b: caught error must be the original RPC error identity');
+      assert.strictEqual(alertResolved, true, '14a: alert.emit promise must have resolved BEFORE computePayroll rejects (proves await)');
+      // Order check: alert_emit_resolved must appear BEFORE compute_reject
+      const iResolved = events.findIndex(e => e.t === 'alert_emit_resolved');
+      const iReject = events.findIndex(e => e.t === 'compute_reject');
+      assert.ok(iResolved !== -1 && iReject !== -1 && iResolved < iReject, '14a: order events must be alert_resolved BEFORE compute_reject');
+    }
+
+    // ── 14c: alert.emit throwing cannot replace original error ────────────
+    {
+      const originalErr = new Error('RPC boom');
+      const alert = { emit: async () => { throw new Error('ALERT INTERNAL BOOM (should be swallowed)'); } };
+      const mocks = {
+        financeWrite: () => {},
+        sb: async () => { throw originalErr; },
+        monthDate: () => '2026-09-01',
+        num: (v, d = 0) => Number.isFinite(Number(v)) ? Number(v) : d,
+      };
+      let caught;
+      try { await rebuilt(mocks.financeWrite, mocks.sb, mocks.monthDate, mocks.num, alert, { body: {}, headers: {} }, { id: 'a', role: 'admin' }); }
+      catch (e) { caught = e; }
+      assert.strictEqual(caught, originalErr, '14c: original err must survive even when alert.emit throws');
+    }
+
+    // ── 14d: happy path does not call alert.emit ─────────────────────────
+    {
+      let alertCallCount = 0;
+      const alert = { emit: async () => { alertCallCount++; return { sent: true }; } };
+      const mocks = {
+        financeWrite: () => {},
+        sb: async () => 42,   // RPC returns count
+        monthDate: () => '2026-09-01',
+        num: (v, d = 0) => Number.isFinite(Number(v)) ? Number(v) : d,
+      };
+      const r = await rebuilt(mocks.financeWrite, mocks.sb, mocks.monthDate, mocks.num, alert, { body: {}, headers: {} }, { id: 'a', role: 'admin' });
+      assert.deepStrictEqual(r, { processed: 42, month: '2026-09-01' }, '14d: happy path returns normal result');
+      assert.strictEqual(alertCallCount, 0, '14d: happy path must NEVER call alert.emit');
+    }
+
+    pass('T14 behavioral: await alert, preserve original err, happy path clean');
+  } catch (e) { fail('T14 behavioral await + original err + happy path clean', e); }
 
   if (failures.length) { console.log('\nFAIL — ' + failures.length + ' assertion(s) failed'); process.exit(1); }
   else { console.log('\nALL PASSED'); }
