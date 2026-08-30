@@ -15,6 +15,12 @@ function onOpen() {
   // ─────────────────────────────────────────────────────────────
   ui.createMenu('🚛 RIFIM OS')
 
+    // ─ Launch 1 Sep 2026 — top-level supaya cepat diakses ────────
+    .addItem('🚀 Pre-Launch Cleanup (1 Sep 2026)',        'preLaunchCleanupRIFIM_MENU')
+    .addItem('🔄 Sync RAOS Scan Order (7-hari rolling)',  'syncRaosScanOrders_MENU')
+    .addItem('⏰ Setup Trigger Sync RAOS Scan (15 menit)', 'setupRaosScanOrderTrigger')
+    .addSeparator()
+
     // ─ HRIS Staff ────────────────────────────────────────────────
     .addSubMenu(
       ui.createMenu('👤 HRIS — Staff')
@@ -92,6 +98,13 @@ function onOpen() {
         .addSeparator()
         .addItem('🖼️ Setup Logo Perusahaan',        'setupBrandingLogosUI')
         .addItem('🖼️ Test Insert Logo ke Sheet',    'testInsertLogo')
+        .addSeparator()
+        .addItem('🚀 Pre-Launch Cleanup (1 Sep 2026)', 'preLaunchCleanupRIFIM_MENU')
+    )
+    .addSubMenu(
+      ui.createMenu('💳 Isi Saldo — RAOS Feed')
+        .addItem('🔄 Sync RAOS Scan Order (7-hari rolling)', 'syncRaosScanOrders_MENU')
+        .addItem('⏰ Setup Trigger Sync (15 menit)',         'setupRaosScanOrderTrigger')
     )
 
     .addToUi();

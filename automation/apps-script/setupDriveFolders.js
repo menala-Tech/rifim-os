@@ -68,7 +68,7 @@ const DOC_CODE_TO_FOLDER = {
  */
 function setupDriveFolders() {
   var root     = DriveApp.getFolderById(DRIVE_ROOT_FOLDER_ID);
-  var dokumen  = _getOrCreateFolder(root, 'Dokumen');
+  var dokumen  = _setup_getOrCreateFolder(root, 'Dokumen');
 
   var folderIds = { root: DRIVE_ROOT_FOLDER_ID, dokumen: dokumen.getId() };
 
@@ -76,7 +76,7 @@ function setupDriveFolders() {
   Logger.log('📁 Dokumen  : ' + dokumen.getName() + ' (' + dokumen.getId() + ')');
 
   DOC_TYPE_FOLDERS.forEach(function(name) {
-    var sub = _getOrCreateFolder(dokumen, name);
+    var sub = _setup_getOrCreateFolder(dokumen, name);
     folderIds[name] = sub.getId();
     Logger.log('  📁 ' + name + ' → ' + sub.getId());
   });
@@ -151,9 +151,11 @@ function _saveFolderIdsToConfig(folderIds) {
 
 /**
  * Helper: ambil atau buat subfolder dalam parent.
+ * FIX 2026-08-29: di-prefix `_setup_` supaya tidak shadow
+ * driveManager._getOrCreateFolder (yang delegate ke canonical helper).
  * @private
  */
-function _getOrCreateFolder(parentFolder, name) {
+function _setup_setup_getOrCreateFolder(parentFolder, name) {
   var it = parentFolder.getFoldersByName(name);
   if (it.hasNext()) return it.next();
   return parentFolder.createFolder(name);

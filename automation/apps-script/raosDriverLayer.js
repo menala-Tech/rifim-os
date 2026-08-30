@@ -60,7 +60,7 @@ function raosGetDrivers(opts) {
   if (opts.zone)   params.push('zone=eq.'   + encodeURIComponent(opts.zone));
   if (opts.cabang) params.push('cabang=eq.' + encodeURIComponent(opts.cabang));
   if (opts.status) params.push('status=eq.' + encodeURIComponent(opts.status));
-  return _sbGet(_sbUrl('drivers', params));
+  return _rd_sbGet(_rd_sbUrl('drivers', params));
 }
 
 /**
@@ -74,7 +74,7 @@ function raosAddDriver(data) {
   }
   data.status = data.status || 'AKTIF';
   try {
-    _sbPost('drivers', data);
+    _rd_sbPost('drivers', data);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e.message };
@@ -88,7 +88,7 @@ function raosAddDriver(data) {
  */
 function raosUpdateDriver(loginId, updates) {
   try {
-    _sbPatch('drivers', 'id_maxim=eq.' + encodeURIComponent(loginId), updates);
+    _rd_sbPatch('drivers', 'id_maxim=eq.' + encodeURIComponent(loginId), updates);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e.message };
@@ -398,10 +398,10 @@ function importDriversDariSheetKeSupabase() {
 
         try {
           // Upsert: jika id_maxim sudah ada di Supabase → update, jika belum → insert
-          var url  = _sbUrl('drivers') + '?on_conflict=id_maxim';
+          var url  = _rd_sbUrl('drivers') + '?on_conflict=id_maxim';
           var resp = UrlFetchApp.fetch(url, {
             method : 'POST',
-            headers: _sbHeaders({ 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+            headers: _rd_sbHeaders({ 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
             payload: JSON.stringify({
               id_maxim   : idMaxim,
               nama_driver: nama,
@@ -458,16 +458,23 @@ function setupDriverSyncTrigger() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 7. HELPER Supabase internal
+// 7. HELPER Supabase internal (prefix _rd_ agar tidak shadow hrisLayer._sb*)
 // ══════════════════════════════════════════════════════════════════════════════
+//
+// FIX 2026-08-29: sebelumnya file ini mendefinisikan _sbUrl/_sbGet/_sbPost/
+// _sbPatch/_sbHeaders yang bentrok dengan hrisLayer.js — signature _sbHeaders
+// berbeda (hrisLayer: (key, prefer) vs sini: (extra)), sehingga load-order
+// alphabetical bikin caller hrisLayer kehilangan Prefer header di POST.
+// Semua helper di file ini di-prefix `_rd_` (raosDriverLayer local) supaya
+// scope terisolasi. hrisLayer._sb* tetap satu-satunya global helper _sb*.
 
-function _sbUrl(table, params) {
+function _rd_sbUrl(table, params) {
   var base = (PropertiesService.getScriptProperties().getProperty('SUPABASE_URL')
               || SUPABASE_URL) + '/rest/v1/' + table;
   return params && params.length ? base + '?' + params.join('&') : base;
 }
 
-function _sbHeaders(extra) {
+function _rd_sbHeaders(extra) {
   var key = PropertiesService.getScriptProperties().getProperty('SUPABASE_SERVICE_KEY') || '';
   var h   = { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' };
   if (extra) Object.keys(extra).forEach(function(k) { h[k] = extra[k]; });
@@ -521,16 +528,16 @@ function routeRaosDriverLayer(action, params) {
 // SUPABASE HELPERS
 // ══════════════════════════════════════════════════════════════════════════════
 
-function _sbGet(url) {
-  var resp = UrlFetchApp.fetch(url, { headers: _sbHeaders(), muteHttpExceptions: true });
+function _rd_sbGet(url) {
+  var resp = UrlFetchApp.fetch(url, { headers: _rd_sbHeaders(), muteHttpExceptions: true });
   if (resp.getResponseCode() !== 200) throw new Error('Supabase GET gagal: ' + resp.getContentText());
   return JSON.parse(resp.getContentText());
 }
 
-function _sbPost(table, data) {
-  var resp = UrlFetchApp.fetch(_sbUrl(table), {
+function _rd_sbPost(table, data) {
+  var resp = UrlFetchApp.fetch(_rd_sbUrl(table), {
     method: 'POST',
-    headers: _sbHeaders({ 'Prefer': 'return=minimal' }),
+    headers: _rd_sbHeaders({ 'Prefer': 'return=minimal' }),
     payload: JSON.stringify(data),
     muteHttpExceptions: true,
   });
@@ -538,11 +545,11 @@ function _sbPost(table, data) {
   if (code !== 201 && code !== 200) throw new Error('Supabase POST gagal (' + code + '): ' + resp.getContentText());
 }
 
-function _sbPatch(table, filter, data) {
-  var url  = _sbUrl(table) + '?' + filter;
+function _rd_sbPatch(table, filter, data) {
+  var url  = _rd_sbUrl(table) + '?' + filter;
   var resp = UrlFetchApp.fetch(url, {
     method: 'PATCH',
-    headers: _sbHeaders({ 'Prefer': 'return=minimal' }),
+    headers: _rd_sbHeaders({ 'Prefer': 'return=minimal' }),
     payload: JSON.stringify(data),
     muteHttpExceptions: true,
   });
