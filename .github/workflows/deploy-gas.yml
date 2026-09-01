@@ -55,6 +55,24 @@ jobs:
           clasp push --force
 
       - name: Redeploy existing production Web App
+        # 2026-09-01 root-cause fix: the previous command was
+        #   `clasp update-deployment <ID> --description "..."`
+        # which -- despite the workflow reporting success on every run --
+        # only updates the deployment's DESCRIPTION metadata; it does NOT
+        # create a new script version, and it does NOT swap the deployment
+        # to the freshly-pushed source. The live Web App stayed on whatever
+        # version was originally deployed via the GAS Editor, and every
+        # `automation/apps-script/**` change since then landed in source
+        # but never in production. That is why Finance's POST endpoints
+        # returned the "Maaf, saat ini tidak dapat membuka file" HTML page
+        # (surfaced upstream as "GAS balas HTML") even though the CI
+        # workflow was green -- the doPost handler in the deployed bundle
+        # was old enough to be broken.
+        #
+        # `clasp deploy --deploymentId <ID> --description "..."` creates a
+        # new script version from HEAD and updates the named deployment to
+        # point at it, preserving the deployment ID (and therefore the
+        # public Web App URL). This is the actually-redeploying command.
         run: |
           cd automation/apps-script
-          clasp update-deployment "$GAS_DEPLOYMENT_ID" --description "GitHub main ${GITHUB_SHA}"
+          clasp deploy --deploymentId "$GAS_DEPLOYMENT_ID" --description "GitHub main ${GITHUB_SHA}"
