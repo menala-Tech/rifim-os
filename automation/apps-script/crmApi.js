@@ -1379,6 +1379,35 @@ function _finKpiTargetStaffUpsert_(params) {
 function _finPayrollCompute_(params) {
   _finWriteRoleGate_(params);
   var month = _finMonthNorm_(params.month);
+
+  // 2026-09-01 guard: reject if any branch has no target row for this month.
+  // Root cause of the "September 2026 shows Rp 0 for every branch" symptom
+  // in the field UAT: _finKpiTargetBranchList_ folds a missing row into
+  // `Number(t.target_cabang) || 0` and displays Rp 0, indistinguishable from
+  // an intentional zero. If recompute runs against that state, every staff
+  // gets bonus_kpi=0 by design of the RPC -- a silent, hard-to-reverse mass
+  // wipe. Block it here and force whoever triggers the recompute to seed
+  // the missing branches first.
+  var branches = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug&order=name.asc');
+  branches = Array.isArray(branches) ? branches : [];
+  var haveTargets = _crmSbFetch_('GET',
+    '/rest/v1/raos_kpi_targets_branch?select=branch_id&effective_month=eq.' + encodeURIComponent(month));
+  var haveSet = {};
+  (haveTargets || []).forEach(function (t) { haveSet[t.branch_id] = true; });
+  var missing = branches
+    .filter(function (b) { return !haveSet[b.id]; })
+    .map(function (b) { return b.name || b.slug || b.id; });
+  if (missing.length > 0) {
+    return {
+      success: false,
+      code: 'MISSING_TARGETS',
+      month: month,
+      missing_branches: missing,
+      message: 'Beberapa cabang belum punya target untuk bulan ini: ' + missing.join(', ')
+        + '. Set dulu di tab Target Cabang sebelum recompute payroll.',
+    };
+  }
+
   var res = _crmSbFetch_('POST', '/rest/v1/rpc/raos_compute_payroll_month', { p_month: month });
   _crmAuditWrite_(params, 'compute', 'payroll', month, '', String(res));
   return { success: true, month: month, processed: Number(res) || 0 };

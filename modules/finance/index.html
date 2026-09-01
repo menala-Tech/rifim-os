@@ -134,6 +134,18 @@ select option:checked{background:var(--red);color:#fff}
 .launcher .btn{font-size:14px;padding:12px 24px}
 
 footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
+
+/* 2026-09-01 Target Cabang missing-vs-zero indicator.
+   Payroll recompute is now blocked server-side when any branch has no
+   target row for the target month; this styling makes the missing rows
+   obvious in the table so an admin can see what to fix first. */
+.warn-missing{
+  display:inline-block;padding:1px 8px;border-radius:999px;
+  background:rgba(234,179,8,.18);color:#facc15;
+  font-family:inherit;font-size:10px;font-weight:600;letter-spacing:.02em;
+  border:1px solid rgba(234,179,8,.35);cursor:help;
+}
+.row-missing-target{background:rgba(234,179,8,.045)}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="/shared/api-cache.js"></script>
@@ -1495,20 +1507,39 @@ async function loadTargetCabang() {
     // Bonus tetap Rupiah di tier hardcoded (tidak dipengaruhi mode).
     const fmtTarget = (mode, v) => v == null ? '—' :
       (mode === 'order' ? Number(v).toLocaleString('id-ID') + ' scan' : fmtRp(v));
+    // 2026-09-01: distinguish "belum di-set" (row absent for this month) from
+    // "target = 0 (sengaja)". Reader folds missing rows to target_cabang=0,
+    // so we rely on target_id being null to detect absence.
+    const fmtTargetOrMissing = (row, kind) => {
+      if (row.target_id == null) {
+        return '<span class="warn-missing" title="Belum di-set untuk bulan ini — payroll recompute akan diblokir sampai target di-input">belum di-set</span>';
+      }
+      return kind === 'cabang' ? fmtTarget(row.mode, row.target_cabang) : null;
+    };
     // Poin 10 (2026-08-07): tampilkan target_staff_effective (auto-prorate kalau default null).
     // Kalau auto-prorate, tambah badge "auto" biar user tahu asal angkanya.
     tb.innerHTML = data.rows.map(r => {
       const staffVal = r.target_staff_effective != null ? r.target_staff_effective : r.target_staff_default;
       const isAuto = r.target_staff_default == null && r.target_staff_auto_prorated != null;
-      const staffCell = staffVal == null ? '—' : (
-        fmtTarget(r.mode, staffVal) +
-        (isAuto ? ` <span style="font-size:9px;color:#94a3b8;font-weight:400" title="Auto-prorate: ${fmtTarget(r.mode, r.target_cabang)} ÷ ${r.staff_count} staff">auto ÷${r.staff_count}</span>` : '')
-      );
+      const isMissing = r.target_id == null;
+      // 2026-09-01: if this branch has no target row for the month, both
+      // Target Cabang and Target Staff read "belum di-set" -- clearer than
+      // the previous Rp 0 / 0 scan which hid the fact that nothing had
+      // been configured yet.
+      const cabangCell = isMissing
+        ? fmtTargetOrMissing(r, 'cabang')
+        : fmtTarget(r.mode, r.target_cabang);
+      const staffCell = isMissing
+        ? fmtTargetOrMissing(r, 'staff')
+        : (staffVal == null ? '—' : (
+            fmtTarget(r.mode, staffVal) +
+            (isAuto ? ` <span style="font-size:9px;color:#94a3b8;font-weight:400" title="Auto-prorate: ${fmtTarget(r.mode, r.target_cabang)} ÷ ${r.staff_count} staff">auto ÷${r.staff_count}</span>` : '')
+          ));
       return `
-      <tr data-branch="${esc(r.branch_id)}">
+      <tr data-branch="${esc(r.branch_id)}"${isMissing ? ' class="row-missing-target"' : ''}>
         <td>${esc(r.branch_name)}${r.is_excluded_saldo ? ' <span style="font-size:9px;color:#facc15">(order)</span>' : ''}</td>
         <td><span style="padding:2px 8px;border-radius:8px;background:${r.mode==='order'?'rgba(234,179,8,.2);color:#facc15':'rgba(14,165,233,.2);color:#38bdf8'};font-size:10px;font-weight:600">${esc(r.mode)}</span></td>
-        <td style="text-align:right;font-family:monospace">${fmtTarget(r.mode, r.target_cabang)}</td>
+        <td style="text-align:right;font-family:monospace">${cabangCell}</td>
         <td style="text-align:right;font-family:monospace">${staffCell}</td>
         <td style="font-size:10px;color:#888">${fmtDateTime(r.updated_at)}</td>
         <td><button class="btn small" onclick="editTargetCabang('${esc(r.branch_id)}','${esc(r.branch_name)}',${r.target_cabang},${r.target_staff_default},'${esc(r.mode)}')">✏️ Edit</button></td>
