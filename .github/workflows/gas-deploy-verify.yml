@@ -1,0 +1,98 @@
+name: GAS deployment lag check
+
+# Verifies the live Apps Script Web App is running the current main-branch
+# source. `deploy-gas.yml` stamps automation/apps-script/deployMeta.js with
+# the commit SHA before `clasp push`, then updates the deployment; this job
+# calls the deployed `finance_ping` action and fails the build if the
+# reported version does not match `git rev-parse HEAD` on main -- or if the
+# reported deployed_at is older than 24 hours (indicating clasp deploy
+# quietly failed even though clasp push succeeded).
+#
+# Runs after deploy-gas.yml finishes on main, and on a daily schedule so a
+# deployment that goes stale later (mis. because someone redeployed the wrong
+# branch from the GAS Editor) is caught within a day.
+
+on:
+  workflow_run:
+    workflows: ['Deploy to Google Apps Script']
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * *'  # 02:00 UTC = 09:00 WIB, once/day
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      # Same production deployment URL that api/internal/hris-contracts.js
+      # falls back to when env('GAS_URL') is unset. Kept in sync with
+      # deploy-gas.yml GAS_DEPLOYMENT_ID.
+      GAS_EXEC_URL: https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec
+      MAX_LAG_SECONDS: 86400  # 24h
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Probe finance_ping and compare to HEAD
+        run: |
+          set -euo pipefail
+          HEAD_SHA="$(git rev-parse HEAD)"
+          echo "Expected main HEAD: $HEAD_SHA"
+
+          # Follow redirects because Apps Script's /exec 302s through
+          # googleusercontent once for POST. Print status separately so a
+          # login-page redirect (which returns HTML with 200) is distinguishable
+          # from a real JSON response.
+          RESP="$(curl -sS -L \
+            -X POST "$GAS_EXEC_URL" \
+            -H 'Content-Type: text/plain;charset=utf-8' \
+            --max-time 30 \
+            -d '{"action":"finance_ping"}')"
+
+          echo "Raw response (first 400 chars):"
+          echo "${RESP:0:400}"
+
+          # Reject HTML -- that means the deployment returned a Google login
+          # page or an Apps Script error page instead of JSON, which is
+          # exactly the production symptom this job exists to detect.
+          FIRST="$(printf '%s' "$RESP" | head -c 1)"
+          if [ "$FIRST" = "<" ]; then
+            echo "::error::finance_ping returned HTML. Deployment is misconfigured (access level changed, or /exec redirecting to Google login)."
+            exit 1
+          fi
+
+          # Parse JSON. jq --exit-status makes a null field fail the step
+          # rather than silently comparing an empty string.
+          LIVE_VERSION="$(printf '%s' "$RESP" | jq -er '.version')"
+          LIVE_DEPLOYED_AT="$(printf '%s' "$RESP" | jq -er '.deployed_at')"
+          echo "Live deployed version:    $LIVE_VERSION"
+          echo "Live deployed_at (UTC):   $LIVE_DEPLOYED_AT"
+
+          if [ "$LIVE_VERSION" = "$HEAD_SHA" ]; then
+            echo "OK: live deployment matches main HEAD."
+            exit 0
+          fi
+
+          # Version differs -- allow it only if the difference is within the
+          # lag window (deploy-gas.yml may still be running for a very recent
+          # push). Anything older than MAX_LAG_SECONDS is a hard failure.
+          LIVE_EPOCH="$(date -u -d "$LIVE_DEPLOYED_AT" +%s)"
+          NOW_EPOCH="$(date -u +%s)"
+          AGE=$((NOW_EPOCH - LIVE_EPOCH))
+          echo "Deployment age: ${AGE}s (max ${MAX_LAG_SECONDS}s)"
+
+          if [ "$AGE" -gt "$MAX_LAG_SECONDS" ]; then
+            echo "::error::GAS deployment is stale. Live=$LIVE_VERSION, main=$HEAD_SHA, age=${AGE}s. Manual redeploy required: GAS Editor -> Manage deployments -> Edit -> New version -> Save."
+            exit 1
+          fi
+
+          echo "::warning::Live deployment lags main HEAD by ${AGE}s but within the ${MAX_LAG_SECONDS}s tolerance; deploy-gas.yml probably still catching up."

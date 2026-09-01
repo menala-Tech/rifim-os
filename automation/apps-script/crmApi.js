@@ -23,6 +23,11 @@ var CRM_READ_ROLES = ['admin','management','direksi','direktur'];
 var CRM_WRITE_ROLES = ['admin','direksi','direktur'];
 
 var CRM_ACTIONS = {
+  // Unauthenticated deployment-lag probe. Handled BEFORE _crmRequireRead_ so
+  // CI can call it without a Supabase session. Response reveals only the
+  // constants in deployMeta.js (git sha + push timestamp); no PII, no
+  // secrets, no row-level data -- safe to expose publicly.
+  finance_ping: true,
   company_config_list: true,
   company_config_set: true,
   whitelist_list: true,
@@ -82,6 +87,18 @@ function crmHandleGet(e) {
 function crmHandlePost(input) {
   var action = input && input.action;
   if (!action || !CRM_ACTIONS[action]) return null;
+  // finance_ping is the ONLY unauthenticated CRM action: it lets CI probe
+  // which deployment version is live without holding a Supabase session.
+  // The response contains only the constants baked into deployMeta.js by
+  // the deploy-gas.yml workflow -- no user data, no config, no secrets.
+  if (action === 'finance_ping') {
+    return _crmJson({
+      success: true,
+      version: (typeof DEPLOY_META !== 'undefined' && DEPLOY_META.version) || 'unknown',
+      deployed_at: (typeof DEPLOY_META !== 'undefined' && DEPLOY_META.deployed_at) || null,
+      server_time: new Date().toISOString(),
+    });
+  }
   try {
     _crmRequireRead_(input);
     return _crmJson(_crmDispatch_(action, input));
