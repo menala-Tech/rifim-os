@@ -23,6 +23,11 @@ var CRM_READ_ROLES = ['admin','management','direksi','direktur'];
 var CRM_WRITE_ROLES = ['admin','direksi','direktur'];
 
 var CRM_ACTIONS = {
+  // Unauthenticated deployment-lag probe. Handled BEFORE _crmRequireRead_ so
+  // CI can call it without a Supabase session. Response reveals only the
+  // constants in deployMeta.js (git sha + push timestamp); no PII, no
+  // secrets, no row-level data -- safe to expose publicly.
+  finance_ping: true,
   company_config_list: true,
   company_config_set: true,
   whitelist_list: true,
@@ -82,6 +87,18 @@ function crmHandleGet(e) {
 function crmHandlePost(input) {
   var action = input && input.action;
   if (!action || !CRM_ACTIONS[action]) return null;
+  // finance_ping is the ONLY unauthenticated CRM action: it lets CI probe
+  // which deployment version is live without holding a Supabase session.
+  // The response contains only the constants baked into deployMeta.js by
+  // the deploy-gas.yml workflow -- no user data, no config, no secrets.
+  if (action === 'finance_ping') {
+    return _crmJson({
+      success: true,
+      version: (typeof DEPLOY_META !== 'undefined' && DEPLOY_META.version) || 'unknown',
+      deployed_at: (typeof DEPLOY_META !== 'undefined' && DEPLOY_META.deployed_at) || null,
+      server_time: new Date().toISOString(),
+    });
+  }
   try {
     _crmRequireRead_(input);
     return _crmJson(_crmDispatch_(action, input));
@@ -725,6 +742,32 @@ var FIN_CABANG_LIST = [
 
 function _finOpen_() { return SpreadsheetApp.openById(FINANCE_SHEET_ID); }
 
+// 2026-09-01: dual-tab fallback for canonical/legacy naming migrations. Given
+// [FINANCE, LIA] the reader prefers FINANCE if present, otherwise LIA. This
+// lets the owner rename tabs at their own pace without a coordinated code
+// deploy, and makes finding #1/#2 in AUDIT_SPREADSHEET_DIFF_20260901.md
+// self-healing.
+function _finReadFirst_(sheetNames) {
+  var ss = _finOpen_();
+  var tried = [];
+  for (var i = 0; i < sheetNames.length; i++) {
+    var name = sheetNames[i];
+    tried.push(name);
+    var sh = ss.getSheetByName(name);
+    if (sh) return _finReadSheet_(sh);
+  }
+  throw new Error('Tab tidak ada di Finance sheet: coba ' + tried.join(' / '));
+}
+
+function _finReadSheet_(sh) {
+  var last = sh.getLastRow();
+  if (last < 2) return { headers: [], rows: [] };
+  var lastCol = sh.getLastColumn();
+  var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h || '').trim(); });
+  var rows = sh.getRange(2, 1, last - 1, lastCol).getValues();
+  return { headers: headers, rows: rows };
+}
+
 function _finRead_(sheetName, opts) {
   var ss = _finOpen_();
   var sh = ss.getSheetByName(sheetName);
@@ -754,7 +797,12 @@ function _finWriteRoleGate_(params) {
 // ─── Dashboard: LIA master ledger, filter tanggal/jenis/cabang/search
 function _finLedgerList_(params) {
   _finRoleGate_(params);
-  var data = _finRead_('LIA');
+  // 2026-09-01 owner decision: canonical tab is FINANCE (uppercase); LIA is
+  // the legacy name kept as fallback so an in-flight rename does not break
+  // production mid-migration. Both tabs exist in the current Finance
+  // spreadsheet (1AgpEq...). Reader prefers FINANCE when both exist so
+  // the owner can rename LIA -> FINANCE without any code change.
+  var data = _finReadFirst_(['FINANCE', 'LIA']);
   var from  = params.from ? new Date(params.from + 'T00:00:00+07:00').getTime() : 0;
   var to    = params.to   ? new Date(params.to   + 'T23:59:59+07:00').getTime() : Infinity;
   var jenis = String(params.jenis || '').toLowerCase();
@@ -828,7 +876,11 @@ function _finCabangList_(params) {
 // ─── Tagihan
 function _finTagihanList_(params) {
   _finRoleGate_(params);
-  var data = _finRead_('Tagihan');
+  // 2026-09-01 owner decision: canonical tab is 'Payment'; legacy 'Tagihan'
+  // and 'New Tagihan' kept as fallback. Reader prefers Payment when it
+  // exists so the owner can rename Tagihan -> Payment (or seed a fresh
+  // Payment tab) with no code change.
+  var data = _finReadFirst_(['Payment', 'New Tagihan', 'Tagihan']);
   var status = String(params.status || '').toLowerCase();
   var bulan  = String(params.bulan  || '');
   var search = String(params.search || '').toLowerCase();
@@ -877,8 +929,11 @@ function _finTagihanAdd_(params) {
   if (!body.Instansi || !body['No Tagihan']) return { success: false, message: 'no_tagihan + instansi wajib' };
 
   var ss = _finOpen_();
-  var sh = ss.getSheetByName('New Tagihan') || ss.getSheetByName('Tagihan');
-  if (!sh) return { success: false, message: 'Tab New Tagihan / Tagihan tidak ada' };
+  // 2026-09-01: canonical tab is now 'Payment'; keep legacy fallbacks so
+  // an in-flight migration (Payment created, legacy still populated for a
+  // while) does not lose writes.
+  var sh = ss.getSheetByName('Payment') || ss.getSheetByName('New Tagihan') || ss.getSheetByName('Tagihan');
+  if (!sh) return { success: false, message: 'Tab Payment / New Tagihan / Tagihan tidak ada' };
   var last = sh.getLastRow();
   var lastCol = sh.getLastColumn();
   var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h || '').trim(); });
@@ -895,8 +950,11 @@ function _finTagihanMarkPaid_(params) {
   var tglBayar = String(params.tgl_bayar || Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd')).trim();
 
   var ss = _finOpen_();
-  var sh = ss.getSheetByName('Tagihan');
-  if (!sh) return { success: false, message: 'Tab Tagihan tidak ada' };
+  // 2026-09-01: canonical tab is now 'Payment' (see finding #2 in
+  // AUDIT_SPREADSHEET_DIFF_20260901.md). Fallback to legacy 'Tagihan' so
+  // an in-flight rename does not break mark-paid mid-migration.
+  var sh = ss.getSheetByName('Payment') || ss.getSheetByName('Tagihan');
+  if (!sh) return { success: false, message: 'Tab Payment / Tagihan tidak ada' };
   var lastRow = sh.getLastRow();
   var lastCol = sh.getLastColumn();
   var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h || '').trim(); });
@@ -1362,6 +1420,35 @@ function _finKpiTargetStaffUpsert_(params) {
 function _finPayrollCompute_(params) {
   _finWriteRoleGate_(params);
   var month = _finMonthNorm_(params.month);
+
+  // 2026-09-01 guard: reject if any branch has no target row for this month.
+  // Root cause of the "September 2026 shows Rp 0 for every branch" symptom
+  // in the field UAT: _finKpiTargetBranchList_ folds a missing row into
+  // `Number(t.target_cabang) || 0` and displays Rp 0, indistinguishable from
+  // an intentional zero. If recompute runs against that state, every staff
+  // gets bonus_kpi=0 by design of the RPC -- a silent, hard-to-reverse mass
+  // wipe. Block it here and force whoever triggers the recompute to seed
+  // the missing branches first.
+  var branches = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug&order=name.asc');
+  branches = Array.isArray(branches) ? branches : [];
+  var haveTargets = _crmSbFetch_('GET',
+    '/rest/v1/raos_kpi_targets_branch?select=branch_id&effective_month=eq.' + encodeURIComponent(month));
+  var haveSet = {};
+  (haveTargets || []).forEach(function (t) { haveSet[t.branch_id] = true; });
+  var missing = branches
+    .filter(function (b) { return !haveSet[b.id]; })
+    .map(function (b) { return b.name || b.slug || b.id; });
+  if (missing.length > 0) {
+    return {
+      success: false,
+      code: 'MISSING_TARGETS',
+      month: month,
+      missing_branches: missing,
+      message: 'Beberapa cabang belum punya target untuk bulan ini: ' + missing.join(', ')
+        + '. Set dulu di tab Target Cabang sebelum recompute payroll.',
+    };
+  }
+
   var res = _crmSbFetch_('POST', '/rest/v1/rpc/raos_compute_payroll_month', { p_month: month });
   _crmAuditWrite_(params, 'compute', 'payroll', month, '', String(res));
   return { success: true, month: month, processed: Number(res) || 0 };

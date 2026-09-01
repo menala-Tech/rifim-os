@@ -134,6 +134,18 @@ select option:checked{background:var(--red);color:#fff}
 .launcher .btn{font-size:14px;padding:12px 24px}
 
 footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
+
+/* 2026-09-01 Target Cabang missing-vs-zero indicator.
+   Payroll recompute is now blocked server-side when any branch has no
+   target row for the target month; this styling makes the missing rows
+   obvious in the table so an admin can see what to fix first. */
+.warn-missing{
+  display:inline-block;padding:1px 8px;border-radius:999px;
+  background:rgba(234,179,8,.18);color:#facc15;
+  font-family:inherit;font-size:10px;font-weight:600;letter-spacing:.02em;
+  border:1px solid rgba(234,179,8,.35);cursor:help;
+}
+.row-missing-target{background:rgba(234,179,8,.045)}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="/shared/api-cache.js"></script>
@@ -1171,15 +1183,90 @@ async function cancelSaldoRequest(btn) {
 // masuk. Latency <100ms. Public topic (private=false) → anon key cukup,
 // tidak perlu Supabase Auth session di portal.
 // Fallback poll 60s untuk safety net kalau websocket drop.
-const _srSeenIds = new Set();
+// 2026-09-01 alert-ack fix: _srSeenIds now persists to localStorage (TTL
+// 24h) so a browser reload / crash / overnight shutdown does not silent-mark
+// yesterday's backlog on first-run. Without this, _srFallbackFirstRun added
+// every pending row to _srSeenIds without ringing, and any request that
+// arrived while the admin was away simply never alerted.
+const _SR_SEEN_KEY = 'rifim_saldo_seen_ids_v1';
+const _SR_SEEN_TTL_MS = 24 * 60 * 60 * 1000;
+function _srLoadSeen() {
+  try {
+    const raw = localStorage.getItem(_SR_SEEN_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    const cutoff = Date.now() - _SR_SEEN_TTL_MS;
+    const fresh = new Set();
+    for (const [id, ts] of Object.entries(parsed || {})) {
+      if (Number(ts) > cutoff) fresh.add(id);
+    }
+    return fresh;
+  } catch (_) { return new Set(); }
+}
+function _srPersistSeen() {
+  try {
+    const obj = {};
+    const now = Date.now();
+    for (const id of _srSeenIds) obj[id] = now;
+    localStorage.setItem(_SR_SEEN_KEY, JSON.stringify(obj));
+  } catch (_) { /* quota / private mode -- non-fatal */ }
+}
+const _srSeenIds = _srLoadSeen();
+// _srFallbackFirstRun stays true only if we have zero persisted seen-ids.
+// If we already carry seen-ids from a previous session, the first fallback
+// poll must treat unknown rows as NEW (ring), otherwise the fix above buys
+// nothing.
 let _srAudioCtx = null;
 let _srChannel = null;
 let _srFallbackTimer = null;
-let _srFallbackFirstRun = true;
+let _srFallbackFirstRun = _srSeenIds.size === 0;
+// Stable per-device id so raos_saldo_alert_ack's composite PK dedupes acks
+// per browser instead of per session. Regenerated only if localStorage is
+// wiped -- acceptable for a UX-scoped analytic key.
+const _SR_DEVICE_KEY = 'rifim_saldo_device_id';
+function _srDeviceId() {
+  try {
+    let id = localStorage.getItem(_SR_DEVICE_KEY);
+    if (!id) {
+      id = (crypto && crypto.randomUUID) ? crypto.randomUUID() :
+           ('dev-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
+      localStorage.setItem(_SR_DEVICE_KEY, id);
+    }
+    return id;
+  } catch (_) { return 'unknown-device'; }
+}
 // Poin 5 (2026-08-08): repeating alert state per saldo request.
 const _srActiveLoops = new Map();
 const _srAlertIntervalMs = 5000;
 const _srAlertMaxMs = 5 * 60 * 1000;
+
+// 2026-09-01 alert-ack fix: mark this request as heard-and-seen by this
+// device. Fire-and-forget -- a failed ack must never break the UI. The
+// escalation sweep (GAS trigger) treats absence of an ack row as "still
+// unheard" and sends WhatsApp after 10 min.
+async function _srAckAlert(requestId, method) {
+  if (!requestId) return;
+  try {
+    if (typeof _finGetAccessToken !== 'function') return;
+    const token = await _finGetAccessToken();
+    if (!token) return;
+    const SB_URL = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseUrl) || 'https://vlievtojpmrbsmzlqswl.supabase.co';
+    const SB_ANON = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseAnonKey) || 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+    await fetch(SB_URL + '/rest/v1/rpc/raos_saldo_ack_alert', {
+      method: 'POST',
+      headers: {
+        apikey: SB_ANON,
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        p_request_id: requestId,
+        p_device_id: _srDeviceId(),
+        p_method: method || 'click',
+      }),
+    });
+  } catch (_) { /* non-fatal */ }
+}
 
 function _srBeep() {
   try {
@@ -1229,6 +1316,7 @@ function _srShowAlertToast(payload, body) {
   mute.textContent = '🔕 Bisukan';
   mute.style.cssText = 'padding:5px 10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:7px;color:#fff;cursor:pointer;font-size:11px;font-weight:600';
   const acknowledge = () => {
+    _srAckAlert(payload.id, 'click');
     _srStopLoop(payload.id);
     const tab = document.querySelector('.tab[data-tab="saldo-raos"]');
     if (tab && !tab.classList.contains('active')) tab.click();
@@ -1251,6 +1339,7 @@ function _srNotify(payload) {
   if (!payload || !payload.id) return;
   if (_srSeenIds.has(payload.id)) return;
   _srSeenIds.add(payload.id);
+  _srPersistSeen();
   const nominal = Number(payload.nominal || 0).toLocaleString('id-ID');
   const body = `${payload.staff_name || '?'} — Rp${nominal} (${payload.branch_name || '?'})`;
   _srStopLoop(payload.id);
@@ -1270,6 +1359,7 @@ function _srNotify(payload) {
       });
       notification.onclick = () => {
         window.focus();
+        _srAckAlert(payload.id, 'notification');
         _srStopLoop(payload.id);
         try { notification.close(); } catch (_) {}
         const tab = document.querySelector('.tab[data-tab="saldo-raos"]');
@@ -1297,7 +1387,13 @@ async function _srFallbackPoll() {
       if (!stillPendingIds.has(id)) _srStopLoop(id);
     }
     if (_srFallbackFirstRun) {
+      // 2026-09-01: on the very first poll of a brand-new device (no
+      // persisted seen-ids), silent-mark the backlog to avoid alerting for
+      // pending rows that predate this browser install. Persist immediately
+      // so a subsequent reload picks up where we left off instead of
+      // silent-marking the backlog AGAIN.
       data.rows.forEach(r => _srSeenIds.add(r.id));
+      _srPersistSeen();
       _srFallbackFirstRun = false;
       return;
     }
@@ -1411,20 +1507,39 @@ async function loadTargetCabang() {
     // Bonus tetap Rupiah di tier hardcoded (tidak dipengaruhi mode).
     const fmtTarget = (mode, v) => v == null ? '—' :
       (mode === 'order' ? Number(v).toLocaleString('id-ID') + ' scan' : fmtRp(v));
+    // 2026-09-01: distinguish "belum di-set" (row absent for this month) from
+    // "target = 0 (sengaja)". Reader folds missing rows to target_cabang=0,
+    // so we rely on target_id being null to detect absence.
+    const fmtTargetOrMissing = (row, kind) => {
+      if (row.target_id == null) {
+        return '<span class="warn-missing" title="Belum di-set untuk bulan ini — payroll recompute akan diblokir sampai target di-input">belum di-set</span>';
+      }
+      return kind === 'cabang' ? fmtTarget(row.mode, row.target_cabang) : null;
+    };
     // Poin 10 (2026-08-07): tampilkan target_staff_effective (auto-prorate kalau default null).
     // Kalau auto-prorate, tambah badge "auto" biar user tahu asal angkanya.
     tb.innerHTML = data.rows.map(r => {
       const staffVal = r.target_staff_effective != null ? r.target_staff_effective : r.target_staff_default;
       const isAuto = r.target_staff_default == null && r.target_staff_auto_prorated != null;
-      const staffCell = staffVal == null ? '—' : (
-        fmtTarget(r.mode, staffVal) +
-        (isAuto ? ` <span style="font-size:9px;color:#94a3b8;font-weight:400" title="Auto-prorate: ${fmtTarget(r.mode, r.target_cabang)} ÷ ${r.staff_count} staff">auto ÷${r.staff_count}</span>` : '')
-      );
+      const isMissing = r.target_id == null;
+      // 2026-09-01: if this branch has no target row for the month, both
+      // Target Cabang and Target Staff read "belum di-set" -- clearer than
+      // the previous Rp 0 / 0 scan which hid the fact that nothing had
+      // been configured yet.
+      const cabangCell = isMissing
+        ? fmtTargetOrMissing(r, 'cabang')
+        : fmtTarget(r.mode, r.target_cabang);
+      const staffCell = isMissing
+        ? fmtTargetOrMissing(r, 'staff')
+        : (staffVal == null ? '—' : (
+            fmtTarget(r.mode, staffVal) +
+            (isAuto ? ` <span style="font-size:9px;color:#94a3b8;font-weight:400" title="Auto-prorate: ${fmtTarget(r.mode, r.target_cabang)} ÷ ${r.staff_count} staff">auto ÷${r.staff_count}</span>` : '')
+          ));
       return `
-      <tr data-branch="${esc(r.branch_id)}">
+      <tr data-branch="${esc(r.branch_id)}"${isMissing ? ' class="row-missing-target"' : ''}>
         <td>${esc(r.branch_name)}${r.is_excluded_saldo ? ' <span style="font-size:9px;color:#facc15">(order)</span>' : ''}</td>
         <td><span style="padding:2px 8px;border-radius:8px;background:${r.mode==='order'?'rgba(234,179,8,.2);color:#facc15':'rgba(14,165,233,.2);color:#38bdf8'};font-size:10px;font-weight:600">${esc(r.mode)}</span></td>
-        <td style="text-align:right;font-family:monospace">${fmtTarget(r.mode, r.target_cabang)}</td>
+        <td style="text-align:right;font-family:monospace">${cabangCell}</td>
         <td style="text-align:right;font-family:monospace">${staffCell}</td>
         <td style="font-size:10px;color:#888">${fmtDateTime(r.updated_at)}</td>
         <td><button class="btn small" onclick="editTargetCabang('${esc(r.branch_id)}','${esc(r.branch_name)}',${r.target_cabang},${r.target_staff_default},'${esc(r.mode)}')">✏️ Edit</button></td>

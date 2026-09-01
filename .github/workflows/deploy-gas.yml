@@ -29,6 +29,26 @@ jobs:
       - name: Write clasp credentials
         run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
 
+      - name: Stamp deployMeta.js with commit SHA + timestamp
+        # 2026-09-01: finance_ping healthcheck reads DEPLOY_META constants to
+        # tell CI which version is actually running. Stamp them here, before
+        # clasp push, so the pushed source carries the real values instead of
+        # the local-dev placeholder. Never edit deployMeta.js by hand -- this
+        # step overwrites it on every push.
+        run: |
+          cd automation/apps-script
+          NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > deployMeta.js <<EOF
+          /**
+           * DEPLOY META -- auto-overwritten by deploy-gas.yml. See the
+           * committed copy for full docs.
+           */
+          var DEPLOY_META = {
+            version: '${GITHUB_SHA}',
+            deployed_at: '${NOW}',
+          };
+          EOF
+
       - name: Push source to Apps Script
         run: |
           cd automation/apps-script

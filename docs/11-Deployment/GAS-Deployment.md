@@ -22,17 +22,24 @@
 
 Jaringan lokal memblokir Google OAuth (ETIMEDOUT), sehingga clasp lokal tidak bisa jalan.
 
-### Alur Deploy
+### Alur Deploy (2026-09-01 update: redeploy sekarang otomatis)
 
 ```
 Edit file di automation/apps-script/*.js
         ↓
-git commit + git push
+git commit + git push (main)
         ↓
-GitHub Actions: clasp push otomatis
+deploy-gas.yml:
+  1. Stamp deployMeta.js dengan GITHUB_SHA + timestamp
+  2. clasp push --force
+  3. clasp update-deployment (redeploy Web App yang sama)
         ↓
-(Jika edit logika GAS) Redeploy di GAS Editor
+gas-deploy-verify.yml (dijalankan otomatis setelah deploy + tiap 09:00 WIB):
+  POST finance_ping → cocokkan .version dengan main HEAD
+  → fail build kalau HTML/stale >24h → alarm harian bahkan tanpa push baru
 ```
+
+URL Web App **tidak berubah** — hanya kode + deployment version yang diperbarui.
 
 ---
 
@@ -40,10 +47,32 @@ GitHub Actions: clasp push otomatis
 
 | Jenis Perubahan | clasp push | Redeploy GAS |
 |-----------------|------------|--------------|
-| Edit file `automation/apps-script/*.js` | Otomatis via GitHub Actions | **Wajib** |
-| Tambah file GAS baru | Otomatis via GitHub Actions | **Wajib** |
+| Edit file `automation/apps-script/*.js` | Otomatis via GitHub Actions | Otomatis via `clasp update-deployment` |
+| Tambah file GAS baru | Otomatis via GitHub Actions | Otomatis |
 | Edit frontend HTML saja | Tidak perlu | Tidak perlu |
 | Jalankan `setup*()` manual dari GAS Editor | Tidak perlu | Tidak perlu |
+
+**Fallback manual** (kalau `gas-deploy-verify.yml` gagal — mis. clasp OAuth token expired):
+
+```
+Deploy → Manage deployments → Edit (ikon pensil) → Version: New version → Save
+```
+
+Jangan buat Deployment ID baru — `deploy-gas.yml` dan `hris-contracts.js` pin ke ID lama.
+
+---
+
+## Healthcheck: `finance_ping`
+
+Endpoint publik (tidak butuh session) yang return:
+
+```json
+{ "success": true, "version": "<git-sha>", "deployed_at": "<iso-utc>", "server_time": "<iso-utc>" }
+```
+
+Sumber `version` + `deployed_at`: constant di `automation/apps-script/deployMeta.js`, yang **di-overwrite otomatis oleh `deploy-gas.yml` sebelum `clasp push`**. Jangan edit manual — akan tertimpa.
+
+Aman diekspos publik karena tidak mengandung PII, config, atau data row-level.
 
 ### Cara Redeploy di GAS Editor
 
