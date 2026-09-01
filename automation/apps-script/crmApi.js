@@ -742,6 +742,32 @@ var FIN_CABANG_LIST = [
 
 function _finOpen_() { return SpreadsheetApp.openById(FINANCE_SHEET_ID); }
 
+// 2026-09-01: dual-tab fallback for canonical/legacy naming migrations. Given
+// [FINANCE, LIA] the reader prefers FINANCE if present, otherwise LIA. This
+// lets the owner rename tabs at their own pace without a coordinated code
+// deploy, and makes finding #1/#2 in AUDIT_SPREADSHEET_DIFF_20260901.md
+// self-healing.
+function _finReadFirst_(sheetNames) {
+  var ss = _finOpen_();
+  var tried = [];
+  for (var i = 0; i < sheetNames.length; i++) {
+    var name = sheetNames[i];
+    tried.push(name);
+    var sh = ss.getSheetByName(name);
+    if (sh) return _finReadSheet_(sh);
+  }
+  throw new Error('Tab tidak ada di Finance sheet: coba ' + tried.join(' / '));
+}
+
+function _finReadSheet_(sh) {
+  var last = sh.getLastRow();
+  if (last < 2) return { headers: [], rows: [] };
+  var lastCol = sh.getLastColumn();
+  var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h || '').trim(); });
+  var rows = sh.getRange(2, 1, last - 1, lastCol).getValues();
+  return { headers: headers, rows: rows };
+}
+
 function _finRead_(sheetName, opts) {
   var ss = _finOpen_();
   var sh = ss.getSheetByName(sheetName);
@@ -771,7 +797,12 @@ function _finWriteRoleGate_(params) {
 // ─── Dashboard: LIA master ledger, filter tanggal/jenis/cabang/search
 function _finLedgerList_(params) {
   _finRoleGate_(params);
-  var data = _finRead_('LIA');
+  // 2026-09-01 owner decision: canonical tab is FINANCE (uppercase); LIA is
+  // the legacy name kept as fallback so an in-flight rename does not break
+  // production mid-migration. Both tabs exist in the current Finance
+  // spreadsheet (1AgpEq...). Reader prefers FINANCE when both exist so
+  // the owner can rename LIA -> FINANCE without any code change.
+  var data = _finReadFirst_(['FINANCE', 'LIA']);
   var from  = params.from ? new Date(params.from + 'T00:00:00+07:00').getTime() : 0;
   var to    = params.to   ? new Date(params.to   + 'T23:59:59+07:00').getTime() : Infinity;
   var jenis = String(params.jenis || '').toLowerCase();
@@ -845,7 +876,11 @@ function _finCabangList_(params) {
 // ─── Tagihan
 function _finTagihanList_(params) {
   _finRoleGate_(params);
-  var data = _finRead_('Tagihan');
+  // 2026-09-01 owner decision: canonical tab is 'Payment'; legacy 'Tagihan'
+  // and 'New Tagihan' kept as fallback. Reader prefers Payment when it
+  // exists so the owner can rename Tagihan -> Payment (or seed a fresh
+  // Payment tab) with no code change.
+  var data = _finReadFirst_(['Payment', 'New Tagihan', 'Tagihan']);
   var status = String(params.status || '').toLowerCase();
   var bulan  = String(params.bulan  || '');
   var search = String(params.search || '').toLowerCase();
@@ -894,8 +929,11 @@ function _finTagihanAdd_(params) {
   if (!body.Instansi || !body['No Tagihan']) return { success: false, message: 'no_tagihan + instansi wajib' };
 
   var ss = _finOpen_();
-  var sh = ss.getSheetByName('New Tagihan') || ss.getSheetByName('Tagihan');
-  if (!sh) return { success: false, message: 'Tab New Tagihan / Tagihan tidak ada' };
+  // 2026-09-01: canonical tab is now 'Payment'; keep legacy fallbacks so
+  // an in-flight migration (Payment created, legacy still populated for a
+  // while) does not lose writes.
+  var sh = ss.getSheetByName('Payment') || ss.getSheetByName('New Tagihan') || ss.getSheetByName('Tagihan');
+  if (!sh) return { success: false, message: 'Tab Payment / New Tagihan / Tagihan tidak ada' };
   var last = sh.getLastRow();
   var lastCol = sh.getLastColumn();
   var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h || '').trim(); });
@@ -912,8 +950,11 @@ function _finTagihanMarkPaid_(params) {
   var tglBayar = String(params.tgl_bayar || Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd')).trim();
 
   var ss = _finOpen_();
-  var sh = ss.getSheetByName('Tagihan');
-  if (!sh) return { success: false, message: 'Tab Tagihan tidak ada' };
+  // 2026-09-01: canonical tab is now 'Payment' (see finding #2 in
+  // AUDIT_SPREADSHEET_DIFF_20260901.md). Fallback to legacy 'Tagihan' so
+  // an in-flight rename does not break mark-paid mid-migration.
+  var sh = ss.getSheetByName('Payment') || ss.getSheetByName('Tagihan');
+  if (!sh) return { success: false, message: 'Tab Payment / Tagihan tidak ada' };
   var lastRow = sh.getLastRow();
   var lastCol = sh.getLastColumn();
   var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h || '').trim(); });

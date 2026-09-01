@@ -1,9 +1,12 @@
 # Spreadsheet Column-Diff Audit — 2026-09-01
 
-Read-only audit via Google Drive MCP (account `rifim`) against the two live spreadsheets used by Finance + Isi Saldo:
+Read-only audit via Google Drive MCP (account `rifim`) against the three live spreadsheets used by Finance + Isi Saldo:
 
-- **RIFIM OS DB** — `1jHeA-w1bM32S3-AU-ENN2UjiaCb4iLzRhaf4G7y4ozM`
-- **RAOS DB** — `1eYS2mM3Sy-BNAVGfp8BUHtsZuLiGDetnJeGw-AWk__8`
+- **RIFIM OS DB** — `1jHeA-w1bM32S3-AU-ENN2UjiaCb4iLzRhaf4G7y4ozM` (Smart Office DB, `documents`, `Rekap Fee Harian`, `system_log`, per-driver DBs)
+- **RAOS DB** — `1eYS2mM3Sy-BNAVGfp8BUHtsZuLiGDetnJeGw-AWk__8` (`Form Isi Saldo`, `MASTER TARGET`, `LOG SISTEM`)
+- **FINANCE DB** — `1AgpEqhpDU4BUxcN_i_jaF8Ccw6RwptV2TOJjyTCVPSo` (opened by `_finOpen_()`; holds `FINANCE`, `LIA`, `Tagihan`, `New Tagihan`, `TABEL HARIAN`, `TABEL BULANAN`, `SYSTEM LOG`, per-cabang ID Rifim tabs)
+
+**Correction (2026-09-01 same-day)**: the first version of this doc claimed `LIA` and `Tagihan` were missing. That was wrong — the audit was run against the RIFIM OS DB, but `_finOpen_()` points to the FINANCE DB (a separate spreadsheet, ID discovered later). Both tabs exist in the FINANCE DB. See finding #1 (corrected) and #2 (corrected) below.
 
 No writes. No row content beyond header + 1-2 sample rows.
 
@@ -30,27 +33,23 @@ Live tab list (RAOS): `ABSENSI, Antrian Driver, LOG ACTIVITY, LOG SISTEM, MASTER
 
 ## Findings
 
-### 🔴 FINDING #1 — `_finLedgerList_` reads non-existent tab `'LIA'`
+### ✅ FINDING #1 (CORRECTED) — `_finLedgerList_` reads `'LIA'`, tab EXISTS in FINANCE DB
 
-**File:** [automation/apps-script/crmApi.js:774](../automation/apps-script/crmApi.js:774)
-```js
-var data = _finRead_('LIA');
-```
-**Impact:** Every call to `finance_list` (Finance Dashboard main table) throws `Tab "LIA" tidak ada di Finance sheet`. `crmHandlePost` catches and returns `{success:false, code:'CRM_API_ERROR', message:'Tab "LIA" tidak ada'}` — this is JSON, not HTML, so it is a **DIFFERENT symptom** from the "GAS balas HTML" complaint but affects the same tab.
+**Original claim (wrong):** Tab `LIA` missing.
+**Correction:** Tab `LIA` exists in FINANCE DB (`1AgpEq...`, index 2). The original audit was run against RIFIM OS DB, not FINANCE DB — `_finOpen_()` returns FINANCE DB via `FINANCE_SHEET_ID` @ crmApi.js:736.
 
-**Root cause:** Either (a) tab was cleared/renamed by `PRE_LAUNCH_CLEANUP` on 2026-08-30 (see finding #4), or (b) the tab was never created for this deploy. Live tab list shows nothing beginning with "L" that plausibly maps — closest candidate is `LAPORAN_CABANG` but its shape is unknown; `_finLedgerList_` expects `Timestamp, Email, Pemasukan, Pengeluaran, Cabang, Keterangan, Bukti Foto, Nama Staff`.
+**Owner decision (2026-09-01):** rename LIA → **FINANCE** (canonical), keep LIA as fallback during migration.
+**Applied:** [crmApi.js:774](../automation/apps-script/crmApi.js:774) now uses `_finReadFirst_(['FINANCE', 'LIA'])` — prefers `FINANCE` if the owner renames/creates it, otherwise falls back to `LIA`. Both target tabs currently exist in the live sheet (`FINANCE` at index 0, `LIA` at index 2), so this is safe to deploy immediately.
 
-**Recommended fix:** Confirm intended sheet name with owner. Options: (a) create tab `LIA` and seed headers, (b) rename existing tab, (c) change code to point to the actual current tab (mis. `LAPORAN_CABANG` if that is the merge). Do not merge either — needs owner call.
+### ✅ FINDING #2 (CORRECTED) — `_finTagihanList_` reads `'Tagihan'`, tab EXISTS in FINANCE DB
 
-### 🔴 FINDING #2 — `_finTagihanList_` reads non-existent tab `'Tagihan'`
+**Original claim (wrong):** Tab `Tagihan` missing.
+**Correction:** Tab `Tagihan` exists in FINANCE DB (index 5), plus `New Tagihan` (index 6).
 
-**File:** [automation/apps-script/crmApi.js:848](../automation/apps-script/crmApi.js:848)
-```js
-var data = _finRead_('Tagihan');
-```
-**Impact:** Tab `Tagihan` in Finance Dashboard breaks the same way. Expected cols: `No Tagihan / No.Tagihan, Instansi, Tanggal Bayar / Tgl Bayar, Jumlah, Bulan, ...`. Live spreadsheet has NO tab called Tagihan.
+**Owner decision (2026-09-01):** rename Tagihan → **Payment** (canonical), keep legacy tabs as fallback.
+**Applied:** [crmApi.js:848](../automation/apps-script/crmApi.js:848) now uses `_finReadFirst_(['Payment', 'New Tagihan', 'Tagihan'])`. Owner needs to create a `Payment` tab (or rename existing `Tagihan` → `Payment`) with headers: `No Tagihan, Instansi, Tanggal Bayar, Jumlah, Bulan` (readers also accept `No.Tagihan` / `Tgl Bayar` variants). Until then, the existing `Tagihan` tab keeps working.
 
-**Recommended fix:** Same as #1 — confirm with owner then either create the tab, rename, or repoint the code.
+`_finTagihanAdd_` @ [crmApi.js:908](../automation/apps-script/crmApi.js:908) and `_finTagihanMarkPaid_` @ [crmApi.js:926](../automation/apps-script/crmApi.js:926) also updated to prefer `Payment` with legacy fallback so writes/updates track the same canonical target.
 
 ### 🟡 FINDING #3 — `PRE_LAUNCH_CLEANUP` wrote system_log row with column skip
 
@@ -91,13 +90,14 @@ Someone POSTed a body with unquoted JSON keys (`{action:menala_environment}` ins
 
 ---
 
-## Owner decisions needed before Phase 2 implementation
+## Owner decisions (2026-09-01)
 
-1. **Confirm intended source tab for Finance Dashboard main table** — is `LIA` a tab that got renamed, or was it never seeded? What should `_finLedgerList_` read from now?
-2. **Confirm intended source tab for Tagihan** — same question, but for `_finTagihanList_`.
-3. **Confirm `PRE_LAUNCH_CLEANUP` on 2026-08-30 was intentional** — otherwise trigger restore-from-backup path.
-4. **Ownership of `PRE_LAUNCH_CLEANUP` script** — so its log-write path can be normalised through `_gasLog()`.
+1. ✅ **Finance Dashboard main tab** → canonical `FINANCE`, legacy `LIA` as fallback. Applied.
+2. ✅ **Tagihan tab** → canonical `Payment`, legacy `New Tagihan` / `Tagihan` as fallback. Applied.
+3. ✅ **PRE_LAUNCH_CLEANUP was intentional** (owner: "buang aja"). No restore needed. Empty finance tables until fresh data flows.
+4. **PRE_LAUNCH_CLEANUP script log-write hygiene** — deferred to P2 cleanup (not blocking Phase 1 deploy).
 
-Once decided, produce Phase 2 patch:
-- Point `_finLedgerList_` and `_finTagihanList_` at real live tab names (or create the tabs).
-- Add a startup assertion in `_finRead_` that lists missing tabs from a known-required set at deploy time and pipes them to `system_log` at level=WARN, so this class of "tab missing" issue surfaces in the CI verify job (`finance_ping` follow-up).
+## Follow-up (not blocking)
+
+- Owner needs to either **rename** the existing `LIA` → `FINANCE` and `Tagihan` → `Payment` inside the FINANCE DB, or **leave as-is** — either way, the dual-tab fallback keeps working.
+- Add a startup assertion in `_finReadFirst_` that logs to `system_log` when the primary tab is missing and only the fallback resolved — so a silent rename-drift is visible without an outage.
