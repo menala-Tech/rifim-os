@@ -43,20 +43,33 @@ jobs:
           fetch-depth: 1
 
       - name: Probe finance_ping and compare to HEAD
+        # Uses Node's native fetch with `redirect: 'follow'` because Apps
+        # Script's /exec POST 302s to a googleusercontent GET endpoint that
+        # holds the actual response. curl -L -X POST on this chain fails --
+        # it either re-POSTs the body to the redirect target (which returns
+        # HTML "Maaf, saat ini tidak dapat membuka file") or sends a POST
+        # without Content-Length (HTTP 411). fetch handles the 302 by
+        # converting to GET while preserving the user_content_key -- same
+        # transport hris-contracts.js uses server-side.
         run: |
           set -euo pipefail
           HEAD_SHA="$(git rev-parse HEAD)"
           echo "Expected main HEAD: $HEAD_SHA"
 
-          # Follow redirects because Apps Script's /exec 302s through
-          # googleusercontent once for POST. Print status separately so a
-          # login-page redirect (which returns HTML with 200) is distinguishable
-          # from a real JSON response.
-          RESP="$(curl -sS -L \
-            -X POST "$GAS_EXEC_URL" \
-            -H 'Content-Type: text/plain;charset=utf-8' \
-            --max-time 30 \
-            -d '{"action":"finance_ping"}')"
+          RESP="$(node -e "
+            const url = process.argv[1];
+            (async () => {
+              const r = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'finance_ping' }),
+                redirect: 'follow',
+                signal: AbortSignal.timeout(30000),
+              });
+              const text = await r.text();
+              process.stdout.write(text);
+            })().catch(e => { console.error(e.message); process.exit(2); });
+          " "$GAS_EXEC_URL")"
 
           echo "Raw response (first 400 chars):"
           echo "${RESP:0:400}"
