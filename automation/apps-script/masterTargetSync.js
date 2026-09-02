@@ -135,9 +135,21 @@ function _mtParseNumber_(raw) {
   return isFinite(n) ? n : 0;
 }
 
-// "2026-09" -> "2026-09-01". Accepts also "2026-09-01" pass-through.
+// "2026-09" -> "2026-09-01". Accepts also "2026-09-01" pass-through, plus
+// Date objects (Google Sheets auto-parses cell values like "2026-09" into a
+// Date when the cell format is Date-typed -- observed in system_log rows
+// 65-69 on 2026-09-02: value came back as "Tue Sep 01 2026 00:00:00
+// GMT+0700 (Western Indonesia Time)" which is a Date.toString(), and the
+// old regex-only branch rejected it with bad_month_format).
+// GAS runtime honors appsscript.json timeZone=Asia/Jakarta, so getMonth()
+// resolves in Jakarta wall-clock and matches the sheet's stored month.
 // Returns null on garbage.
 function _mtNormalizeMonth_(raw) {
+  if (raw instanceof Date && !isNaN(raw.getTime())) {
+    var yy = raw.getFullYear();
+    var mm = raw.getMonth() + 1;
+    return yy + '-' + String(mm).padStart(2, '0') + '-01';
+  }
   var s = String(raw).trim();
   var m = s.match(/^(\d{4})-(\d{2})(?:-(\d{2}))?$/);
   if (!m) return null;
