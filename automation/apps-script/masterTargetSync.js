@@ -203,11 +203,22 @@ function _mtDone_(summary, note) {
   return Object.assign({ success: true, note: note }, summary);
 }
 
-// Parse "Rp110.000.000" | "Rp 40.000.000" | "18.000 scan" | "5000" -> integer.
+// Parse "Rp110.000.000" | "Rp 40.000.000" | "18.000 scan" | "5000" | Number -> integer.
+// BUG FIX 2026-09-04: sheet cell yang isinya formula (mis. Batam C3 =
+// B3/7 = 110000000/7 = 15714285.714285714) di-return getValues() sebagai
+// Number, bukan string. String(number) menghasilkan "15714285.714285714"
+// yang kalau di-strip semua dot jadi "15714285714285714" (15Q, digit
+// shift oleh decimal). Fix: detect typeof number FIRST → Math.round
+// langsung; string parsing hanya untuk display literal "Rp10.000.000".
 function _mtParseNumber_(raw) {
-  var s = String(raw).replace(/rp|scan|order|\s|\./gi, '').replace(/,/g, '');
+  if (typeof raw === 'number' && isFinite(raw)) return Math.round(raw);
+  var s = String(raw || '').replace(/rp|scan|order|\s/gi, '').trim();
+  if (!s) return 0;
+  // Format Indonesia: dot = thousand sep, comma = decimal.
+  // Strip dot (thousand), lalu treat comma sebagai decimal separator.
+  s = s.replace(/\./g, '').replace(/,/g, '.');
   var n = Number(s);
-  return isFinite(n) ? n : 0;
+  return isFinite(n) ? Math.round(n) : 0;
 }
 
 // Parse a cell value and infer unit mode. Returns { value: int, mode: 'saldo'|'order'|'scan'|null }.
