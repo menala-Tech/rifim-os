@@ -3,7 +3,15 @@
 if(!/\/hris(?:\/|$)/.test(String(location.pathname||'')))return;
 
 function session(){try{return JSON.parse(localStorage.getItem('rifim_auth')||'{}')||{}}catch(_){return{}}}
-function token(){return String(session().access_token||'')}
+// Hotfix 2026-09-03: pakai RifimPortalSession (auto-refresh via refresh_token)
+// supaya /api/internal/hris-v2 tidak kena 401 saat access_token 1-jam expired.
+function token(){
+  try{
+    var p=window.RifimPortalSession&&window.RifimPortalSession.read&&window.RifimPortalSession.read();
+    if(p&&p.access_token)return String(p.access_token);
+  }catch(_){}
+  return String(session().access_token||'');
+}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function money(n){return 'Rp '+Number(n||0).toLocaleString('id-ID')}
 function role(){var r=String((global.currentUser&&global.currentUser.role)||session().role||'').toLowerCase();return r==='direktur'?'direksi':r==='koord'?'koordinator':r==='mgmt'?'management':r}

@@ -4,7 +4,18 @@ if(!/\/hris(?:\/|$)/.test(String(location.pathname||'')))return;
 function session(){try{return JSON.parse(localStorage.getItem('rifim_auth')||'{}')||{}}catch(_){return{}}}
 function role(){var r=String((global.currentUser&&global.currentUser.role)||session().role||'').toLowerCase();return r==='direktur'?'direksi':r==='koord'?'koordinator':r==='mgmt'?'management':r}
 function canWrite(){return role()==='admin'||role()==='direksi'}
-function token(){return String(session().access_token||'')}
+// Hotfix 2026-09-03: gunakan RifimPortalSession.read() yang punya auto-refresh
+// via refresh_token, alih-alih baca access_token langsung dari localStorage
+// yang tidak pernah refresh dan bikin /api/internal/hris-v2 kena 401
+// "Session invalid" setelah 1 jam idle. Fallback ke session() lama supaya
+// tidak break kalau portal-session.js belum ke-load.
+function token(){
+  try{
+    var p=global.RifimPortalSession&&global.RifimPortalSession.read&&global.RifimPortalSession.read();
+    if(p&&p.access_token)return String(p.access_token);
+  }catch(_){}
+  return String(session().access_token||'');
+}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function money(n){return 'Rp '+Number(n||0).toLocaleString('id-ID')}
 function fmtDate(s){if(!s)return '–';try{return new Date(s).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})}catch(_){return s}}
