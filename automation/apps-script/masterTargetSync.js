@@ -70,15 +70,28 @@ function syncMasterTargetToSupabase() {
       for (var i = 0; i < rows1.length; i++) {
         var r = rows1[i];
         var cabang = String(r[0] || '').trim();
-        var rawCabang = String(r[1] || '').trim();
-        var rawStaff  = String(r[2] || '').trim();
-        var rawTier1  = String(r[3] || '').trim();
-        var rawTier2  = String(r[4] || '').trim();
+        // BUG FIX 2026-09-04 (v2.2): JANGAN String()-ify raw sebelum parser.
+        // Kalau cell isinya Number (Batam C3 = formula 110000000/7 =
+        // 15714285.714285714), stringify duluan bikin typeof === 'string'
+        // sampai parser, dan parser Number-branch (Math.round) tidak pernah
+        // kena. Solusi: preserve raw type. String-cast tetap dipakai HANYA
+        // untuk isBlank/isAdmin check + logging error.
+        var rawCabang = r[1];
+        var rawStaff  = r[2];
+        var rawTier1  = r[3];
+        var rawTier2  = r[4];
         var bulan     = r[5];
+        // Helper "kelihatan blank" — handle string kosong, null, undefined.
+        // Number 0 tetap dianggap non-blank supaya bisa upsert target=0.
+        var isBlank = function (v) {
+          if (v == null) return true;
+          if (typeof v === 'number') return false;
+          return String(v).trim() === '';
+        };
 
         if (!cabang) { runSummary.skipped_blank++; continue; }
         if (cabang.toLowerCase() === 'admin') { runSummary.skipped_admin++; continue; }
-        if (bulan === '' || bulan == null) { runSummary.skipped_blank++; continue; }
+        if (isBlank(bulan)) { runSummary.skipped_blank++; continue; }
 
         var branchId = slugMap[cabang];
         if (!branchId) {
@@ -95,9 +108,9 @@ function syncMasterTargetToSupabase() {
 
         var parsedCabang = _mtParseValueWithUnit_(rawCabang);
         var parsedStaff  = _mtParseValueWithUnit_(rawStaff);
-        // Kalau Target Cabang blank tapi row lain terisi, tetap tulis (target=0)
-        // supaya row ke-track — tapi kalau semuanya blank kecuali cabang+bulan, skip.
-        if (!rawCabang && !rawStaff && !rawTier1 && !rawTier2) {
+        var hasStaff = !isBlank(rawStaff);
+        // Kalau semuanya blank kecuali cabang+bulan, skip.
+        if (isBlank(rawCabang) && !hasStaff && isBlank(rawTier1) && isBlank(rawTier2)) {
           runSummary.skipped_blank++; continue;
         }
 
@@ -105,13 +118,13 @@ function syncMasterTargetToSupabase() {
           branch_id: branchId,
           effective_month: monthISO,
           target_cabang: parsedCabang.value,
-          target_staff: rawStaff ? parsedStaff.value : null,
+          target_staff: hasStaff ? parsedStaff.value : null,
           bonus_tier_1: _mtParseRupiah_(rawTier1),
           bonus_tier_2: _mtParseRupiah_(rawTier2),
           mode_cabang: parsedCabang.mode || 'saldo',
-          mode_staff: rawStaff ? (parsedStaff.mode || 'saldo') : null,
+          mode_staff: hasStaff ? (parsedStaff.mode || 'saldo') : null,
           mode: parsedCabang.mode || 'saldo', // legacy mirror
-          target_staff_default: rawStaff ? parsedStaff.value : null, // legacy mirror
+          target_staff_default: hasStaff ? parsedStaff.value : null, // legacy mirror
         };
 
         try {
@@ -136,11 +149,17 @@ function syncMasterTargetToSupabase() {
         for (var k = 0; k < rows2.length; k++) {
           var r2 = rows2[k];
           var cabang2 = String(r2[0] || '').trim();
-          var rawOrder = String(r2[1] || '').trim();
-          var rawSaldo = String(r2[2] || '').trim();
+          // BUG FIX v2.2: preserve raw type. isBlank helper same as PRIMARY.
+          var rawOrder = r2[1];
+          var rawSaldo = r2[2];
           var bulan2 = r2[3];
+          var isBlankFb = function (v) {
+            if (v == null) return true;
+            if (typeof v === 'number') return false;
+            return String(v).trim() === '';
+          };
 
-          if (!cabang2 || bulan2 === '' || bulan2 == null) { runSummary.skipped_blank++; continue; }
+          if (!cabang2 || isBlankFb(bulan2)) { runSummary.skipped_blank++; continue; }
           // FALLBACK whitelist: hanya row Soeta yang di-sync
           if (!_MT_FALLBACK_ONLY_SLUGS[cabang2]) { runSummary.skipped_fallback_not_soeta++; continue; }
           // Kalau PRIMARY sudah handle Soeta (owner tambah row Soeta di 1fcraq3 nanti), skip fallback
@@ -160,8 +179,8 @@ function syncMasterTargetToSupabase() {
           }
 
           var modeFb, valueFb;
-          if (rawOrder) { modeFb = 'order'; valueFb = _mtParseNumber_(rawOrder); }
-          else if (rawSaldo) { modeFb = 'saldo'; valueFb = _mtParseNumber_(rawSaldo); }
+          if (!isBlankFb(rawOrder)) { modeFb = 'order'; valueFb = _mtParseNumber_(rawOrder); }
+          else if (!isBlankFb(rawSaldo)) { modeFb = 'saldo'; valueFb = _mtParseNumber_(rawSaldo); }
           else { runSummary.skipped_blank++; continue; }
 
           var payloadFb = {
@@ -223,16 +242,25 @@ function _mtParseNumber_(raw) {
 
 // Parse a cell value and infer unit mode. Returns { value: int, mode: 'saldo'|'order'|'scan'|null }.
 // "Rp110.000.000" -> {110000000, 'saldo'}, "5000 order" -> {5000, 'order'},
-// "455 scan" -> {455, 'scan'}, "" -> {0, null}.
+// "455 scan" -> {455, 'scan'}, "" -> {0, null}, Number(15714285.714) -> {15714286, 'saldo'}.
+// BUG FIX 2026-09-04 v2.2: JANGAN stringify raw sebelum _mtParseNumber_.
+// Mode detection dari string (kalau raw string), tapi value parsing pakai
+// raw langsung supaya Number-path parser aktif untuk cell numeric (mis.
+// Batam C3 = formula divide → JS Number 15714285.714285714).
 function _mtParseValueWithUnit_(raw) {
-  var s = String(raw || '').trim();
-  if (!s) return { value: 0, mode: null };
-  var mode = null;
-  if (/rp/i.test(s)) mode = 'saldo';
-  else if (/scan/i.test(s)) mode = 'scan';
-  else if (/order/i.test(s)) mode = 'order';
-  else mode = 'saldo'; // default: numeric tanpa unit dianggap Rp
-  return { value: _mtParseNumber_(s), mode: mode };
+  if (raw == null || (typeof raw === 'string' && raw.trim() === '')) {
+    return { value: 0, mode: null };
+  }
+  // Mode detection: dari string kalau tersedia (unit tokens), else default saldo.
+  var mode = 'saldo';
+  if (typeof raw === 'string') {
+    var s = raw.trim();
+    if (/scan/i.test(s)) mode = 'scan';
+    else if (/order/i.test(s)) mode = 'order';
+    else if (/rp/i.test(s)) mode = 'saldo';
+  }
+  // Pass raw langsung — parser handle Number vs String di dalam.
+  return { value: _mtParseNumber_(raw), mode: mode };
 }
 
 // Parse Rupiah only ("Rp 1.500.000" -> 1500000). Kolom bonus_tier_* selalu Rp.
