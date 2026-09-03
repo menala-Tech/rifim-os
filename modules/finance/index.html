@@ -388,9 +388,17 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <span class="sink raos">👑 Owner logic: RAOS</span>
       </div>
       <div class="roadmap">
-        <strong>Aturan:</strong> Soeta &amp; Makassar pakai <code>mode=order</code> (target scan valid),
-        cabang lain <code>mode=saldo</code> (target nominal Rp). Bonus Saldo hanya berlaku untuk cabang
-        <code>mode=saldo</code>. Bonus KPI tetap dihitung untuk semua cabang berbasis driver assignment.
+        <strong>SSoT (v2 2026-09-04):</strong> Sheet
+        <a href="https://docs.google.com/spreadsheets/d/1fcraq3QHqIaD-13Ebzt6stT9aA6j_loTXeAtpNX12kw/edit?gid=1422434008" target="_blank" style="color:#facc15">MASTER TARGET</a>
+        di <code>DATABASE STAFF</code> — auto-sync ke Supabase tiap 5 menit.
+        <strong>Edit di PWA bersifat transient</strong> (di-overwrite sync berikutnya kalau nilai sheet beda).
+        <br>
+        <strong>Tier Bonus:</strong>
+        <em>Tier 1</em> = staff realisasi ≥ Target Staff → <code>bonus_tier_1</code> per staff;
+        <em>Tier 2</em> = cabang total ≥ Target Cabang → <code>bonus_tier_2</code> tambahan per staff.
+        <br>
+        <strong>Mode axes:</strong> Target Cabang &amp; Target Staff bisa punya unit beda per axis
+        (Makassar: cabang=<code>order</code>, staff=<code>scan</code>).
       </div>
 
       <div class="toolbar">
@@ -400,15 +408,17 @@ footer{text-align:center;padding:20px;font-size:11px;opacity:.4}
         <button class="btn small" id="tc-recompute">⚙️ Recompute Payroll Bulan Ini</button>
       </div>
 
-      <table class="tbl">
+      <table class="tbl" style="font-size:11px">
         <thead><tr>
-          <th>Cabang</th><th>Mode</th>
+          <th>Cabang</th><th>Mode Cabang</th><th>Mode Staff</th>
           <th style="text-align:right">Target Cabang</th>
-          <th style="text-align:right">Target Staff Default</th>
+          <th style="text-align:right">Target Staff</th>
+          <th style="text-align:right" title="Bonus per staff kalau staff realisasi ≥ Target Staff">Bonus T1</th>
+          <th style="text-align:right" title="Bonus tambahan per staff kalau cabang total ≥ Target Cabang">Bonus T2</th>
           <th>Update</th><th>Aksi</th>
         </tr></thead>
         <tbody id="tc-body">
-          <tr><td colspan="6"><div class="empty">Loading target cabang…</div></td></tr>
+          <tr><td colspan="9"><div class="empty">Loading target cabang…</div></td></tr>
         </tbody>
       </table>
     </div>
@@ -1499,56 +1509,64 @@ async function loadTargetCabang() {
   if (monthEl && !monthEl.value) {
     const d = new Date(); monthEl.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
   }
-  tb.innerHTML = '<tr><td colspan="6"><div class="empty">Loading target cabang…</div></td></tr>';
+  tb.innerHTML = '<tr><td colspan="9"><div class="empty">Loading target cabang…</div></td></tr>';
   try {
     const data = await _gasCall('finance_kpi_target_branch_list', { month: monthEl.value });
     if (!data.success) throw new Error(data.message || 'Gagal load');
-    if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="6"><div class="empty">Tidak ada cabang</div></td></tr>'; return; }
-    // Poin 12 (2026-08-07): Cabang mode='order' (Soeta/Makassar) tampil
-    // Target Cabang + Target Staff sebagai ANGKA scan count, bukan Rupiah.
-    // Bonus tetap Rupiah di tier hardcoded (tidak dipengaruhi mode).
-    const fmtTarget = (mode, v) => v == null ? '—' :
-      (mode === 'order' ? Number(v).toLocaleString('id-ID') + ' scan' : fmtRp(v));
+    if (!data.rows.length) { tb.innerHTML = '<tr><td colspan="9"><div class="empty">Tidak ada cabang</div></td></tr>'; return; }
+    // 2026-09-04 v2: mode bisa beda per axis (mode_cabang vs mode_staff).
+    // Contoh Makassar: mode_cabang='order' (5000), mode_staff='scan' (455).
+    // fmtTarget dispatch per-mode: saldo → Rp, order → "x order", scan → "x scan".
+    const fmtTarget = (mode, v) => {
+      if (v == null) return '—';
+      const n = Number(v).toLocaleString('id-ID');
+      if (mode === 'order') return n + ' order';
+      if (mode === 'scan')  return n + ' scan';
+      return fmtRp(v);
+    };
     // 2026-09-01: distinguish "belum di-set" (row absent for this month) from
     // "target = 0 (sengaja)". Reader folds missing rows to target_cabang=0,
     // so we rely on target_id being null to detect absence.
-    const fmtTargetOrMissing = (row, kind) => {
-      if (row.target_id == null) {
-        return '<span class="warn-missing" title="Belum di-set untuk bulan ini — payroll recompute akan diblokir sampai target di-input">belum di-set</span>';
-      }
-      return kind === 'cabang' ? fmtTarget(row.mode, row.target_cabang) : null;
+    const fmtMissing = () =>
+      '<span class="warn-missing" title="Belum di-set untuk bulan ini — payroll recompute akan diblokir sampai target di-input">belum di-set</span>';
+    const modePill = (mode) => {
+      const color = mode==='order' ? 'rgba(234,179,8,.2);color:#facc15'
+                  : mode==='scan'  ? 'rgba(168,85,247,.2);color:#c084fc'
+                  :                  'rgba(14,165,233,.2);color:#38bdf8';
+      return `<span style="padding:2px 8px;border-radius:8px;background:${color};font-size:10px;font-weight:600">${esc(mode || '—')}</span>`;
     };
-    // Poin 10 (2026-08-07): tampilkan target_staff_effective (auto-prorate kalau default null).
-    // Kalau auto-prorate, tambah badge "auto" biar user tahu asal angkanya.
     tb.innerHTML = data.rows.map(r => {
-      const staffVal = r.target_staff_effective != null ? r.target_staff_effective : r.target_staff_default;
-      const isAuto = r.target_staff_default == null && r.target_staff_auto_prorated != null;
       const isMissing = r.target_id == null;
-      // 2026-09-01: if this branch has no target row for the month, both
-      // Target Cabang and Target Staff read "belum di-set" -- clearer than
-      // the previous Rp 0 / 0 scan which hid the fact that nothing had
-      // been configured yet.
-      const cabangCell = isMissing
-        ? fmtTargetOrMissing(r, 'cabang')
-        : fmtTarget(r.mode, r.target_cabang);
-      const staffCell = isMissing
-        ? fmtTargetOrMissing(r, 'staff')
-        : (staffVal == null ? '—' : (
-            fmtTarget(r.mode, staffVal) +
-            (isAuto ? ` <span style="font-size:9px;color:#94a3b8;font-weight:400" title="Auto-prorate: ${fmtTarget(r.mode, r.target_cabang)} ÷ ${r.staff_count} staff">auto ÷${r.staff_count}</span>` : '')
-          ));
+      // Target Staff prioritas: sheet SSoT (r.target_staff) > PWA override
+      // (r.target_staff_default) > auto-prorate. GAS sudah kompose ke
+      // r.target_staff_effective, sini cuma render + badge asal.
+      const isAutoStaff = r.target_staff == null && r.target_staff_default == null && r.target_staff_auto_prorated != null;
+      const isSheetStaff = r.target_staff != null;
+      const cabangCell = isMissing ? fmtMissing() : fmtTarget(r.mode_cabang, r.target_cabang);
+      const staffCell = isMissing ? fmtMissing()
+        : (r.target_staff_effective == null ? '—'
+          : fmtTarget(r.mode_staff, r.target_staff_effective)
+            + (isSheetStaff ? ' <span style="font-size:9px;color:#4ade80;font-weight:400" title="Nilai dari sheet MASTER TARGET">sheet</span>' : '')
+            + (isAutoStaff  ? ` <span style="font-size:9px;color:#94a3b8;font-weight:400" title="Auto-prorate: ${fmtTarget(r.mode_cabang, r.target_cabang)} ÷ ${r.staff_count} staff">auto ÷${r.staff_count}</span>` : ''));
+      const tier1Cell = isMissing ? '—' : (Number(r.bonus_tier_1) > 0 ? fmtRp(r.bonus_tier_1)
+        : '<span style="color:#666" title="Belum di-set atau Rp 0">—</span>');
+      const tier2Cell = isMissing ? '—' : (Number(r.bonus_tier_2) > 0 ? fmtRp(r.bonus_tier_2)
+        : '<span style="color:#666" title="Belum di-set atau Rp 0">—</span>');
       return `
       <tr data-branch="${esc(r.branch_id)}"${isMissing ? ' class="row-missing-target"' : ''}>
         <td>${esc(r.branch_name)}${r.is_excluded_saldo ? ' <span style="font-size:9px;color:#facc15">(order)</span>' : ''}</td>
-        <td><span style="padding:2px 8px;border-radius:8px;background:${r.mode==='order'?'rgba(234,179,8,.2);color:#facc15':'rgba(14,165,233,.2);color:#38bdf8'};font-size:10px;font-weight:600">${esc(r.mode)}</span></td>
+        <td>${modePill(r.mode_cabang)}</td>
+        <td>${modePill(r.mode_staff)}</td>
         <td style="text-align:right;font-family:monospace">${cabangCell}</td>
         <td style="text-align:right;font-family:monospace">${staffCell}</td>
+        <td style="text-align:right;font-family:monospace">${tier1Cell}</td>
+        <td style="text-align:right;font-family:monospace">${tier2Cell}</td>
         <td style="font-size:10px;color:#888">${fmtDateTime(r.updated_at)}</td>
-        <td><button class="btn small" onclick="editTargetCabang('${esc(r.branch_id)}','${esc(r.branch_name)}',${r.target_cabang},${r.target_staff_default},'${esc(r.mode)}')">✏️ Edit</button></td>
+        <td><button class="btn small" onclick='editTargetCabangV2(${JSON.stringify(r).replace(/'/g,"&#39;")})'>✏️ Edit</button></td>
       </tr>`;
     }).join('');
   } catch (err) {
-    tb.innerHTML = `<tr><td colspan="6"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
+    tb.innerHTML = `<tr><td colspan="9"><div class="empty" style="color:#f87171">❌ ${err.message}</div></td></tr>`;
   }
 }
 // Generic editable modal — dinamis, terima array field config
@@ -1635,62 +1653,128 @@ function openEditModal(config) {
   }
 }
 
-async function editTargetCabang(branchId, branchName, currTarget, currStaffDefault, currMode) {
+// 2026-09-04 v2: modal edit yang mendukung bonus tier + target_staff sheet
+// + mode split (mode_cabang vs mode_staff). SSoT warning ditampilkan di
+// subtitle -- admin perlu tahu edit ini transient (sync 5 min overwrite).
+async function editTargetCabangV2(row) {
   const monthEl = document.getElementById('tc-month');
-  const isExcluded = /soeta|makassar/i.test(branchName);
+  const branchId = row.branch_id;
+  const branchName = row.branch_name;
+  const modeOpts = [
+    { value: 'saldo', label: 'Saldo (Rp)' },
+    { value: 'order', label: 'Order (scan valid)' },
+    { value: 'scan',  label: 'Scan (count)' },
+  ];
   openEditModal({
     title: '✏️ Edit Target Cabang — ' + branchName,
-    subtitle: 'Bulan efektif: <b>' + monthEl.value + '</b>. Soeta &amp; Makassar sebaiknya pakai mode=order (target scan valid).',
+    subtitle:
+      'Bulan efektif: <b>' + monthEl.value + '</b>.<br>' +
+      '<span style="color:#facc15">⚠️ SSoT sheet MASTER TARGET auto-sync tiap 5 menit</span> — ' +
+      'edit di sini akan di-<b>overwrite</b> saat sync berikutnya kalau nilai sheet beda. ' +
+      'Untuk permanen, edit di ' +
+      '<a href="https://docs.google.com/spreadsheets/d/1fcraq3QHqIaD-13Ebzt6stT9aA6j_loTXeAtpNX12kw/edit?gid=1422434008" target="_blank" style="color:#facc15">sheet</a>.',
     fields: [
       {
         name: 'target_cabang',
-        label: 'Target Cabang (Rp bulan ini)',
+        label: 'Target Cabang (angka, unit ikut Mode Cabang)',
         type: 'number',
-        value: currTarget || 0,
+        value: row.target_cabang || 0,
         required: true,
         hint: 'Total target agregat cabang untuk bulan ini',
       },
       {
-        name: 'target_staff_default',
-        label: 'Target Staff Default (Rp per staff)',
-        type: 'number',
-        value: currStaffDefault != null ? currStaffDefault : '',
-        nullable: true,
-        placeholder: 'Kosongkan = auto-prorate dari Target Cabang / jumlah staff',
-        hint: 'Kalau kosong, sistem akan bagi rata Target Cabang ke jumlah staff aktif',
+        name: 'mode_cabang',
+        label: 'Mode Cabang',
+        type: 'select',
+        value: row.mode_cabang || 'saldo',
+        options: modeOpts,
+        required: true,
       },
       {
-        name: 'mode',
-        label: 'Mode Pengukuran',
+        name: 'target_staff',
+        label: 'Target Staff (angka, unit ikut Mode Staff)',
+        type: 'number',
+        value: row.target_staff != null ? row.target_staff : '',
+        nullable: true,
+        placeholder: 'Kosongkan = fallback ke target_staff_default / auto-prorate',
+        hint: 'SSoT dari sheet kolom C. Kalau kosong, sistem pakai target_staff_default atau auto-prorate.',
+      },
+      {
+        name: 'mode_staff',
+        label: 'Mode Staff (bisa beda dari Mode Cabang — contoh Makassar: cabang order, staff scan)',
         type: 'select',
-        value: currMode || (isExcluded ? 'order' : 'saldo'),
-        options: [
-          { value: 'saldo', label: 'Saldo (nominal Rp) — cabang non-Soeta/Makassar' },
-          { value: 'order', label: 'Order (scan valid) — Soeta & Makassar' },
-        ],
+        value: row.mode_staff || row.mode_cabang || 'saldo',
+        options: modeOpts,
         required: true,
+      },
+      {
+        name: 'bonus_tier_1',
+        label: 'Bonus Tier 1 (Rp per staff, kalau staff hit Target Staff)',
+        type: 'number',
+        value: row.bonus_tier_1 || 0,
+        hint: 'Contoh: Rp 1.500.000',
+      },
+      {
+        name: 'bonus_tier_2',
+        label: 'Bonus Tier 2 (Rp tambahan per staff, kalau cabang hit Target Cabang)',
+        type: 'number',
+        value: row.bonus_tier_2 || 0,
+        hint: 'Contoh: Rp 500.000. Additive di atas Tier 1.',
+      },
+      {
+        name: 'target_staff_default',
+        label: 'Target Staff Default (legacy override, opsional)',
+        type: 'number',
+        value: row.target_staff_default != null ? row.target_staff_default : '',
+        nullable: true,
+        placeholder: 'Legacy — hanya dipakai kalau Target Staff (sheet) kosong',
+        hint: 'Fallback lama sebelum kolom target_staff v2. Biarkan kosong kalau bingung.',
       },
     ],
     onSave: async (payload) => {
       const data = await _gasCall('finance_kpi_target_branch_upsert', {
         branch_id: branchId, month: monthEl.value,
         target_cabang: payload.target_cabang,
+        target_staff: payload.target_staff == null ? '' : payload.target_staff,
         target_staff_default: payload.target_staff_default == null ? '' : payload.target_staff_default,
-        mode: payload.mode,
+        bonus_tier_1: payload.bonus_tier_1 || 0,
+        bonus_tier_2: payload.bonus_tier_2 || 0,
+        mode: payload.mode_cabang,           // legacy mirror
+        mode_cabang: payload.mode_cabang,
+        mode_staff: payload.mode_staff,
       });
       if (!data.success) throw new Error(data.message);
-      showToast('✅ Target ' + branchName + ' tersimpan', 'ok');
+      showToast('✅ Target ' + branchName + ' tersimpan (⚠️ transient sampai sync berikutnya)', 'ok');
       loadTargetCabang();
     },
     onDelete: async () => {
+      if (!confirm('Reset SEMUA field target/bonus ' + branchName + ' ke 0 untuk bulan ' + monthEl.value + '?\n(Sync berikutnya bisa isi ulang dari sheet)')) return;
       const data = await _gasCall('finance_kpi_target_branch_upsert', {
         branch_id: branchId, month: monthEl.value,
-        target_cabang: 0, target_staff_default: '', mode: currMode || 'saldo',
+        target_cabang: 0, target_staff: '', target_staff_default: '',
+        bonus_tier_1: 0, bonus_tier_2: 0,
+        mode: row.mode_cabang || 'saldo',
+        mode_cabang: row.mode_cabang || 'saldo',
+        mode_staff: row.mode_staff || row.mode_cabang || 'saldo',
       });
       if (!data.success) throw new Error(data.message);
       showToast('✅ Target ' + branchName + ' di-reset ke 0', 'ok');
       loadTargetCabang();
     },
+  });
+}
+
+// Backward-compat wrapper — dipakai kalau ada UI lain yang masih panggil
+// dgn signature lama (branchId, branchName, currTarget, currStaffDefault, currMode).
+// Deprecated: prefer editTargetCabangV2(row) yang dapat full row object.
+async function editTargetCabang(branchId, branchName, currTarget, currStaffDefault, currMode) {
+  return editTargetCabangV2({
+    branch_id: branchId, branch_name: branchName,
+    target_cabang: currTarget, target_staff: null,
+    target_staff_default: currStaffDefault,
+    bonus_tier_1: 0, bonus_tier_2: 0,
+    mode_cabang: currMode, mode_staff: currMode, mode: currMode,
+    is_excluded_saldo: /soeta|makassar/i.test(branchName),
   });
 }
 async function computePayrollForMonth() {
