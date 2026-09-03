@@ -3,7 +3,7 @@
 
   if (global.document && !global.document.querySelector('script[data-rifim-fixed-shell]')) {
     const fixedShell = global.document.createElement('script')
-    fixedShell.src = '/shared/fixed-module-shell.js?v=20260818-fixed-1'
+    fixedShell.src = '/shared/fixed-module-shell.js?v=20260903-fixed-2'
     fixedShell.async = false
     fixedShell.setAttribute('data-rifim-fixed-shell', '1')
     global.document.head.appendChild(fixedShell)
