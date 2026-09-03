@@ -2,9 +2,30 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-08-18 (P0 HRIS/branding audit — local sync-recovery + minimal fix, belum di-commit)
+> Last updated: 2026-09-04 (MASTER TARGET v2 — bonus tier + split mode, PR #116 pending merge)
 
-## Sesi 2026-08-18 — P0 HRIS/PKWT/Branding: audit ulang setelah temuan stale checkout
+## Sesi 2026-09-04 — MASTER TARGET v2 (bonus tier + split mode)
+
+SSoT MASTER TARGET pindah dari RAOS Master `1eYS…` (OLD 4-kolom) ke DATABASE STAFF `1fcraq3…` (NEW 6-kolom: Cabang, Target Cabang, Target Staff, Bonus Tier 1, Bonus Tier 2, Bulan Aktif). Writer dua-pass: PRIMARY 1fcraq3 (8 cabang, semua field baru), FALLBACK 1eYS whitelist Soeta only (belum ada di sheet baru).
+
+**Supabase (applied PROD):** migration `20260904000000_master_target_v2_bonus_tier` — ADD `target_staff bigint`, `bonus_tier_1 numeric`, `bonus_tier_2 numeric`, `mode_cabang text`, `mode_staff text` + backfill `mode_cabang := mode`. Kolom `mode` legacy dipertahankan, di-mirror writer.
+
+**Tier semantics locked:** Tier 1 = staff hit `target_staff` → `bonus_tier_1` per staff; Tier 2 = cabang hit `target_cabang` → `bonus_tier_2` tambahan per staff.
+
+**Mode axes:** `mode_cabang` = unit Target Cabang, `mode_staff` = unit Target Staff. Case Makassar `mode_cabang='order'` (5000), `mode_staff='scan'` (455) — dua axis beda unit dalam 1 row.
+
+**Sheet edit:** kolom F `Bulan Aktif` added ke `1fcraq3/MASTER TARGET`, pre-filled `2026-09` untuk 8 cabang (skip Admin).
+
+**Post-merge deploy checklist:**
+1. `cd automation/apps-script && clasp push --force` (auto-mode block Claude, owner manual)
+2. GAS Editor → run `syncMasterTargetToSupabase`, verify 9 rows Supabase aktif bulan berjalan
+3. Trigger 5-min sudah installed sesi 2026-09-03, tidak perlu re-install
+
+**Follow-up (bukan blocker):** PWA Finance Target Cabang belum baca kolom baru — sekarang cuma display `target_cabang + mode`. Update UI di PR terpisah.
+
+## Sesi 2026-08-18 — P0 HRIS/PKWT/Branding: audit ulang setelah temuan stale checkout (arsip)
+
+### Detail arsip sesi 2026-08-18
 
 **PENTING — insiden yang terjadi sesi ini**: local checkout repo ini sempat
 **107 commit ketinggalan** dari `origin/main` tanpa disadari di awal sesi.
