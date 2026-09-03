@@ -104,26 +104,43 @@ function install(){
   if(document.getElementById('rifim-fixed-module-shell')){
     ensureTableHeaderCss();ensureTableFreezeSync();ensureModuleRuntimeHotfix();ensureSessionFetch();ensureFinanceAutoRecompute();ensureHrisPreactivationEntry();ensureHrisPreviewGuard();return;
   }
+  // 2026-09-03: compact header + tabs across modules supaya lebih banyak
+  // table row terlihat di viewport pertama. Penurunan tinggi berkisar 18-40px
+  // per modul. Font-size header shell dikecilkan lewat targeted selectors,
+  // KPI card padding juga dipangkas.
   if(/^\/finance(?:\/|$)/.test(p))css(`
- :root{--rifim-head:58px;--rifim-tabs:46px}
- #app>header{position:fixed!important;top:0!important;left:0!important;right:0!important;width:100%!important;z-index:9990!important;height:var(--rifim-head)!important;min-height:var(--rifim-head)!important}
- main{padding-top:calc(var(--rifim-head) + var(--rifim-tabs) + 14px)!important}
- main>.tabs,.tabs{position:fixed!important;top:var(--rifim-head)!important;left:0!important;right:0!important;width:100%!important;margin:0!important;z-index:9980!important;height:var(--rifim-tabs)!important;min-height:var(--rifim-tabs)!important}
- @media(max-width:900px){:root{--rifim-head:54px;--rifim-tabs:44px}}
+ :root{--rifim-head:46px;--rifim-tabs:36px}
+ #app>header{position:fixed!important;top:0!important;left:0!important;right:0!important;width:100%!important;z-index:9990!important;height:var(--rifim-head)!important;min-height:var(--rifim-head)!important;padding-top:4px!important;padding-bottom:4px!important}
+ #app>header,#app>header *{font-size:13px!important}
+ #app>header h1,#app>header .brand,#app>header [class*=title]{font-size:15px!important}
+ main{padding-top:calc(var(--rifim-head) + var(--rifim-tabs) + 8px)!important}
+ main>.tabs,.tabs{position:fixed!important;top:var(--rifim-head)!important;left:0!important;right:0!important;width:100%!important;margin:0!important;z-index:9980!important;height:var(--rifim-tabs)!important;min-height:var(--rifim-tabs)!important;font-size:13px!important}
+ main .stat,main .kpi,main [class*=card]{padding:8px 12px!important}
+ main .stat h3,main .kpi h3,main [class*=card] h3{font-size:11px!important;margin:0 0 2px!important}
+ main .stat .val,main .kpi .val{font-size:18px!important;line-height:1.1!important}
+ @media(max-width:900px){:root{--rifim-head:42px;--rifim-tabs:34px}}
  `);
   else if(/^\/hris(?:\/|$)/.test(p))css(`
- #app>header{position:fixed!important;top:0!important;left:0!important;right:0!important;width:100%!important;z-index:9990!important}
- #app>nav{position:fixed!important;top:56px!important;left:0!important;right:0!important;width:100%!important;z-index:9980!important}
- #app>main,main{padding-top:132px!important}
+ #app>header{position:fixed!important;top:0!important;left:0!important;right:0!important;width:100%!important;z-index:9990!important;height:44px!important;min-height:44px!important;padding-top:4px!important;padding-bottom:4px!important}
+ #app>header,#app>header *{font-size:13px!important}
+ #app>header h1,#app>header .brand{font-size:15px!important}
+ #app>nav{position:fixed!important;top:44px!important;left:0!important;right:0!important;width:100%!important;z-index:9980!important;height:38px!important;min-height:38px!important;font-size:13px!important}
+ #app>main,main{padding-top:90px!important}
+ main .stat,main .kpi,main .card{padding:8px 12px!important}
+ main .stat h3,main .kpi h3,main .card h3{font-size:11px!important;margin:0 0 2px!important}
+ main .stat .val,main .kpi .val,main .card .val{font-size:18px!important;line-height:1.1!important}
  `);
   else if(/^\/smart-office(?:\/|$)/.test(p))css(`
- .topnav{position:fixed!important;top:0!important;left:0!important;right:0!important;width:100%!important;z-index:9990!important}
- .layout{padding-top:var(--topnav-h)!important}
- .main .tabs{position:sticky!important;top:0!important;z-index:9980!important}
+ :root{--topnav-h:44px!important}
+ .topnav{position:fixed!important;top:0!important;left:0!important;right:0!important;width:100%!important;z-index:9990!important;height:44px!important;min-height:44px!important;padding-top:4px!important;padding-bottom:4px!important;font-size:13px!important}
+ .layout{padding-top:44px!important}
+ .main .tabs{position:sticky!important;top:0!important;z-index:9980!important;font-size:13px!important;height:36px!important;min-height:36px!important}
  `);
   else if(/^\/sistem(?:\/|$)/.test(p))css(`
- #app>header{position:fixed!important;top:0!important;left:0!important;right:0!important;width:100%!important;z-index:9990!important;height:86px!important;min-height:86px!important;padding-top:4px!important;padding-bottom:4px!important}
- #app>main{padding-top:110px!important}
+ #app>header{position:fixed!important;top:0!important;left:0!important;right:0!important;width:100%!important;z-index:9990!important;height:64px!important;min-height:64px!important;padding-top:4px!important;padding-bottom:4px!important}
+ #app>header,#app>header *{font-size:13px!important}
+ #app>header h1{font-size:15px!important}
+ #app>main{padding-top:78px!important}
  `);
   ensureTableHeaderCss();
   ensureTableFreezeSync();
@@ -134,5 +151,5 @@ function install(){
   ensureHrisPreviewGuard();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
-global.RifimFixedModuleShell={version:'1.7.0-session-fetch',install:install};
+global.RifimFixedModuleShell={version:'1.8.0-compact-header',install:install};
 })(window);
