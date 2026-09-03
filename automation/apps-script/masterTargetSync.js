@@ -1,113 +1,189 @@
 /**
- * MASTER TARGET → raos_kpi_targets_branch SYNC (2026-09-02)
+ * MASTER TARGET → raos_kpi_targets_branch SYNC (v2 2026-09-04)
  *
- * Owner decision (audit sinkronisasi 2026-09-02): sheet `MASTER TARGET` di
- * RAOS Master Spreadsheet (1eYS...) adalah SSoT untuk target KPI bulanan
- * per-cabang. Owner edit di sheet (Excel-like), Finance dashboard baca dari
- * Supabase table `raos_kpi_targets_branch`. Sebelum ini tidak ada sync --
- * dua sumber bisa drift, Finance render "Rp 0" saat sheet punya nilai.
+ * SSoT migration (owner decision 2026-09-04): pindah dari RAOS Master
+ * spreadsheet (1eYS…, 4-kolom OLD schema) ke DATABASE STAFF spreadsheet
+ * (1fcraq3…, 6-kolom NEW schema Target Cabang + Target Staff + Bonus Tier 1
+ * + Bonus Tier 2 + Bulan Aktif). Soeta belum ada di sheet baru → fallback
+ * baca dari RAOS Master hanya untuk row Soeta (target scan cabang saja, tanpa
+ * tier bonus). Dua-pass sync dalam satu ScriptLock.
  *
- * Sheet schema (RAOS 1eYS... tab "MASTER TARGET"):
- *   A: Cabang               (e.g. "ID Rifim Airport Batam" -- matches branches.slug)
- *   B: Target Order (Scan)  (e.g. "18.000 scan", "5.000 scan", or empty)
- *   C: Target Saldo (Rp)    (e.g. "Rp110.000.000", "Rp 40.000.000", or empty)
- *   D: Bulan Aktif          (e.g. "2026-09"; empty rows are skipped)
+ * PRIMARY sheet schema (DATABASE STAFF 1fcraq3, tab "MASTER TARGET"):
+ *   A: Cabang         ("ID Rifim Airport Batam" — matches branches.slug)
+ *   B: Target Cabang  ("Rp110.000.000" | "5000 order" | "18000 scan")
+ *   C: Target Staff   ("Rp15.714.286"  | "300 order"  | "455 scan")
+ *   D: Bonus Tier 1   ("Rp 1.500.000") — bonus per-staff kalau target_staff tercapai
+ *   E: Bonus Tier 2   ("Rp 500.000")   — bonus tambahan kalau target_cabang tercapai
+ *   F: Bulan Aktif    ("2026-09" | Date-typed cell)
+ *
+ * FALLBACK sheet schema (RAOS Master 1eYS, tab "MASTER TARGET" OLD 4-kolom):
+ *   A: Cabang, B: Target Order (Scan), C: Target Saldo, D: Bulan Aktif
+ *   Hanya row "ID Rifim Airport Soeta" yang di-sync dari sini (branches lain
+ *   di-skip supaya tidak override nilai baru dari PRIMARY sheet).
  *
  * Sync rules:
- *   - Row skipped if `Cabang` blank OR `Bulan Aktif` blank
- *   - Cabang lookup: branches.slug = Cabang (exact match, case-sensitive
- *     because slug is the canonical join key everywhere else)
- *   - Mode inference: if Target Order has value -> mode='order'
- *                     elif Target Saldo has value -> mode='saldo'
- *                     else skip (both empty means row is unset)
- *   - Value parsing:
- *       "18.000 scan"       -> 18000
- *       "Rp110.000.000"     -> 110000000
- *       "Rp 40.000.000"     -> 40000000
- *   - Bulan Aktif "2026-09" -> effective_month = "2026-09-01" (first-of-month
- *     canonical, matches _finKpiTargetBranchUpsert_ elsewhere)
- *   - Upsert on (branch_id, effective_month) -- one target row per month
+ *   - PRIMARY: skip row kalau Cabang blank, Cabang='Admin', atau Bulan Aktif blank
+ *   - PRIMARY: parse per-cell unit (Rp → saldo, "order" → order, "scan" → scan);
+ *              mode_cabang = unit Target Cabang, mode_staff = unit Target Staff
+ *   - FALLBACK: hanya row Soeta di-upsert; bonus_tier_1/2 = 0 (tidak ada kolom di sheet lama)
+ *   - Upsert on (branch_id, effective_month) — Prefer resolution=merge-duplicates
+ *   - Kolom `mode` legacy di-mirror dari mode_cabang untuk backcompat
  *
- * Trigger: install via `installMasterTargetSyncTrigger()` -- runs every 5 min
- * so admin edits propagate quickly. Wrapped in _gasWithLock so overlapping
- * runs coalesce. Logs summary to system_log for audit.
+ * Trigger: `installMasterTargetSyncTrigger()` — every 5 min. Wrapped in
+ * _gasWithLock. Logs summary ke system_log.
  *
- * Read-only from sheet side; only writes to Supabase.
+ * Read-only dari sheet, hanya write ke Supabase.
  */
 
-var _MT_SHEET_ID = '1eYS2mM3Sy-BNAVGfp8BUHtsZuLiGDetnJeGw-AWk__8';
-var _MT_TAB_NAME = 'MASTER TARGET';
+var _MT_PRIMARY_SHEET_ID  = '1fcraq3QHqIaD-13Ebzt6stT9aA6j_loTXeAtpNX12kw'; // DATABASE STAFF
+var _MT_FALLBACK_SHEET_ID = '1eYS2mM3Sy-BNAVGfp8BUHtsZuLiGDetnJeGw-AWk__8'; // RAOS Master
+var _MT_TAB_NAME          = 'MASTER TARGET';
+var _MT_FALLBACK_ONLY_SLUGS = { 'ID Rifim Airport Soeta': true }; // whitelist row Soeta
 
 function syncMasterTargetToSupabase() {
   return _gasWithLock(function () {
-    var runSummary = { scanned: 0, upserted: 0, skipped_blank: 0, skipped_unmapped: 0, errors: [] };
+    var runSummary = {
+      scanned_primary: 0, scanned_fallback: 0,
+      upserted: 0, skipped_blank: 0, skipped_unmapped: 0,
+      skipped_admin: 0, skipped_fallback_not_soeta: 0,
+      errors: [],
+    };
 
-    // 1. Read sheet
-    var ss = SpreadsheetApp.openById(_MT_SHEET_ID);
-    var sh = ss.getSheetByName(_MT_TAB_NAME);
-    if (!sh) throw new Error('Tab "' + _MT_TAB_NAME + '" not found in RAOS Master Spreadsheet');
-    var last = sh.getLastRow();
-    if (last < 2) return _mtDone_(runSummary, 'empty_sheet');
-    var rows = sh.getRange(2, 1, last - 1, 4).getValues();
-    runSummary.scanned = rows.length;
-
-    // 2. Lookup branches once (name -> id, slug -> id)
+    // Lookup branches once (slug -> id)
     var branches = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug');
     if (!Array.isArray(branches)) throw new Error('branches lookup failed');
     var slugMap = {};
     branches.forEach(function (b) { if (b.slug) slugMap[b.slug] = b.id; });
 
-    // 3. Build upsert payload rows
-    var toUpsert = [];
-    for (var i = 0; i < rows.length; i++) {
-      var r = rows[i];
-      var cabang = String(r[0] || '').trim();
-      var rawOrder = String(r[1] || '').trim();
-      var rawSaldo = String(r[2] || '').trim();
-      var bulan = String(r[3] || '').trim();
+    // Track cabang yang sudah dihandle PRIMARY supaya FALLBACK tidak override
+    var handledSlugs = {};
 
-      if (!cabang || !bulan) { runSummary.skipped_blank++; continue; }
+    // ===== PASS 1: PRIMARY (DATABASE STAFF 1fcraq3 NEW schema) =====
+    var ss1 = SpreadsheetApp.openById(_MT_PRIMARY_SHEET_ID);
+    var sh1 = ss1.getSheetByName(_MT_TAB_NAME);
+    if (!sh1) throw new Error('Tab "' + _MT_TAB_NAME + '" not found in PRIMARY sheet');
+    var last1 = sh1.getLastRow();
+    if (last1 >= 2) {
+      var rows1 = sh1.getRange(2, 1, last1 - 1, 6).getValues();
+      runSummary.scanned_primary = rows1.length;
 
-      var branchId = slugMap[cabang];
-      if (!branchId) { runSummary.skipped_unmapped++;
-        runSummary.errors.push({ row: i + 2, cabang: cabang, reason: 'no_branch_match' });
-        continue;
+      for (var i = 0; i < rows1.length; i++) {
+        var r = rows1[i];
+        var cabang = String(r[0] || '').trim();
+        var rawCabang = String(r[1] || '').trim();
+        var rawStaff  = String(r[2] || '').trim();
+        var rawTier1  = String(r[3] || '').trim();
+        var rawTier2  = String(r[4] || '').trim();
+        var bulan     = r[5];
+
+        if (!cabang) { runSummary.skipped_blank++; continue; }
+        if (cabang.toLowerCase() === 'admin') { runSummary.skipped_admin++; continue; }
+        if (bulan === '' || bulan == null) { runSummary.skipped_blank++; continue; }
+
+        var branchId = slugMap[cabang];
+        if (!branchId) {
+          runSummary.skipped_unmapped++;
+          runSummary.errors.push({ pass: 'primary', row: i + 2, cabang: cabang, reason: 'no_branch_match' });
+          continue;
+        }
+
+        var monthISO = _mtNormalizeMonth_(bulan);
+        if (!monthISO) {
+          runSummary.errors.push({ pass: 'primary', row: i + 2, cabang: cabang, reason: 'bad_month_format', value: String(bulan) });
+          continue;
+        }
+
+        var parsedCabang = _mtParseValueWithUnit_(rawCabang);
+        var parsedStaff  = _mtParseValueWithUnit_(rawStaff);
+        // Kalau Target Cabang blank tapi row lain terisi, tetap tulis (target=0)
+        // supaya row ke-track — tapi kalau semuanya blank kecuali cabang+bulan, skip.
+        if (!rawCabang && !rawStaff && !rawTier1 && !rawTier2) {
+          runSummary.skipped_blank++; continue;
+        }
+
+        var payload = {
+          branch_id: branchId,
+          effective_month: monthISO,
+          target_cabang: parsedCabang.value,
+          target_staff: rawStaff ? parsedStaff.value : null,
+          bonus_tier_1: _mtParseRupiah_(rawTier1),
+          bonus_tier_2: _mtParseRupiah_(rawTier2),
+          mode_cabang: parsedCabang.mode || 'saldo',
+          mode_staff: rawStaff ? (parsedStaff.mode || 'saldo') : null,
+          mode: parsedCabang.mode || 'saldo', // legacy mirror
+          target_staff_default: rawStaff ? parsedStaff.value : null, // legacy mirror
+        };
+
+        try {
+          _mtUpsertOne_(payload);
+          runSummary.upserted++;
+          handledSlugs[cabang] = true;
+        } catch (e) {
+          runSummary.errors.push({ pass: 'primary', row: 'upsert', payload: payload, reason: String(e && e.message || e) });
+        }
       }
-
-      var mode, targetCabang;
-      if (rawOrder) {
-        mode = 'order';
-        targetCabang = _mtParseNumber_(rawOrder);
-      } else if (rawSaldo) {
-        mode = 'saldo';
-        targetCabang = _mtParseNumber_(rawSaldo);
-      } else {
-        runSummary.skipped_blank++; continue;
-      }
-
-      var monthISO = _mtNormalizeMonth_(bulan);
-      if (!monthISO) {
-        runSummary.errors.push({ row: i + 2, cabang: cabang, reason: 'bad_month_format', value: bulan });
-        continue;
-      }
-
-      toUpsert.push({
-        branch_id: branchId,
-        effective_month: monthISO,
-        target_cabang: targetCabang,
-        target_staff_default: null,
-        mode: mode,
-      });
     }
 
-    // 4. Upsert one-by-one (Supabase REST upsert requires unique constraint
-    //    on (branch_id, effective_month) -- rely on Prefer: resolution=merge)
-    for (var j = 0; j < toUpsert.length; j++) {
-      try {
-        _mtUpsertOne_(toUpsert[j]);
-        runSummary.upserted++;
-      } catch (e) {
-        runSummary.errors.push({ row: 'upsert', payload: toUpsert[j], reason: String(e && e.message || e) });
+    // ===== PASS 2: FALLBACK (RAOS Master 1eYS OLD schema, hanya Soeta) =====
+    var ss2 = SpreadsheetApp.openById(_MT_FALLBACK_SHEET_ID);
+    var sh2 = ss2.getSheetByName(_MT_TAB_NAME);
+    if (sh2) {
+      var last2 = sh2.getLastRow();
+      if (last2 >= 2) {
+        var rows2 = sh2.getRange(2, 1, last2 - 1, 4).getValues();
+        runSummary.scanned_fallback = rows2.length;
+
+        for (var k = 0; k < rows2.length; k++) {
+          var r2 = rows2[k];
+          var cabang2 = String(r2[0] || '').trim();
+          var rawOrder = String(r2[1] || '').trim();
+          var rawSaldo = String(r2[2] || '').trim();
+          var bulan2 = r2[3];
+
+          if (!cabang2 || bulan2 === '' || bulan2 == null) { runSummary.skipped_blank++; continue; }
+          // FALLBACK whitelist: hanya row Soeta yang di-sync
+          if (!_MT_FALLBACK_ONLY_SLUGS[cabang2]) { runSummary.skipped_fallback_not_soeta++; continue; }
+          // Kalau PRIMARY sudah handle Soeta (owner tambah row Soeta di 1fcraq3 nanti), skip fallback
+          if (handledSlugs[cabang2]) { runSummary.skipped_fallback_not_soeta++; continue; }
+
+          var branchId2 = slugMap[cabang2];
+          if (!branchId2) {
+            runSummary.skipped_unmapped++;
+            runSummary.errors.push({ pass: 'fallback', row: k + 2, cabang: cabang2, reason: 'no_branch_match' });
+            continue;
+          }
+
+          var monthISO2 = _mtNormalizeMonth_(bulan2);
+          if (!monthISO2) {
+            runSummary.errors.push({ pass: 'fallback', row: k + 2, cabang: cabang2, reason: 'bad_month_format', value: String(bulan2) });
+            continue;
+          }
+
+          var modeFb, valueFb;
+          if (rawOrder) { modeFb = 'order'; valueFb = _mtParseNumber_(rawOrder); }
+          else if (rawSaldo) { modeFb = 'saldo'; valueFb = _mtParseNumber_(rawSaldo); }
+          else { runSummary.skipped_blank++; continue; }
+
+          var payloadFb = {
+            branch_id: branchId2,
+            effective_month: monthISO2,
+            target_cabang: valueFb,
+            target_staff: null,
+            bonus_tier_1: 0,
+            bonus_tier_2: 0,
+            mode_cabang: modeFb,
+            mode_staff: null,
+            mode: modeFb,
+            target_staff_default: null,
+          };
+
+          try {
+            _mtUpsertOne_(payloadFb);
+            runSummary.upserted++;
+          } catch (e) {
+            runSummary.errors.push({ pass: 'fallback', row: 'upsert', payload: payloadFb, reason: String(e && e.message || e) });
+          }
+        }
       }
     }
 
@@ -118,32 +194,44 @@ function syncMasterTargetToSupabase() {
 function _mtDone_(summary, note) {
   try {
     _gasLog('masterTargetSync', 'run', 'INFO',
-      note + ': scanned=' + summary.scanned + ' upserted=' + summary.upserted
-      + ' skipped_blank=' + summary.skipped_blank + ' skipped_unmapped=' + summary.skipped_unmapped
-      + ' errors=' + summary.errors.length,
+      note + ': primary=' + summary.scanned_primary + ' fallback=' + summary.scanned_fallback
+      + ' upserted=' + summary.upserted + ' blank=' + summary.skipped_blank
+      + ' unmapped=' + summary.skipped_unmapped + ' admin=' + summary.skipped_admin
+      + ' fb_skipped=' + summary.skipped_fallback_not_soeta + ' errors=' + summary.errors.length,
       summary);
   } catch (_) { /* log best-effort */ }
   return Object.assign({ success: true, note: note }, summary);
 }
 
 // Parse "Rp110.000.000" | "Rp 40.000.000" | "18.000 scan" | "5000" -> integer.
-// Strategy: strip Rp/scan/spaces/dots, coerce to int. Comma decimal not
-// expected in these headers; treat comma same as dot just in case.
 function _mtParseNumber_(raw) {
-  var s = String(raw).replace(/rp|scan|\s|\./gi, '').replace(/,/g, '');
+  var s = String(raw).replace(/rp|scan|order|\s|\./gi, '').replace(/,/g, '');
   var n = Number(s);
   return isFinite(n) ? n : 0;
 }
 
-// "2026-09" -> "2026-09-01". Accepts also "2026-09-01" pass-through, plus
-// Date objects (Google Sheets auto-parses cell values like "2026-09" into a
-// Date when the cell format is Date-typed -- observed in system_log rows
-// 65-69 on 2026-09-02: value came back as "Tue Sep 01 2026 00:00:00
-// GMT+0700 (Western Indonesia Time)" which is a Date.toString(), and the
-// old regex-only branch rejected it with bad_month_format).
-// GAS runtime honors appsscript.json timeZone=Asia/Jakarta, so getMonth()
-// resolves in Jakarta wall-clock and matches the sheet's stored month.
-// Returns null on garbage.
+// Parse a cell value and infer unit mode. Returns { value: int, mode: 'saldo'|'order'|'scan'|null }.
+// "Rp110.000.000" -> {110000000, 'saldo'}, "5000 order" -> {5000, 'order'},
+// "455 scan" -> {455, 'scan'}, "" -> {0, null}.
+function _mtParseValueWithUnit_(raw) {
+  var s = String(raw || '').trim();
+  if (!s) return { value: 0, mode: null };
+  var mode = null;
+  if (/rp/i.test(s)) mode = 'saldo';
+  else if (/scan/i.test(s)) mode = 'scan';
+  else if (/order/i.test(s)) mode = 'order';
+  else mode = 'saldo'; // default: numeric tanpa unit dianggap Rp
+  return { value: _mtParseNumber_(s), mode: mode };
+}
+
+// Parse Rupiah only ("Rp 1.500.000" -> 1500000). Kolom bonus_tier_* selalu Rp.
+function _mtParseRupiah_(raw) {
+  return _mtParseNumber_(raw);
+}
+
+// "2026-09" -> "2026-09-01". Accepts pass-through "2026-09-01" plus Date objects.
+// (GAS auto-parses "2026-09" cells into Date when cell format is Date; getMonth
+// resolves in Jakarta wall-clock karena appsscript.json timeZone=Asia/Jakarta.)
 function _mtNormalizeMonth_(raw) {
   if (raw instanceof Date && !isNaN(raw.getTime())) {
     var yy = raw.getFullYear();
@@ -158,9 +246,8 @@ function _mtNormalizeMonth_(raw) {
   return m[1] + '-' + m[2] + '-01';
 }
 
-// One row upsert with Prefer: resolution=merge-duplicates on the unique
-// composite index (branch_id, effective_month). Uses _crmSbFetch_-style
-// service_role auth (no user JWT needed -- trigger context).
+// Upsert satu row dengan Prefer resolution=merge-duplicates pada unique index
+// (branch_id, effective_month). Service-role auth via _getSupabaseConfig.
 function _mtUpsertOne_(row) {
   var cfg = _getSupabaseConfig();
   var res = UrlFetchApp.fetch(cfg.url + '/rest/v1/raos_kpi_targets_branch?on_conflict=branch_id,effective_month', {
@@ -179,9 +266,8 @@ function _mtUpsertOne_(row) {
 }
 
 /**
- * Install the time-based trigger. Idempotent -- clears any existing trigger
- * for syncMasterTargetToSupabase before creating a new one, so re-running is
- * safe. Run once from the GAS Editor after deploy.
+ * Install trigger every 5 min. Idempotent — clears existing sebelum create.
+ * Run once dari GAS Editor setelah deploy.
  */
 function installMasterTargetSyncTrigger() {
   var existing = ScriptApp.getProjectTriggers();
