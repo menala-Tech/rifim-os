@@ -495,6 +495,76 @@ async function hrisActivate(req,a){
   }
 }
 
+// hris_deactivate — soft-delete karyawan. Hanya set user_profiles.is_active=false
+// (row histori tetap aman). Sengaja TIDAK menyentuh raos_attendance/payroll dsb.
+// Design decision 2026-09-03: hard-delete tidak diekspos di modul Karyawan; kalau
+// benar-benar perlu, admin pakai "🧹 Bersihkan Data" yang sudah punya preview
+// dependency + typed HAPUS DATA confirmation.
+async function hrisDeactivate(req,a){
+  if(!opsCanWrite(a.role))throw new Error('Hanya Admin/Direksi boleh menonaktifkan staff')
+  const employeeId=String(req.body?.employee_id||'').trim().toUpperCase()
+  if(!employeeId)throw new Error('employee_id wajib')
+  // Cari user_profile via staff_id (kolom TEXT di user_profiles yang mirror
+  // employee_id di HRIS). Kalau tidak ketemu → refuse dengan pesan jelas.
+  const prof=await sb(`/rest/v1/user_profiles?staff_id=eq.${q(employeeId)}&select=id,full_name,role,is_active&limit=1`)
+  const row=prof?.[0]
+  if(!row)throw new Error('Data staff tidak ditemukan di user_profiles')
+  if(!row.is_active){
+    await opsAudit(a,'deactivate_employee_noop','hris',{employee_id:employeeId,reason:'already_inactive'},0,true,{})
+    return{row,message:'ℹ️ Staff sudah dalam status NONAKTIF',changed:false}
+  }
+  // Mirror ke employees.status juga supaya tabel HRIS konsisten (best effort).
+  await sb(`/rest/v1/user_profiles?id=eq.${q(row.id)}`,{
+    method:'PATCH',
+    headers:{Prefer:'return=minimal'},
+    body:JSON.stringify({is_active:false,updated_at:new Date().toISOString()})
+  })
+  try{
+    await sb(`/rest/v1/employees?employee_id=eq.${q(employeeId)}`,{
+      method:'PATCH',
+      headers:{Prefer:'return=minimal'},
+      body:JSON.stringify({status:'nonaktif',updated_at:new Date().toISOString()})
+    })
+  }catch(e){/* employees update best-effort */}
+  await opsAudit(a,'deactivate_employee','hris',{employee_id:employeeId,full_name:row.full_name},1,true,{})
+  return{row:{...row,is_active:false},message:'🚫 Staff dinonaktifkan (data historis tetap aman)',changed:true}
+}
+
+// hris_masterdata_diff — bandingkan user_profiles (HRIS) vs SSoT
+// (raos_staff_ssot_records — mirror sheet MASTER DATA STAFF yang sudah di-sync
+// GAS tiap 10 menit). Tidak mengubah data apapun; UI menampilkan 2 kelompok:
+//   1. Ada di HRIS tapi tidak di Sheet  → kandidat nonaktifkan
+//   2. Ada di Sheet tapi tidak di HRIS  → kandidat tambah/aktifkan
+// Admin memutuskan aksi per row.
+async function hrisMasterdataDiff(req,a){
+  if(!['admin','direksi','management'].includes(a.role))throw new Error('Role tidak boleh melihat rekonsiliasi masterdata')
+  const [hris,ssot]=await Promise.all([
+    sb('/rest/v1/user_profiles?select=id,staff_id,full_name,role,branch_id,is_active&order=full_name.asc&limit=5000'),
+    sb('/rest/v1/raos_staff_ssot_records?select=staff_id,full_name,legacy_branch_name,resolved_role,status_active,conflict_status&order=full_name.asc&limit=5000')
+  ])
+  const norm=v=>String(v||'').trim().toUpperCase()
+  const hrisBySid=new Map((hris||[]).filter(x=>x.staff_id).map(x=>[norm(x.staff_id),x]))
+  const ssotBySid=new Map((ssot||[]).filter(x=>x.staff_id).map(x=>[norm(x.staff_id),x]))
+  const inHrisNotSheet=[];const inSheetNotHris=[];const active_mismatch=[]
+  for(const [sid,h] of hrisBySid){
+    const s=ssotBySid.get(sid)
+    if(!s){inHrisNotSheet.push({staff_id:sid,full_name:h.full_name,role:h.role,is_active:h.is_active});continue}
+    if(!!h.is_active!==!!s.status_active){
+      active_mismatch.push({staff_id:sid,full_name:h.full_name,hris_active:!!h.is_active,sheet_active:!!s.status_active,sheet_role:s.resolved_role,sheet_branch:s.legacy_branch_name})
+    }
+  }
+  for(const [sid,s] of ssotBySid){
+    if(!hrisBySid.has(sid))inSheetNotHris.push({staff_id:sid,full_name:s.full_name,sheet_role:s.resolved_role,sheet_branch:s.legacy_branch_name,sheet_active:!!s.status_active,conflict:s.conflict_status||null})
+  }
+  return{
+    counts:{hris_only:inHrisNotSheet.length,sheet_only:inSheetNotHris.length,active_mismatch:active_mismatch.length},
+    in_hris_not_sheet:inHrisNotSheet,
+    in_sheet_not_hris:inSheetNotHris,
+    active_mismatch,
+    checked_at:new Date().toISOString()
+  }
+}
+
 // hris_activation_reconcile — dry-run (apply=false) or apply=true.
 // Forwarded as caller bearer so DEFINER RPC's get_my_role()/auth.uid() resolve
 // to the admin/direksi actor (never to service_role).
@@ -781,6 +851,8 @@ module.exports=async function handler(req,res){
     // are now mode handlers here; frontend callers were updated in the same
     // commit — old URLs no longer exist.
     if(req.method==='POST'&&mode==='hris_activate')return out(res,200,{success:true,...await hrisActivate(req,p)});
+    if(req.method==='POST'&&mode==='hris_deactivate')return out(res,200,{success:true,...await hrisDeactivate(req,p)});
+    if(req.method==='GET' &&mode==='hris_masterdata_diff')return out(res,200,{success:true,...await hrisMasterdataDiff(req,p)});
     if(req.method==='POST'&&mode==='hris_activation_reconcile_preview')return out(res,200,{success:true,...await hrisReconcile(req,p,false)});
     if(req.method==='POST'&&mode==='hris_activation_reconcile_apply')return out(res,200,{success:true,...await hrisReconcile(req,p,true)});
     if(req.method==='POST'&&mode==='hris_staff_sync')return out(res,200,{success:true,...await hrisStaffSync(req,p)});

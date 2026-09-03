@@ -18,7 +18,15 @@ var mutationDebounce=null;
 
 function gas(){return (global.RifimAPI&&global.RifimAPI._gasUrl)||global.GAS_WEB_APP_URL||''}
 function auth(){try{return JSON.parse(localStorage.getItem('rifim_auth')||'{}')||{}}catch(_){return{}}}
-function token(){var a=auth();return String(a.access_token||a.accessToken||'')}
+// Hotfix 2026-09-03: pakai RifimPortalSession (auto-refresh) supaya
+// /api/internal/hris-v2?mode=employees tidak kena 401 saat token expired.
+function token(){
+  try{
+    var p=window.RifimPortalSession&&window.RifimPortalSession.read&&window.RifimPortalSession.read();
+    if(p&&p.access_token)return String(p.access_token);
+  }catch(_){}
+  var a=auth();return String(a.access_token||a.accessToken||'');
+}
 function readCache(){try{var x=JSON.parse(localStorage.getItem(KEY)||'null');rows=x&&Array.isArray(x.rows)?x.rows:[]}catch(_){rows=[]}}
 function save(r){rows=r||[];try{localStorage.setItem(KEY,JSON.stringify({at:Date.now(),rows:rows}))}catch(_){}}
 async function refreshFast(){var t=token();if(!t)return null;var r=await fetch('/api/internal/hris-v2?mode=employees&company_code=ALL&status=ALL',{headers:{Authorization:'Bearer '+t},cache:'no-store'});var d=await r.json().catch(function(){return{}});if(!r.ok||d.success!==true)throw new Error(d.message||'HRIS employee API gagal');save(d.rows||d.employees||[]);return rows}
