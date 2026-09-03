@@ -3,7 +3,7 @@
 
   if (global.document && !global.document.querySelector('script[data-rifim-fixed-shell]')) {
     const fixedShell = global.document.createElement('script')
-    fixedShell.src = '/shared/fixed-module-shell.js?v=20260818-fixed-1'
+    fixedShell.src = '/shared/fixed-module-shell.js?v=20260903-fixed-2'
     fixedShell.async = false
     fixedShell.setAttribute('data-rifim-fixed-shell', '1')
     global.document.head.appendChild(fixedShell)
@@ -18,6 +18,11 @@
   const SB_URL = isPreview ? QA_SB_URL : PROD_SB_URL
   const SB_ANON = isPreview ? QA_SB_ANON : PROD_SB_ANON
   const STORAGE_KEY = 'rifim_auth'
+  // Phase 2 (2026-09-03): mirror key yang dipakai supabase-js client di
+  // finance/hris/crm/sistem/portal (storageKey: 'rifim_portal_sb'). Dual-write
+  // di writeSession() supaya token rotation portal-session langsung visible
+  // ke supabase-js client tanpa mereka ikut auto-refresh (yang bikin drift).
+  const SB_MIRROR_KEY = 'rifim_portal_sb'
 
   const FALLBACK_ALIASES = {
     staff: 'staff',
@@ -44,17 +49,63 @@
   }
 
   function readSession() {
-    try { return JSON.parse(global.localStorage.getItem(STORAGE_KEY) || 'null') }
-    catch (_) { return null }
+    try {
+      var raw = global.localStorage.getItem(STORAGE_KEY)
+      if (raw) return JSON.parse(raw)
+      // Phase 2 migration: hydrate dari mirror key kalau ada
+      // (misal user yang login via portal/secure.html sebelum patch ini —
+      // token tersimpan di rifim_portal_sb via supabase-js, rifim_auth kosong)
+      var mirror = global.localStorage.getItem(SB_MIRROR_KEY)
+      if (!mirror) return null
+      var m = JSON.parse(mirror)
+      if (!m || !m.access_token) return null
+      var hydrated = {
+        access_token: m.access_token,
+        refresh_token: m.refresh_token || '',
+        expires_at: Number(m.expires_at || 0),
+        id: (m.user && m.user.id) || null,
+        email: (m.user && m.user.email) || null,
+        ts: Date.now(),
+        // role/name akan diisi lewat fetchProfile pada validate() berikutnya
+      }
+      global.localStorage.setItem(STORAGE_KEY, JSON.stringify(hydrated))
+      return hydrated
+    } catch (_) { return null }
+  }
+
+  // Serialize snapshot yg cocok untuk supabase-js storage (storageKey
+  // 'rifim_portal_sb'). Minimum shape: access_token / refresh_token /
+  // expires_at / expires_in / token_type / user. Kita simpan user seminim
+  // mungkin (id+email) supaya sb.auth.getUser() tidak return null.
+  function writeSbMirror(session) {
+    try {
+      if (!session || !session.access_token) {
+        global.localStorage.removeItem(SB_MIRROR_KEY)
+        return
+      }
+      var exp = Number(session.expires_at || 0)
+      var now = Math.floor(Date.now() / 1000)
+      var mirror = {
+        access_token: session.access_token,
+        refresh_token: session.refresh_token || '',
+        expires_at: exp || (now + 3600),
+        expires_in: exp ? Math.max(0, exp - now) : 3600,
+        token_type: 'bearer',
+        user: session.id ? { id: session.id, email: session.email || null } : null,
+      }
+      global.localStorage.setItem(SB_MIRROR_KEY, JSON.stringify(mirror))
+    } catch (_) { /* best effort */ }
   }
 
   function writeSession(session) {
     global.localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
+    writeSbMirror(session)
     return session
   }
 
   function clearSession() {
     global.localStorage.removeItem(STORAGE_KEY)
+    try { global.localStorage.removeItem(SB_MIRROR_KEY) } catch (_) {}
   }
 
   function decodeJwt(token) {
@@ -513,6 +564,7 @@
       // Broadcast logout to all tabs by removing session
       if (global.localStorage) {
         global.localStorage.removeItem(STORAGE_KEY)
+        try { global.localStorage.removeItem(SB_MIRROR_KEY) } catch (_) {}
       }
       // Release any lock we hold
       clearLock(tabId)

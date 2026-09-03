@@ -252,8 +252,10 @@ let _autorefTimer = null;
 
 function sb() {
   if (_sb) return _sb;
+  // Phase 2 (2026-09-03): autoRefreshToken=false. Portal-session owns the
+  // refresh + dual-write ke rifim_portal_sb; supabase-js hanya konsumsi.
   _sb = window.supabase.createClient(SB_URL, SB_ANON, {
-    auth: { persistSession: true, storageKey: 'rifim_portal_sb', autoRefreshToken: true }
+    auth: { persistSession: true, storageKey: 'rifim_portal_sb', autoRefreshToken: false }
   });
   return _sb;
 }

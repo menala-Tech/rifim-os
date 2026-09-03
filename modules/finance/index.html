@@ -696,10 +696,12 @@ async function _finGetAccessToken() {
         // Preview UAT and produced 401 "Session tidak valid".
         const _finSbUrl  = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseUrl)     || 'https://vlievtojpmrbsmzlqswl.supabase.co';
         const _finSbKey  = (window.RifimPortalSession && window.RifimPortalSession.config && window.RifimPortalSession.config.supabaseAnonKey) || 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
+        // Phase 2 (2026-09-03): autoRefreshToken=false. Portal-session owns
+        // the refresh + dual-write ke rifim_portal_sb.
         _finSessionClient = window.supabase.createClient(
           _finSbUrl,
           _finSbKey,
-          { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'rifim_portal_sb' } },
+          { auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'rifim_portal_sb' } },
         );
       }
       let session = (await _finSessionClient.auth.getSession()).data.session;

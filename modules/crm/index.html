@@ -682,7 +682,9 @@ function getSb() {
   // previously wiped rifim_auth). URL/anon key come from RifimPortalSession
   // so this client always targets the SAME project the Portal session was
   // issued for (QA on Preview, PROD on rifim-os.vercel.app).
-  _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'rifim_portal_sb' } });
+  // Phase 2 (2026-09-03): autoRefreshToken=false. Portal-session owns the
+  // refresh + dual-write ke rifim_portal_sb; supabase-js hanya konsumsi.
+  _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: false, storageKey: 'rifim_portal_sb' } });
   return _sb;
 }
 

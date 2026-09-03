@@ -29,6 +29,16 @@ function ensureModuleRuntimeHotfix(){
   s.dataset.rifimModuleRuntimeHotfix='1';
   document.head.appendChild(s);
 }
+function ensureSessionFetch(){
+  // 2026-09-03: auto-refresh + retry pada 401 dari Supabase + sticky banner
+  // "Sesi berakhir". Depends on portal-session.js (dimuat lebih dulu).
+  if(document.querySelector('script[data-rifim-session-fetch]'))return;
+  var s=document.createElement('script');
+  s.src='/shared/session-fetch.js?v=20260903-session-fetch-1';
+  s.async=false;
+  s.dataset.rifimSessionFetch='1';
+  document.head.appendChild(s);
+}
 function ensureFinanceAutoRecompute(){
   if(!/^\/finance(?:\/|$)/.test(p))return;
   if(document.querySelector('script[data-finance-staff-auto-recompute]'))return;
@@ -92,7 +102,7 @@ function ensureHrisPreactivationEntry(){
 function css(t){var s=document.createElement('style');s.id='rifim-fixed-module-shell';s.textContent=t;document.head.appendChild(s)}
 function install(){
   if(document.getElementById('rifim-fixed-module-shell')){
-    ensureTableHeaderCss();ensureTableFreezeSync();ensureModuleRuntimeHotfix();ensureFinanceAutoRecompute();ensureHrisPreactivationEntry();ensureHrisPreviewGuard();return;
+    ensureTableHeaderCss();ensureTableFreezeSync();ensureModuleRuntimeHotfix();ensureSessionFetch();ensureFinanceAutoRecompute();ensureHrisPreactivationEntry();ensureHrisPreviewGuard();return;
   }
   if(/^\/finance(?:\/|$)/.test(p))css(`
  :root{--rifim-head:58px;--rifim-tabs:46px}
@@ -118,10 +128,11 @@ function install(){
   ensureTableHeaderCss();
   ensureTableFreezeSync();
   ensureModuleRuntimeHotfix();
+  ensureSessionFetch();
   ensureFinanceAutoRecompute();
   ensureHrisPreactivationEntry();
   ensureHrisPreviewGuard();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
-global.RifimFixedModuleShell={version:'1.6.0-preview-guard',install:install};
+global.RifimFixedModuleShell={version:'1.7.0-session-fetch',install:install};
 })(window);
