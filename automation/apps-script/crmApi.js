@@ -1186,7 +1186,12 @@ function _finKpiTargetBranchList_(params) {
   var branches = _crmSbFetch_('GET', '/rest/v1/branches?select=id,name,slug,parent_branch_id&order=name.asc');
   if (!Array.isArray(branches)) branches = [];
 
-  var rows = _crmSbFetch_('GET', '/rest/v1/raos_kpi_targets_branch?select=id,branch_id,target_cabang,target_staff_default,mode,updated_at&effective_month=eq.' + encodeURIComponent(month));
+  // 2026-09-04: extend SELECT dengan kolom v2 (target_staff, bonus_tier_1,
+  // bonus_tier_2, mode_cabang, mode_staff). Kolom `mode` legacy tetap
+  // dibaca -- backfill mode_cabang := mode sudah dijalankan di migration,
+  // tapi row baru yang di-write dari masterTargetSync.js v2 juga mirror
+  // mode = mode_cabang. Fallback chain UI: target_staff || target_staff_default.
+  var rows = _crmSbFetch_('GET', '/rest/v1/raos_kpi_targets_branch?select=id,branch_id,target_cabang,target_staff,target_staff_default,bonus_tier_1,bonus_tier_2,mode,mode_cabang,mode_staff,updated_at&effective_month=eq.' + encodeURIComponent(month));
   if (!Array.isArray(rows)) rows = [];
 
   var byBranch = {};
@@ -1221,17 +1226,31 @@ function _finKpiTargetBranchList_(params) {
     if (branchDefault == null && targetCabang > 0 && staffCount > 0) {
       autoProrated = Math.round(targetCabang / staffCount);
     }
+    // 2026-09-04: expose v2 columns. Prioritas Target Staff:
+    //   1. target_staff (SSoT dari sheet MASTER TARGET v2, kolom C)
+    //   2. target_staff_default (legacy override manual dari PWA)
+    //   3. autoProrated (target_cabang / staff_count)
+    var sheetStaff = t.target_staff != null ? Number(t.target_staff) : null;
+    var effectiveStaff = sheetStaff != null ? sheetStaff
+      : (branchDefault != null ? branchDefault : autoProrated);
+    var modeCabang = t.mode_cabang || t.mode || (isExcluded ? 'order' : 'saldo');
+    var modeStaff = t.mode_staff || modeCabang;
     return {
       branch_id: b.id,
       branch_name: b.name,
       branch_slug: b.slug,
       is_excluded_saldo: isExcluded,
       target_cabang: targetCabang,
-      target_staff_default: branchDefault,
-      target_staff_effective: branchDefault != null ? branchDefault : autoProrated,
+      target_staff: sheetStaff,                       // v2: dari sheet kolom C, nullable
+      target_staff_default: branchDefault,             // legacy override PWA
+      target_staff_effective: effectiveStaff,          // display value (chain: sheet > default > auto)
       target_staff_auto_prorated: autoProrated,
       staff_count: staffCount,
-      mode: t.mode || (isExcluded ? 'order' : 'saldo'),
+      bonus_tier_1: Number(t.bonus_tier_1) || 0,      // v2: staff hit target_staff
+      bonus_tier_2: Number(t.bonus_tier_2) || 0,      // v2: cabang hit target_cabang
+      mode: modeCabang,                                // legacy alias = mode_cabang
+      mode_cabang: modeCabang,                         // v2 explicit
+      mode_staff: modeStaff,                           // v2 explicit (bisa beda: Makassar order+scan)
       target_id: t.id || null,
       updated_at: t.updated_at || null,
     };
@@ -1241,6 +1260,12 @@ function _finKpiTargetBranchList_(params) {
 }
 
 // ─── Target Cabang: upsert
+// 2026-09-04 (v2 bonus tier): accept optional bonus_tier_1, bonus_tier_2,
+// target_staff, mode_cabang, mode_staff. Semua opsional -- kalau tidak
+// dikirim, kolom tidak di-touch (kecuali untuk row baru: default 0/null).
+// WARNING: MASTER TARGET sheet adalah SSoT dengan sync 5-menit. Edit di
+// PWA bersifat TRANSIENT -- akan di-overwrite sync berikutnya. UI harus
+// warn admin.
 function _finKpiTargetBranchUpsert_(params) {
   _finWriteRoleGate_(params);
   var branchId = String(params.branch_id || '').trim();
@@ -1250,18 +1275,35 @@ function _finKpiTargetBranchUpsert_(params) {
   var targetStaffDefault = params.target_staff_default != null && params.target_staff_default !== ''
     ? Number(params.target_staff_default) : null;
   var mode = String(params.mode || 'saldo');
-  if (mode !== 'saldo' && mode !== 'order') return { success: false, message: 'mode harus saldo/order' };
+  if (mode !== 'saldo' && mode !== 'order' && mode !== 'scan') return { success: false, message: 'mode harus saldo/order/scan' };
+
+  // v2 fields (opsional)
+  var targetStaff = params.target_staff != null && params.target_staff !== ''
+    ? Number(params.target_staff) : null;
+  var bonusTier1 = params.bonus_tier_1 != null && params.bonus_tier_1 !== ''
+    ? Number(params.bonus_tier_1) : 0;
+  var bonusTier2 = params.bonus_tier_2 != null && params.bonus_tier_2 !== ''
+    ? Number(params.bonus_tier_2) : 0;
+  var modeCabang = params.mode_cabang ? String(params.mode_cabang) : mode;
+  var modeStaff = params.mode_staff ? String(params.mode_staff) : modeCabang;
+  if (['saldo','order','scan'].indexOf(modeCabang) < 0) return { success: false, message: 'mode_cabang invalid' };
+  if (['saldo','order','scan'].indexOf(modeStaff) < 0) return { success: false, message: 'mode_staff invalid' };
 
   // Cek existing
-  var existing = _crmSbFetch_('GET', '/rest/v1/raos_kpi_targets_branch?select=id,target_cabang,target_staff_default,mode&branch_id=eq.' + encodeURIComponent(branchId) + '&effective_month=eq.' + encodeURIComponent(month));
+  var existing = _crmSbFetch_('GET', '/rest/v1/raos_kpi_targets_branch?select=id,target_cabang,target_staff,target_staff_default,bonus_tier_1,bonus_tier_2,mode,mode_cabang,mode_staff&branch_id=eq.' + encodeURIComponent(branchId) + '&effective_month=eq.' + encodeURIComponent(month));
   var beforeStr = (existing && existing[0]) ? JSON.stringify(existing[0]) : '(baru)';
 
   var body = {
     branch_id: branchId,
     effective_month: month,
     target_cabang: targetCabang,
+    target_staff: targetStaff,
     target_staff_default: targetStaffDefault,
-    mode: mode,
+    bonus_tier_1: bonusTier1,
+    bonus_tier_2: bonusTier2,
+    mode: modeCabang,       // legacy mirror
+    mode_cabang: modeCabang,
+    mode_staff: modeStaff,
     updated_at: new Date().toISOString(),
   };
 
