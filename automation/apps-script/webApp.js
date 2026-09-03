@@ -594,6 +594,35 @@ function doGet(e) {
     } catch (err) { return _json({ success: false, message: err.message }); }
   }
 
+  // ─── /sistem MANUAL SYNC BUTTONS (2026-09-04 backup manual) ────────
+  // Enable back UI /sistem tombol "Jalankan" untuk 3 aksi paling sering.
+  // Auto-trigger GAS 10-min (staff) tetap jalan; ini backup on-demand
+  // biar admin bisa push langsung tanpa nunggu next tick.
+  //
+  // Response format: RAOS-legacy { ok, elapsed_ms, label, result } supaya
+  // compatible dengan modules/sistem/index.html callRaos() reader.
+  if (action === 'sync_staff') {
+    var t0 = Date.now();
+    try {
+      var rStaff = syncEmployeesFromMasterStaff();
+      return _json({ ok: true, elapsed_ms: Date.now() - t0, label: 'Sync Staff dari SSOT', result: rStaff });
+    } catch (err) { return _json({ ok: false, error: err.message, elapsed_ms: Date.now() - t0 }); }
+  }
+  if (action === 'sync_driver_airport') {
+    var t1 = Date.now();
+    try {
+      var rDrvA = prosesInputDriverAirport();
+      return _json({ ok: true, elapsed_ms: Date.now() - t1, label: 'Sync Driver Airport', result: rDrvA || 'OK' });
+    } catch (err) { return _json({ ok: false, error: err.message, elapsed_ms: Date.now() - t1 }); }
+  }
+  if (action === 'sync_driver_external') {
+    var t2 = Date.now();
+    try {
+      var rDrvE = prosesInputDriverExternal();
+      return _json({ ok: true, elapsed_ms: Date.now() - t2, label: 'Sync Driver External', result: rDrvE || 'OK' });
+    } catch (err) { return _json({ ok: false, error: err.message, elapsed_ms: Date.now() - t2 }); }
+  }
+
   // ─── HRIS GET Actions ─────────────────────────────────────────────
   if (action === 'hris_employees') {
     try {

@@ -1,16 +1,28 @@
 /* RIFIM OS — System Control Center V3 overlay.
  * Canonical 2026-08-18: legacy RAOS Web API writer actions are retired from UI.
  * Driver/Staff/credential syncs are owned by the canonical RAOS GAS triggers.
+ *
+ * 2026-09-04 update: 3 aksi (sync_staff, sync_driver_airport,
+ * sync_driver_external) di-un-retire sebagai BACKUP MANUAL. Auto-trigger
+ * GAS tetap jalan; tombol ini biar admin bisa push on-demand tanpa nunggu
+ * tick berikutnya. Route ke Rifim-OS Web App via RIFIM_ACTIONS set di
+ * modules/sistem/index.html — bukan RAOS_URL (yg tidak anonymous).
  */
 (function(){
   'use strict';
   try{if(typeof ALLOWED_ROLES!=='undefined'&&!ALLOWED_ROLES.includes('direktur'))ALLOWED_ROLES.push('direktur');}catch(_){ }
   const PAGE_ROLES=['admin','direksi','direktur','management'];
   const WRITE_ROLES=['admin','direksi','direktur'];
+  // Aksi yang masih retired (belum ada endpoint di Rifim-OS Web App —
+  // butuh RAOS project handler). sync_staff + 2 driver di-un-retire di
+  // 2026-09-04 sebagai backup manual.
   const RETIRED_ACTIONS=new Set([
-    'sync_staff','sync_driver_airport','sync_driver_external','sync_raos_credentials',
-    'force_refresh_staff_auth','force_refresh_driver_auth','run_kpi','run_backup','sync_selfie_drive'
+    'sync_raos_credentials',
+    'force_refresh_staff_auth','force_refresh_driver_auth',
+    'run_kpi','run_backup','sync_selfie_drive'
   ]);
+  // Aksi backup manual: label + note "auto tetap jalan"
+  const BACKUP_MANUAL_ACTIONS=new Set(['sync_staff','sync_driver_airport','sync_driver_external']);
   let profile=null,running=null;
 
   function addStyle(){
@@ -45,6 +57,16 @@
       if(desc&&!desc.dataset.canonicalNote){
         desc.dataset.canonicalNote='1';
         desc.insertAdjacentHTML('beforeend','<br><span class="sys-v3-canonical">Canonical: otomatis via SSOT/RAOS GAS — tombol manual dinonaktifkan agar tidak membuat writer kedua.</span>');
+      }
+    });
+    // 2026-09-04: 3 aksi backup manual — label "Jalankan Sekarang" + note kuning
+    BACKUP_MANUAL_ACTIONS.forEach(action=>{
+      const card=document.querySelector(`.card[data-action="${action}"]`);if(!card)return;
+      const btn=card.querySelector('button');if(btn){btn.textContent='⚡ Jalankan Sekarang';btn.title='Backup manual on-demand. Auto-trigger 5-10 menit tetap jalan.';}
+      const desc=card.querySelector('.desc');
+      if(desc&&!desc.dataset.backupNote){
+        desc.dataset.backupNote='1';
+        desc.insertAdjacentHTML('beforeend','<br><span style="color:#fde047;font-weight:700">⚡ Backup manual — auto-sync GAS tetap jalan tiap 5-10 menit. Klik hanya kalau butuh push langsung tanpa nunggu.</span>');
       }
     });
   }
