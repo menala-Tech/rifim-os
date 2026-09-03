@@ -2,26 +2,43 @@
 
 > Dokumen ini mencatat status aktual proyek. Update setiap akhir sprint.
 >
-> Last updated: 2026-09-04 (MASTER TARGET v2 — bonus tier + split mode, PR #116 pending merge)
+> Last updated: 2026-09-04 malam (MASTER TARGET v2 full-stack landed + parser bugfix + /sistem manual sync buttons + skill baru)
 
-## Sesi 2026-09-04 — MASTER TARGET v2 (bonus tier + split mode)
+## Sesi 2026-09-04 — MASTER TARGET v2 full-stack + /sistem enable
 
-SSoT MASTER TARGET pindah dari RAOS Master `1eYS…` (OLD 4-kolom) ke DATABASE STAFF `1fcraq3…` (NEW 6-kolom: Cabang, Target Cabang, Target Staff, Bonus Tier 1, Bonus Tier 2, Bulan Aktif). Writer dua-pass: PRIMARY 1fcraq3 (8 cabang, semua field baru), FALLBACK 1eYS whitelist Soeta only (belum ada di sheet baru).
+**5 PR landed** (semua deployed ke PROD via clasp push + Vercel auto-deploy):
+
+| PR | Title | Impact |
+|---|---|---|
+| #116 | Writer v2 dual-source + tier + split mode | SSoT MASTER TARGET pindah 1eYS → 1fcraq3 (6-kolom NEW), Soeta fallback |
+| #117 | UI Finance Target Cabang v2 (9 kolom) | Display Bonus T1/T2 + mode_cabang/mode_staff split |
+| #118 | Parser fix Number cell (Batam 15Q bug) | `_mtParseNumber_` detect typeof=='number' → Math.round |
+| #119 | Preserve raw cell type v2.2 | Writer body String()-ify sebelum parser → root-cause Batam masih 15Q setelah #118 |
+| #120 | /sistem manual sync buttons backup | 3 aksi un-retire (sync_staff, sync_driver_airport, sync_driver_external) route ke Rifim-OS Web App |
 
 **Supabase (applied PROD):** migration `20260904000000_master_target_v2_bonus_tier` — ADD `target_staff bigint`, `bonus_tier_1 numeric`, `bonus_tier_2 numeric`, `mode_cabang text`, `mode_staff text` + backfill `mode_cabang := mode`. Kolom `mode` legacy dipertahankan, di-mirror writer.
 
 **Tier semantics locked:** Tier 1 = staff hit `target_staff` → `bonus_tier_1` per staff; Tier 2 = cabang hit `target_cabang` → `bonus_tier_2` tambahan per staff.
 
-**Mode axes:** `mode_cabang` = unit Target Cabang, `mode_staff` = unit Target Staff. Case Makassar `mode_cabang='order'` (5000), `mode_staff='scan'` (455) — dua axis beda unit dalam 1 row.
+**Mode axes:** Makassar sekarang `mode_cabang='order'` (5000) + `mode_staff='scan'` (455) — dua axis beda unit dalam 1 row (verified).
 
 **Sheet edit:** kolom F `Bulan Aktif` added ke `1fcraq3/MASTER TARGET`, pre-filled `2026-09` untuk 8 cabang (skip Admin).
 
-**Post-merge deploy checklist:**
-1. `cd automation/apps-script && clasp push --force` (auto-mode block Claude, owner manual)
-2. GAS Editor → run `syncMasterTargetToSupabase`, verify 9 rows Supabase aktif bulan berjalan
-3. Trigger 5-min sudah installed sesi 2026-09-03, tidak perlu re-install
+**Verify final query Batam:** `target_staff = 15714286` (Rp 15.7M) ✅ (dari `110000000/7`, sebelumnya salah tulis 15714285714285716).
 
-**Follow-up (bukan blocker):** PWA Finance Target Cabang belum baca kolom baru — sekarang cuma display `target_cabang + mode`. Update UI di PR terpisah.
+**Skill baru:** `.claude/skills/rifim-os-staff-driver-flow/SKILL.md` — mapping alur staff+driver → HRIS/Finance/RAOS PWA dengan gotcha diagnostics table. Auto-invoke sesi berikutnya.
+
+**Follow-up (bukan blocker):**
+- Payroll compute engine (`raos_compute_payroll_month` RPC) belum baca kolom `bonus_tier_1/2` v2 — masih pakai tier hardcoded 80/90/100%
+- 6 aksi /sistem masih retired (`sync_raos_credentials`, `force_refresh_*`, `run_kpi`, `run_backup`, `sync_selfie_drive`) — butuh handler di Rifim-OS webApp.js kalau owner mau enable
+- Ideas untuk kurangi gotcha admin (dari discussion 2026-09-04, ditunda):
+  1. Auto-trigger driver 5 min (hilangkan tombol Extensions manual)
+  2. Dropdown validasi cabang di sheet MASTER DATA STAFF + Input Driver
+  3. Auto-create `user_profiles` shell saat staff baru add ke sheet
+
+## Sesi 2026-09-03 — Session Phase 1+2 + compact header + RLS delete (arsip)
+
+3 PR landed: #113 (session auto-refresh + sticky banner + unified token store), #114 (compact header semua modul PWA), #115 (RLS DELETE policies Admin+Direksi only 22 policies). GAS Web App access setting fixed jadi anonymous (deployment ID frozen bug). MASTER TARGET Supabase 9/9 rows landed via Date-object fix #112.
 
 ## Sesi 2026-08-18 — P0 HRIS/PKWT/Branding: audit ulang setelah temuan stale checkout (arsip)
 
