@@ -244,6 +244,12 @@ h1{font-size:22px;font-weight:800;margin-bottom:4px}
 const SB_URL = 'https://vlievtojpmrbsmzlqswl.supabase.co';
 const SB_ANON = 'sb_publishable_8KpL6zmpt_O_x21v4Jn3Tw_J_I3y-r1';
 const RAOS_URL = 'https://script.google.com/macros/s/AKfycbxrgQ_MWvsdA_bsbNF4deIALWATDCspYvY47fakpuXMZeAtGAd4baeVVe1dPGDAi1tZJA/exec';
+// 2026-09-04: Rifim-OS Web App URL untuk backup manual sync (sync_staff /
+// sync_driver_*). Auto-trigger GAS tetap jalan; ini biar admin bisa push
+// on-demand tanpa nunggu tick berikutnya. Aksi legacy RAOS (KPI, backup,
+// force refresh, credentials, selfie_drive) tetap ke RAOS_URL.
+const RIFIM_URL = 'https://script.google.com/macros/s/AKfycbzzK75gxawaylaUZpoC1zp_hq5ktznlN7scIl24HkdEgR2l3cVmpUSLck0potcMZZtw/exec';
+const RIFIM_ACTIONS = new Set(['sync_staff', 'sync_driver_airport', 'sync_driver_external']);
 const ALLOWED_ROLES = ['admin', 'direksi', 'management'];
 
 let _sb = null;
@@ -297,7 +303,11 @@ async function callRaos(action, extra) {
   const { data: { session } } = await sb().auth.getSession();
   if (!session) throw new Error('Session expired. Login ulang.');
   const body = Object.assign({ action, token: session.access_token }, extra || {});
-  const res = await fetch(RAOS_URL, {
+  // 2026-09-04: aksi backup manual (sync_staff, sync_driver_*) route ke
+  // Rifim-OS Web App (anonymous access). Sisanya (legacy RAOS actions)
+  // tetap ke RAOS_URL.
+  const url = RIFIM_ACTIONS.has(action) ? RIFIM_URL : RAOS_URL;
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoid CORS preflight
     body: JSON.stringify(body),
