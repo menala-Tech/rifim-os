@@ -340,7 +340,7 @@ tr:last-child td{border-bottom:none}
             <div style="flex:1;min-width:280px">
               ℹ️ <strong>Mode SSOT sementara:</strong> Tambah / ubah karyawan lewat sheet <a href="https://docs.google.com/spreadsheets/d/1fcraq3QHqIaD-13Ebzt6stT9aA6j_loTXeAtpNX12kw/edit" target="_blank" style="color:#78350f;text-decoration:underline"><strong>MASTER DATA STAFF</strong></a>. Sinkron otomatis ke HRIS + PWA RAOS tiap 10 menit. Kolom <em>Perusahaan · Tipe Kontrak · Tanggal Masuk · Department</em> tetap diedit di HRIS via tombol Detail.
             </div>
-            <button class="btn btn-primary" id="btn-sync-ssot-now" onclick="syncSsotNow()" style="background:#f59e0b;border-color:#f59e0b;color:#fff;font-size:12px;padding:6px 12px;white-space:nowrap">🔄 Sinkron Database Staff</button> <button class="btn btn-secondary" type="button" data-maintenance-module="hris_karyawan">🧹 Bersihkan Data</button> <span id="staff-sync-last-at" style="font-size:12px;color:var(--muted,#64748b);margin-left:8px">Terakhir sinkron: -</span>
+            <button class="btn btn-primary" id="btn-sync-ssot-now" onclick="syncSsotNow()" style="background:#f59e0b;border-color:#f59e0b;color:#fff;font-size:12px;padding:6px 12px;white-space:nowrap">🔄 Sinkron Database Staff</button> <button class="btn btn-secondary" type="button" id="btn-masterdata-diff" onclick="openMasterdataDiff()" title="Bandingkan HRIS vs sheet MASTER DATA STAFF. Non-destruktif — hanya tampilkan diff.">🔎 Cek vs Masterdata</button> <button class="btn btn-secondary" type="button" data-maintenance-module="hris_karyawan">🧹 Bersihkan Data</button> <span id="staff-sync-last-at" style="font-size:12px;color:var(--muted,#64748b);margin-left:8px">Terakhir sinkron: -</span>
           </div>
           <div class="toolbar">
             <input type="text" id="search-emp" placeholder="Cari nama / ID / jabatan…" oninput="filterEmployees()">
@@ -3030,6 +3030,97 @@ function fmtNum(n) {
 
 function dRow(label, value) {
   return `<div class="detail-item"><div class="detail-label">${label}</div><div class="detail-value">${value}</div></div>`;
+}
+
+// ─── Cek vs Masterdata (2026-09-03) ─────────────────────────────────────────
+// Bandingkan user_profiles (HRIS) dengan raos_staff_ssot_records (mirror sheet
+// MASTER DATA STAFF). Non-destruktif — hanya menampilkan diff. Admin memilih
+// aksi per row (Aktifkan / Nonaktifkan) via tombol yang sudah ada di tabel
+// Karyawan; modal ini murni diagnostic.
+async function openMasterdataDiff() {
+  const modal = _mdEnsureModal();
+  const body = modal.querySelector('#md-diff-body');
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:#64748b">Memuat perbandingan…</div>';
+  modal.style.display = 'flex';
+  try {
+    const session = window.RifimPortalSession?.read?.();
+    const token = session?.access_token || '';
+    if (!token) throw new Error('Session tidak tersedia. Login ulang.');
+    const r = await fetch('/api/internal/hris-contracts?mode=hris_masterdata_diff', {
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store'
+    });
+    const j = await r.json();
+    if (!r.ok || !j?.success) throw new Error(j?.message || 'Gagal ambil diff.');
+    body.innerHTML = _mdRenderDiff(j);
+  } catch (e) {
+    body.innerHTML = `<div style="padding:24px;color:#b91c1c">Error: ${(e && e.message) || e}</div>`;
+  }
+}
+
+function _mdEnsureModal() {
+  let modal = document.getElementById('md-diff-modal');
+  if (modal) return modal;
+  modal = document.createElement('div');
+  modal.id = 'md-diff-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:flex-start;justify-content:center;z-index:9999;padding:24px;overflow:auto';
+  modal.innerHTML = `
+    <div style="background:#fff;max-width:960px;width:100%;border-radius:12px;box-shadow:0 20px 40px rgba(0,0,0,.2);overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e2e8f0">
+        <div>
+          <h3 style="margin:0;font-size:16px">🔎 Cek Karyawan vs Masterdata</h3>
+          <div style="font-size:12px;color:#64748b;margin-top:2px">Perbandingan HRIS (user_profiles) vs sheet MASTER DATA STAFF (via raos_staff_ssot_records — sync tiap 10 menit).</div>
+        </div>
+        <button type="button" class="muted" onclick="document.getElementById('md-diff-modal').style.display='none'" style="border:none;background:transparent;font-size:20px;cursor:pointer">✕</button>
+      </div>
+      <div id="md-diff-body" style="max-height:70vh;overflow:auto"></div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+  return modal;
+}
+
+function _mdRenderDiff(j) {
+  const c = j.counts || {};
+  const badge = (n, color) => `<span style="display:inline-block;background:${color};color:#fff;font-weight:600;padding:2px 8px;border-radius:999px;font-size:12px">${n}</span>`;
+  const section = (title, rows, cols, hint) => {
+    if (!rows || !rows.length) return `<div style="padding:12px 20px;color:#64748b">${title}: <em>tidak ada</em></div>`;
+    const th = cols.map(c => `<th style="text-align:left;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#475569">${c.label}</th>`).join('');
+    const tr = rows.map(r => `<tr>${cols.map(c => `<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-size:13px">${_mdCell(r[c.key])}</td>`).join('')}</tr>`).join('');
+    return `
+      <div style="padding:12px 20px">
+        <div style="font-weight:600;margin-bottom:6px">${title}</div>
+        ${hint ? `<div style="font-size:12px;color:#64748b;margin-bottom:8px">${hint}</div>` : ''}
+        <div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table></div>
+      </div>`;
+  };
+  const summary = `
+    <div style="padding:16px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;gap:16px;flex-wrap:wrap;font-size:13px">
+      <div>HRIS only ${badge(c.hris_only||0, '#f59e0b')}</div>
+      <div>Sheet only ${badge(c.sheet_only||0, '#3b82f6')}</div>
+      <div>Status mismatch ${badge(c.active_mismatch||0, '#ef4444')}</div>
+      <div style="margin-left:auto;color:#64748b">Dicek: ${new Date(j.checked_at || Date.now()).toLocaleString('id-ID')}</div>
+    </div>`;
+  const s1 = section('1. Ada di HRIS tapi tidak di Sheet',
+    j.in_hris_not_sheet || [],
+    [ {key:'staff_id',label:'ID'}, {key:'full_name',label:'Nama'}, {key:'role',label:'Role'}, {key:'is_active',label:'Aktif?'} ],
+    'Kandidat untuk dinonaktifkan (kalau memang sudah tidak dipakai). Gunakan tombol 🚫 Nonaktifkan di baris tabel Karyawan.');
+  const s2 = section('2. Ada di Sheet tapi tidak di HRIS',
+    j.in_sheet_not_hris || [],
+    [ {key:'staff_id',label:'ID'}, {key:'full_name',label:'Nama'}, {key:'sheet_role',label:'Role Sheet'}, {key:'sheet_branch',label:'Cabang Sheet'}, {key:'sheet_active',label:'Aktif Sheet?'}, {key:'conflict',label:'Conflict'} ],
+    'Kandidat untuk ditambah/diaktifkan. Klik "🔄 Sinkron Database Staff" di atas untuk pull dari SSOT.');
+  const s3 = section('3. Status mismatch (HRIS vs Sheet)',
+    j.active_mismatch || [],
+    [ {key:'staff_id',label:'ID'}, {key:'full_name',label:'Nama'}, {key:'hris_active',label:'Aktif HRIS?'}, {key:'sheet_active',label:'Aktif Sheet?'}, {key:'sheet_role',label:'Role Sheet'}, {key:'sheet_branch',label:'Cabang Sheet'} ],
+    'Sheet yang jadi sumber kebenaran. Sinkronkan HRIS ke Sheet via tombol di atas.');
+  return summary + s1 + s2 + s3;
+}
+
+function _mdCell(v) {
+  if (v === null || v === undefined || v === '') return '<span style="color:#94a3b8">—</span>';
+  if (v === true) return '✅';
+  if (v === false) return '<span style="color:#b91c1c">❌</span>';
+  return String(v);
 }
 </script>
 </body>
