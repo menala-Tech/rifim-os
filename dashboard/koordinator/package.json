@@ -1,0 +1,15 @@
+{
+  "name": "dashboard-keuangan-menala",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PWA dashboard 4 metrik keuangan MENALA/RIFIM (tanpa SOETA)",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "predev": "node scripts/build.mjs",
+    "dev": "npx --yes serve public -l 5173",
+    "prestart": "node scripts/build.mjs",
+    "start": "npx --yes serve public -l 5173"
+  },
+  "author": "RIFIM / MENALA",
+  "license": "UNLICENSED"
+}

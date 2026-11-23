@@ -1,0 +1,16 @@
+{
+  "name": "Dashboard Keuangan MENALA",
+  "short_name": "Keuangan MENALA",
+  "description": "Ringkasan 4 metrik keuangan MENALA/RIFIM (tanpa SOETA)",
+  "id": "./index.html",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "id-ID",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

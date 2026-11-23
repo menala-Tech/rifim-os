@@ -1,0 +1,21 @@
+node_modules/
+.env
+.env.local
+.DS_Store
+Thumbs.db
+*.log
+dist/
+.vercel
+.idea/
+.vscode/
+*.local
+public/icons/*.tmp
+
+# Override konfigurasi lokal (API_URL berbeda saat dev / staging)
+src/config.local.js
+docs/DEPLOYMENT_IDS.md
+.playwright-mcp/
+
+# Override parent rifim-os .gitignore — file-file ini perlu di-commit untuk dashboard keuangan
+!backend/*.gs
+!public/icons/icon-192.png

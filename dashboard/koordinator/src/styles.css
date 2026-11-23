@@ -1,0 +1,260 @@
+/* Dashboard Keuangan MENALA - vanilla CSS */
+:root {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-2: #334155;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --accent-income: #22c55e;
+  --accent-expense: #ef4444;
+  --accent-proj-income: #3b82f6;  /* biru untuk estimasi pendapatan */
+  --accent-proj-expense: #f97316; /* coral/oranye untuk estimasi pengeluaran */
+  --border: #334155;
+  --radius: 14px;
+  --shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 20px 10px;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.container { padding: 10px 16px 32px; }
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 18px 18px 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.card:active { transform: scale(0.98); }
+
+.card .label {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin: 0 0 6px;
+}
+
+.card .value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.card .delta {
+  font-size: 0.8rem;
+  margin-top: 6px;
+  color: var(--muted);
+}
+
+/* Varian warna */
+.card--income .value { color: var(--accent-income); }
+.card--expense .value { color: var(--accent-expense); }
+
+/* Kartu estimasi: border dashed */
+.card--proj-income {
+  border: 2px dashed var(--accent-proj-income);
+  background: rgba(59, 130, 246, 0.06);
+}
+.card--proj-income .value { color: var(--accent-proj-income); }
+
+.card--proj-expense {
+  border: 2px dashed var(--accent-proj-expense);
+  background: rgba(249, 115, 22, 0.06);
+}
+.card--proj-expense .value { color: var(--accent-proj-expense); }
+
+.net-flow-card {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  text-align: center;
+  border: 1px solid var(--border);
+}
+.net-flow-card .label {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.net-flow-card .value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+}
+.net-flow-card.positive .value { color: var(--accent-income); }
+.net-flow-card.negative .value { color: var(--accent-expense); }
+
+.footnote {
+  margin-top: 20px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* Drill-down */
+.drill {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 50;
+  overflow-y: auto;
+  padding: 20px 16px 40px;
+}
+.drill.hidden { display: none; }
+
+.drill-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.drill-header button {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.drill-header h2 { margin: 0; font-size: 1.1rem; }
+
+.drill-section {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+}
+
+.drill-section h3 {
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.branch-row,
+.tx-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.branch-row:last-child,
+.tx-row:last-child { border-bottom: none; }
+
+.trend-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 80px;
+  margin-top: 6px;
+}
+.trend-bar span {
+  flex: 1;
+  background: var(--accent-proj-income);
+  border-radius: 3px 3px 0 0;
+  min-height: 4px;
+}
+.trend-bar--keluar span { background: var(--accent-proj-expense); }
+
+.drill-empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+@media (min-width: 640px) {
+  .grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ---------- Skeleton shimmer ---------- */
+.card--skeleton {
+  cursor: default;
+  pointer-events: none;
+}
+.skeleton-line {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 0%,
+    rgba(148, 163, 184, 0.25) 50%,
+    var(--surface-2) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+.skeleton-line--sm { height: 10px; width: 55%; }
+.skeleton-line--lg { height: 22px; width: 80%; }
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ---------- Error state ---------- */
+.error-state {
+  grid-column: 1 / -1;
+  background: var(--surface);
+  border: 1px solid var(--accent-expense);
+  border-radius: var(--radius);
+  padding: 18px;
+  text-align: center;
+}
+.error-state p { margin: 4px 0; }
+.error-state .delta { color: var(--muted); font-size: 0.85rem; }
+.error-state button { margin-top: 10px; }

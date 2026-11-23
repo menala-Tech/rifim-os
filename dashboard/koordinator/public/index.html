@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Dashboard Keuangan MENALA</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="./src/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Dashboard Keuangan</h1>
+      <p class="subtitle">MENALA / RIFIM &middot; <span id="periode">—</span></p>
+    </div>
+    <button id="btn-refresh" class="btn-ghost" aria-label="Muat ulang">&#x21bb;</button>
+  </header>
+
+  <main id="app" class="container">
+    <section id="cards" class="grid" aria-live="polite">
+      <!-- 4 kartu metrik di-render oleh app.js -->
+    </section>
+
+    <section id="net-flow" class="net-flow-card" aria-live="polite">
+      <!-- footer net flow -->
+    </section>
+
+    <p class="footnote">Subdivision yang mengandung kata "Soeta" dikecualikan dari total.</p>
+  </main>
+
+  <div id="drill-root" class="drill hidden" role="dialog" aria-modal="true"></div>
+
+  <script type="module" src="./src/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW gagal:', err));
+      });
+    }
+  </script>
+</body>
+</html>
